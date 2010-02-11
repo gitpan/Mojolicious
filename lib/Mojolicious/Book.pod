@@ -1,0 +1,40 @@
+# Copyright (C) 2008-2010, Sebastian Riedel.
+
+=head1 NAME
+
+Mojolicious::Book - The Definitive Guide To Mojolicious
+
+=head1 STATUS
+
+This book is currently being written, to get status updates and/or read early
+drafts you can visit L<http://labs.kraih.com>, L<http://twitter.com/kraih>
+and L<http://github.com/kraih/mojo> or join the official IRC channel C<#mojo>
+on C<irc.perl.org>.
+
+=head1 TUTORIAL
+
+A really fast and fun way to get started developing web applications with
+Mojolicious is the tutorial in L<Mojolicious::Lite>, you should take a look.
+
+=head1 CHAPTERS
+
+New chapters will be added one by one, so keep a close eye on this.
+
+=over 4
+
+=item L<Mojolicious::Book::Cheatsheet>
+
+A concise all-purpose reference.
+
+=item L<Mojolicious::Book::FAQ>
+
+Frequently asked questions with the right answers.
+
+=item L<Mojolicious::Book::CodingGuidelines>
+
+Coding guidelines and mission statement.
+A must read for developers and contributors!
+
+=back
+
+=cut
