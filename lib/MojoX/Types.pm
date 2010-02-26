@@ -83,7 +83,7 @@ List of MIME types.
 =head1 METHODS
 
 L<MojoX::Types> inherits all methods from L<Mojo::Base> and implements the
-follwing the ones.
+following ones.
 
 =head2 C<type>
 
@@ -94,6 +94,6 @@ Get or set MIME type for file extension.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

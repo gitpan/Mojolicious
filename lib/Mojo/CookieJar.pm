@@ -6,14 +6,10 @@ use strict;
 use warnings;
 
 use base 'Mojo::Base';
-use bytes;
 
 use Mojo::Cookie::Request;
 
 __PACKAGE__->attr(max_cookie_size => 4096);
-
-__PACKAGE__->attr(_jar => sub { {} });
-__PACKAGE__->attr(_size => 0);
 
 # I can't help but feel this is all my fault.
 # It was those North Korean fortune cookies - they were so insulting.
@@ -42,11 +38,11 @@ sub add {
         next if length $cookie->value > $self->max_cookie_size;
 
         # Initialize
-        $self->_jar->{$domain} ||= [];
+        $self->{_jar}->{$domain} ||= [];
 
         # Check if we already have the same cookie
         my @new;
-        for my $old (@{$self->_jar->{$domain}}) {
+        for my $old (@{$self->{_jar}->{$domain}}) {
 
             # Unique cookie id
             my $opath = $old->path;
@@ -57,13 +53,13 @@ sub add {
 
         # Add
         push @new, $cookie;
-        $self->_jar->{$domain} = \@new;
+        $self->{_jar}->{$domain} = \@new;
     }
 
     return $self;
 }
 
-sub empty { shift->_jar({}) }
+sub empty { shift->{_jar} = {} }
 
 sub find {
     my ($self, $url) = @_;
@@ -80,7 +76,7 @@ sub find {
     while ($domain =~ /[^\.]+\.[^\.]+|localhost$/) {
 
         # Nothing
-        next unless my $jar = $self->_jar->{$domain};
+        next unless my $jar = $self->{_jar}->{$domain};
 
         # Look inside
         my @new;
@@ -89,10 +85,10 @@ sub find {
             # Session cookie
             my $session =
               defined $cookie->max_age && $cookie->max_age > 0 ? 1 : 0;
-            if ($cookie->expires || !$session) {
+            if ($cookie->expires && !$session) {
 
                 # Expired
-                next if $cookie->expires && time > $cookie->expires->epoch;
+                next if time > ($cookie->expires->epoch || 0);
             }
 
             # Port
@@ -112,7 +108,7 @@ sub find {
             # Not expired
             push @new, $cookie;
         }
-        $self->_jar->{$domain} = \@new;
+        $self->{_jar}->{$domain} = \@new;
     }
 
     # Remove leading dot or part
@@ -146,6 +142,8 @@ L<Mojo::CookieJar> implements the following attributes.
     my $max_cookie_size = $jar->max_cookie_size;
     $jar                = $jar->max_cookie_size(4096);
 
+Maximum size of cookies in bytes.
+
 =head1 METHODS
 
 L<Mojo::CookieJar> inherits all methods from L<Mojo::Base> and implements the
@@ -155,16 +153,22 @@ following new ones.
 
     $jar = $jar->add(@cookies);
 
+Add multiple cookies to the jar.
+
 =head2 C<empty>
 
     $jar->empty;
+
+Empty the jar.
 
 =head2 C<find>
 
     my @cookies = $jar->find($url);
 
+Find cookies in the jar.
+
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

@@ -17,7 +17,7 @@ __PACKAGE__->attr(description => <<'EOF');
 Get file from URL.
 EOF
 __PACKAGE__->attr(usage => <<"EOF");
-usage: $0 get [URL]
+usage: $0 get [OPTIONS] [URL]
 
 These options are available:
   --headers    Print response headers to STDERR.
@@ -95,10 +95,14 @@ implements the following new ones.
     my $description = $get->description;
     $get            = $get->description('Foo!');
 
+Short description of this command, used for the command list.
+
 =head2 C<usage>
 
     my $usage = $get->usage;
     $get      = $get->usage('Foo!');
+
+Usage information for this command, used for the help screen.
 
 =head1 METHODS
 
@@ -109,8 +113,10 @@ the following new ones.
 
     $get = $get->run(@ARGV);
 
+Run this command.
+
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

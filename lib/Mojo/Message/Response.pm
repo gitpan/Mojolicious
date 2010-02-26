@@ -94,13 +94,14 @@ sub cookies {
     }
 
     # Set-Cookie2
+    my $headers = $self->headers;
     my $cookies = [];
-    if (my $cookie2 = $self->headers->set_cookie2) {
+    if (my $cookie2 = $headers->set_cookie2) {
         push @$cookies, @{Mojo::Cookie::Response->parse($cookie2)};
     }
 
     # Set-Cookie
-    if (my $cookie = $self->headers->set_cookie) {
+    if (my $cookie = $headers->set_cookie) {
         push @$cookies, @{Mojo::Cookie::Response->parse($cookie)};
     }
 
@@ -116,8 +117,8 @@ sub fix_headers {
     $self->SUPER::fix_headers(@_);
 
     # Date header is required in responses
-    $self->headers->date(Mojo::Date->new->to_string)
-      unless $self->headers->date;
+    my $headers = $self->headers;
+    $headers->date(Mojo::Date->new->to_string) unless $headers->date;
 
     return $self;
 }
@@ -125,7 +126,7 @@ sub fix_headers {
 sub is_status_class {
     my ($self, $class) = @_;
     return unless my $code = $self->code;
-    return 1 if ($code >= $class && $code < ($class + 100));
+    return 1 if $code >= $class && $code < ($class + 100);
     return;
 }
 
@@ -148,7 +149,9 @@ sub parse_until_body {
 }
 
 sub _build_start_line {
-    my $self    = shift;
+    my $self = shift;
+
+    # Version
     my $version = $self->version;
 
     # HTTP 0.9 has no start line
@@ -247,10 +250,14 @@ and implements the following new ones.
     my $code = $res->code;
     $res     = $res->code(200);
 
+HTTP response code.
+
 =head2 C<message>
 
     my $message = $res->message;
     $res        = $res->message('OK');
+
+HTTP response message.
 
 =head1 METHODS
 
@@ -263,28 +270,40 @@ implements the following new ones.
     $res        = $res->cookies(Mojo::Cookie::Response->new);
     $req        = $req->cookies({name => 'foo', value => 'bar'});
 
+Access response cookies.
+
 =head2 C<default_message>
 
     my $message = $res->default_message;
+
+Generate default response message for code.
 
 =head2 C<fix_headers>
 
     $res = $res->fix_headers;
 
+Make sure message has all required headers for the current HTTP version.
+
 =head2 C<is_status_class>
 
     my $is_2xx = $res->is_status_class(200);
+
+Check response status class.
 
 =head2 C<parse>
 
     $res = $res->parse('HTTP/1.1 200 OK');
 
+Parse HTTP response chunk.
+
 =head2 C<parse_until_body>
 
     $res = $res->parse_until_body('HTTP/1.1 200 OK');
 
+Parse HTTP response chunk until the body is reached.
+
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

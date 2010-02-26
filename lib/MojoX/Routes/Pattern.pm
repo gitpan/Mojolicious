@@ -416,7 +416,7 @@ Character indicating the start of a wildcard placeholder, defaults to C<*>.
 =head1 METHODS
 
 L<MojoX::Routes::Pattern> inherits all methods from L<Mojo::Base> and
-implements the follwing the ones.
+implements the following ones.
 
 =head2 C<new>
 
@@ -452,6 +452,6 @@ Match pattern against a path and remove matching parts.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

@@ -66,10 +66,14 @@ L<Mojo::Command> and implements the following new ones.
     my $description = $psgi->description;
     $psgi           = $psgi->description('Foo!');
 
+Short description of this command, used for the command list.
+
 =head2 C<usage>
 
     my $usage = $psgi->usage;
     $psgi     = $psgi->usage('Foo!');
+
+Usage information for this command, used for the help screen.
 
 =head1 METHODS
 
@@ -80,8 +84,10 @@ and implements the following new ones.
 
     $psgi = $psgi->run(@ARGV);
 
+Run this command.
+
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

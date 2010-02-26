@@ -160,6 +160,9 @@ sub serve_error {
 
     my $res = $c->res;
 
+    # Render once
+    return if ($res->code || '') eq $code;
+
     # Code
     $res->code($code);
 
@@ -275,7 +278,7 @@ Directory to serve static files from.
 =head1 METHODS
 
 L<MojoX::Dispatcher::Static> inherits all methods from L<Mojo::Base> and
-implements the follwing the ones.
+implements the following ones.
 
 =head2 C<dispatch>
 
@@ -312,6 +315,6 @@ Serve error page, guaranteed to render at least a default page.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

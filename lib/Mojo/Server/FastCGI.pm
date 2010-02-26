@@ -6,14 +6,11 @@ use strict;
 use warnings;
 
 use base 'Mojo::Server';
-use bytes;
 
 use IO::Poll 'POLLIN';
 use IO::Socket;
 
 use constant DEBUG => $ENV{MOJO_SERVER_DEBUG} || 0;
-
-__PACKAGE__->attr('_listen');
 
 # Roles
 my @ROLES = qw/RESPONDER  AUTHORIZER FILTER/;
@@ -56,7 +53,7 @@ sub accept_connection {
     my $self = shift;
 
     # Listen socket
-    unless ($self->_listen) {
+    unless ($self->{_listen}) {
         my $listen = IO::Socket->new;
 
         # Open
@@ -65,7 +62,7 @@ sub accept_connection {
             return;
         }
 
-        $self->_listen($listen);
+        $self->{_listen} = $listen;
     }
 
     # Debug
@@ -73,7 +70,7 @@ sub accept_connection {
 
     # Accept
     my $c;
-    unless ($c = $self->_listen->accept) {
+    unless ($c = $self->{_listen}->accept) {
         $self->app->log->error("Can't accept FastCGI connection: $!");
         return;
     }
@@ -427,44 +424,64 @@ implements the following new ones.
 
     my $c = $fcgi->accept_connection;
 
+Accept FastCGI connection.
+
 =head2 C<read_record>
 
     my ($type, $id, $body) = $fcgi->read_record($c);
+
+Parse FastCGI record.
 
 =head2 C<read_request>
 
     my $tx = $fcgi->read_request($c);
 
+Parse FastCGI request.
+
 =head2 C<role_name>
 
     my $name = $fcgi->role_name(3);
+
+FastCGI role name.
 
 =head2 C<role_number>
 
     my $number = $fcgi->role_number('FILTER');
 
+FastCGI role number.
+
 =head2 C<run>
 
     $fcgi->run;
+
+Start FastCGI.
 
 =head2 C<type_name>
 
     my $name = $fcgi->type_name(5);
 
+FastCGI type name.
+
 =head2 C<type_number>
 
     my $number = $fcgi->type_number('STDIN');
+
+FastCGI type number.
 
 =head2 C<write_records>
 
     $fcgi->write_record($c, 'STDOUT', $id, 'HTTP/1.1 200 OK');
 
+Write FastCGI record.
+
 =head2 C<write_response>
 
     $fcgi->write_response($tx);
 
+Write FastCGI response.
+
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

@@ -6,7 +6,6 @@ use strict;
 use warnings;
 
 use base 'Mojo::Asset';
-use bytes;
 
 # We can't use File::Temp because there is no seek support in the version
 # shipped with Perl 5.8
@@ -70,10 +69,11 @@ sub add_chunk {
     my ($self, $chunk) = @_;
 
     # Seek to end
-    $self->handle->seek(0, SEEK_END);
+    $self->handle->sysseek(0, SEEK_END);
 
     # Store
     $chunk = '' unless defined $chunk;
+    utf8::encode($chunk) if utf8::is_utf8($chunk);
     $self->handle->syswrite($chunk, length $chunk);
 
     return $self;
@@ -87,7 +87,7 @@ sub contains {
     my ($buffer, $window);
 
     # Seek to start
-    $self->handle->seek($self->start_range, SEEK_SET);
+    $self->handle->sysseek($self->start_range, SEEK_SET);
     my $end = defined $self->end_range ? $self->end_range : $self->size;
     my $rlen = length($bytestream) * 2;
     if ($rlen > $end - $self->start_range) {
@@ -123,7 +123,7 @@ sub get_chunk {
 
     # Seek to start
     my $off = $offset + $self->start_range;
-    $self->handle->seek($off, SEEK_SET);
+    $self->handle->sysseek($off, SEEK_SET);
     my $end = $self->end_range;
     my $buffer;
 
@@ -177,7 +177,7 @@ sub slurp {
     my $self = shift;
 
     # Seek to start
-    $self->handle->seek(0, SEEK_SET);
+    $self->handle->sysseek(0, SEEK_SET);
 
     # Slurp
     my $content = '';
@@ -217,30 +217,42 @@ L<Mojo::Asset::File> implements the following attributes.
     my $cleanup = $asset->cleanup;
     $asset      = $asset->cleanup(1);
 
+Delete file automatically once it's not used anymore.
+
 =head2 C<end_range>
 
     my $end = $asset->end_range;
     $asset  = $asset->end_range(8);
+
+Pretend file ends earlier.
 
 =head2 C<handle>
 
     my $handle = $asset->handle;
     $asset     = $asset->handle(IO::File->new);
 
+Actual file handle.
+
 =head2 C<path>
 
     my $path = $asset->path;
     $asset   = $asset->path('/foo/bar/baz.txt');
+
+Actual file path.
 
 =head2 C<start_range>
 
     my $start = $asset->start_range;
     $asset    = $asset->start_range(0);
 
+Pretend file starts later.
+
 =head2 C<tmpdir>
 
     my $tmpdir = $asset->tmpdir;
     $asset     = $asset->tmpdir('/tmp');
+
+Temporary directory.
 
 =head1 METHODS
 
@@ -251,28 +263,40 @@ the following new ones.
 
     $asset = $asset->add_chunk('foo bar baz');
 
+Add chunk of data to asset.
+
 =head2 C<contains>
 
     my $position = $asset->contains('bar');
+
+Check if asset contains a specific string.
 
 =head2 C<get_chunk>
 
     my $chunk = $asset->get_chunk($offset);
 
+Get chunk of data starting from a specific position.
+
 =head2 C<move_to>
 
     $asset = $asset->move_to('/foo/bar/baz.txt');
+
+Move asset data into a specific file.
 
 =head2 C<size>
 
     my $size = $asset->size;
 
+Size of asset data in bytes.
+
 =head2 C<slurp>
 
     my $string = $file->slurp;
 
+Read all asset data at once.
+
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

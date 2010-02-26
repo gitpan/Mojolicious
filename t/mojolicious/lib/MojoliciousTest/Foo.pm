@@ -16,6 +16,8 @@ sub config {
     $self->render_text($self->stash('config')->{test});
 }
 
+sub exceptionduringpausedtransaction { shift->pause and die 'Exception' }
+
 sub index {
     shift->stash(
         layout  => 'default',
@@ -24,16 +26,16 @@ sub index {
     );
 }
 
+sub session_domain {
+    my $self = shift;
+    $self->session(user => 'Bender');
+    $self->render_text('Bender rockzzz!');
+}
+
 sub something {
     my $self = shift;
     $self->res->headers->header('X-Bender' => 'Bite my shiny metal ass!');
     $self->render_text($self->url_for('something', something => '42'));
-}
-
-sub url_for_missing {
-    my $self = shift;
-    $self->render_text(
-        $self->url_for('something_missing', something => '42'));
 }
 
 sub stage1 {
@@ -49,11 +51,7 @@ sub stage1 {
 
 sub stage2 { shift->render_text('Welcome aboard!') }
 
-sub syntaxerror {
-    shift->render('syntaxerror', format => 'html', handler => 'epl');
-}
-
-sub exceptionduringpausedtransaction { shift->pause and die 'Exception' }
+sub syntaxerror { shift->render('syntaxerror', format => 'html') }
 
 sub templateless { shift->render(handler => 'test') }
 
@@ -61,6 +59,12 @@ sub test {
     my $self = shift;
     $self->res->headers->header('X-Bender' => 'Bite my shiny metal ass!');
     $self->render_text($self->url_for(controller => 'bar'));
+}
+
+sub url_for_missing {
+    my $self = shift;
+    $self->render_text(
+        $self->url_for('something_missing', something => '42'));
 }
 
 sub willdie { die 'for some reason' }

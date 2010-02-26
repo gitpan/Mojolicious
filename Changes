@@ -1,5 +1,38 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+0.999922 2010-02-11 00:00:00
+        - Added session support.
+        - Added signed cookie support.
+        - Added I18N support. (vti, memowe)
+        - Added template detection again, you can now just mix multiple
+          template engines and the renderer will automatically pick the right
+          template.
+          So you don't have to use the "handler" argument anymore, even
+          though it's still available and overrides auto detection.
+        - Added Flash Policy Server example. (xantus)
+        - Added more reference docs.
+        - Added .gitignore generator command. (marcus)
+        - Added automatic CGI/FastCGI environment detection to
+          Mojo::Commands.
+        - Renamed Mojolicious::Book to Mojolicious::Guides.
+        - Removed hot deployment support for Windows because of
+          incompatibilities between Active Perl and Strawberry Perl.
+        - Made process id and lock file defaults more userfriendly in
+          Mojo::Server::Daemon.
+        - Updated for Perl 5.12, not using the bytes pragma anymore.
+        - Fixed a bug where WebSocket servers could not directly start
+          sending messages.
+        - Fixed connection id handling in Mojo::Client.
+        - Fixed multiple epoll bugs.
+        - Fixed Mojo::IOLoop connection check.
+        - Fixed identification headers.
+        - Fixed a bug where exception pages would be rendered multiple times.
+        - Fixed reverse proxy support. (vti)
+        - Fixed error state in Mojo::Stateful. (vti)
+        - Fixed seek bug. (lee7)
+        - Fixed a PSGI header bug. (lee7)
+        - Fixed typos.
+
 0.999921 2010-02-11 00:00:00
         - Fixed a small kqueue bug.
 

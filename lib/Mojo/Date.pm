@@ -155,6 +155,8 @@ L<Mojo::Date> implements the following attributes.
     my $epoch = $date->epoch;
     $date     = $date->epoch(784111777);
 
+Epoch seconds.
+
 =head1 METHODS
 
 L<Mojo::Date> inherits all methods from L<Mojo::Base> and implements the
@@ -164,6 +166,8 @@ following new ones.
 
     my $date = Mojo::Date->new;
     my $date = Mojo::Date->new($string);
+
+Construct a new L<Mojo::Date> object.
 
 =head2 C<parse>
 
@@ -180,8 +184,10 @@ Parsable formats include:
 
     my $string = $date->to_string;
 
+Render date suitable for HTTP 1.1 messages.
+
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

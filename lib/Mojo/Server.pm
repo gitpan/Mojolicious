@@ -87,9 +87,9 @@ __PACKAGE__->attr(
 sub new {
     my $self = shift->SUPER::new(@_);
 
-    # Reload on USR1 or WINCH (win32) signal
-    my $signal = $^O eq 'MSWin32' ? 'WINCH' : 'USR1';
-    $SIG{$signal} = sub { $self->reload(2) };
+    # Reload on USR1 signal (does not work on win32)
+    $SIG{USR1} = sub { $self->reload(2) }
+      if $^O ne 'MSWin32';
 
     return $self;
 }
@@ -130,10 +130,15 @@ L<Mojo::Server> implements the following attributes.
     my $app = $server->app;
     $server = $server->app(MojoSubclass->new);
 
+Application this server handles, defaults to a L<Mojo::HelloWorld> object.
+
 =head2 C<app_class>
 
     my $app_class = $server->app_class;
     $server       = $server->app_class('MojoSubclass');
+
+Class of the application this server handles, defaults to
+L<Mojo::HelloWorld>.
 
 =head2 C<build_tx_cb>
 
@@ -143,12 +148,16 @@ L<Mojo::Server> implements the following attributes.
         return Mojo::Transaction::HTTP->new;
     });
 
+Transaction builder callback.
+
 =head2 C<continue_handler_cb>
 
     my $handler = $server->continue_handler_cb;
     $server     = $server->continue_handler_cb(sub {
         my ($self, $tx) = @_;
     });
+
+Callback handling C<100 Continue> requests.
 
 =head2 C<handler_cb>
 
@@ -157,10 +166,14 @@ L<Mojo::Server> implements the following attributes.
         my ($self, $tx) = @_;
     });
 
+Handler callback.
+
 =head2 C<reload>
 
     my $reload = $server->reload;
     $server    = $server->reload(1);
+
+Activate automatic reloading.
 
 =head2 C<websocket_handshake_cb>
 
@@ -168,6 +181,8 @@ L<Mojo::Server> implements the following attributes.
     $server       = $server->websocket_handshake_cb(sub {
         my ($self, $tx) = @_;
     });
+
+WebSocket handshake callback.
 
 =head1 METHODS
 
@@ -178,12 +193,16 @@ following new ones.
 
     my $server = Mojo::Server->new;
 
+Construct a new L<Mojo::Server> object.
+
 =head2 C<run>
 
     $server->run;
 
+Start server.
+
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

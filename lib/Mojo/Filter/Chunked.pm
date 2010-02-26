@@ -6,7 +6,6 @@ use strict;
 use warnings;
 
 use base 'Mojo::Filter';
-use bytes;
 
 # Here's to alcohol, the cause of—and solution to—all life's problems.
 sub build {
@@ -23,9 +22,8 @@ sub build {
     # Trailing headers
     my $headers = ref $chunk && $chunk->isa('Mojo::Headers') ? 1 : 0;
 
-    my $formatted = '';
-
     # End
+    my $formatted = '';
     if ($headers || ($chunk_length == 0)) {
         $self->done;
 
@@ -59,9 +57,10 @@ sub parse {
         return $self;
     }
 
-    # Got a chunk (we ignore the chunk extension)
+    # New chunk (ignore the chunk extension)
     my $filter  = $self->input_buffer;
     my $content = $filter->to_string;
+    my $buffer  = $self->output_buffer;
     while ($content =~ /^((?:\x0d?\x0a)?([\da-fA-F]+).*\x0d?\x0a)/) {
         my $header = $1;
         my $length = hex($2);
@@ -76,7 +75,7 @@ sub parse {
         # Read chunk
         else {
 
-            # We have a whole chunk
+            # Whole chunk
             if (length $content >= (length($header) + $length)) {
 
                 # Remove header
@@ -85,14 +84,14 @@ sub parse {
 
                 # Remove payload
                 substr $content, 0, $length, '';
-                $self->output_buffer->add_chunk($filter->remove($length));
+                $buffer->add_chunk($filter->remove($length));
 
                 # Remove newline at end of chunk
                 $content =~ s/^(\x0d?\x0a)//;
                 $filter->remove(length $1) if $1;
             }
 
-            # Not a whole chunk, need to wait for more data
+            # Not a whole chunk, wait for more data
             else {last}
         }
     }
@@ -103,22 +102,30 @@ sub parse {
 
 sub _parse_trailing_headers {
     my $self = shift;
-    $self->headers->state('headers');
-    $self->headers->parse;
-    if ($self->headers->is_done) {
+
+    # Parse
+    my $headers = $self->headers;
+    $headers->state('headers');
+    $headers->parse;
+
+    # Done
+    if ($headers->is_done) {
         $self->_remove_chunked_encoding;
         $self->done;
     }
 }
 
 sub _remove_chunked_encoding {
-    my $self     = shift;
-    my $encoding = $self->headers->transfer_encoding;
+    my $self = shift;
+
+    # Remove encoding
+    my $headers  = $self->headers;
+    my $encoding = $headers->transfer_encoding;
     $encoding =~ s/,?\s*chunked//ig;
     $encoding
-      ? $self->headers->transfer_encoding($encoding)
-      : $self->headers->remove('Transfer-Encoding');
-    $self->headers->content_length($self->output_buffer->raw_size);
+      ? $headers->transfer_encoding($encoding)
+      : $headers->remove('Transfer-Encoding');
+    $headers->content_length($self->output_buffer->raw_size);
 }
 
 1;
@@ -162,12 +169,16 @@ implements the following new ones.
 
     my $formatted = $filter->build('Hello World!');
 
+Build chunked content.
+
 =head2 C<parse>
 
     $filter = $filter->parse;
 
+Filter chunked content.
+
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

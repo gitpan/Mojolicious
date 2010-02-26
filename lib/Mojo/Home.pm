@@ -15,8 +15,6 @@ use Mojo::Loader;
 
 __PACKAGE__->attr(app_class => 'Mojo::HelloWorld');
 
-__PACKAGE__->attr(_parts => sub { [] });
-
 # I'm normally not a praying man, but if you're up there,
 # please save me Superman.
 sub detect {
@@ -29,7 +27,7 @@ sub detect {
     # Environment variable
     if ($ENV{MOJO_HOME}) {
         my @parts = File::Spec->splitdir($ENV{MOJO_HOME});
-        $self->_parts(\@parts);
+        $self->{_parts} = \@parts;
         return $self;
     }
 
@@ -54,12 +52,12 @@ sub detect {
                 pop @home;
             }
 
-            $self->_parts(\@home);
+            $self->{_parts} = \@home;
         }
     }
 
     # FindBin fallback
-    $self->_parts([split /\//, $FindBin::Bin]) unless @{$self->_parts};
+    $self->{_parts} = [split /\//, $FindBin::Bin] unless $self->{_parts};
 
     return $self;
 }
@@ -68,7 +66,8 @@ sub lib_dir {
     my $self = shift;
 
     # Directory found
-    my $path = File::Spec->catdir(@{$self->_parts}, 'lib');
+    my $parts = $self->{_parts} || [];
+    my $path = File::Spec->catdir(@$parts, 'lib');
     return $path if -d $path;
 
     # No lib directory
@@ -78,17 +77,27 @@ sub lib_dir {
 sub parse {
     my ($self, $path) = @_;
     my @parts = File::Spec->splitdir($path);
-    $self->_parts(\@parts);
+    $self->{_parts} = \@parts;
     return $self;
 }
 
-sub rel_dir { File::Spec->catdir(@{shift->_parts}, split '/', shift) }
-
-sub rel_file {
-    File::Spec->catfile(@{shift->_parts}, split '/', shift);
+sub rel_dir {
+    my $self = shift;
+    my $parts = $self->{_parts} || [];
+    return File::Spec->catdir(@$parts, split '/', shift);
 }
 
-sub to_string { File::Spec->catdir(@{shift->_parts}) }
+sub rel_file {
+    my $self = shift;
+    my $parts = $self->{_parts} || [];
+    return File::Spec->catfile(@$parts, split '/', shift);
+}
+
+sub to_string {
+    my $self = shift;
+    my $parts = $self->{_parts} || [];
+    return File::Spec->catdir(@$parts);
+}
 
 1;
 __END__
@@ -117,6 +126,8 @@ L<Mojo::Home> implements the following attributes.
     my $class = $home->app_class;
     $home     = $home->app_class('Foo::Bar');
 
+Application class.
+
 =head1 METHODS
 
 L<Mojo::Home> inherits all methods from L<Mojo::Base> and implements the
@@ -127,29 +138,41 @@ following new ones.
     $home = $home->detect;
     $home = $home->detect('My::App');
 
+Detect home directory from application class.
+
 =head2 C<lib_dir>
 
     my $path = $home->lib_dir;
+
+Path to C<lib> directory.
 
 =head2 C<parse>
 
     $home = $home->parse('/foo/bar');
 
+Parse path.
+
 =head2 C<rel_dir>
 
     my $path = $home->rel_dir('foo/bar');
 
+Generate absolute path for relative directory.
+
 =head2 C<rel_file>
 
     my $path = $home->rel_file('foo/bar.html');
+
+Generate absolute path for relative file.
 
 =head2 C<to_string>
 
     my $string = $home->to_string;
     my $string = "$home";
 
+Home directory.
+
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

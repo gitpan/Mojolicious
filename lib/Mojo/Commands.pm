@@ -17,6 +17,9 @@ EOF
 __PACKAGE__->attr(message => <<"EOF");
 usage: $0 COMMAND [OPTIONS]
 
+Tip: CGI and FastCGI environments can be automatically detected very often,
+     and also work without commands.
+
 These commands are currently available:
 EOF
 __PACKAGE__->attr(namespaces => sub { ['Mojo::Command'] });
@@ -25,6 +28,9 @@ __PACKAGE__->attr(namespaces => sub { ['Mojo::Command'] });
 # You know, the birth of Santa.
 sub run {
     my ($self, $name, @args) = @_;
+
+    # Try to detect environment
+    $name = $self->_detect unless $name;
 
     # Run command
     if ($name && $name =~ /^\w+$/ && ($name ne 'help' || $args[0])) {
@@ -135,6 +141,19 @@ sub start {
     ref $self ? $self->run(@args) : $self->new->run(@args);
 }
 
+sub _detect {
+    my $self = shift;
+
+    # CGI
+    return 'cgi' if defined $ENV{PATH_INFO};
+
+    # FastCGI
+    return 'fastcgi' unless defined $ENV{PATH};
+
+    # Nothing
+    return;
+}
+
 1;
 __END__
 
@@ -146,28 +165,140 @@ Mojo::Commands - Commands
 
     use Mojo::Commands;
 
+    # Command line interface
     my $commands = Mojo::Commands->new;
     $commands->run(@ARGV);
 
 =head1 DESCRIPTION
 
-L<Mojo::Commands> is the interactive command interface to the L<Mojo>
+L<Mojo::Commands> is the interactive command line interface to the L<Mojo>
 framework.
+It will automatically detect available commands in the L<Mojo::Command>
+namespace.
+Commands are implemented by subclassing L<Mojo::Command>.
+
+These commands are available by default.
+
+=over 4
+
+=item C<help>
+
+    mojo
+    mojo help
+
+List available commands with short descriptions.
+
+    mojo help <command>
+
+List available options for the command with short descriptions.
+
+=item C<generate>
+
+    mojo generate
+    mojo generate help
+
+List available generator commands with short descriptions.
+
+    mojo generate help <generator>
+
+List available options for generator command with short descriptions.
+
+=item C<generate app>
+
+    mojo generate app <AppName>
+
+Generate application directory structure for a fully functional L<Mojo>
+application.
+
+=item C<generate makefile>
+
+    script/myapp generate makefile
+
+Generate C<Makefile.PL> file for application.
+
+=item C<generate psgi>
+
+    script/myapp generate psgi
+
+Generate C<myapp.psgi> file for application.
+
+=item C<cgi>
+
+    mojo cgi
+    script/myapp cgi
+
+Start application with CGI backend.
+
+=item C<daemon>
+
+    mojo cgi
+    script/myapp daemon
+
+Start application with standalone HTTP 1.1 server backend.
+
+=item C<daemon_prefork>
+
+    mojo daemon_prefork
+    script/myapp daemon_prefork
+
+Start application with preforking standalone HTTP 1.1 server backend.
+
+=item C<fastcgi>
+
+    mojo fastcgi
+    script/myapp fastcgi
+
+Start application with FastCGI backend.
+
+=item C<get>
+
+   mojo get http://mojolicious.org
+   script/myapp get /foo
+
+Perform GET request to remote host or local application.
+
+=item C<test>
+
+   mojo test
+   script/myapp test
+   script/myapp test t/foo.t
+
+Runs application tests from the C<t> directory.
+
+=item C<version>
+
+    mojo version
+
+List version information for installed core and optional modules, very useful
+for debugging.
+
+=back
 
 =head1 ATTRIBUTES
 
 L<Mojo::Commands> inherits all attributes from L<Mojo::Command> and
 implements the following new ones.
 
+=head2 C<hint>
+
+    my $hint  = $commands->hint;
+    $commands = $commands->hint('Foo!');
+
+Short hint shown after listing available commands.
+
 =head2 C<message>
 
     my $message  = $commands->message;
     $commands    = $commands->message('Hello World!');
 
+Short usage message shown before listing available commands.
+
 =head2 C<namespaces>
 
     my $namespaces = $commands->namespaces;
     $commands      = $commands->namespaces(['Mojo::Command']);
+
+Namespaces to search for available commands, defaults to L<Mojo::Command>.
 
 =head1 METHODS
 
@@ -179,13 +310,17 @@ the following new ones.
     $commands = $commands->run;
     $commands = $commands->run(@ARGV);
 
+Load and run commands.
+
 =head2 C<start>
 
     Mojo::Commands->start;
     Mojo::Commands->start(@ARGV);
 
+Start the command line interface.
+
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

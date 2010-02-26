@@ -432,11 +432,9 @@ use warnings;
 
 use base 'Mojo::Base';
 use overload (
-    '0+' => sub { $_[0]->_value },
-    '""' => sub { $_[0]->_value },
+    '0+' => sub { $_[0]->{_value} },
+    '""' => sub { $_[0]->{_value} }
 );
-
-__PACKAGE__->attr('_value');
 
 sub new { shift->SUPER::new(_value => shift) }
 
@@ -484,6 +482,8 @@ L<Mojo::JSON> implements the following attributes.
     my $error = $json->error;
     $json     = $json->error('Oops!');
 
+Parser errors.
+
 =head1 METHODS
 
 L<Mojo::JSON> inherits all methods from L<Mojo::Base> and implements the
@@ -494,22 +494,30 @@ following new ones.
     my $array = $json->decode('[1, 2, 3]');
     my $hash  = $json->decode('{"foo": "bar"}');
 
+Decode JSON string.
+
 =head2 C<encode>
 
     my $string = $json->encode({foo => 'bar'});
+
+Encode Perl structure.
 
 =head2 C<false>
 
     my $false = Mojo::JSON->false;
     my $false = $json->false;
 
+False value, used because Perl has no native equivalent.
+
 =head2 C<true>
 
     my $true = Mojo::JSON->true;
     my $true = $json->true;
 
+True value, used because Perl has no native equivalent.
+
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

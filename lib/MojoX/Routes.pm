@@ -11,8 +11,6 @@ use Mojo::URL;
 use MojoX::Routes::Pattern;
 use Scalar::Util 'weaken';
 
-use constant DEBUG => $ENV{MOJOX_ROUTES_DEBUG} || 0;
-
 __PACKAGE__->attr([qw/block inline name parent/]);
 __PACKAGE__->attr([qw/children conditions/] => sub { [] });
 __PACKAGE__->attr(dictionary                => sub { {} });
@@ -337,7 +335,7 @@ used for matching.
 =head1 METHODS
 
 L<MojoX::Routes> inherits all methods from L<Mojo::Base> and implements the
-follwing the ones.
+following ones.
 
 =head2 C<new>
 
@@ -430,6 +428,6 @@ Apply C<websocket> constraint to this route.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

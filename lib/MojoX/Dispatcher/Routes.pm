@@ -18,9 +18,6 @@ __PACKAGE__->attr(hidden => sub { [qw/new app attr render req res stash tx/] }
 );
 __PACKAGE__->attr('namespace');
 
-__PACKAGE__->attr('_hidden');
-__PACKAGE__->attr(_loaded => sub { {} });
-
 # Hey. What kind of party is this? There's no booze and only one hooker.
 sub auto_render {
     my ($self, $c) = @_;
@@ -146,7 +143,7 @@ sub _dispatch_controller {
     $c->app->log->debug(qq/Dispatching "${class}::$method"./);
 
     # Load class
-    unless ($self->_loaded->{$class}) {
+    unless ($self->{_loaded}->{$class}) {
 
         # Load
         if (my $e = Mojo::Loader->load($class)) {
@@ -160,7 +157,7 @@ sub _dispatch_controller {
         }
 
         # Loaded
-        $self->_loaded->{$class}++;
+        $self->{_loaded}->{$class}++;
     }
 
     # Not a controller
@@ -237,9 +234,9 @@ sub _generate_method {
     my $field = $c->match->captures;
 
     # Prepare hidden
-    unless ($self->_hidden) {
-        $self->_hidden({});
-        $self->_hidden->{$_}++ for @{$self->hidden};
+    unless ($self->{_hidden}) {
+        $self->{_hidden} = {};
+        $self->{_hidden}->{$_}++ for @{$self->hidden};
     }
 
     my $method = $field->{method};
@@ -249,7 +246,7 @@ sub _generate_method {
     return unless $method;
 
     # Shortcut for hidden methods
-    return if $self->_hidden->{$method};
+    return if $self->{_hidden}->{$method};
     return if index($method, '_') == 0;
 
     # Invalid
@@ -311,7 +308,7 @@ L<MojoX::Dispatcher::Routes> is a L<MojoX::Routes> based dispatcher.
 =head2 ATTRIBUTES
 
 L<MojoX::Dispatcher::Routes> inherits all attributes from L<MojoX::Routes>
-and implements the follwing the ones.
+and implements the following ones.
 
 =head2 C<controller_base_class>
 
@@ -342,7 +339,7 @@ Namespace to search for controllers.
 =head1 METHODS
 
 L<MojoX::Dispatcher::Routes> inherits all methods from L<MojoX::Routes> and
-implements the follwing the ones.
+implements the following ones.
 
 =head2 C<auto_render>
 
@@ -366,6 +363,6 @@ Hide method or attribute from the dispatcher.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

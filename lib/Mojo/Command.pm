@@ -238,24 +238,43 @@ Mojo::Command - Command Base Class
 
 =head1 SYNOPSIS
 
+    # Camel case command name
+    package Mojo::Command::Mycommand;
+
+    # Subclass
     use base 'Mojo::Command';
 
+    # Take care of command line options
+    use Getopt::Long 'GetOptions';
+
+    # Short description
+    __PACKAGE__->attr(description => <<'EOF');
+    My first Mojo command.
+    EOF
+
+    # Short usage message
+    __PACKAGE__->attr(usage => <<"EOF");
+    usage: $0 mycommand [OPTIONS]
+
+    These options are available:
+      --something   Does something.
+    EOF
+
+    # <suitable Futurama quote here>
     sub run {
         my $self = shift;
-        $self->render_to_rel_file('foo_bar', 'foo/bar.txt');
+
+        # Handle options
+        @ARGV = @_ if @_;
+        GetOptions('something' => sub { $something = 1 });
+
+        # Magic here! :)
     }
-
-    1;
-    __DATA__
-
-    @@ foo_bar
-    % for (1 .. 5) {
-        Hello World!
-    % }
 
 =head1 DESCRIPTION
 
-L<Mojo::Command> is an abstract base class for commands.
+L<Mojo::Command> is an abstract base class for L<Mojo> commands.
+See L<Mojo::Commands> for a list of commands that are available by default.
 
 =head1 ATTRIBUTES
 
@@ -266,15 +285,21 @@ L<Mojo::Command> implements the following attributes.
     my $description = $command->description;
     $command        = $command->description('Foo!');
 
+Short description of command, used for the command list.
+
 =head2 C<quiet>
 
     my $quiet = $command->quiet;
     $command  = $command->quiet(1);
 
+Limited command output.
+
 =head2 C<usage>
 
     my $usage = $command->usage;
     $command  = $command->usage('Foo!');
+
+Usage information for command, used for the help screen.
 
 =head1 METHODS
 
@@ -285,75 +310,114 @@ following new ones.
 
     $command = $command->chmod_file('/foo/bar.txt', 0644);
 
+Portably change mode of a file.
+
 =head2 C<chmod_rel_file>
 
     $command = $command->chmod_rel_file('foo/bar.txt', 0644);
+
+Portably change mode of a relative file.
 
 =head2 C<class_to_file>
 
     my $file = $command->class_to_file('Foo::Bar');
 
+Convert a class name to a file.
+
+    FooBar -> foo_bar
+
 =head2 C<class_to_path>
 
     my $path = $command->class_to_path('Foo::Bar');
+
+Convert class name to path.
+
+    Foo::Bar -> Foo/Bar.pm
 
 =head2 C<create_dir>
 
     $command = $command->create_dir('/foo/bar/baz');
 
+Portably create a directory.
+
 =head2 C<create_rel_dir>
 
     $command = $command->create_rel_dir('foo/bar/baz');
+
+Portably create a relative directory.
 
 =head2 C<get_all_data>
 
     my $all = $command->get_all_data;
     my $all = $command->get_all_data('Some::Class');
 
+Extract all embedded files from the C<__DATA__> section of a class.
+
 =head2 C<get_data>
 
     my $data = $command->get_data('foo_bar');
     my $data = $command->get_data('foo_bar', 'Some::Class');
 
+Extract embedded file from the C<__DATA__> section of a class.
+
 =head2 C<help>
 
     $command->help;
+
+Print usage information for command.
 
 =head2 C<rel_dir>
 
     my $path = $command->rel_dir('foo/bar');
 
+Portably generate an absolute path from a relative UNIX style path.
+
 =head2 C<rel_file>
 
     my $path = $command->rel_file('foo/bar.txt');
+
+Portably generate an absolute path from a relative UNIX style path.
 
 =head2 C<render_data>
 
     my $data = $command->render_data('foo_bar', @arguments);
 
+Render a template from the C<__DATA__> section of the command class.
+
 =head2 C<render_to_file>
 
     $command = $command->render_to_file('foo_bar', '/foo/bar.txt');
 
+Render a template from the C<__DATA__> section of the command class to a
+file.
+
 =head2 C<render_to_rel_file>
 
     $command = $command->render_to_rel_file('foo_bar', 'foo/bar.txt');
-    $command = $command->render_to_rel_file('foo_bar', 'foo/bar.txt');
+
+Portably render a template from the C<__DATA__> section of the command class
+to a relative file.
 
 =head2 C<run>
 
     $command = $command->run(@ARGV);
 
+Run command.
+
 =head2 C<write_file>
 
     $command = $command->write_file('/foo/bar.txt', 'Hello World!');
+
+Portably write text to a file.
 
 =head2 C<write_rel_file>
 
     $command = $command->write_rel_file('foo/bar.txt', 'Hello World!');
 
+Portably write text to a relative file.
+
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

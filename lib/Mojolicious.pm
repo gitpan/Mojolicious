@@ -12,6 +12,7 @@ use Mojolicious::Plugins;
 use MojoX::Dispatcher::Routes;
 use MojoX::Dispatcher::Static;
 use MojoX::Renderer;
+use MojoX::Session::Cookie;
 use MojoX::Types;
 
 __PACKAGE__->attr(controller_class => 'Mojolicious::Controller');
@@ -19,11 +20,13 @@ __PACKAGE__->attr(mode => sub { ($ENV{MOJO_MODE} || 'development') });
 __PACKAGE__->attr(plugins  => sub { Mojolicious::Plugins->new });
 __PACKAGE__->attr(renderer => sub { MojoX::Renderer->new });
 __PACKAGE__->attr(routes   => sub { MojoX::Dispatcher::Routes->new });
-__PACKAGE__->attr(static   => sub { MojoX::Dispatcher::Static->new });
-__PACKAGE__->attr(types    => sub { MojoX::Types->new });
+__PACKAGE__->attr(secret  => 'You really should change this!');
+__PACKAGE__->attr(session => sub { MojoX::Session::Cookie->new });
+__PACKAGE__->attr(static  => sub { MojoX::Dispatcher::Static->new });
+__PACKAGE__->attr(types   => sub { MojoX::Types->new });
 
 our $CODENAME = 'Snowman';
-our $VERSION  = '0.999921';
+our $VERSION  = '0.999922';
 
 sub new {
     my $self = shift->SUPER::new(@_);
@@ -55,11 +58,11 @@ sub new {
     $self->static->root($self->home->rel_dir('public'));
 
     # Hide own controller methods
-    $self->routes->hide(qw/client finish helper param pause/);
+    $self->routes->hide(qw/client cookie finish flash helper param pause/);
     $self->routes->hide(qw/receive_message redirect_to render_exception/);
     $self->routes->hide(qw/render_json render_inner render_not_found/);
     $self->routes->hide(qw/render_partial render_static render_text resume/);
-    $self->routes->hide(qw/send_message url_for/);
+    $self->routes->hide(qw/send_message session signed_cookie url_for/);
 
     # Mode
     my $mode = $self->mode;
@@ -93,6 +96,9 @@ sub new {
 sub dispatch {
     my ($self, $c) = @_;
 
+    # Session
+    $self->session->load($c);
+
     # Hook
     $self->plugins->run_hook(before_dispatch => $c);
 
@@ -116,9 +122,27 @@ sub dispatch {
     # Nothing found
     elsif ($e) { $c->render_not_found }
 
+    # Finish
+    $self->finish($c);
+}
+
+sub finish {
+    my ($self, $c) = @_;
+
+    # Already finished
+    return if $c->stash->{finished};
+
+    # Paused
+    return if $c->tx->is_paused;
+
     # Hook
-    $self->plugins->run_hook_reverse(after_dispatch => $c)
-      unless $c->tx->is_paused;
+    $self->plugins->run_hook_reverse(after_dispatch => $c);
+
+    # Session
+    $self->session->store($c);
+
+    # Finished
+    $c->stash->{finished} = 1;
 }
 
 # Bite my shiny metal ass!
@@ -183,7 +207,7 @@ Mojolicious - The Web In A Box!
 
 =head1 SYNOPSIS
 
-    # Mojolicious Application
+    # Mojolicious application
     package MyApp;
 
     use base 'Mojolicious';
@@ -230,22 +254,24 @@ art technology.
 An amazing MVC web framework supporting a simplified single file mode through
 L<Mojolicious::Lite>.
 
-Very clean and Object Oriented pure Perl API without any hidden magic and no
-requirements besides Perl 5.8.1.
+Very clean, portable and Object Oriented pure Perl API without any hidden
+magic and no requirements besides Perl 5.8.1.
 
-Full stack HTTP 1.1 and WebSocket client/server implementation with IPv6 and
-TLS support.
+Full stack HTTP 1.1 and WebSocket client/server implementation with IPv6,
+TLS, IDNA, pipelining, chunking and multipart support.
 
-Builtin async IO and prefork web server with epoll, kqueue, hot deployment
-and UNIX domain socket sharing support, perfect for embedding.
+Builtin async IO and prefork web server supporting epoll, kqueue, hot
+deployment and UNIX domain socket sharing, perfect for embedding.
 
 CGI, FastCGI and L<PSGI> support.
 
 Fresh code, based upon years of experience developing Catalyst.
 
-=back
+Powerful out of the box with RESTful routes, plugins, sessions, signed
+cookies, static file server, testing framework, Perl-ish templates, JSON,
+I18N, first class Unicode support and much more for you to discover!
 
-And much more for you to discover!
+=back
 
 =head2 Simplicity
 
@@ -278,7 +304,7 @@ Web development for humans, making hard things possible and everything fun.
     % my ($second, $minute, $hour) = (localtime(time))[0, 1, 2];
     The time is <%= $hour %>:<%= $minute %>:<%= $second %>.
 
-For more user friendly documentation see L<Mojolicious::Book> and
+For more user friendly documentation see L<Mojolicious::Guides> and
 L<Mojolicious::Lite>.
 
 =head2 Architecture
@@ -364,6 +390,14 @@ application.
         $r->route('/:controller/:action')->to('test#welcome');
     }
 
+=head2 C<secret>
+
+    my $secret = $mojo->secret;
+    $mojo      = $mojo->secret('passw0rd');
+
+A secret passphrase used for signed cookies and the like, has a very unsecure
+default, so you should change it!!!
+
 =head2 C<static>
 
     my $static = $mojo->static;
@@ -403,6 +437,12 @@ Also sets up the renderer, static dispatcher and a default set of plugins.
 
 The heart of every Mojolicious application, calls the static and routes
 dispatchers for every request.
+
+=head2 C<finish>
+
+    $mojo->finish($c);
+
+Clean up after processing a request, usually called automatically.
 
 =head2 C<handler>
 
@@ -482,6 +522,8 @@ In alphabetical order:
 Adam Kennedy
 
 Adriano Ferreira
+
+Alex Salimon
 
 Alexey Likhatskiy
 

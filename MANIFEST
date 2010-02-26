@@ -1,7 +1,7 @@
-.DS_Store
 .perltidyrc
 Changes
 draft-hixie-thewebsocketprotocol-68.txt
+examples/flash-policy-server.pl
 examples/microhttpd.pl
 fcgi-spec.html
 lib/Mojo.pm
@@ -18,6 +18,7 @@ lib/Mojo/Command/DaemonPrefork.pm
 lib/Mojo/Command/Fastcgi.pm
 lib/Mojo/Command/Generate.pm
 lib/Mojo/Command/Generate/App.pm
+lib/Mojo/Command/Generate/Gitignore.pm
 lib/Mojo/Command/Generate/Makefile.pm
 lib/Mojo/Command/Generate/Psgi.pm
 lib/Mojo/Command/Get.pm
@@ -62,10 +63,6 @@ lib/Mojo/Transaction/WebSocket.pm
 lib/Mojo/Upload.pm
 lib/Mojo/URL.pm
 lib/Mojolicious.pm
-lib/Mojolicious/Book.pod
-lib/Mojolicious/Book/Cheatsheet.pod
-lib/Mojolicious/Book/CodingGuidelines.pod
-lib/Mojolicious/Book/FAQ.pod
 lib/Mojolicious/Command/Generate.pm
 lib/Mojolicious/Command/Generate/App.pm
 lib/Mojolicious/Command/Generate/LiteApp.pm
@@ -73,6 +70,10 @@ lib/Mojolicious/Command/Inflate.pm
 lib/Mojolicious/Command/Routes.pm
 lib/Mojolicious/Commands.pm
 lib/Mojolicious/Controller.pm
+lib/Mojolicious/Guides.pod
+lib/Mojolicious/Guides/Cheatsheet.pod
+lib/Mojolicious/Guides/CodingGuidelines.pod
+lib/Mojolicious/Guides/FAQ.pod
 lib/Mojolicious/Lite.pm
 lib/Mojolicious/Plugin.pm
 lib/Mojolicious/Plugin/AgentCondition.pm
@@ -81,6 +82,7 @@ lib/Mojolicious/Plugin/DefaultHelpers.pm
 lib/Mojolicious/Plugin/EplRenderer.pm
 lib/Mojolicious/Plugin/EpRenderer.pm
 lib/Mojolicious/Plugin/HeaderCondition.pm
+lib/Mojolicious/Plugin/I18n.pm
 lib/Mojolicious/Plugin/JsonConfig.pm
 lib/Mojolicious/Plugin/PodRenderer.pm
 lib/Mojolicious/Plugin/PoweredBy.pm
@@ -94,6 +96,8 @@ lib/MojoX/Renderer.pm
 lib/MojoX/Routes.pm
 lib/MojoX/Routes/Match.pm
 lib/MojoX/Routes/Pattern.pm
+lib/MojoX/Session/Cookie.pm
+lib/MojoX/Session/Cookie/Controller.pm
 lib/MojoX/Types.pm
 lib/Test/Mojo.pm
 lib/Test/Mojo/Server.pm
@@ -105,6 +109,7 @@ README
 rfc2388.txt
 rfc2616.txt
 rfc2965.txt
+rfc3492.txt
 rfc3875.txt
 rfc3986.txt
 rfc4627.txt
@@ -146,6 +151,7 @@ t/mojo/url.t
 t/mojolicious/app.t
 t/mojolicious/charset_lite_app.t
 t/mojolicious/embedded_lite_app.t
+t/mojolicious/i18n_lite_app.t
 t/mojolicious/json_config_lite_app.json
 t/mojolicious/json_config_lite_app.t
 t/mojolicious/lib/MojoliciousTest.pm

@@ -87,10 +87,14 @@ L<Mojo::Command> and implements the following new ones.
     my $description = $makefile->description;
     $makefile       = $makefile->description('Foo!');
 
+Short description of this command, used for the command list.
+
 =head2 C<usage>
 
     my $usage = $makefile->usage;
     $makefile = $makefile->usage('Foo!');
+
+Usage information for this command, used for the help screen.
 
 =head1 METHODS
 
@@ -101,8 +105,10 @@ L<Mojo::Command> and implements the following new ones.
 
     $makefile = $makefile->run(@ARGV);
 
+Run this command.
+
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

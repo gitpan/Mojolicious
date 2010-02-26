@@ -6,7 +6,6 @@ use strict;
 use warnings;
 
 use base 'Mojo::Server';
-use bytes;
 
 use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 8192;
 
@@ -47,9 +46,8 @@ sub run {
     my $headers = $res->content->headers;
     my @headers;
     for my $name (@{$headers->names}) {
-        for my $value ($headers->header($name)) {
-            push @headers, $name => $value;
-        }
+        my $value = $headers->header($name);
+        push @headers, $name => $value;
     }
 
     # Response body
@@ -124,8 +122,10 @@ implements the following new ones.
 
     my $res = $psgi->run($env);
 
+Start PSGI.
+
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

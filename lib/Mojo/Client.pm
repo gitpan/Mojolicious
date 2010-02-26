@@ -6,7 +6,6 @@ use strict;
 use warnings;
 
 use base 'Mojo::Base';
-use bytes;
 
 use Carp 'croak';
 use Mojo::ByteStream 'b';
@@ -28,10 +27,6 @@ __PACKAGE__->attr(keep_alive_timeout => 15);
 __PACKAGE__->attr(max_redirects      => 0);
 __PACKAGE__->attr(websocket_timeout  => 300);
 
-__PACKAGE__->attr(_cache       => sub { [] });
-__PACKAGE__->attr(_connections => sub { {} });
-__PACKAGE__->attr([qw/_finite _queued/] => 0);
-
 # Singleton
 our $CLIENT;
 
@@ -43,17 +38,19 @@ sub DESTROY {
     my $self = shift;
 
     # Shortcut
-    return unless $self->ioloop;
+    return unless my $loop = $self->ioloop;
 
     # Cleanup active connections
-    for my $id (keys %{$self->_connections}) {
-        $self->ioloop->drop($id);
+    my $cs = $self->{_cs} || {};
+    for my $id (keys %$cs) {
+        $loop->drop($id);
     }
 
     # Cleanup keep alive connections
-    for my $cached (@{$self->_cache}) {
+    my $cache = $self->{_cache} || [];
+    for my $cached (@$cache) {
         my $id = $cached->[1];
-        $self->ioloop->drop($id);
+        $loop->drop($id);
     }
 }
 
@@ -164,16 +161,16 @@ sub process {
     $self->queue(@_) if @_;
 
     # Already running
-    return $self if $self->_finite;
+    return $self if $self->{_finite};
 
     # Loop is finite
-    $self->_finite(1);
+    $self->{_finite} = 1;
 
     # Start ioloop
     $self->ioloop->start;
 
     # Loop is not finite if it's still running
-    $self->_finite(undef);
+    delete $self->{_finite};
 
     return $self;
 }
@@ -379,7 +376,7 @@ sub _connect {
         $self->ioloop->writing($id);
 
         # Add new connection
-        $self->_connections->{$id} = {cb => $cb, tx => $tx};
+        $self->{_cs}->{$id} = {cb => $cb, tx => $tx};
 
         # Kept alive first transaction
         $tx = $pipeline ? $tx->[0] : $tx;
@@ -424,12 +421,12 @@ sub _connect {
 
         # Callbacks
         $self->ioloop->error_cb($id => sub { $self->_error(@_) });
-        $self->ioloop->hup_cb($id => sub { $self->_hup(@_) });
+        $self->ioloop->hup_cb($id => sub { $self->_error(@_) });
         $self->ioloop->read_cb($id => sub { $self->_read(@_) });
         $self->ioloop->write_cb($id => sub { $self->_write(@_) });
 
         # Add new connection
-        $self->_connections->{$id} = {cb => $cb, tx => $tx};
+        $self->{_cs}->{$id} = {cb => $cb, tx => $tx};
     }
 
     return $id;
@@ -439,40 +436,45 @@ sub _connected {
     my ($self, $id) = @_;
 
     # Prepare transactions
-    my $tx = $self->_connections->{$id}->{tx};
+    my $loop = $self->ioloop;
+    my $tx   = $self->{_cs}->{$id}->{tx};
     for my $tx (ref $tx eq 'ARRAY' ? @$tx : ($tx)) {
 
+        # Connection
+        $tx->connection($id);
+
         # Store connection information in transaction
-        my $local = $self->ioloop->local_info($id);
+        my $local = $loop->local_info($id);
         $tx->local_address($local->{address});
         $tx->local_port($local->{port});
-        my $remote = $self->ioloop->remote_info($id);
+        my $remote = $loop->remote_info($id);
         $tx->remote_address($remote->{address});
         $tx->remote_port($remote->{port});
     }
 
     # Keep alive timeout
-    $self->ioloop->connection_timeout($id => $self->keep_alive_timeout);
+    $loop->connection_timeout($id => $self->keep_alive_timeout);
 }
 
 sub _deposit {
     my ($self, $name, $id) = @_;
 
     # Limit keep alive connections
-    while (@{$self->_cache} >= $self->max_keep_alive_connections) {
-        my $cached = shift @{$self->_cache};
+    my $cache = $self->{_cache} ||= [];
+    while (@$cache >= $self->max_keep_alive_connections) {
+        my $cached = shift @$cache;
         $self->_drop($cached->[1]);
     }
 
     # Deposit
-    push @{$self->_cache}, [$name, $id];
+    push @$cache, [$name, $id];
 }
 
 sub _drop {
     my ($self, $id) = @_;
 
     # Keep connection alive
-    if (my $tx = $self->_connections->{$id}->{tx}) {
+    if (my $tx = $self->{_cs}->{$id}->{tx}) {
 
         # Read only
         $self->ioloop->not_writing($id);
@@ -492,7 +494,7 @@ sub _drop {
     }
 
     # Drop connection
-    delete $self->_connections->{$id};
+    delete $self->{_cs}->{$id};
 }
 
 sub _error {
@@ -502,11 +504,11 @@ sub _error {
     my $message = $error || 'Unknown connection error, probably harmless.';
 
     # Transaction
-    if (my $tx = $self->_connections->{$id}->{tx}) {
+    if (my $tx = $self->{_cs}->{$id}->{tx}) {
 
         # Add error message to all transactions
         for my $tx (ref $tx eq 'ARRAY' ? @$tx : ($tx)) {
-            $tx->error($message);
+            $tx->error($message) unless $tx->is_finished;
         }
     }
 
@@ -537,19 +539,20 @@ sub _finish {
     my ($self, $id) = @_;
 
     # Connection
-    my $c = $self->_connections->{$id};
+    my $c = $self->{_cs}->{$id};
 
     # Transaction
-    my $tx = $c->{tx};
+    my $old = $c->{tx};
 
     # Pipeline
-    my $pipeline = ref $tx eq 'ARRAY' ? 1 : 0;
+    my $pipeline = ref $old eq 'ARRAY' ? 1 : 0;
 
     # Drop WebSockets
-    if ($tx && !$pipeline && $tx->is_websocket) {
-        $tx = undef;
-        $self->_queued($self->_queued - 1);
-        delete $self->_connections->{$id};
+    my $new;
+    if ($old && !$pipeline && $old->is_websocket) {
+        $old = undef;
+        $self->{_queued} -= 1;
+        delete $self->{_cs}->{$id};
         $self->_drop($id);
     }
 
@@ -557,35 +560,33 @@ sub _finish {
     else {
 
         # WebSocket upgrade
-        $self->_upgrade($id) if $tx;
+        $new = $self->_upgrade($id) if $old;
 
         # Drop old connection so we can reuse it
-        my $websocket = 0;
-        $websocket = 1 if $c->{tx} && !$pipeline && $c->{tx}->is_websocket;
-        $self->_drop($id) unless $tx && $websocket;
+        $self->_drop($id) unless $new;
     }
 
     # Finish normal transaction
-    if ($tx) {
+    if ($old) {
 
         # Cookies to the jar
-        for my $tx ($pipeline ? @$tx : ($tx)) { $self->_store_cookies($tx) }
+        for my $tx ($pipeline ? @$old : ($old)) { $self->_store_cookies($tx) }
 
         # Counter
-        $self->_queued($self->_queued - 1)
-          unless $c->{tx} && !$pipeline && $c->{tx}->is_websocket;
+        $self->{_queued} -= 1 unless $new && !$pipeline;
 
         # Done
-        unless ($self->_redirect($c, $tx)) {
+        unless ($self->_redirect($c, $old)) {
             my $cb = $c->{cb} || $self->default_cb;
-            $tx = $c->{tx};
+            my $tx = $new;
+            $tx ||= $old;
             local $self->{tx} = $tx;
             $self->$cb($tx, $c->{history}) if $cb;
         }
     }
 
     # Stop ioloop
-    $self->ioloop->stop if $self->_finite && !$self->_queued;
+    $self->ioloop->stop if $self->{_finite} && !$self->{_queued};
 }
 
 sub _fix_cookies {
@@ -603,8 +604,6 @@ sub _fix_cookies {
 
     return @cookies;
 }
-
-sub _hup { shift->_error(@_) }
 
 sub _prepare_server {
     my $self = shift;
@@ -661,7 +660,7 @@ sub _queue {
 
     # Pipeline
     if ($pipeline) {
-        my $c = $self->_connections->{$id};
+        my $c = $self->{_cs}->{$id};
         $c->{writer} = 0;
         $c->{reader} = 0;
     }
@@ -673,7 +672,8 @@ sub _queue {
     for my $t ($pipeline ? @$tx : ($tx)) {
 
         # We identify ourself
-        $t->req->headers->user_agent('Mozilla/5.0 (compatible; Mojo; Perl)')
+        $t->req->headers->user_agent(
+            'Mozilla/5.0 (compatible; Mojolicious; Perl)')
           unless $t->req->headers->user_agent;
 
         # State change callback
@@ -681,7 +681,8 @@ sub _queue {
     }
 
     # Counter
-    $self->_queued($self->_queued + 1);
+    $self->{_queued} ||= 0;
+    $self->{_queued} += 1;
 
     return $id;
 }
@@ -690,7 +691,7 @@ sub _read {
     my ($self, $loop, $id, $chunk) = @_;
 
     # Connection
-    my $c = $self->_connections->{$id};
+    my $c = $self->{_cs}->{$id};
 
     # Transaction
     if (my $tx = $c->{tx}) {
@@ -740,7 +741,7 @@ sub _redirect {
     my $nid = $self->_queue($new, $c->{cb});
 
     # Create new conenction
-    my $nc = $self->_connections->{$nid};
+    my $nc = $self->{_cs}->{$nid};
     push @$h, $tx;
     $nc->{history}   = $h;
     $nc->{redirects} = $r + 1;
@@ -753,7 +754,7 @@ sub _state {
     my ($self, $id, $tx) = @_;
 
     # Connection
-    my $c = $self->_connections->{$id};
+    my $c = $self->{_cs}->{$id};
 
     # Normal transaction
     unless (ref $c->{tx} eq 'ARRAY') {
@@ -832,22 +833,22 @@ sub _upgrade {
     my ($self, $id) = @_;
 
     # Connection
-    my $c = $self->_connections->{$id};
+    my $c = $self->{_cs}->{$id};
 
     # Transaction
-    my $tx = $c->{tx};
+    my $old = $c->{tx};
 
     # Pipeline
-    return if ref $tx eq 'ARRAY';
+    return if ref $old eq 'ARRAY';
 
     # No handshake
-    return unless $tx->req->headers->upgrade;
+    return unless $old->req->headers->upgrade;
 
     # Handshake failed
-    return unless $tx->res->code eq '101';
+    return unless ($old->res->code || '') eq '101';
 
     # Start new WebSocket
-    $c->{tx} = Mojo::Transaction::WebSocket->new(handshake => $tx);
+    my $new = $c->{tx} = Mojo::Transaction::WebSocket->new(handshake => $old);
 
     # Cleanup connection
     delete $c->{reader};
@@ -860,7 +861,7 @@ sub _upgrade {
     weaken $self;
 
     # State change callback
-    $c->{tx}->state_cb(
+    $new->state_cb(
         sub {
             my $tx = shift;
 
@@ -873,6 +874,8 @@ sub _upgrade {
               : $self->ioloop->not_writing($id);
         }
     );
+
+    return $new;
 }
 
 sub _withdraw {
@@ -881,7 +884,8 @@ sub _withdraw {
     # Withdraw
     my $found;
     my @cache;
-    for my $cached (@{$self->_cache}) {
+    my $cache = $self->{_cache} || [];
+    for my $cached (@$cache) {
 
         # Search for name or id
         $found = $cached->[1] and next
@@ -890,7 +894,7 @@ sub _withdraw {
         # Cache again
         push @cache, $cached;
     }
-    $self->_cache(\@cache);
+    $self->{_cache} = \@cache;
 
     return $found;
 }
@@ -899,7 +903,7 @@ sub _write {
     my ($self, $loop, $id) = @_;
 
     # Connection
-    my $c = $self->_connections->{$id};
+    my $c = $self->{_cs}->{$id};
 
     # Transaction
     if (my $tx = $c->{tx}) {
@@ -1225,6 +1229,6 @@ Open a WebSocket connection with transparent handshake.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

@@ -12,9 +12,6 @@ use Mojo::ByteStream;
 
 __PACKAGE__->attr(buffer => sub { Mojo::ByteStream->new });
 
-__PACKAGE__->attr(_buffer  => sub { [] });
-__PACKAGE__->attr(_headers => sub { {} });
-
 # Filter regex
 my $FILTER_RE = qr/[[:cntrl:]\(\|\)\<\>\@\,\;\:\\\"\/\[\]\?\=\{\}\s]/;
 
@@ -92,6 +89,8 @@ my (%ORDERED_HEADERS, %NORMALCASE_HEADERS);
     }
 }
 
+sub accept_language { shift->header('Accept-Language' => @_) }
+
 sub add {
     my $self = shift;
     my $name = shift;
@@ -123,7 +122,7 @@ sub add {
     }
 
     # Add line
-    push @{$self->_headers->{$name}}, @values;
+    push @{$self->{_headers}->{$name}}, @values;
 
     return $self;
 }
@@ -166,7 +165,7 @@ sub from_hash {
 
     # Empty hash deletes all headers
     if (keys %{$hash} == 0) {
-        $self->_headers({});
+        $self->{_headers} = {};
         return $self;
     }
 
@@ -192,7 +191,7 @@ sub header {
 
     # Get
     my $headers;
-    return unless $headers = $self->_headers->{lc $name};
+    return unless $headers = $self->{_headers}->{lc $name};
 
     # String
     unless (wantarray) {
@@ -218,7 +217,7 @@ sub names {
     my $self = shift;
 
     # Names
-    my @names = keys %{$self->_headers};
+    my @names = keys %{$self->{_headers}};
 
     # Sort
     @names = sort {
@@ -244,8 +243,8 @@ sub parse {
     $self->buffer->add_chunk($chunk);
 
     # Parse headers
-    my $buffer  = $self->buffer;
-    my $headers = $self->_buffer;
+    my $buffer = $self->buffer;
+    my $headers = $self->{_buffer} || [];
     $self->state('headers') if $self->is_state('start');
     while (1) {
 
@@ -271,11 +270,11 @@ sub parse {
 
             # Done
             $self->done;
-            $self->_buffer([]);
+            $self->{_buffer} = [];
             return $buffer;
         }
     }
-    $self->_buffer($headers);
+    $self->{_buffer} = $headers;
 
     return;
 }
@@ -284,7 +283,7 @@ sub proxy_authorization { shift->header('Proxy-Authorization' => @_) }
 
 sub remove {
     my ($self, $name) = @_;
-    delete $self->_headers->{lc $name};
+    delete $self->{_headers}->{lc $name};
     return $self;
 }
 
@@ -361,6 +360,13 @@ implements the following new ones.
 
 The Buffer to use for header parsing, by default a L<Mojo::ByteStream>
 object.
+
+=head2 C<accept_language>
+
+    my $accept_language = $headers->accept_language;
+    $headers            = $headers->accept_language('de, en');
+
+Shortcut for the C<Accept-Language> header.
 
 =head2 C<connection>
 
@@ -588,6 +594,6 @@ Nested arrayrefs to represent multi line values are optional.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

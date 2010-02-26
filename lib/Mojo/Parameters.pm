@@ -123,8 +123,8 @@ sub parse {
         my $value = $2;
 
         # Replace "+" with whitespace
-        $name  =~ s/\+/\ /g;
-        $value =~ s/\+/\ /g;
+        $name  =~ s/\+/\ /g if $name;
+        $value =~ s/\+/\ /g if $value;
 
         # Unescape
         $name  = b($name)->url_unescape->to_string;
@@ -241,15 +241,21 @@ L<Mojo::Parameters> implements the following attributes.
     my $charset = $params->charset;
     $params     = $params->charset('UTF-8');
 
+Charset used for decoding parameters.
+
 =head2 C<pair_separator>
 
     my $separator = $params->pair_separator;
     $params       = $params->pair_separator(';');
 
+Separator for parameter pairs.
+
 =head2 C<params>
 
     my $parameters = $params->params;
     $params        = $params->params(foo => 'b;ar', baz => 23);
+
+The parameters.
 
 =head1 METHODS
 
@@ -262,17 +268,25 @@ the following new ones.
     my $params = Mojo::Parameters->new('foo=b%3Bar&baz=23');
     my $params = Mojo::Parameters->new(foo => 'b;ar', baz => 23);
 
+Construct a new L<Mojo::Parameters> object.
+
 =head2 C<append>
 
     $params = $params->append(foo => 'ba;r');
+
+Append parameters.
 
 =head2 C<clone>
 
     my $params2 = $params->clone;
 
+Clone parameters.
+
 =head2 C<merge>
 
     $params = $params->merge($params2, $params3);
+
+Merge parameters.
 
 =head2 C<param>
 
@@ -280,24 +294,34 @@ the following new ones.
     my @foo = $params->param('foo');
     my $foo = $params->param(foo => 'ba;r');
 
+Check parameter values.
+
 =head2 C<parse>
 
     $params = $params->parse('foo=b%3Bar&baz=23');
+
+Parse parameters.
 
 =head2 C<remove>
 
     $params = $params->remove('foo');
 
+Remove a parameter.
+
 =head2 C<to_hash>
 
     my $hash = $params->to_hash;
+
+Turn parameters into a hashref.
 
 =head2 C<to_string>
 
     my $string = $params->to_string;
 
+Turn parameters into a string.
+
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

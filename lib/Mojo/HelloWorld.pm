@@ -249,12 +249,16 @@ following new ones.
 
     my $hello = Mojo::HelloWorld->new;
 
+Construct a new L<Mojo::HelloWorld> application.
+
 =head2 C<handler>
 
     $tx = $hello->handler($tx);
 
+Handle request.
+
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut

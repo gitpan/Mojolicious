@@ -12,21 +12,23 @@ Features:
     * An amazing MVC web framework supporting a simplified single file mode
       through Mojolicious::Lite.
 
-    * Very clean and Object Oriented pure Perl API without any hidden magic
-      and no requirements besides Perl 5.8.1.
+    * Very clean, portable and Object Oriented pure Perl API without any
+      hidden magic and no requirements besides Perl 5.8.1.
 
     * Full stack HTTP 1.1 and WebSocket client/server implementation with
-      IPv6 and TLS support.
+      IPv6, TLS, IDNA, pipelining, chunking and multipart support.
 
-    * Builtin async IO and prefork web server with epoll, kqueue, hot
-      deployment and UNIX domain socket sharing support, perfect for
-      embedding.
+    * Builtin async IO and prefork web server supporting epoll, kqueue, hot
+      deployment and UNIX domain socket sharing, perfect for embedding.
 
     * CGI, FastCGI and PSGI support.
 
     * Fresh code, based upon years of experience developing Catalyst.
 
-    And much more for you to discover!
+    * Powerful out of the box with RESTful routes, plugins, sessions, signed
+      cookies, static file server, testing framework, Perl-ish templates,
+      JSON, I18N, first class Unicode support and much more for you to
+      discover!
 
 Simplicity:
 
@@ -60,8 +62,8 @@ Simplicity:
         % my ($second, $minute, $hour) = (localtime(time))[0, 1, 2];
         The time is <%= $hour %>:<%= $minute %>:<%= $second %>.
 
-    For more user friendly documentation see "perldoc Mojolicious::Book" and
-    "perldoc Mojolicious::Lite".
+    For more user friendly documentation see "perldoc Mojolicious::Guides"
+    and "perldoc Mojolicious::Lite".
 
 Architecture:
 

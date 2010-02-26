@@ -5,7 +5,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 11;
+use Test::More tests => 9;
 
 use_ok('Mojo::Server::PSGI');
 
@@ -40,13 +40,11 @@ my $res = $app->($env);
 # Response
 is($res->[0],      200);
 is($res->[1]->[0], 'Date');
-ok($res->[1]->[1]->[0]);
-is($res->[1]->[2],      'Content-Length');
-is($res->[1]->[3]->[0], 104);
-is($res->[1]->[4],      'Content-Type');
-is($res->[1]->[5]->[0], 'text/plain');
-is($res->[1]->[6],      'X-Powered-By');
-is($res->[1]->[7]->[0], 'Mojo (Perl)');
+ok($res->[1]->[1]);
+is($res->[1]->[2], 'Content-Length');
+is($res->[1]->[3], 104);
+is($res->[1]->[4], 'Content-Type');
+is($res->[1]->[5], 'text/plain');
 my $params = '';
 while (defined(my $chunk = $res->[2]->getline)) { $params .= $chunk }
 $params = eval "my $params";

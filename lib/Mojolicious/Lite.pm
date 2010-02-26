@@ -167,11 +167,13 @@ There is also a helper command to generate a small example application.
 
 All the normal L<Mojolicious> command options are available from the command
 line.
+Note that CGI and FastCGI environments can usually be auto detected and will
+just work without commands.
 
     % ./myapp.pl daemon
     Server available at http://127.0.0.1:3000.
 
-    % ./myapp.pl daemon 8080
+    % ./myapp.pl daemon --listen http://*:8080
     Server available at http://127.0.0.1:8080.
 
     % ./myapp.pl daemon_prefork
@@ -407,7 +409,7 @@ multiple features at once.
     __DATA__
 
     @@ index.html.ep
-    % layout 'funky');
+    % layout 'funky';
     Who is groovy?
     <form action="<%= url_for 'form' %>" method="POST">
         <input type="text" name="groovy" />
@@ -571,6 +573,6 @@ L<Mojolicious::Lite> inherits all methods from L<Mojolicious>.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Book>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
 
 =cut
