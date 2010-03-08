@@ -19,7 +19,8 @@ use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 8192;
 
 __PACKAGE__->attr(buffer  => sub { Mojo::ByteStream->new });
 __PACKAGE__->attr(content => sub { Mojo::Content::Single->new });
-__PACKAGE__->attr(default_charset                   => 'UTF-8');
+__PACKAGE__->attr(default_charset => 'UTF-8');
+__PACKAGE__->attr([qw/finish_cb progress_cb/]);
 __PACKAGE__->attr([qw/major_version minor_version/] => 1);
 
 # I'll keep it short and sweet. Family. Religion. Friendship.
@@ -103,27 +104,10 @@ sub body_params {
         for my $data (@$formdata) {
             my $name     = $data->[0];
             my $filename = $data->[1];
-            my $part     = $data->[2];
+            my $value    = $data->[2];
 
             # File
             next if $filename;
-
-            # Charset
-            my $charset;
-            if (my $type = $part->headers->content_type) {
-                $type =~ /charset=\"?(\S+)\"?/;
-                $charset = $1 if $1;
-            }
-
-            # Value
-            my $value = $part->asset->slurp;
-
-            # Try to decode
-            if ($charset) {
-                my $backup = $value;
-                $value = b($value)->decode($charset)->to_string;
-                $value = $backup unless defined $value;
-            }
 
             $params->append($name, $value);
         }
@@ -155,7 +139,17 @@ sub build {
 # It cost 80 million dollars to make.
 # How do you sleep at night?
 # On top of a pile of money, with many beautiful women.
-sub build_body { shift->content->build_body(@_) }
+sub build_body {
+    my $self = shift;
+
+    # Body
+    my $body = $self->content->build_body(@_);
+
+    # Finished
+    if (my $cb = $self->finish_cb) { $self->$cb }
+
+    return $body;
+}
 
 sub build_headers {
     my $self = shift;
@@ -242,13 +236,28 @@ sub fix_headers {
     return $self;
 }
 
-sub get_body_chunk { shift->content->get_body_chunk(@_) }
+sub get_body_chunk {
+    my $self = shift;
+
+    # Progress
+    if (my $cb = $self->progress_cb) { $self->$cb('body', @_) }
+
+    # Chunk
+    if (defined(my $chunk = $self->content->get_body_chunk(@_))) {
+        return $chunk;
+    }
+
+    # Finished
+    if (my $cb = $self->finish_cb) { $self->$cb }
+
+    return;
+}
 
 sub get_header_chunk {
     my $self = shift;
 
     # Progress
-    $self->progress_cb->($self, 'headers', @_) if $self->progress_cb;
+    if (my $cb = $self->progress_cb) { $self->$cb('headers', @_) }
 
     # HTTP 0.9 has no headers
     return '' if $self->version eq '0.9';
@@ -263,7 +272,7 @@ sub get_start_line_chunk {
     my ($self, $offset) = @_;
 
     # Progress
-    $self->progress_cb->($self, 'start_line', $offset) if $self->progress_cb;
+    if (my $cb = $self->progress_cb) { $self->$cb('start_line', @_) }
 
     my $copy = $self->_build_start_line;
     return substr($copy, $offset, CHUNK_SIZE);
@@ -311,8 +320,6 @@ sub parse_until_body {
 
     return $self->_parse(1);
 }
-
-sub progress_cb { shift->content->progress_cb(@_) }
 
 sub start_line_size { length shift->build_start_line }
 
@@ -410,19 +417,19 @@ sub _parse {
     my $until_body = @_ ? shift : 0;
 
     # Progress
-    $self->progress_cb->($self) if $self->progress_cb;
+    if (my $cb = $self->progress_cb) { $self->$cb }
 
     # Start line and headers
     my $buffer = $self->buffer;
     if ($self->is_state(qw/start headers/)) {
 
         # Check line size
-        $self->error('Maximum line size exceeded.')
+        $self->error(413)
           if $buffer->size > ($ENV{MOJO_MAX_LINE_SIZE} || 10240);
     }
 
     # Check message size
-    $self->error('Maximum message size exceeded.')
+    $self->error(413)
       if $buffer->raw_size > ($ENV{MOJO_MAX_MESSAGE_SIZE} || 524288);
 
     # Content
@@ -452,6 +459,9 @@ sub _parse {
     $self->state('done_with_leftovers')
       if $self->content->is_state('done_with_leftovers');
 
+    # Finished
+    if ((my $cb = $self->finish_cb) && $self->is_finished) { $self->$cb }
+
     return $self;
 }
 
@@ -464,6 +474,13 @@ sub _parse_formdata {
     my $content = $self->content;
     return \@formdata unless $content->is_multipart;
 
+    # Default charset
+    my $default = $self->default_charset;
+    if (my $type = $self->headers->content_type) {
+        $type =~ /charset=\"?(\S+)\"?/;
+        $default = $1 if $1;
+    }
+
     # Walk the tree
     my @parts;
     push @parts, $content;
@@ -475,13 +492,49 @@ sub _parse_formdata {
             next;
         }
 
+        # Charset
+        my $charset = $default;
+        if (my $type = $part->headers->content_type) {
+            $type =~ /charset=\"?(\S+)\"?/;
+            $charset = $1 if $1;
+        }
+
         # "Content-Disposition"
         my $disposition = $part->headers->content_disposition;
         next unless $disposition;
         my ($name)     = $disposition =~ /\ name="?([^\";]+)"?/;
         my ($filename) = $disposition =~ /\ filename="?([^\"]*)"?/;
+        my $value      = $part;
 
-        push @formdata, [$name, $filename, $part];
+        # Unescape
+        $name     = b($name)->url_unescape->to_string;
+        $filename = b($filename)->url_unescape->to_string;
+
+        # Decode
+        if ($charset) {
+            my $backup = $name;
+            $name     = b($name)->decode($charset)->to_string;
+            $name     = $backup unless defined $name;
+            $backup   = $filename;
+            $filename = b($filename)->decode($charset)->to_string;
+            $filename = $backup unless defined $filename;
+        }
+
+        # Form value
+        unless ($filename) {
+
+            # Slurp
+            $value = $part->asset->slurp;
+
+            # Decode
+            if ($charset && !$part->headers->content_transfer_encoding) {
+                my $backup = $value;
+                $value = b($value)->decode($charset)->to_string;
+                $value = $backup unless defined $value;
+            }
+        }
+
+        push @formdata, [$name, $filename, $value];
     }
 
     return \@formdata;
@@ -500,7 +553,8 @@ Mojo::Message - HTTP 1.1 Message Base Class
 
 =head1 DESCRIPTION
 
-L<Mojo::Message> is an abstract base class for HTTP 1.1 messages.
+L<Mojo::Message> is an abstract base class for HTTP 1.1 messages as described
+in RFC 2616 and RFC 2388.
 
 =head1 ATTRIBUTES
 
@@ -543,6 +597,15 @@ Content container, defaults to a L<Mojo::Content::Single> object.
     $message    = $message->default_charset('UTF-8');
 
 Default charset used for form data parsing.
+
+=head2 C<finish_cb>
+
+    my $cb   = $message->finish_cb;
+    $message = $message->finish_cb(sub {
+        my $self = shift;
+    });
+
+Callback called after message building or parsing is finished.
 
 =head2 C<headers>
 

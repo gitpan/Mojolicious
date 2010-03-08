@@ -212,7 +212,7 @@ sub _parse_start_line {
             $self->message($4);
             $self->state('content');
         }
-        else { $self->error('Parser error: Invalid response line.') }
+        else { $self->error(400) }
     }
 }
 
@@ -238,7 +238,8 @@ Mojo::Message::Response - HTTP 1.1 Response Container
 
 =head1 DESCRIPTION
 
-L<Mojo::Message::Response> is a container for HTTP 1.1 responses.
+L<Mojo::Message::Response> is a container for HTTP 1.1 responses as described
+in RFC 2616.
 
 =head1 ATTRIBUTES
 

@@ -167,8 +167,8 @@ There is also a helper command to generate a small example application.
 
 All the normal L<Mojolicious> command options are available from the command
 line.
-Note that CGI and FastCGI environments can usually be auto detected and will
-just work without commands.
+Note that CGI, FastCGI and PSGI environments can usually be auto detected and
+will just work without commands.
 
     % ./myapp.pl daemon
     Server available at http://127.0.0.1:3000.
@@ -494,6 +494,89 @@ Formats can be automatically detected by looking at file extensions.
     @@ detected.txt.ep
     TXT was detected.
 
+Signed cookie based sessions just work out of the box as soon as you start
+using them.
+The C<flash> can be used to store values that will only be available for one
+request, this is very useful in combination with C<redirect_to>.
+
+    use Mojolicious::Lite;
+
+    get '/login' => sub {
+        my $self = shift;
+        my $name = $self->param('name') || '';
+        my $pass = $self->param('pass') || '';
+        return $self->render unless $name eq 'sebastian' && $pass eq '1234';
+        $self->session(name => $name);
+        $self->flash(message => 'Thanks for logging in!');
+        $self->redirect_to('index');
+    } => 'login';
+
+    get '/' => sub {
+        my $self = shift;
+        return $self->redirect_to('login') unless $self->session('name');
+        $self->render;
+    } => 'index';
+
+    get '/logout' => sub {
+        my $self = shift;
+        $self->session(expires => 1);
+        $self->redirect_to('index');
+    } => 'logout';
+
+    shagadelic;
+    __DATA__
+
+    @@ layouts/default.html.ep
+    <!doctype html><html>
+        <head><title>Mojolicious rocks!</title></head>
+        <body><%= content %></body>
+    </html>
+
+    @@ login.html.ep
+    % layout 'default';
+    <form action="<%= url_for %>">
+        <% if (param 'name') { %>
+            <b>Wrong name or password, please try again.</b><br />
+        <% } %>
+        Name:<br />
+        <input type="text" name="name" value="<%= param 'name' %>" /><br />
+        Password:<br />
+        <input type="text" name="pass" value="<%= param 'pass' %>" /><br />
+        <input type="submit" value="Login"/>
+    </form>
+
+    @@ index.html.ep
+    % layout 'default';
+    <% if (my $message = flash 'message' ) { %>
+        <b><%= $message %></b><br />
+    <% } %>
+    Welcome <%= session 'name' %>!<br />
+    <a href="<%= url_for 'logout' %>">Logout</a>
+
+Note that you should use a custom C<secret> to make signed cookies really secure.
+
+    app->secret('My secret passphrase here!');
+
+A full featured HTTP 1.1 and WebSocket client is built right in.
+Especially in combination with L<Mojo::JSON> this can be a very powerful
+tool.
+
+    get '/test' => sub {
+        my $self = shift;
+        $self->render_data(
+            $self->client->get('http://mojolicious.org')->res->body);
+    };
+
+WebSocket applications have never been this easy before.
+
+    websocket '/echo' => sub {
+        my $self = shift;
+        $self->receive_message(sub {
+            my ($self, $message) = @_;
+            $self->send_message("echo: $message");
+        });
+    };
+
 External templates will be searched by the renderer in a C<templates>
 directory.
 
@@ -526,6 +609,11 @@ it with normal Perl unit tests like C<t/funky.t>.
 Run all unit tests with the C<test> command.
 
     % ./myapp.pl test
+
+To make your tests less noisy you can also change the application log level
+directly in your test files.
+
+    app->log->level('error');
 
 To disable debug messages later in a production setup you can change the
 L<Mojolicious> mode, default will be C<development>.

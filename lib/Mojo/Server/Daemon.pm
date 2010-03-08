@@ -22,7 +22,7 @@ __PACKAGE__->attr(keep_alive_timeout => 15);
 __PACKAGE__->attr(
     lock_file => sub {
         my $self = shift;
-        return File::Spec->catfile(File::Spec->splitdir(File::Spec->tmpdir),
+        return File::Spec->catfile($ENV{MOJO_TMPDIR} || File::Spec->tmpdir,
             Mojo::Command->class_to_file(ref $self->app) . '.lock');
     }
 );
@@ -31,7 +31,7 @@ __PACKAGE__->attr(max_keep_alive_requests => 100);
 __PACKAGE__->attr(
     pid_file => sub {
         my $self = shift;
-        return File::Spec->catfile(File::Spec->splitdir(File::Spec->tmpdir),
+        return File::Spec->catfile($ENV{MOJO_TMPDIR} || File::Spec->tmpdir,
             Mojo::Command->class_to_file(ref $self->app) . '.pid');
     }
 );
@@ -67,14 +67,8 @@ sub accept_unlock { flock(shift->{_lock}, LOCK_UN) }
 sub prepare_ioloop {
     my $self = shift;
 
-    # Lock callback
-    my $loop = $self->ioloop;
-    $loop->lock_cb(sub { $self->accept_lock($_[1]) });
-
-    # Unlock callback
-    $loop->unlock_cb(sub { $self->accept_unlock });
-
     # Stop ioloop on HUP signal
+    my $loop = $self->ioloop;
     $SIG{HUP} = sub { $loop->stop };
 
     # Listen
@@ -88,18 +82,25 @@ sub prepare_ioloop {
 sub prepare_lock_file {
     my $self = shift;
 
-    my $file = $self->lock_file;
+    return unless my $file = $self->lock_file;
 
     # Create lock file
     my $fh = IO::File->new("> $file")
       or croak qq/Can't open lock file "$file"/;
     $self->{_lock} = $fh;
+
+    # Lock callback
+    my $loop = $self->ioloop;
+    $loop->lock_cb(sub { $self->accept_lock($_[1]) });
+
+    # Unlock callback
+    $loop->unlock_cb(sub { $self->accept_unlock });
 }
 
 sub prepare_pid_file {
     my $self = shift;
 
-    my $file = $self->pid_file;
+    return unless my $file = $self->pid_file;
 
     # PID file
     my $fh;
@@ -253,6 +254,9 @@ sub _build_tx {
 sub _drop {
     my ($self, $id) = @_;
 
+    # WebSocket
+    if (my $ws = $self->{_cs}->{$id}->{websocket}) { $ws->server_close }
+
     # Drop connection
     delete $self->{_cs}->{$id};
 }
@@ -261,10 +265,7 @@ sub _error {
     my ($self, $loop, $id, $error) = @_;
 
     # Log
-    my $log = $self->app->log;
-    $error
-      ? $log->error($error)
-      : $log->debug('Unknown connection error, probably harmless.');
+    $self->app->log->error($error) if $error;
 
     # Drop
     $self->_drop($id);

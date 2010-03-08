@@ -20,13 +20,23 @@ __PACKAGE__->attr(mode => sub { ($ENV{MOJO_MODE} || 'development') });
 __PACKAGE__->attr(plugins  => sub { Mojolicious::Plugins->new });
 __PACKAGE__->attr(renderer => sub { MojoX::Renderer->new });
 __PACKAGE__->attr(routes   => sub { MojoX::Dispatcher::Routes->new });
-__PACKAGE__->attr(secret  => 'You really should change this!');
+__PACKAGE__->attr(
+    secret => sub {
+        my $self = shift;
+
+        # Warn developers about unsecure default
+        $self->log->debug('Your secret passphrase needs to be changed!!!');
+
+        # Application name
+        return ref $self;
+    }
+);
 __PACKAGE__->attr(session => sub { MojoX::Session::Cookie->new });
 __PACKAGE__->attr(static  => sub { MojoX::Dispatcher::Static->new });
 __PACKAGE__->attr(types   => sub { MojoX::Types->new });
 
 our $CODENAME = 'Snowman';
-our $VERSION  = '0.999922';
+our $VERSION  = '0.999923';
 
 sub new {
     my $self = shift->SUPER::new(@_);
@@ -58,11 +68,12 @@ sub new {
     $self->static->root($self->home->rel_dir('public'));
 
     # Hide own controller methods
-    $self->routes->hide(qw/client cookie finish flash helper param pause/);
-    $self->routes->hide(qw/receive_message redirect_to render_exception/);
-    $self->routes->hide(qw/render_json render_inner render_not_found/);
-    $self->routes->hide(qw/render_partial render_static render_text resume/);
-    $self->routes->hide(qw/send_message session signed_cookie url_for/);
+    $self->routes->hide(qw/client cookie finish finished flash helper/);
+    $self->routes->hide(qw/param pause receive_message redirect_to render/);
+    $self->routes->hide(qw/render_data render_exception render_inner/);
+    $self->routes->hide(qw/render_json render_not_found render_partial/);
+    $self->routes->hide(qw/render_static render_text resume send_message/);
+    $self->routes->hide(qw/session signed_cookie url_for/);
 
     # Mode
     my $mode = $self->mode;
@@ -192,7 +203,7 @@ sub start {
     $ENV{MOJO_APP} ||= $class;
 
     # Start!
-    Mojolicious::Commands->start(@_);
+    return Mojolicious::Commands->start(@_);
 }
 
 # This will run once at startup
@@ -291,7 +302,13 @@ Web development for humans, making hard things possible and everything fun.
         );
     };
 
-    get '/:name' => sub {
+    get '/fetch' => sub {
+        my $self = shift;
+        $self->render_data(
+            $self->client->get('http://mojolicious.org')->res->body);
+    };
+
+    post '/:name' => sub {
         my $self = shift;
         my $name = $self->param('name') || 'Mojo';
         $self->render_text("Hello $name!");
@@ -395,8 +412,10 @@ application.
     my $secret = $mojo->secret;
     $mojo      = $mojo->secret('passw0rd');
 
-A secret passphrase used for signed cookies and the like, has a very unsecure
-default, so you should change it!!!
+A secret passphrase used for signed cookies and the like, defaults to the
+application name which is not very secure, so you should change it!!!
+As long as you are using the unsecure default there will be debug messages in
+the log file reminding you to change your passphrase.
 
 =head2 C<static>
 
@@ -594,6 +613,8 @@ Rafal Pocztarski
 Randal Schwartz
 
 Robert Hicks
+
+Sascha Kiefer
 
 Sergey Zasenko
 

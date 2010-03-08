@@ -5,13 +5,7 @@
 use strict;
 use warnings;
 
-use Test::More;
-
-# Devel::Cover support
-if ($INC{'Devel/Cover.pm'}) {
-    plan skip_all => "Loader tests don't play nice with Devel::Cover";
-}
-else { plan tests => 29 }
+use Test::More tests => 29;
 
 use FindBin;
 use lib "$FindBin::Bin/lib";
@@ -69,7 +63,7 @@ ok(LoaderTest::C->can('new'));
 
 # Reload
 my $file = IO::File->new;
-my $dir  = File::Temp::tempdir();
+my $dir  = File::Temp::tempdir;
 my $path = File::Spec->catfile($dir, 'MojoTestReloader.pm');
 $file->open("> $path");
 $file->syswrite("package MojoTestReloader;\nsub test { 23 }\n1;");

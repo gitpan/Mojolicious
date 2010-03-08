@@ -108,8 +108,8 @@ sub client_read {
     }
 
     # Check for request/response errors
-    $self->error('Request error.')  if $req->has_error;
-    $self->error('Response error.') if $res->has_error;
+    $self->error($req->error) if $req->has_error;
+    $self->error($res->error) if $res->has_error;
 
     # Make sure we don't wait longer than the set time for a 100 Continue
     # (defaults to 5 seconds)
@@ -303,19 +303,14 @@ sub server_read {
     my $handled = $self->{_handled};
     if ($req->has_error && !$handled) {
 
-        # Request entity too large
-        if ($req->error =~ /^Maximum (?:message|line) size exceeded.$/) {
-            $res->code(413);
-        }
+        # Write
+        $self->state('write');
 
-        # Bad request
-        else { $res->code(400) }
+        # Handler callback
+        $self->handler_cb->($self);
 
         # Close connection
         $res->headers->connection('Close');
-
-        # Write
-        $self->state('write');
 
         # Protect handler from incoming pipelined requests
         $self->{_handled} = 1;
@@ -547,7 +542,7 @@ Mojo::Transaction::HTTP - HTTP 1.1 Transaction Container
 =head1 DESCRIPTION
 
 L<Mojo::Transaction::HTTP> is a container and state machine for HTTP 1.1
-transactions.
+transactions as described in RFC 2616.
 
 =head1 ATTRIBUTES
 

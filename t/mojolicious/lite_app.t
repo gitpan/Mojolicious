@@ -13,7 +13,7 @@ use Test::More;
 # Make sure sockets are working
 plan skip_all => 'working sockets required for this test!'
   unless Mojo::IOLoop->new->generate_port;
-plan tests => 348;
+plan tests => 363;
 
 # Wait you're the only friend I have...
 # You really want a robot for a friend?
@@ -57,10 +57,11 @@ get '/address' => sub {
 # POST /upload
 post '/upload' => sub {
     my $self = shift;
-    $self->stash(rendered => 1);
     my $body = $self->res->body || '';
     $self->res->body("called, $body");
-    if (my $u = $self->req->upload('file')) {
+    return if $self->req->has_error;
+    if (my $u = $self->req->upload('Вячеслав')) {
+        $self->stash(rendered => 1);
         $self->res->body($self->res->body . $u->filename . $u->size);
     }
 };
@@ -202,7 +203,7 @@ post '/utf8' => 'form';
 # POST /malformed_UTF-8
 post '/malformed_utf8' => sub {
     my $c = shift;
-    $c->render_text(Mojo::URL->new($c->param('foo')));
+    $c->render_text(b($c->param('foo'))->url_escape->to_string);
 };
 
 # GET /json
@@ -225,6 +226,42 @@ get '/subrequest' => sub {
     my $self = shift;
     $self->pause;
     $self->client->post(
+        '/template' => sub {
+            my $client = shift;
+            $self->render_text($client->res->body);
+            $self->finish;
+        }
+    )->process;
+};
+
+# GET /subrequest_simple
+get '/subrequest_simple' => sub {
+    my $self = shift;
+    my $tx   = $self->client->post('/template');
+    $self->render_text($tx->res->body);
+};
+
+# GET /subrequest_sync
+get '/subrequest_sync' => sub {
+    my $self = shift;
+    $self->client->post(
+        '/template' => sub {
+            my $client = shift;
+            $client->post(
+                '/template' => sub {
+                    my $client = shift;
+                    $self->render_text($client->res->body);
+                }
+            )->process;
+        }
+    )->process;
+};
+
+# GET /subrequest_async
+get '/subrequest_async' => sub {
+    my $self = shift;
+    $self->pause;
+    $self->client->async->post(
         '/template' => sub {
             my $client = shift;
             $self->render_text($client->res->body);
@@ -349,8 +386,9 @@ my $backup2 = app->log->level;
 app->log->level('fatal');
 my $tx   = Mojo::Transaction::HTTP->new;
 my $part = Mojo::Content::Single->new;
+my $name = b('Вячеслав')->url_escape;
 $part->headers->content_disposition(
-    qq/form-data; name="file"; filename="foo.jpg"/);
+    qq/form-data; name="$name"; filename="$name.jpg"/);
 $part->headers->content_type('image/jpeg');
 $part->asset->add_chunk('1234' x 1024);
 my $content = Mojo::Content::MultiPart->new;
@@ -362,7 +400,7 @@ $tx->req->url->parse('/upload');
 $tx->req->content($content);
 $client->process($tx);
 is($tx->res->code, 413);
-is($tx->res->body, '');
+is($tx->res->body, 'called, ');
 app->log->level($backup2);
 $ENV{MOJO_MAX_MESSAGE_SIZE} = $backup;
 
@@ -371,8 +409,9 @@ $backup = $ENV{MOJO_MAX_MESSAGE_SIZE} || '';
 $ENV{MOJO_MAX_MESSAGE_SIZE} = 1073741824;
 $tx                         = Mojo::Transaction::HTTP->new;
 $part                       = Mojo::Content::Single->new;
+$name                       = b('Вячеслав')->url_escape;
 $part->headers->content_disposition(
-    qq/form-data; name="file"; filename="foo.jpg"/);
+    qq/form-data; name="$name"; filename="$name.jpg"/);
 $part->headers->content_type('image/jpeg');
 $part->asset->add_chunk('1234' x 1024);
 $content = Mojo::Content::MultiPart->new;
@@ -385,7 +424,8 @@ $tx->req->content($content);
 $client->process($tx);
 is($tx->state,     'done');
 is($tx->res->code, 200);
-is($tx->res->body, 'called, foo.jpg4096');
+is(b($tx->res->body)->decode('UTF-8')->to_string,
+    'called, Вячеслав.jpg4096');
 $ENV{MOJO_MAX_MESSAGE_SIZE} = $backup;
 
 # GET / (with body and max message size)
@@ -393,7 +433,8 @@ $backup = $ENV{MOJO_MAX_MESSAGE_SIZE} || '';
 $ENV{MOJO_MAX_MESSAGE_SIZE} = 1024;
 $backup2 = app->log->level;
 app->log->level('fatal');
-$t->get_ok('/', '1234' x 1024)->status_is(413)->content_is('');
+$t->get_ok('/', '1234' x 1024)->status_is(413)
+  ->content_is('/root.html/root.html/root.html/root.html/root.html');
 app->log->level($backup2);
 $ENV{MOJO_MAX_MESSAGE_SIZE} = $backup;
 
@@ -644,6 +685,24 @@ $t->get_ok('/subrequest')->status_is(200)
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_is('Just works!');
 
+# GET /subrequest_simple
+$t->get_ok('/subrequest_simple')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is('Just works!');
+
+# GET /subrequest_sync
+$t->get_ok('/subrequest_sync')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is('Just works!');
+
+# GET /subrequest_async
+$t->get_ok('/subrequest_async')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is('Just works!');
+
 # GET /redirect_url
 $t->get_ok('/redirect_url')->status_is(302)
   ->header_is(Server         => 'Mojolicious (Perl)')
@@ -675,14 +734,14 @@ Test::Mojo->new(tx => $t->redirects->[0])->status_is(302)
   ->header_is(Location       => '/template.txt')->content_is('Redirecting!');
 
 # GET /koi8-r
+my $koi8 =
+    'Этот человек наполняет меня надеждой.'
+  . ' Ну, и некоторыми другими глубокими и приводящими в'
+  . ' замешательство эмоциями.';
 $t->get_ok('/koi8-r')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_type_is('text/html; charset=koi8-r')
-  ->content_is(
-    "Этот человек наполняет меня надеждой."
-      . " Ну, и некоторыми другими глубокими и приводящими в"
-      . " замешательство эмоциями.\n");
+  ->content_type_is('text/html; charset=koi8-r')->content_like(qr/^$koi8/);
 
 # GET /with_ladder
 $t->get_ok('/with_ladder', {'X-Bender' => 'Rodriguez'})->status_is(200)
@@ -880,8 +939,8 @@ layouted <%== content %>
 % my $cookie = $self->req->cookie('mojolicious');
 <%= stash('_name') %> too!<%= $self->cookie('foo') %>!\
 <%= $self->signed_cookie('bar')%>!<%= $self->signed_cookie('bad')%>!\
-<%= $self->cookie('bad') %>!<%= $self->session('foo')%>!\
-<%= $self->flash('foo') %>!<%= $cookie->path if $cookie %>!
+<%= $self->cookie('bad') %>!<%= session 'foo' %>!\
+<%= flash 'foo' %>!<%= $cookie->path if $cookie %>!
 % $self->session(foo => 'session');
 % $self->flash(foo => 'flash') if $self->req->headers->header('X-Flash');
 % $self->stash->{session} = {} if $self->req->headers->header('X-Flash2');

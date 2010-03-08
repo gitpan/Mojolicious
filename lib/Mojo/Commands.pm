@@ -17,8 +17,8 @@ EOF
 __PACKAGE__->attr(message => <<"EOF");
 usage: $0 COMMAND [OPTIONS]
 
-Tip: CGI and FastCGI environments can be automatically detected very often,
-     and also work without commands.
+Tip: CGI, FastCGI and PSGI environments can be automatically detected very
+     often and work without commands.
 
 These commands are currently available:
 EOF
@@ -70,8 +70,7 @@ sub run {
 
         # Run
         my $command = $module->new;
-        $help ? $command->help : $command->run(@args);
-        return $self;
+        return $help ? $command->help : $command->run(@args);
     }
 
     # Try all namspaces
@@ -138,11 +137,14 @@ sub start {
     my @args = @_ ? @_ : @ARGV;
 
     # Run
-    ref $self ? $self->run(@args) : $self->new->run(@args);
+    return ref $self ? $self->run(@args) : $self->new->run(@args);
 }
 
 sub _detect {
     my $self = shift;
+
+    # PSGI (Plack only for now)
+    return 'psgi' if defined $ENV{PLACK_ENV};
 
     # CGI
     return 'cgi' if defined $ENV{PATH_INFO};
@@ -307,8 +309,8 @@ the following new ones.
 
 =head2 C<run>
 
-    $commands = $commands->run;
-    $commands = $commands->run(@ARGV);
+    $commands->run;
+    $commands->run(@ARGV);
 
 Load and run commands.
 

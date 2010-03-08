@@ -191,13 +191,9 @@ sub parse {
 
     my $mixed_re = qr/
         (
-        $tag_start$capture_end$expr$escp     # Escaped expression (end)
-        |
         $tag_start$capture_start$expr$escp   # Escaped expression (start)
         |
         $tag_start$expr$escp                 # Escaped expression
-        |
-        $tag_start$capture_end$expr          # Expression (end)
         |
         $tag_start$capture_start$expr        # Expression (start)
         |
@@ -296,15 +292,15 @@ sub parse {
 
             # Perl token with capture end or start
             if ($token =~ /$token_capture_re/) {
-                my $tag     = $1;
-                my $capture = $2;
-                $token =~ s/^($tag)$capture/$tag/;
+                my $tag     = quotemeta $1;
+                my $capture = quotemeta $2;
+                $token =~ s/^($tag)$capture/$1/;
                 @capture_token =
-                  ("\\$capture" eq $capture_end ? 'cpen' : 'cpst', undef);
+                  ($capture eq $capture_end ? 'cpen' : 'cpst', undef);
             }
 
             # End
-            if ($token =~ /^$tag_end|($trim$tag_end)$/) {
+            if ($state ne 'text' && $token =~ /^($trim$tag_end)|$tag_end$/) {
 
                 # Trim previous text
                 if ($1) {
@@ -328,9 +324,6 @@ sub parse {
             # Code
             elsif ($token =~ /^$tag_start$/) { $state = 'code' }
 
-            # Comment
-            elsif ($token =~ /^$tag_start$cmnt$/) { $state = 'cmnt' }
-
             # Expression
             elsif ($token =~ /^$tag_start$expr$/) {
                 $state = 'expr';
@@ -340,6 +333,9 @@ sub parse {
             elsif ($token =~ /^$tag_start$expr$escp$/) {
                 $state = 'escp';
             }
+
+            # Comment
+            elsif ($token =~ /^$tag_start$cmnt$/) { $state = 'cmnt' }
 
             # Value
             else {
@@ -451,8 +447,8 @@ sub _trim_line {
     $offset ||= 2;
     for (my $j = @$line - $offset; $j >= 0; $j -= 2) {
 
-        # Skip capture start
-        next if $line->[$j] eq 'cpst';
+        # Skip capture
+        next if $line->[$j] eq 'cpst' || $line->[$j] eq 'cpen';
 
         # Only trim text
         return 1 unless $line->[$j] eq 'text';
@@ -541,7 +537,16 @@ like that.
     %== Perl expression line, replaced with XML escaped result
     %# Comment line, useful for debugging
 
-L<Mojo::ByteStream> objects are excluded from automatic escaping.
+Automatic escaping behavior can be reversed with the C<auto_escape>
+attribute, this is the default in L<Mojolicious> C<.ep> templates for
+example.
+
+    <%= Perl expression, replaced with XML escaped result %>
+    <%== Perl expression, replaced with result %>
+    %= Perl expression line, replaced with XML escaped result
+    %== Perl expression line, replaced with result
+
+L<Mojo::ByteStream> objects are always excluded from automatic escaping.
 Whitespace characters around tags can be trimmed with a special tag ending.
 
     <%= All whitespace characters around this expression will be trimmed =%>

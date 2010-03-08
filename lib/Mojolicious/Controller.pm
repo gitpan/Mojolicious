@@ -33,6 +33,20 @@ sub finish {
     $self->app->finish($self);
 }
 
+sub finished {
+    my $self = shift;
+
+    # WebSocket check
+    Carp::croak('No WebSocket connection in progress')
+      unless $self->tx->is_websocket;
+
+    # Callback
+    my $cb = shift;
+
+    # Connection finished
+    $self->tx->finished(sub { shift and $self->$cb(@_) });
+}
+
 sub helper {
     my $self = shift;
 
@@ -40,7 +54,7 @@ sub helper {
     return unless my $name = shift;
 
     # Helper
-    Carp::croak(qq/Helper "$name" not found./)
+    Carp::croak(qq/Helper "$name" not found/)
       unless my $helper = $self->app->renderer->helper->{$name};
 
     # Run
@@ -53,7 +67,7 @@ sub receive_message {
     my $self = shift;
 
     # WebSocket check
-    Carp::croak('No WebSocket connection to receive messages from.')
+    Carp::croak('No WebSocket connection to receive messages from')
       unless $self->tx->is_websocket;
 
     # Callback
@@ -125,6 +139,12 @@ sub render {
 
     # Render
     return $self->app->renderer->render($self);
+}
+
+sub render_data {
+    my $self = shift;
+    $self->stash->{data} = shift;
+    return $self->render(@_);
 }
 
 sub render_exception {
@@ -205,7 +225,7 @@ sub send_message {
     my $self = shift;
 
     # WebSocket check
-    Carp::croak('No WebSocket connection to send message to.')
+    Carp::croak('No WebSocket connection to send message to')
       unless $self->tx->is_websocket;
 
     # Send
@@ -267,6 +287,24 @@ ones.
     
 A L<Mojo::Client> prepared for the current environment.
 
+    my $tx = $c->client->get('http://mojolicious.org');
+
+    $c->client->post_form('http://kraih.com/login' => {user => 'mojo'});
+
+    $c->client->get('http://mojolicious.org' => sub {
+        my $client = shift;
+        $c->render_data($client->res->body);
+    })->process;
+
+For async processing you can use C<pause> and C<finish>.
+
+    $c->pause;
+    $c->client->async->get('http://mojolicious.org' => sub {
+        my $client = shift;
+        $c->render_data($client->res->body);
+        $c->finish;
+    })->process;
+
 =head2 C<finish>
 
     $c->finish;
@@ -275,6 +313,17 @@ Similar to C<resume> but will also trigger automatic rendering and the
 C<after_dispatch> plugin hook, which would normally get disabled once a
 request gets paused.
 For WebSockets it will gracefully end the connection.
+
+=head2 C<finished>
+
+    $c->finished(sub {...});
+
+Callback signaling that peer finished the WebSocket connection, only works if
+there is currently a WebSocket connection in progress.
+
+    $c->finished(sub {
+        my $self = shift;
+    });
 
 =head2 C<helper>
 
@@ -289,7 +338,7 @@ available.
 
     $c->pause;
 
-Pause transaction associated with this request, used for asynchronous web
+Pause transaction associated with this request, used for async web
 applications.
 Note that automatic rendering and some plugins that do state changing
 operations inside the C<after_dispatch> hook won't work if you pause a
@@ -303,7 +352,7 @@ Receive messages via WebSocket, only works if there is currently a WebSocket
 connection in progress.
 
     $c->receive_message(sub {
-        my ($self, $message) = @_
+        my ($self, $message) = @_;
     });
 
 =head2 C<redirect_to>
@@ -335,6 +384,12 @@ It will set a default template to use based on the controller and action name
 or fall back to the route name.
 You can call it with a hash of options which can be preceded by an optional
 template name.
+
+=head2 C<render_data>
+
+    $c->render_data($bits);
+
+Render binary data, similar to C<render_text> but data will not be encoded.
 
 =head2 C<render_exception>
 
@@ -387,13 +442,14 @@ Render a static asset using L<MojoX::Dispatcher::Static>.
     $c->render_text('Hello World!');
     $c->render_text('Hello World', layout => 'green');
 
-Render the givent content as plain text.
+Render the givent content as plain text, note that text will be encoded.
+See C<render_data> for an alternative without encoding.
 
 =head2 C<resume>
 
     $c->resume;
 
-Resume transaction associated with this request, used for asynchronous web
+Resume transaction associated with this request, used for async web
 applications.
 
 =head2 C<send_message>

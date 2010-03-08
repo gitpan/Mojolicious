@@ -14,7 +14,7 @@ use Mojo::Headers;
 
 use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 8192;
 
-__PACKAGE__->attr([qw/body_cb filter progress_cb/]);
+__PACKAGE__->attr([qw/body_cb filter/]);
 __PACKAGE__->attr([qw/buffer filter_buffer/] => sub { Mojo::ByteStream->new }
 );
 __PACKAGE__->attr(headers => sub { Mojo::Headers->new });
@@ -304,7 +304,8 @@ Mojo::Content - HTTP 1.1 Content Base Class
 
 =head1 DESCRIPTION
 
-L<Mojo::Content> is an abstract base class for HTTP 1.1 content.
+L<Mojo::Content> is an abstract base class for HTTP 1.1 content as described
+in RFC 2616.
 
 =head1 ATTRIBUTES
 
@@ -354,16 +355,6 @@ Input buffer for filtering.
     $content    = $content->headers(Mojo::Headers->new);
 
 The headers.
-
-=head2 C<progress_cb>
-
-    my $cb   = $content->progress_cb;
-    $content = $content->progress_cb(sub {
-        my $self = shift;
-        print '+';
-    });
-
-Progress reporting callback.
 
 =head2 C<relaxed>
 

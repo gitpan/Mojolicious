@@ -28,9 +28,6 @@ sub body_size { shift->asset->size }
 sub get_body_chunk {
     my ($self, $offset) = @_;
 
-    # Progress
-    $self->progress_cb->($self, 'body', $offset) if $self->progress_cb;
-
     # Body generator
     return $self->generate_body_chunk($offset) if $self->body_cb;
 
@@ -108,7 +105,8 @@ Mojo::Content::Single - HTTP 1.1 Content Container
 
 =head1 DESCRIPTION
 
-L<Mojo::Content::Single> is a container for HTTP 1.1 content.
+L<Mojo::Content::Single> is a container for HTTP 1.1 content as described in
+RFC 2616.
 
 =head1 ATTRIBUTES
 

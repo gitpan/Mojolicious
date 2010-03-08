@@ -62,7 +62,7 @@ sub authority {
 
     # *( unreserved / pct-encoded / sub-delims ), extended with "[" and "]"
     # to support IPv6
-    my $host = b($self->host)->url_escape("$UNRESERVED$SUBDELIM\[\]");
+    my $host = $self->ihost;
     my $port = $self->port;
 
     # *( unreserved / pct-encoded / sub-delims / ":" )
@@ -308,7 +308,8 @@ Mojo::URL - Uniform Resource Locator
 
 =head1 DESCRIPTION
 
-L<Mojo::URL> implements a subset of RFC 3986 for Uniform Resource Locators.
+L<Mojo::URL> implements a subset of RFC 3986 and RFC 3987 for Uniform
+Resource Locators.
 
 =head1 ATTRIBUTES
 

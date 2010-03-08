@@ -1,9 +1,7 @@
 .perltidyrc
 Changes
-draft-hixie-thewebsocketprotocol-68.txt
 examples/flash-policy-server.pl
 examples/microhttpd.pl
-fcgi-spec.html
 lib/Mojo.pm
 lib/Mojo/Asset.pm
 lib/Mojo/Asset/File.pm
@@ -22,6 +20,7 @@ lib/Mojo/Command/Generate/Gitignore.pm
 lib/Mojo/Command/Generate/Makefile.pm
 lib/Mojo/Command/Generate/Psgi.pm
 lib/Mojo/Command/Get.pm
+lib/Mojo/Command/Psgi.pm
 lib/Mojo/Command/Test.pm
 lib/Mojo/Command/Version.pm
 lib/Mojo/Commands.pm
@@ -106,13 +105,6 @@ Makefile.PL
 MANIFEST			This list of files
 MANIFEST.SKIP
 README
-rfc2388.txt
-rfc2616.txt
-rfc2965.txt
-rfc3492.txt
-rfc3875.txt
-rfc3986.txt
-rfc4627.txt
 script/mojo
 script/mojolicious
 t/mojo/apache_cgi.t
@@ -178,6 +170,8 @@ t/mojolicious/templates/layouts/green.html.epl
 t/mojolicious/templates/simple.html.pod
 t/mojolicious/templates/syntaxerror.html.epl
 t/mojolicious/templates/withlayout.html.epl
+t/mojolicious/twinkle_lite_app.json
+t/mojolicious/twinkle_lite_app.t
 t/mojolicious/websocket_lite_app.t
 t/mojox/dispatcher/routes.t
 t/mojox/dispatcher/routes/controller.t

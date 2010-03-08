@@ -161,8 +161,7 @@ sub _parse_multipart {
     my $boundary = $1;
 
     # Boundary missing
-    return $self->error('Parser error: Boundary missing or invalid.')
-      unless $boundary;
+    return $self->error(400) unless $boundary;
 
     # Parse
     while (1) {
@@ -271,7 +270,8 @@ Mojo::Content::MultiPart - HTTP 1.1 MultiPart Content Container
 
 =head1 DESCRIPTION
 
-L<Mojo::Content::MultiPart> is a container for HTTP 1.1 multipart content.
+L<Mojo::Content::MultiPart> is a container for HTTP 1.1 multipart content as
+described in RFC 2616.
 
 =head1 ATTRIBUTES
 

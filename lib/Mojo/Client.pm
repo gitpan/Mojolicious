@@ -17,21 +17,19 @@ use Mojo::Parameters;
 use Mojo::Server::Daemon;
 use Mojo::Transaction::HTTP;
 use Mojo::Transaction::WebSocket;
+use Mojo::URL;
 use Scalar::Util 'weaken';
 
-__PACKAGE__->attr([qw/default_cb tls_ca_file tls_verify_cb tx/]);
-__PACKAGE__->attr([qw/max_keep_alive_connections/] => 5);
+__PACKAGE__->attr([qw/app log tls_ca_file tls_verify_cb tx/]);
 __PACKAGE__->attr(cookie_jar => sub { Mojo::CookieJar->new });
-__PACKAGE__->attr(ioloop     => sub { Mojo::IOLoop->singleton });
-__PACKAGE__->attr(keep_alive_timeout => 15);
-__PACKAGE__->attr(max_redirects      => 0);
-__PACKAGE__->attr(websocket_timeout  => 300);
+__PACKAGE__->attr(ioloop     => sub { Mojo::IOLoop->new });
+__PACKAGE__->attr(keep_alive_timeout         => 15);
+__PACKAGE__->attr(max_keep_alive_connections => 5);
+__PACKAGE__->attr(max_redirects              => 0);
+__PACKAGE__->attr(websocket_timeout          => 300);
 
 # Singleton
 our $CLIENT;
-
-# Global application, log, port and server for testing
-my ($APP, $LOG, $PORT, $SERVER);
 
 # Make sure we leave a clean ioloop behind
 sub DESTROY {
@@ -54,13 +52,42 @@ sub DESTROY {
     }
 }
 
-sub app {
-    my ($self, $app) = @_;
-    if ($app) {
-        $APP = $app;
-        return $self;
+sub async {
+    my $self = shift;
+
+    # Already async
+    my $singleton = Mojo::IOLoop->singleton;
+    return $self if $self->{_is_async} || !$singleton->is_running;
+
+    # Async
+    unless ($self->{_async}) {
+
+        # Clone
+        my $clone = $self->{_async} = $self->clone;
+        $clone->{_is_async} = 1;
+
+        # Singleton
+        $clone->ioloop($singleton);
     }
-    return $APP;
+
+    return $self->{_async};
+}
+
+sub clone {
+    my $self = shift;
+
+    # Clone
+    my $clone = $self->new;
+    $clone->app($self->app);
+    $clone->cookie_jar($self->cookie_jar);
+    $clone->keep_alive_timeout($self->keep_alive_timeout);
+    $clone->max_keep_alive_connections($self->max_keep_alive_connections);
+    $clone->max_redirects($self->max_redirects);
+    $clone->tls_ca_file($self->tls_ca_file);
+    $clone->tls_verify_cb($self->tls_verify_cb);
+    $clone->websocket_timeout($self->websocket_timeout);
+
+    return $clone;
 }
 
 sub delete { shift->_build_tx('DELETE', @_) }
@@ -69,25 +96,36 @@ sub finish {
     my $self = shift;
 
     # WebSocket
-    croak 'No WebSocket connection to finish.'
+    croak 'No WebSocket connection to finish'
       if ref $self->tx eq 'ARRAY' && !$self->tx->is_websocket;
 
     # Finish
     $self->tx->finish;
 }
 
-sub get  { shift->_build_tx('GET',  @_) }
-sub head { shift->_build_tx('HEAD', @_) }
+sub finished {
+    my $self = shift;
 
-sub log {
-    my ($self, $log) = @_;
-    if ($log) {
-        $LOG = $log;
-        return $self;
-    }
-    return $LOG;
+    # WebSocket
+    croak 'No WebSocket connection in progress'
+      if ref $self->tx eq 'ARRAY' && !$self->tx->is_websocket;
+
+    # Callback
+    my $cb = shift;
+
+    # Transaction
+    my $tx = $self->tx;
+
+    # Weaken
+    weaken $self;
+    weaken $tx;
+
+    # Connection finished
+    $tx->finished(sub { shift; local $self->{tx} = $tx; $self->$cb(@_) });
 }
 
+sub get  { shift->_build_tx('GET',  @_) }
+sub head { shift->_build_tx('HEAD', @_) }
 sub post { shift->_build_tx('POST', @_) }
 
 sub post_form {
@@ -108,25 +146,20 @@ sub post_form {
 
     # Parameters
     my $params = Mojo::Parameters->new;
+    $params->charset($encoding) if defined $encoding;
     for my $name (sort keys %$form) {
 
         # Array
         if (ref $form->{$name} eq 'ARRAY') {
             for my $value (@{$form->{$name}}) {
-                $params->append($name,
-                    $encoding
-                    ? b($value)->encode($encoding)->to_string
-                    : $value);
+                $params->append($name, $value);
             }
         }
 
         # Single value
         else {
             my $value = $form->{$name};
-            $params->append($name,
-                $encoding
-                ? b($value)->encode($encoding)->to_string
-                : $value);
+            $params->append($name, $value);
         }
     }
 
@@ -150,6 +183,12 @@ sub post_form {
         $tx->req->body($params->to_string);
     }
 
+    # Quick process
+    if (!$cb && !$self->{_is_async}) {
+        $self->process($tx);
+        return $tx;
+    }
+
     # Queue transaction with callback
     $self->queue($tx, $cb);
 }
@@ -157,20 +196,25 @@ sub post_form {
 sub process {
     my $self = shift;
 
-    # Queue transactions
+    # Queue
     $self->queue(@_) if @_;
+    my $queue = $self->{_queue} || [];
+    $self->{_queue} = [];
 
     # Already running
-    return $self if $self->{_finite};
+    if (!$self->{_is_async} && $self->{_queued}) {
+        my $clone = $self->clone;
+        for my $job (@$queue) { $clone->queue(@$job) }
+        return $clone->process;
+    }
 
-    # Loop is finite
-    $self->{_finite} = 1;
+    # Process
+    else {
+        for my $job (@$queue) { $self->_queue(@$job) }
+    }
 
     # Start ioloop
     $self->ioloop->start;
-
-    # Loop is not finite if it's still running
-    delete $self->{_finite};
 
     return $self;
 }
@@ -183,11 +227,9 @@ sub queue {
     # Callback
     my $cb = pop @_ if ref $_[-1] && ref $_[-1] eq 'CODE';
 
-    # Embedded server
-    $self->_prepare_server if $APP;
-
     # Queue transactions
-    $self->_queue($_, $cb) for @_;
+    my $queue = $self->{_queue} ||= [];
+    for my $tx (@_) { push @$queue, [$tx, $cb] if $tx }
 
     return $self;
 }
@@ -196,7 +238,7 @@ sub receive_message {
     my $self = shift;
 
     # WebSocket
-    croak 'No WebSocket connection to receive messages from.'
+    croak 'No WebSocket connection to receive messages from'
       if ref $self->tx eq 'ARRAY' && !$self->tx->is_websocket;
 
     # Callback
@@ -218,7 +260,7 @@ sub req {
     my $self = shift;
 
     # Pipeline
-    croak 'Method "req" not supported for pipelines.'
+    croak 'Method "req" not supported for pipelines'
       if ref $self->tx eq 'ARRAY';
 
     $self->tx->req(@_);
@@ -228,7 +270,7 @@ sub res {
     my $self = shift;
 
     # Pipeline
-    croak 'Method "res" not supported for pipelines.'
+    croak 'Method "res" not supported for pipelines'
       if ref $self->tx eq 'ARRAY';
 
     $self->tx->res(@_);
@@ -240,7 +282,7 @@ sub send_message {
     my $self = shift;
 
     # WebSocket
-    croak 'No WebSocket connection to send message to.'
+    croak 'No WebSocket connection to send message to'
       if ref $self->tx eq 'ARRAY' && !$self->tx->is_websocket;
 
     # Send
@@ -303,19 +345,21 @@ sub _build_multipart_post {
         my $part = Mojo::Content::Single->new;
 
         # Content-Disposition
-        $part->headers->content_disposition(qq/form-data; name="$name"/);
+        my $escaped = b($name);
+        $escaped->encode($encoding) if $encoding;
+        $escaped = $escaped->url_escape($Mojo::URL::PARAM)->to_string;
+        $part->headers->content_disposition(qq/form-data; name="$escaped"/);
 
         # Content-Type
         my $type = 'text/plain';
         $type .= qq/;charset=$encoding/ if $encoding;
         $part->headers->content_type($type);
 
-        # Value
-        my $value =
-          ref $form->{$name} eq 'ARRAY'
-          ? join ',', @{$form->{$name}}
-          : $form->{$name};
-        $part->asset->add_chunk($value);
+        # Values
+        my $f = $form->{$name};
+        my $chunk = join ',', ref $f ? @$f : ($f);
+        $chunk = b($chunk)->encode($encoding)->to_string if $encoding;
+        $part->asset->add_chunk($chunk);
 
         push @parts, $part;
     }
@@ -349,10 +393,16 @@ sub _build_tx {
     my $cb = pop @_ if ref $_[-1] && ref $_[-1] eq 'CODE';
 
     # Body
-    $req->body(pop @_) if @_ & 1 == 1;
+    $req->body(pop @_) if @_ & 1 == 1 || ref $_[-2] eq 'HASH';
 
     # Headers
     $req->headers->from_hash(ref $_[0] eq 'HASH' ? $_[0] : {@_});
+
+    # Quick process
+    if (!$cb && !$self->{_is_async}) {
+        $self->process($tx);
+        return $tx;
+    }
 
     # Queue transaction with callback
     $self->queue($tx, $cb);
@@ -408,12 +458,9 @@ sub _connect {
         unless (defined $id) {
 
             # Update all transactions
-            for my $tx ($pipeline ? @$tx : ($tx)) {
-                $tx->error("Couldn't create connection.");
-            }
+            for my $tx ($pipeline ? @$tx : ($tx)) { $tx->error(500) }
 
             # Callback
-            $cb ||= $self->default_cb;
             $self->$cb($tx) if $cb;
 
             return;
@@ -500,20 +547,18 @@ sub _drop {
 sub _error {
     my ($self, $loop, $id, $error) = @_;
 
-    # Error message
-    my $message = $error || 'Unknown connection error, probably harmless.';
-
     # Transaction
     if (my $tx = $self->{_cs}->{$id}->{tx}) {
 
         # Add error message to all transactions
         for my $tx (ref $tx eq 'ARRAY' ? @$tx : ($tx)) {
-            $tx->error($message) unless $tx->is_finished;
+            $tx->error(500) unless $tx->is_finished;
         }
     }
 
     # Log
-    $error ? $LOG->error($message) : $LOG->debug($message) if $LOG;
+    my $log = $self->log;
+    $log->error($error) if $error && $log;
 
     # Finish
     $self->_finish($id);
@@ -550,6 +595,7 @@ sub _finish {
     # Drop WebSockets
     my $new;
     if ($old && !$pipeline && $old->is_websocket) {
+        $old->client_close;
         $old = undef;
         $self->{_queued} -= 1;
         delete $self->{_cs}->{$id};
@@ -577,7 +623,7 @@ sub _finish {
 
         # Done
         unless ($self->_redirect($c, $old)) {
-            my $cb = $c->{cb} || $self->default_cb;
+            my $cb = $c->{cb};
             my $tx = $new;
             $tx ||= $old;
             local $self->{tx} = $tx;
@@ -586,7 +632,7 @@ sub _finish {
     }
 
     # Stop ioloop
-    $self->ioloop->stop if $self->{_finite} && !$self->{_queued};
+    $self->ioloop->stop if !$self->{_is_async} && !$self->{_queued};
 }
 
 sub _fix_cookies {
@@ -609,40 +655,44 @@ sub _prepare_server {
     my $self = shift;
 
     # Server
-    unless ($PORT) {
-        $SERVER = Mojo::Server::Daemon->new(silent => 1);
-        $PORT = $self->ioloop->generate_port;
-        die "Couldn't find a free TCP port for testing.\n" unless $PORT;
-        $SERVER->listen("http://*:$PORT");
-        $SERVER->lock_file($SERVER->lock_file . '.test');
-        $SERVER->prepare_lock_file;
-        $SERVER->prepare_ioloop;
+    unless ($self->{_port}) {
+        my $server = $self->{_server} =
+          Mojo::Server::Daemon->new(ioloop => $self->ioloop, silent => 1);
+        my $port = $self->{_port} = $self->ioloop->generate_port;
+        die "Couldn't find a free TCP port for testing.\n" unless $port;
+        $server->listen("http://*:$port");
+        $server->prepare_ioloop;
     }
 
     # Application
-    delete $SERVER->{app};
-    ref $APP ? $SERVER->app($APP) : $SERVER->app_class($APP);
+    my $server = $self->{_server};
+    delete $server->{app};
+    my $app = $self->app;
+    ref $app ? $server->app($app) : $server->app_class($app);
 }
 
 sub _queue {
     my ($self, $tx, $cb) = @_;
 
+    # Embedded server
+    $self->_prepare_server if $self->app;
+
     # Pipeline
     my $pipeline = ref $tx eq 'ARRAY' ? 1 : 0;
 
     # Log
-    $LOG ||= $SERVER->app->log if $SERVER;
+    $self->log($self->{_server}->app->log) if $self->{_server} && !$self->log;
 
     # Prepare all transactions
     for my $tx ($pipeline ? @$tx : ($tx)) {
 
         # Embedded server
-        if ($APP) {
+        if ($self->app) {
             my $url = $tx->req->url->to_abs;
             next if $url->host;
             $url->scheme('http');
             $url->host('localhost');
-            $url->port($PORT);
+            $url->port($self->{_port});
             $tx->req->url($url);
         }
 
@@ -931,14 +981,23 @@ Mojo::Client - Async IO HTTP 1.1 And WebSocket Client
 =head1 SYNOPSIS
 
     use Mojo::Client;
-
     my $client = Mojo::Client->new;
+
+    $client->async->get(
+        'http://kraih.com' => sub {
+            my $self = shift;
+            print $self->res->code;
+        }
+    )->process;
+
     $client->get(
         'http://kraih.com' => sub {
             my $self = shift;
             print $self->res->code;
         }
     )->process;
+
+    print $client->post('http://mojolicious.org')->res->body;
 
 =head1 DESCRIPTION
 
@@ -958,6 +1017,14 @@ L<IO::Socket::SSL> are supported transparently and used if installed.
 
 L<Mojo::Client> implements the following attributes.
 
+=head2 C<app>
+
+    my $app = $client->app;
+    $client = $client->app(MyApp->new);
+
+A Mojo application to associate this client with.
+If set, local requests will be processed in this application.
+
 =head2 C<cookie_jar>
 
     my $cookie_jar = $client->cookie_jar;
@@ -966,26 +1033,13 @@ L<Mojo::Client> implements the following attributes.
 Cookie jar to use for this clients requests, by default a L<Mojo::CookieJar>
 object.
 
-=head2 C<default_cb>
-
-    my $cb  = $client->default_cb;
-    $client = $client->default_cb(sub {...});
-
-A default callback to use if your request does not specify a callback.
-
-    $client->default_cb(sub {
-        my ($self, $tx) = @_;
-    });
-
 =head2 C<ioloop>
 
     my $loop = $client->ioloop;
     $client  = $client->ioloop(Mojo::IOLoop->new);
 
-Loop object to use for io operations, by default it will use the global
-L<Mojo::IOLoop> singleton.
-You can force the client to block on C<process> by creating a new loop
-object.
+Loop object to use for io operations, by default a L<Mojo::IOLoop> obkect
+will be used.
 
 =head2 C<keep_alive_timeout>
 
@@ -993,6 +1047,14 @@ object.
     $client                = $client->keep_alive_timeout(15);
 
 Timeout in seconds for keep alive between requests, defaults to C<15>.
+
+=head2 C<log>
+
+    my $log = $client->log;
+    $client = $client->log(Mojo::Log->new);
+
+A L<Mojo::Log> object used for logging, by default the application log will
+be used.
 
 =head2 C<max_keep_alive_connections>
 
@@ -1054,19 +1116,37 @@ Construct a new L<Mojo::Client> object.
 Use C<singleton> if you want to share keep alive connections and cookies with
 other clients
 
-=head2 C<app>
+=head2 C<async>
 
-    my $app = $client->app;
-    $client = $client->app(MyApp->new);
+    my $async = $client->async;
 
-A Mojo application to associate this client with.
-If set, local requests will be processed in this application.
+Clone client instance and start using the global shared L<Mojo::IOLoop>
+singleton.
+
+    $client->async->get('http://mojolicious.org' => sub {
+        my $self = shift;
+        print $self->res->body;
+    })->process;
+
+=head2 C<clone>
+
+    my $clone = $client->clone;
+
+Clone client instance.
 
 =head2 C<delete>
 
+    my $tx  = $client->delete('http://kraih.com');
+    my $tx  = $client->delete('http://kraih.com' => (Connection => 'close'));
+    my $tx  = $client->delete(
+        'http://kraih.com' => (Connection => 'close') => 'Hi!'
+    );
     $client = $client->delete('http://kraih.com' => sub {...});
     $client = $client->delete(
         'http://kraih.com' => (Connection => 'close') => sub {...}
+    );
+    $client = $client->delete(
+        'http://kraih.com' => (Connection => 'close') => 'Hi!' => sub {...}
     );
 
 Send a HTTP C<DELETE> request.
@@ -1077,34 +1157,58 @@ Send a HTTP C<DELETE> request.
 
 Finish the WebSocket connection, only available from callbacks.
 
+=head2 C<finished>
+
+    $client->finished(sub {...});
+
+Callback signaling that peer finished the WebSocket connection, only
+available from callbacks.
+
+    $client->finished(sub {
+        my $self = shift;
+    });
+
 =head2 C<get>
 
+    my $tx  = $client->get('http://kraih.com');
+    my $tx  = $client->get('http://kraih.com' => (Connection => 'close'));
+    my $tx  = $client->get(
+        'http://kraih.com' => (Connection => 'close') => 'Hi!'
+    );
     $client = $client->get('http://kraih.com' => sub {...});
     $client = $client->get(
         'http://kraih.com' => (Connection => 'close') => sub {...}
+    );
+    $client = $client->get(
+        'http://kraih.com' => (Connection => 'close') => 'Hi!' => sub {...}
     );
 
 Send a HTTP C<GET> request.
 
 =head2 C<head>
 
+    my $tx  = $client->head('http://kraih.com');
+    my $tx  = $client->head('http://kraih.com' => (Connection => 'close'));
+    my $tx  = $client->head(
+        'http://kraih.com' => (Connection => 'close') => 'Hi!'
+    );
     $client = $client->head('http://kraih.com' => sub {...});
     $client = $client->head(
         'http://kraih.com' => (Connection => 'close') => sub {...}
     );
+    $client = $client->head(
+        'http://kraih.com' => (Connection => 'close') => 'Hi!' => sub {...}
+    );
 
 Send a HTTP C<HEAD> request.
 
-=head2 C<log>
-
-    my $log = $client->log;
-    $client = $client->log(Mojo::Log->new);
-
-A L<Mojo::Log> object used for logging, by default the application log will
-be used.
-
 =head2 C<post>
 
+    my $tx  = $client->post('http://kraih.com');
+    my $tx  = $client->post('http://kraih.com' => (Connection => 'close'));
+    my $tx  = $client->post(
+        'http://kraih.com' => (Connection => 'close') => 'Hi!'
+    );
     $client = $client->post('http://kraih.com' => sub {...});
     $client = $client->post(
         'http://kraih.com' => (Connection => 'close') => sub {...}
@@ -1123,21 +1227,38 @@ Send a HTTP C<POST> request.
 
 =head2 C<post_form>
 
+    my $tx  = $client->post_form('http://kraih.com/foo' => {test => 123});
+    my $tx  = $client->post_form(
+        'http://kraih.com/foo'
+        'UTF-8',
+        {test => 123}
+    );
+    my $tx  = $client->post_form(
+        'http://kraih.com/foo',
+        {test => 123},
+        {Expect => '100-continue'}
+    );
+    my $tx  = $client->post_form(
+        'http://kraih.com/foo',
+        'UTF-8',
+        {test => 123},
+        {Expect => '100-continue'}
+    );
     $client = $client->post_form('/foo' => {test => 123}, sub {...});
     $client = $client->post_form(
-        '/foo',
+        'http://kraih.com/foo',
         'UTF-8',
         {test => 123},
         sub {...}
     );
     $client = $client->post_form(
-        '/foo',
+        'http://kraih.com/foo',
         {test => 123},
         {Expect => '100-continue'},
         sub {...}
     );
     $client = $client->post_form(
-        '/foo',
+        'http://kraih.com/foo',
         'UTF-8',
         {test => 123},
         {Expect => '100-continue'},
@@ -1153,10 +1274,16 @@ Send a HTTP C<POST> request with form data.
     $client = $client->process(@transactions => sub {...});
 
 Process all queued transactions.
-Will be blocking unless you have a global shared ioloop.
+Will be blocking unless you have a global shared ioloop and use the C<async>
+method.
 
 =head2 C<put>
 
+    my $tx  = $client->put('http://kraih.com');
+    my $tx  = $client->put('http://kraih.com' => (Connection => 'close'));
+    my $tx  = $client->put(
+        'http://kraih.com' => (Connection => 'close') => 'Hi!'
+    );
     $client = $client->put('http://kraih.com' => sub {...});
     $client = $client->put(
         'http://kraih.com' => (Connection => 'close') => sub {...}
