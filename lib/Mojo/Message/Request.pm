@@ -7,8 +7,10 @@ use warnings;
 
 use base 'Mojo::Message';
 
+use Mojo::ByteStream 'b';
 use Mojo::Cookie::Request;
 use Mojo::Parameters;
+use Mojo::URL;
 
 __PACKAGE__->attr(env => sub { {} });
 __PACKAGE__->attr(method => 'GET');
@@ -59,12 +61,26 @@ sub fix_headers {
     $self->SUPER::fix_headers(@_);
 
     # Host header is required in HTTP 1.1 requests
+    my $url     = $self->url;
+    my $headers = $self->headers;
     if ($self->at_least_version('1.1')) {
-        my $host = $self->url->ihost;
-        my $port = $self->url->port;
+        my $host = $url->ihost;
+        my $port = $url->port;
         $host .= ":$port" if $port;
-        my $headers = $self->headers;
         $headers->host($host) unless $headers->host;
+    }
+
+    # Basic authorization
+    if ((my $u = $url->userinfo) && !$headers->authorization) {
+        $headers->authorization('Basic ' . b($u)->b64_encode->to_string);
+    }
+
+    # Basic proxy authorization
+    if (my $proxy = $self->proxy) {
+        if ((my $u = $proxy->userinfo) && !$headers->proxy_authorization) {
+            $headers->proxy_authorization(
+                'Basic ' . b($u)->b64_encode->to_string);
+        }
     }
 
     return $self;
@@ -118,8 +134,23 @@ sub parse {
         # Base URL
         my $base = $self->url->base;
         $base->scheme('http') unless $base->scheme;
-        if (!$base->authority && (my $host = $self->headers->host)) {
+        my $headers = $self->headers;
+        if (!$base->authority && (my $host = $headers->host)) {
             $base->authority($host);
+        }
+
+        # Basic authorization
+        if (my $auth = $headers->authorization) {
+            if (my $userinfo = $self->_parse_basic_auth($auth)) {
+                $base->userinfo($userinfo);
+            }
+        }
+
+        # Basic proxy authorization
+        if (my $auth = $headers->proxy_authorization) {
+            if (my $userinfo = $self->_parse_basic_auth($auth)) {
+                $self->proxy(Mojo::URL->new->userinfo($userinfo));
+            }
         }
     }
 
@@ -155,10 +186,25 @@ sub _build_start_line {
     my $query = $url->query->to_string;
     $path .= "?$query" if $query;
     $path = "/$path" unless $path =~ /^\//;
-    $path = $url if $self->proxy;
 
-    # Method and version
-    my $method  = $self->method;
+    # Proxy
+    if ($self->proxy) {
+        my $clone = $url = $url->clone;
+        $clone->userinfo(undef);
+        $path = $clone;
+    }
+
+    # Method
+    my $method = $self->method;
+
+    # CONNECT
+    if ($method eq 'CONNECT') {
+        my $host = $url->host;
+        my $port = $url->port || ($url->scheme eq 'https' ? '443' : '80');
+        $path = "$host:$port";
+    }
+
+    # Version
     my $version = $self->version;
 
     # HTTP 0.9
@@ -166,6 +212,16 @@ sub _build_start_line {
 
     # HTTP 1.0 and above
     return "$method $path HTTP/$version\x0d\x0a";
+}
+
+sub _parse_basic_auth {
+    my ($self, $header) = @_;
+
+    # Shortcut
+    return unless $header =~ /Basic (.+)$/;
+
+    # Decode
+    return b($1)->b64_decode->to_string;
 }
 
 sub _parse_env {
@@ -315,7 +371,10 @@ sub _parse_start_line {
     if (defined $line) {
         if ($line =~ m/$START_LINE_RE/o) {
             $self->method($1);
-            $self->url->parse($2);
+            my $url = $self->url;
+            $self->method eq 'CONNECT'
+              ? $url->authority($2)
+              : $url->parse($2);
 
             # HTTP 0.9 is identified by the missing version
             if (defined $3 && defined $4) {

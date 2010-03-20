@@ -1,5 +1,6 @@
 .perltidyrc
 Changes
+examples/connect-proxy.pl
 examples/flash-policy-server.pl
 examples/microhttpd.pl
 lib/Mojo.pm
@@ -18,7 +19,6 @@ lib/Mojo/Command/Generate.pm
 lib/Mojo/Command/Generate/App.pm
 lib/Mojo/Command/Generate/Gitignore.pm
 lib/Mojo/Command/Generate/Makefile.pm
-lib/Mojo/Command/Generate/Psgi.pm
 lib/Mojo/Command/Get.pm
 lib/Mojo/Command/Psgi.pm
 lib/Mojo/Command/Test.pm
@@ -124,6 +124,7 @@ t/mojo/date.t
 t/mojo/fastcgi.t
 t/mojo/headers.t
 t/mojo/home.t
+t/mojo/ioloop.t
 t/mojo/json.t
 t/mojo/lib/LoaderException.pm
 t/mojo/lib/LoaderException2.pm

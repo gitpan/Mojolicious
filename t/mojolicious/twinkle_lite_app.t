@@ -11,6 +11,8 @@ use Test::More;
 # Make sure sockets are working
 plan skip_all => 'working sockets required for this test!'
   unless Mojo::IOLoop->new->generate_port;
+plan skip_all => 'Perl 5.10 required for this test!'
+  unless eval { require Pod::Simple::HTML; 1 };
 plan tests => 14;
 
 # Pizza delivery for...
@@ -24,7 +26,7 @@ app->log->level('error');
 
 # Twinkle template syntax
 my $twinkle = {
-    capture_end     => '-',
+    capture_end     => '.',
     capture_start   => '+',
     escape_mark     => '*',
     expression_mark => '*',
@@ -84,7 +86,7 @@ test<%= content %>123\
  ** for my $i (@$numbers) { ***
  *** $i ***
  ** } ***
- **+ my $foo = *** 23 **-*** *** $foo ***
+ **+ my $foo = block *** 23 **.*** *** $foo ***
 
 @@ docs.html.pod
 <%= '=head3 ' . $codename %>

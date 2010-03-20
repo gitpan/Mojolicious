@@ -9,6 +9,8 @@ use base 'Mojo::Base';
 
 use Carp 'croak';
 use Errno qw/EAGAIN EWOULDBLOCK/;
+use File::Spec;
+use IO::File;
 use IO::Poll qw/POLLERR POLLHUP POLLIN POLLOUT/;
 use IO::Socket;
 use Mojo::ByteStream;
@@ -45,8 +47,54 @@ use constant TLS => $ENV{MOJO_NO_TLS}
   ? 0
   : eval { require IO::Socket::SSL; 1 };
 
+# Default TLS cert (20.03.2010)
+# (openssl req -new -x509 -keyout cakey.pem -out cacert.pem -nodes -days 7300)
+use constant CERT => <<EOF;
+-----BEGIN CERTIFICATE-----
+MIIDbzCCAtigAwIBAgIJAM+kFv1MwalmMA0GCSqGSIb3DQEBBQUAMIGCMQswCQYD
+VQQGEwJERTEWMBQGA1UECBMNTmllZGVyc2FjaHNlbjESMBAGA1UEBxMJSGFtYmVy
+Z2VuMRQwEgYDVQQKEwtNb2pvbGljaW91czESMBAGA1UEAxMJbG9jYWxob3N0MR0w
+GwYJKoZIhvcNAQkBFg5rcmFpaEBjcGFuLm9yZzAeFw0xMDAzMjAwMDQ1MDFaFw0z
+MDAzMTUwMDQ1MDFaMIGCMQswCQYDVQQGEwJERTEWMBQGA1UECBMNTmllZGVyc2Fj
+aHNlbjESMBAGA1UEBxMJSGFtYmVyZ2VuMRQwEgYDVQQKEwtNb2pvbGljaW91czES
+MBAGA1UEAxMJbG9jYWxob3N0MR0wGwYJKoZIhvcNAQkBFg5rcmFpaEBjcGFuLm9y
+ZzCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEAzu9mOiyUJB2NBuf1lZxViNM2
+VISqRAoaXXGOBa6RgUoVfA/n81RQlgvVA0qCSQHC534DdYRk3CdyJR9UGPuxF8k4
+CckOaHWgcJJsd8H0/q73PjbA5ItIpGTTJNh8WVpFDjHTJmQ5ihwddap4/offJxZD
+dPrMFtw1ZHBRug5tHUECAwEAAaOB6jCB5zAdBgNVHQ4EFgQUo+Re5wuuzVFqH/zV
+cxRGXL0j5K4wgbcGA1UdIwSBrzCBrIAUo+Re5wuuzVFqH/zVcxRGXL0j5K6hgYik
+gYUwgYIxCzAJBgNVBAYTAkRFMRYwFAYDVQQIEw1OaWVkZXJzYWNoc2VuMRIwEAYD
+VQQHEwlIYW1iZXJnZW4xFDASBgNVBAoTC01vam9saWNpb3VzMRIwEAYDVQQDEwls
+b2NhbGhvc3QxHTAbBgkqhkiG9w0BCQEWDmtyYWloQGNwYW4ub3JnggkAz6QW/UzB
+qWYwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQUFAAOBgQCZZcOeAobctD9wtPtO
+40CKHpiGYEM3rh7VvBhjTcVnX6XlLvffIg3uTrVRhzmlEQCZz3O5TsBzfMAVnjYz
+llhwgRF6Xn8ict9L8yKDoGSbw0Q7HaCb8/kOe0uKhcSDUd3PjJU0ZWgc20zcGFA9
+R65bABoJ2vU1rlQFmjs0RT4UcQ==
+-----END CERTIFICATE-----
+EOF
+
+# Default TLS key (20.03.2010)
+# (openssl req -new -x509 -keyout cakey.pem -out cacert.pem -nodes -days 7300)
+use constant KEY => <<EOF;
+-----BEGIN RSA PRIVATE KEY-----
+MIICXAIBAAKBgQDO72Y6LJQkHY0G5/WVnFWI0zZUhKpEChpdcY4FrpGBShV8D+fz
+VFCWC9UDSoJJAcLnfgN1hGTcJ3IlH1QY+7EXyTgJyQ5odaBwkmx3wfT+rvc+NsDk
+i0ikZNMk2HxZWkUOMdMmZDmKHB11qnj+h98nFkN0+swW3DVkcFG6Dm0dQQIDAQAB
+AoGAeLmd8C51tqQu1GqbEc+E7zAZsDE9jDhArWdELfhsFvt7kUdOUN1Nrlv0x9i+
+LY2Dgb44kmTM2suAgjvGulSMOYBGosZcM0w3ES76nmeAVJ1NBFhbZTCJqo9svoD/
+NKdctRflUuvFSWimoui+vj9D5p/4lvAMdBHUWj5FlQsYiOECQQD/FRXtsDetptFu
+Vp8Kw+6bZ5+efcjVfciTp7fQKI2xZ2n1QyloaV4zYXgDC2y3fMYuRigCGrX9XeFX
+oGHGMyYFAkEAz635I8f4WQa/wvyl/SR5agtDVnkJqMHMgOuykytiF8NFbDSkJv+b
+1VfyrWcfK/PVsSGBI67LCMDoP+PZBVOjDQJBAIInoCjH4aEZnYNPb5duojFpjmiw
+helpZQ7yZTgxeRssSUR8IITGPuq4sSPckHyPjg/OfFuWhYXigTjU/Q7EyoECQERT
+Dykna9wWLVZ/+jgLHOq3Y+L6FSRxBc/QO0LRvgblVlygAPVXmLQaqBtGVuoF4WLS
+DANqSR/LH12Nn2NyPa0CQBbzoHgx2i3RncWoq1EeIg2mSMevEcjA6sxgYmsyyzlv
+AnqxHi90n/p912ynLg2SjBq+03GaECeGzC/QqKK2gtA=
+-----END RSA PRIVATE KEY-----
+EOF
+
 __PACKAGE__->attr(
-    [qw/lock_cb unlock_cb/] => sub {
+    [qw/lock_cb tick_cb unlock_cb/] => sub {
         sub {1}
     }
 );
@@ -56,6 +104,16 @@ __PACKAGE__->attr(timeout                              => '0.25');
 
 # Singleton
 our $LOOP;
+
+sub DESTROY {
+    my $self = shift;
+
+    # Cleanup temporary cert file
+    if (my $cert = $self->{_cert}) { unlink $cert if -w $cert }
+
+    # Cleanup temporary key file
+    if (my $key = $self->{_key}) { unlink $key if -w $key }
+}
 
 sub new {
     my $self = shift->SUPER::new(@_);
@@ -81,26 +139,10 @@ sub connect {
         Type     => SOCK_STREAM
     );
 
-    # TLS certificate verification
-    if ($args->{tls} && $args->{tls_ca_file}) {
-        $options{SSL_ca_file}         = $args->{tls_ca_file};
-        $options{SSL_verify_mode}     = 0x01;
-        $options{SSL_verify_callback} = $args->{tls_verify_cb};
-    }
-
     # New connection
-    my $class =
-        TLS && $args->{tls} ? 'IO::Socket::SSL'
-      : IPV6 ? 'IO::Socket::INET6'
-      :        'IO::Socket::INET';
+    my $class = IPV6 ? 'IO::Socket::INET6' : 'IO::Socket::INET';
     my $socket = $class->new(%options) or return;
     my $id = "$socket";
-
-    # Non blocking
-    $socket->blocking(0);
-
-    # Disable Nagle's algorithm
-    setsockopt $socket, IPPROTO_TCP, TCP_NODELAY, 1;
 
     # Add connection
     my $c = $self->{_cs}->{$id} = {
@@ -110,13 +152,23 @@ sub connect {
         socket     => $socket
     };
 
+    # Start TLS
+    if ($args->{tls}) {
+        my $old = $id;
+        $id = $self->start_tls($id => $args);
+        $self->drop($old) && return unless $id;
+    }
+
+    # Non blocking
+    $socket->blocking(0);
+
+    # Disable Nagle's algorithm
+    setsockopt $socket, IPPROTO_TCP, TCP_NODELAY, 1;
+
     # Timeout
-    $c->{connect_timer} = $self->timer(
-        $id => (
-            after => $self->connect_timeout,
-            cb    => sub { shift->_error($id, 'Connect timeout.') }
-        )
-    );
+    $c->{connect_timer} =
+      $self->timer($self->connect_timeout =>
+          sub { shift->_error($id, 'Connect timeout.') });
 
     # File descriptor
     my $fd = fileno $socket;
@@ -130,22 +182,37 @@ sub connect {
 
 sub connection_timeout {
     my ($self, $id, $timeout) = @_;
-    $self->{_cs}->{$id}->{timeout} = $timeout and return $self if $timeout;
-    return $self->{_cs}->{$id}->{timeout};
+
+    # Connection
+    return unless my $c = $self->{_cs}->{$id};
+
+    # Timeout
+    $c->{timeout} = $timeout and return $self if $timeout;
+
+    return $c->{timeout};
 }
 
 sub drop {
     my ($self, $id) = @_;
 
-    # Finish connection once buffer is empty
-    my $c = $self->{_cs}->{$id};
-    if ($c && (($c->{buffer} && $c->{buffer}->size) || $c->{protected})) {
-        $c->{finish} = 1;
-        return $self;
+    # Connection
+    if (my $c = $self->{_cs}->{$id}) {
+
+        # Protected connection
+        my $protected = $c->{protected} || 0;
+
+        # Finish connection once buffer is empty
+        if (my $buffer = $c->{buffer}) { $protected = 1 if $buffer->size }
+
+        # Delay connection drop
+        if ($protected) {
+            $c->{finish} = 1;
+            return $self;
+        }
     }
 
     # Drop
-    return $self->_drop($id);
+    return $self->_drop_immediately($id);
 }
 
 sub error_cb { shift->_add_event('error', @_) }
@@ -211,16 +278,17 @@ sub listen {
         $options{LocalPort} = $args->{port} || 3000;
         $options{Proto}     = 'tcp';
         $options{ReuseAddr} = 1;
-        my $cert = $args->{tls_cert};
-        $options{SSL_cert_file} = $cert if $cert;
-        my $key = $args->{tls_key};
-        $options{SSL_key_file} = $key if $key;
+
+        # TLS options
+        if ($args->{tls}) {
+            $options{SSL_cert_file} = $args->{tls_cert}
+              || $self->_prepare_cert;
+            $options{SSL_key_file} = $args->{tls_key} || $self->_prepare_key;
+        }
 
         # Create socket
-        my $class =
-            TLS && $args->{tls} ? 'IO::Socket::SSL'
-          : IPV6 ? 'IO::Socket::INET6'
-          :        'IO::Socket::INET';
+        my $class = IPV6 ? 'IO::Socket::INET6' : 'IO::Socket::INET';
+        $class = 'IO::Socket::SSL' if TLS && $args->{tls};
         $socket = $class->new(%options)
           or croak "Can't create listen socket: $!";
     }
@@ -239,30 +307,36 @@ sub listen {
 
 sub local_info {
     my ($self, $id) = @_;
-    return {} unless my $c      = $self->{_cs}->{$id};
+
+    # Connection
+    return {} unless my $c = $self->{_cs}->{$id};
+
+    # Socket
     return {} unless my $socket = $c->{socket};
+
+    # Info
     return {address => $socket->sockhost, port => $socket->sockport};
 }
 
 sub not_writing {
     my ($self, $id) = @_;
 
-    # Active
-    $self->_active($id);
-
     # Connection
-    my $c = $self->{_cs}->{$id};
+    return unless my $c = $self->{_cs}->{$id};
 
-    # Chunk still in buffer or called from write event
-    my $buffer = $c->{buffer};
-    return $c->{read_only} = 1
-      if $c->{protected} || ($buffer && $buffer->size);
+    # Activity
+    $self->_activity($id);
+
+    # Chunk still in buffer or protected
+    my $protected = $c->{protected} || 0;
+    if (my $buffer = $c->{buffer}) { $protected = 1 if $buffer->size }
+    return $c->{read_only} = 1 if $protected;
 
     # Socket
     return unless my $socket = $c->{socket};
 
     # KQueue
-    my $loop = $self->{_loop} ||= $self->_new_loop;
+    my $loop = $self->{_loop} ||= $self->_build_loop;
     if (KQUEUE) {
         my $fd = fileno $socket;
 
@@ -282,467 +356,11 @@ sub not_writing {
     else { $loop->mask($socket, POLLIN) }
 }
 
-sub read_cb { shift->_add_event('read', @_) }
-
-sub remote_info {
-    my ($self, $id) = @_;
-    return {} unless my $c      = $self->{_cs}->{$id};
-    return {} unless my $socket = $c->{socket};
-    return {address => $socket->peerhost, port => $socket->peerport};
-}
-
-sub singleton { $LOOP ||= shift->new(@_) }
-
-sub start {
-    my $self = shift;
-
-    # Already running
-    return if $self->{_running};
-
-    # Running
-    $self->{_running} = 1;
-
-    # Loop
-    $self->{_loop} ||= $self->_new_loop;
-
-    # Mainloop
-    $self->_spin while $self->{_running};
-
-    return $self;
-}
-
-sub stop { delete shift->{_running} }
-
-sub timer {
-    my $self = shift;
-    my $id   = shift;
-
-    # Arguments
-    my $args = ref $_[0] ? $_[0] : {@_};
-
-    # Started
-    $args->{started} = time;
-
-    # Connection
-    $args->{connection} = $id;
-
-    # Connection doesn't exist
-    return unless my $c = $self->{_cs}->{$id};
-    my $tid = "$args";
-
-    # Add timer
-    $self->{_ts}->{$tid} = $args;
-
-    # Bind timer to connection
-    my $timers = $c->{timers} ||= [];
-    push @{$timers}, $tid;
-
-    return $tid;
-}
-
-sub write_cb { shift->_add_event('write', @_) }
-
-sub writing {
-    my ($self, $id) = @_;
-
-    # Active
-    $self->_active($id);
-
-    # Connection
-    my $c = $self->{_cs}->{$id};
-
-    # Writing again
-    delete $c->{read_only};
-
-    # Socket
-    return unless my $socket = $c->{socket};
-
-    # KQueue
-    my $loop = $self->{_loop} ||= $self->_new_loop;
-    if (KQUEUE) {
-        my $fd = fileno $socket;
-
-        # Writing
-        my $writing = $c->{writing};
-        $loop->EV_SET($fd, KQUEUE_READ,  KQUEUE_ADD) unless defined $writing;
-        $loop->EV_SET($fd, KQUEUE_WRITE, KQUEUE_ADD) unless $writing;
-
-        # Writing
-        $c->{writing} = 1;
-    }
-
-    # Epoll
-    elsif (EPOLL) { $loop->mask($socket, EPOLL_POLLIN | EPOLL_POLLOUT) }
-
-    # Poll
-    else { $loop->mask($socket, POLLIN | POLLOUT) }
-}
-
-sub _accept {
-    my ($self, $listen) = @_;
-
-    # Accept
-    my $socket = $listen->accept or return;
-    my $id = "$socket";
-
-    # Add connection
-    my $c = $self->{_cs}->{$id} = {
-        accepting => 1,
-        buffer    => Mojo::ByteStream->new,
-        socket    => $socket
-    };
-
-    # Timeout
-    $c->{accept_timer} = $self->timer(
-        $id => (
-            after => $self->accept_timeout,
-            cb    => sub { shift->_error($id, 'Accept timeout.') }
-        )
-    );
-
-    # Disable Nagle's algorithm
-    setsockopt($socket, IPPROTO_TCP, TCP_NODELAY, 1)
-      unless $self->{_listen}->{$listen}->{file};
-
-    # File descriptor
-    my $fd = fileno $socket;
-    $self->{_fds}->{$fd} = $id;
-
-    # Accept callback
-    my $cb = $self->{_listen}->{$listen}->{cb};
-    $self->_event('accept', $cb, $id) if $cb;
-
-    # Unlock callback
-    $self->_callback('unlock', $self->unlock_cb);
-
-    # Remove listen sockets
-    $listen = $self->{_listen} || {};
-    my $loop = $self->{_loop};
-    for my $lid (keys %$listen) {
-        my $socket = $listen->{$lid}->{socket};
-
-        # Remove listen socket from kqueue
-        if (KQUEUE) {
-            $loop->EV_SET(fileno $socket, KQUEUE_READ, KQUEUE_DELETE);
-        }
-
-        # Remove listen socket from poll or epoll
-        else { $loop->remove($socket) }
-    }
-
-    # Not listening anymore
-    delete $self->{_listening};
-}
-
-sub _accepting {
-    my ($self, $id) = @_;
-
-    # Connection
-    my $c = $self->{_cs}->{$id};
-
-    # Connected
-    return unless $c->{socket}->connected;
-
-    # Accepted
-    delete $c->{accepting};
-
-    # Remove timeout
-    $self->_drop(delete $c->{accept_timer});
-
-    # Non blocking
-    $c->{socket}->blocking(0);
-
-    # Add socket to poll
-    $self->not_writing($id);
-}
-
-sub _active {
-    my ($self, $id) = @_;
-    return $self->{_cs}->{$id}->{active} = time;
-}
-
-sub _add_event {
-    my ($self, $event, $id, $cb) = @_;
-
-    # Add event callback to connection
-    $self->{_cs}->{$id}->{$event} = $cb;
-
-    return $self;
-}
-
-# Failed callbacks should not kill everything
-sub _callback {
-    my $self  = shift;
-    my $event = shift;
-    my $cb    = shift;
-
-    # Invoke callback
-    my $value = eval { $self->$cb(@_) };
-
-    # Callback error
-    warn qq/Callback "$event" failed: $@/ if $@;
-
-    return $value;
-}
-
-sub _connecting {
-    my ($self, $id) = @_;
-
-    # Connection
-    my $c = $self->{_cs}->{$id};
-
-    # Not yet connected
-    return unless $c->{socket}->connected;
-
-    # Connected
-    delete $c->{connecting};
-
-    # Remove timeout
-    $self->_drop(delete $c->{connect_timer});
-
-    # Connect callback
-    my $cb = $c->{connect_cb};
-    $self->_event('connect', $cb, $id) if $cb;
-}
-
-sub _drop {
-    my ($self, $id) = @_;
-
-    # Drop timer
-    if ($self->{_ts}->{$id}) {
-
-        # Connection for timer
-        my $cid = $self->{_ts}->{$id}->{connection};
-
-        # Connection exists
-        if (my $c = $self->{_cs}->{$cid}) {
-
-            # Cleanup
-            my @timers;
-            for my $timer (@{$c->{timers}}) {
-                next if $timer eq $id;
-                push @timers, $timer;
-            }
-            $c->{timers} = \@timers;
-        }
-
-        # Drop
-        delete $self->{_ts}->{$id};
-        return $self;
-    }
-
-    # Delete connection
-    my $c = delete $self->{_cs}->{$id};
-
-    # Drop listen socket
-    if (!$c && ($c = delete $self->{_listen}->{$id})) {
-
-        # Not listening
-        return $self unless $self->{_listening};
-
-        # Not listening anymore
-        delete $self->{_listening};
-    }
-
-    # Drop socket
-    if (my $socket = $c->{socket}) {
-
-        # Cleanup timers
-        if (my $timers = $c->{timers}) {
-            for my $tid (@$timers) { $self->_drop($tid) }
-        }
-
-        # Remove file descriptor
-        my $fd = fileno $socket;
-        delete $self->{_fds}->{$fd};
-
-        # Remove socket from kqueue
-        if (my $loop = $self->{_loop}) {
-            if (KQUEUE) {
-
-                # Writing
-                my $writing = $c->{writing};
-                $loop->EV_SET($fd, KQUEUE_READ, KQUEUE_DELETE)
-                  if defined $writing;
-                $loop->EV_SET($fd, KQUEUE_WRITE, KQUEUE_DELETE) if $writing;
-            }
-
-            # Remove socket from poll or epoll
-            else { $loop->remove($socket) }
-        }
-
-        # Close socket
-        close $socket;
-    }
-
-    return $self;
-}
-
-sub _error {
-    my ($self, $id, $error) = @_;
-
-    # Get error callback
-    my $event = $self->{_cs}->{$id}->{error};
-
-    # Cleanup
-    $self->_drop($id);
-
-    # No event
-    warn "Unhandled event error: $error" and return unless $event;
-
-    # Error callback
-    $self->_event('error', $event, $id, $error);
-}
-
-# Failed events should not kill everything
-sub _event {
-    my $self  = shift;
-    my $event = shift;
-    my $cb    = shift;
-    my $id    = shift;
-
-    # Invoke callback
-    my $value = eval { $self->$cb($id, @_) };
-
-    # Event error
-    if ($@) {
-        my $message = qq/Event "$event" failed for connection "$id": $@/;
-        ($event eq 'error' || $event eq 'timer')
-          ? ($self->_drop($id) and warn $message)
-          : $self->_error($id, $message);
-    }
-
-    return $value;
-}
-
-sub _hup {
-    my ($self, $id) = @_;
-
-    # Get hup callback
-    my $event = $self->{_cs}->{$id}->{hup};
-
-    # Cleanup
-    $self->_drop($id);
-
-    # No event
-    return unless $event;
-
-    # HUP callback
-    $self->_event('hup', $event, $id);
-}
-
-sub _is_listening {
-    my $self   = shift;
-    my $cs     = $self->{_cs};
-    my $listen = $self->{_listen} || {};
-    return 1
-      if keys %$listen
-          && keys %$cs < $self->max_connections
-          && $self->_callback('lock', $self->lock_cb, !keys %$cs);
-    return;
-}
-
-# Initialize as late as possible because kqueues don't survive a fork
-sub _new_loop {
-    return IO::KQueue->new if KQUEUE;
-    return IO::Epoll->new  if EPOLL;
-    return IO::Poll->new;
-}
-
-sub _prepare {
-    my $self = shift;
-
-    # Prepare
-    for my $id (keys %{$self->{_cs}}) {
-
-        # Connection
-        my $c = $self->{_cs}->{$id};
-
-        # Accepting
-        $self->_accepting($id) if $c->{accepting};
-
-        # Connecting
-        $self->_connecting($id) if $c->{connecting};
-
-        # Drop once buffer is empty
-        $self->_drop($id) and next
-          if $c->{finish} && (!ref $c->{buffer} || !$c->{buffer}->size);
-
-        # Read only
-        $self->not_writing($id) if delete $c->{read_only};
-
-        # Timeout
-        my $timeout = $c->{timeout} || 15;
-
-        # Last active
-        my $time = $c->{active} || $self->_active($id);
-
-        # HUP
-        $self->_hup($id) if (time - $time) >= $timeout;
-    }
-
-    # Nothing to do
-    my $listen = $self->{_listen} || {};
-    return delete $self->{_running}
-      unless keys %{$self->{_cs}}
-          || $self->{_listening}
-          || ($self->max_connections > 0 && keys %$listen);
-
-    return;
-}
-
-sub _read {
-    my ($self, $id) = @_;
-
-    # Listen socket (new connection)
-    my $found;
-    my $listen = $self->{_listen} || {};
-    for my $lid (keys %$listen) {
-        my $socket = $listen->{$lid}->{socket};
-        if ($id eq $socket) {
-            $found = $socket;
-            last;
-        }
-    }
-
-    # Accept new connection
-    return $self->_accept($found) if $found;
-
-    # Connection
-    my $c = $self->{_cs}->{$id};
-
-    # Socket
-    return unless defined(my $socket = $c->{socket});
-
-    # Read chunk
-    my $read = $socket->sysread(my $buffer, CHUNK_SIZE, 0);
-
-    # Error
-    unless (defined $read) {
-
-        # Retry
-        return if $! == EAGAIN || $! == EWOULDBLOCK;
-
-        # Read error
-        return $self->_error($id, $!);
-    }
-
-    # EOF
-    return $self->_hup($id) if $read == 0;
-
-    # Callback
-    my $event = $c->{read};
-    $self->_event('read', $event, $id, $buffer) if $event;
-
-    # Active
-    $self->_active($id);
-}
-
-sub _spin {
+sub one_tick {
     my $self = shift;
 
     # Listening
-    if (!$self->{_listening} && $self->_is_listening) {
+    if (!$self->{_listening} && $self->_should_listen) {
 
         # Add listen sockets
         my $listen = $self->{_listen} || {};
@@ -849,10 +467,549 @@ sub _spin {
     $self->_hup($_) for @hup;
 
     # Timers
-    $self->_timing;
+    $self->_timer;
+
+    # Tick callback
+    my $cb = $self->tick_cb;
+    $self->_run_callback('tick', $cb) if $cb;
 }
 
-sub _timing {
+sub read_cb { shift->_add_event('read', @_) }
+
+sub remote_info {
+    my ($self, $id) = @_;
+
+    # Connection
+    return {} unless my $c = $self->{_cs}->{$id};
+
+    # Socket
+    return {} unless my $socket = $c->{socket};
+
+    # Info
+    return {address => $socket->peerhost, port => $socket->peerport};
+}
+
+sub singleton { $LOOP ||= shift->new(@_) }
+
+sub start {
+    my $self = shift;
+
+    # Already running
+    return if $self->{_running};
+
+    # Running
+    $self->{_running} = 1;
+
+    # Loop
+    $self->{_loop} ||= $self->_build_loop;
+
+    # Mainloop
+    $self->one_tick while $self->{_running};
+
+    return $self;
+}
+
+sub start_tls {
+    my $self = shift;
+    my $id   = shift;
+
+    # Shortcut
+    return unless TLS;
+
+    # Arguments
+    my $args = ref $_[0] ? $_[0] : {@_};
+
+    # TLS certificate verification
+    my %options = (Timeout => $self->connect_timeout);
+    if ($args->{tls_ca_file}) {
+        $options{SSL_ca_file}         = $args->{tls_ca_file};
+        $options{SSL_verify_mode}     = 0x01;
+        $options{SSL_verify_callback} = $args->{tls_verify_cb};
+    }
+
+    # Connection
+    return unless my $c = $self->{_cs}->{$id};
+
+    # Socket
+    return unless my $socket = $c->{socket};
+
+    # Start
+    $socket->blocking(1);
+    return unless my $new = IO::Socket::SSL->start_SSL($socket, %options);
+    $socket->blocking(0);
+
+    # Upgrade
+    $c->{socket} = $new;
+    $self->{_cs}->{$new} = delete $self->{_cs}->{$id};
+
+    return "$new";
+}
+
+sub stop { delete shift->{_running} }
+
+sub timer {
+    my ($self, $after, $cb) = @_;
+
+    # Timer
+    my $timer = {after => $after, cb => $cb, started => time};
+
+    # Add timer
+    my $id = "$timer";
+    $self->{_ts}->{$id} = $timer;
+
+    return $id;
+}
+
+sub write_cb { shift->_add_event('write', @_) }
+
+sub writing {
+    my ($self, $id) = @_;
+
+    # Activity
+    $self->_activity($id);
+
+    # Connection
+    my $c = $self->{_cs}->{$id};
+
+    # Writing again
+    delete $c->{read_only};
+
+    # Socket
+    return unless my $socket = $c->{socket};
+
+    # KQueue
+    my $loop = $self->{_loop} ||= $self->_build_loop;
+    if (KQUEUE) {
+        my $fd = fileno $socket;
+
+        # Writing
+        my $writing = $c->{writing};
+        $loop->EV_SET($fd, KQUEUE_READ,  KQUEUE_ADD) unless defined $writing;
+        $loop->EV_SET($fd, KQUEUE_WRITE, KQUEUE_ADD) unless $writing;
+
+        # Writing
+        $c->{writing} = 1;
+    }
+
+    # Epoll
+    elsif (EPOLL) { $loop->mask($socket, EPOLL_POLLIN | EPOLL_POLLOUT) }
+
+    # Poll
+    else { $loop->mask($socket, POLLIN | POLLOUT) }
+}
+
+sub _accept {
+    my ($self, $listen) = @_;
+
+    # Accept
+    my $socket = $listen->accept or return;
+
+    # Unlock callback
+    $self->_run_callback('unlock', $self->unlock_cb);
+
+    # Add connection
+    my $id = "$socket";
+    my $c = $self->{_cs}->{$id} = {
+        accepting => 1,
+        buffer    => Mojo::ByteStream->new,
+        socket    => $socket
+    };
+
+    # Timeout
+    $c->{accept_timer} =
+      $self->timer($self->accept_timeout, =>
+          sub { shift->_error($id, 'Accept timeout.') });
+
+    # Disable Nagle's algorithm
+    setsockopt($socket, IPPROTO_TCP, TCP_NODELAY, 1)
+      unless $self->{_listen}->{$listen}->{file};
+
+    # File descriptor
+    my $fd = fileno $socket;
+    $self->{_fds}->{$fd} = $id;
+
+    # Accept callback
+    my $cb = $self->{_listen}->{$listen}->{cb};
+    $self->_run_event('accept', $cb, $id) if $cb;
+
+    # Remove listen sockets
+    $listen = $self->{_listen} || {};
+    my $loop = $self->{_loop};
+    for my $lid (keys %$listen) {
+        my $socket = $listen->{$lid}->{socket};
+
+        # Remove listen socket from kqueue
+        if (KQUEUE) {
+            $loop->EV_SET(fileno $socket, KQUEUE_READ, KQUEUE_DELETE);
+        }
+
+        # Remove listen socket from poll or epoll
+        else { $loop->remove($socket) }
+    }
+
+    # Not listening anymore
+    delete $self->{_listening};
+}
+
+sub _activity {
+    my ($self, $id) = @_;
+
+    # Connection
+    return unless my $c = $self->{_cs}->{$id};
+
+    # Activity
+    return $c->{active} = time;
+}
+
+sub _add_event {
+    my ($self, $event, $id, $cb) = @_;
+
+    # Connection
+    return unless my $c = $self->{_cs}->{$id};
+
+    # Add event callback
+    $c->{$event} = $cb if $cb;
+
+    return $self;
+}
+
+# Initialize as late as possible because kqueues don't survive a fork
+sub _build_loop {
+
+    # "kqueue"
+    return IO::KQueue->new if KQUEUE;
+
+    # "epoll"
+    return IO::Epoll->new if EPOLL;
+
+    # "poll"
+    return IO::Poll->new;
+}
+
+sub _drop_immediately {
+    my ($self, $id) = @_;
+
+    # Drop timer
+    if ($self->{_ts}->{$id}) {
+
+        # Drop
+        delete $self->{_ts}->{$id};
+        return $self;
+    }
+
+    # Delete connection
+    my $c = delete $self->{_cs}->{$id};
+
+    # Drop listen socket
+    if (!$c && ($c = delete $self->{_listen}->{$id})) {
+
+        # Not listening
+        return $self unless $self->{_listening};
+
+        # Not listening anymore
+        delete $self->{_listening};
+    }
+
+    # Drop socket
+    if (my $socket = $c->{socket}) {
+
+        # Remove file descriptor
+        my $fd = fileno $socket;
+        delete $self->{_fds}->{$fd};
+
+        # Remove socket from kqueue
+        if (my $loop = $self->{_loop}) {
+            if (KQUEUE) {
+
+                # Writing
+                my $writing = $c->{writing};
+                $loop->EV_SET($fd, KQUEUE_READ, KQUEUE_DELETE)
+                  if defined $writing;
+                $loop->EV_SET($fd, KQUEUE_WRITE, KQUEUE_DELETE) if $writing;
+            }
+
+            # Remove socket from poll or epoll
+            else { $loop->remove($socket) }
+        }
+
+        # Close socket
+        close $socket;
+    }
+
+    return $self;
+}
+
+sub _error {
+    my ($self, $id, $error) = @_;
+
+    # Get error callback
+    my $event = $self->{_cs}->{$id}->{error};
+
+    # Cleanup
+    $self->_drop_immediately($id);
+
+    # No event
+    warn "Unhandled event error: $error" and return unless $event;
+
+    # Error callback
+    $self->_run_event('error', $event, $id, $error);
+}
+
+sub _hup {
+    my ($self, $id) = @_;
+
+    # Get hup callback
+    my $event = $self->{_cs}->{$id}->{hup};
+
+    # Cleanup
+    $self->_drop_immediately($id);
+
+    # No event
+    return unless $event;
+
+    # HUP callback
+    $self->_run_event('hup', $event, $id);
+}
+
+sub _prepare {
+    my $self = shift;
+
+    # Prepare
+    while (my ($id, $c) = each %{$self->{_cs}}) {
+
+        # Accepting
+        $self->_prepare_accept($id) if $c->{accepting};
+
+        # Connecting
+        $self->_prepare_connect($id) if $c->{connecting};
+
+        # Connection needs to be finished
+        if ($c->{finish}) {
+
+            # Buffer empty
+            unless ($c->{buffer} && !$c->{buffer}->size) {
+                $self->_drop_immediately($id);
+                next;
+            }
+        }
+
+        # Read only
+        $self->not_writing($id) if delete $c->{read_only};
+
+        # Timeout
+        my $timeout = $c->{timeout} || 15;
+
+        # Last active
+        my $time = $c->{active} || $self->_activity($id);
+
+        # HUP
+        $self->_hup($id) if (time - $time) >= $timeout;
+    }
+
+    # Nothing to do
+    my $running = 0;
+
+    # Connections
+    my $listen = $self->{_listen} || {};
+    if (keys %{$self->{_cs}}) { $running = 1 }
+
+    # Timers
+    elsif (keys %{$self->{_ts}}) { $running = 1 }
+
+    # Listening
+    elsif ($self->{_listening}) { $running = 1 }
+
+    # Listen sockets
+    elsif ($self->max_connections > 0 && keys %$listen) { $running = 1 }
+
+    # Stopped
+    unless ($running) {
+        delete $self->{_running};
+        return 1;
+    }
+
+    return;
+}
+
+sub _prepare_accept {
+    my ($self, $id) = @_;
+
+    # Connection
+    my $c = $self->{_cs}->{$id};
+
+    # Connected
+    return unless $c->{socket}->connected;
+
+    # Accepted
+    delete $c->{accepting};
+
+    # Remove timeout
+    $self->_drop_immediately(delete $c->{accept_timer});
+
+    # Non blocking
+    $c->{socket}->blocking(0);
+
+    # Add socket to poll
+    $self->not_writing($id);
+}
+
+sub _prepare_cert {
+    my $self = shift;
+
+    # Shortcut
+    my $cert = $self->{_cert};
+    return $cert if $cert && -r $cert;
+
+    # Create temporary TLS cert file
+    $cert = File::Spec->catfile($ENV{MOJO_TMPDIR} || File::Spec->tmpdir,
+        'mojocert.pem');
+    my $file = IO::File->new;
+    $file->open("> $cert")
+      or croak qq/Can't create temporary TLS cert file "$cert"/;
+    print $file CERT;
+
+    return $self->{_cert} = $cert;
+}
+
+sub _prepare_connect {
+    my ($self, $id) = @_;
+
+    # Connection
+    my $c = $self->{_cs}->{$id};
+
+    # Not yet connected
+    return unless $c->{socket}->connected;
+
+    # Connected
+    delete $c->{connecting};
+
+    # Remove timeout
+    $self->_drop_immediately(delete $c->{connect_timer});
+
+    # Connect callback
+    my $cb = $c->{connect_cb};
+    $self->_run_event('connect', $cb, $id) if $cb;
+}
+
+sub _prepare_key {
+    my $self = shift;
+
+    # Shortcut
+    my $key = $self->{_key};
+    return $key if $key && -r $key;
+
+    # Create temporary TLS key file
+    $key = File::Spec->catfile($ENV{MOJO_TMPDIR} || File::Spec->tmpdir,
+        'mojokey.pem');
+    my $file = IO::File->new;
+    $file->open("> $key")
+      or croak qq/Can't create temporary TLS key file "$key"/;
+    print $file KEY;
+
+    return $self->{_key} = $key;
+}
+
+sub _read {
+    my ($self, $id) = @_;
+
+    # Listen socket (new connection)
+    my $found;
+    my $listen = $self->{_listen} || {};
+    for my $lid (keys %$listen) {
+        my $socket = $listen->{$lid}->{socket};
+        if ($id eq $socket) {
+            $found = $socket;
+            last;
+        }
+    }
+
+    # Accept new connection
+    return $self->_accept($found) if $found;
+
+    # Connection
+    my $c = $self->{_cs}->{$id};
+
+    # Socket
+    return unless defined(my $socket = $c->{socket});
+
+    # Read chunk
+    my $read = $socket->sysread(my $buffer, CHUNK_SIZE, 0);
+
+    # Error
+    unless (defined $read) {
+
+        # Retry
+        return if $! == EAGAIN || $! == EWOULDBLOCK;
+
+        # Read error
+        return $self->_error($id, $!);
+    }
+
+    # EOF
+    return $self->_hup($id) if $read == 0;
+
+    # Callback
+    my $event = $c->{read};
+    $self->_run_event('read', $event, $id, $buffer) if $event;
+
+    # Active
+    $self->_activity($id);
+}
+
+# Failed callbacks should not kill everything
+sub _run_callback {
+    my $self  = shift;
+    my $event = shift;
+    my $cb    = shift;
+
+    # Invoke callback
+    my $value = eval { $self->$cb(@_) };
+
+    # Callback error
+    warn qq/Callback "$event" failed: $@/ if $@;
+
+    return $value;
+}
+
+# Failed events should not kill everything
+sub _run_event {
+    my $self  = shift;
+    my $event = shift;
+    my $cb    = shift;
+    my $id    = shift;
+
+    # Invoke callback
+    my $value = eval { $self->$cb($id, @_) };
+
+    # Event error
+    if ($@) {
+        my $message = qq/Event "$event" failed for connection "$id": $@/;
+        $event eq 'error'
+          ? ($self->_drop_immediately($id) and warn $message)
+          : $self->_error($id, $message);
+    }
+
+    return $value;
+}
+
+sub _should_listen {
+    my $self = shift;
+
+    # Listen sockets
+    my $listen = $self->{_listen} || {};
+    return unless keys %$listen;
+
+    # Connections
+    my $cs = $self->{_cs};
+    return unless keys %$cs < $self->max_connections;
+
+    # Lock
+    return unless $self->_run_callback('lock', $self->lock_cb, !keys %$cs);
+
+    return 1;
+}
+
+sub _timer {
     my $self = shift;
 
     # Timers
@@ -863,29 +1020,15 @@ sub _timing {
         my $t = $ts->{$id};
 
         # Timer
-        my $run = 0;
-        if (defined $t->{after} && $t->{after} <= time - $t->{started}) {
+        my $after = $t->{after} || 0;
+        if ($after <= time - $t->{started}) {
 
-            # Done
-            delete $t->{after};
-            $run++;
+            # Callback
+            if (my $cb = $t->{cb}) { $self->_run_callback('timer', $cb) }
+
+            # Drop
+            $self->_drop_immediately($id);
         }
-
-        # Recurring
-        elsif (!defined $t->{after} && defined $t->{interval}) {
-            $t->{last} ||= 0;
-            $run++ if $t->{last} + $t->{interval} <= time;
-        }
-
-        # Callback
-        if ((my $cb = $t->{cb}) && $run) {
-            $self->_event('timer', $cb, $t->{connection}, "$t");
-            $t->{last} = time;
-        }
-
-        # Continue
-        $self->_drop($id)
-          unless defined $t->{after} || defined $t->{interval};
     }
 }
 
@@ -908,7 +1051,7 @@ sub _write {
 
         # Write callback
         $c->{protected} = 1;
-        my $chunk = $self->_event('write', $event, $id);
+        my $chunk = $self->_run_event('write', $event, $id);
         delete $c->{protected};
 
         # Add to buffer
@@ -938,8 +1081,8 @@ sub _write {
     # Remove written chunk from buffer
     $buffer->remove($written);
 
-    # Active
-    $self->_active($id) if $written;
+    # Activity
+    $self->_activity($id) if $written;
 }
 
 1;
@@ -947,7 +1090,7 @@ __END__
 
 =head1 NAME
 
-Mojo::IOLoop - Minimalistic Event Loop For TCP Clients And Servers
+Mojo::IOLoop - Minimalistic Reactor For TCP Clients And Servers
 
 =head1 SYNOPSIS
 
@@ -1012,15 +1155,10 @@ Mojo::IOLoop - Minimalistic Event Loop For TCP Clients And Servers
     });
 
     # Add a timer
-    $loop->timer($id => (after => 5, cb => sub {
-        my ($self, $cid, $tid) = @_;
-        $self->drop($cid);
-    }));
-
-    # Add another timer
-    $loop->timer($id => (interval => 3, cb => sub {
-        print "Timer is running again!\n";
-    }));
+    $loop->timer(5 => sub {
+        my $self = shift;
+        $self->drop($id);
+    });
 
     # Start and stop loop
     $loop->start;
@@ -1028,10 +1166,9 @@ Mojo::IOLoop - Minimalistic Event Loop For TCP Clients And Servers
 
 =head1 DESCRIPTION
 
-L<Mojo::IOLoop> is a very minimalistic event loop that has been reduced to
-the absolute minimal feature set required to build solid and scalable TCP
-clients and servers, easy to extend and replace with alternative
-implementations.
+L<Mojo::IOLoop> is a very minimalistic reactor that has been reduced to the
+absolute minimal feature set required to build solid and scalable TCP clients
+and servers.
 
 Optional modules L<IO::KQueue>, L<IO::Epoll>, L<IO::Socket::INET6> and
 L<IO::Socket::SSL> are supported transparently and used if installed.
@@ -1083,13 +1220,13 @@ Setting the value to C<0> will make this loop stop accepting new connections
 and allow it to shutdown gracefully without interrupting existing
 connections.
 
-=head2 C<unlock_cb>
+=head2 C<tick_cb>
 
-    my $cb = $loop->unlock_cb;
-    $loop  = $loop->unlock_cb(sub {...});
+    my $cb = $loop->tick_cb;
+    $loop  = $loop->tick_cb(sub {...});
 
-A callback to free the listen lock, called after accepting a new connection
-and used to sync multiple server processes.
+Callback to be invoked on every reactor tick, this for example allows you to
+run multiple reactors next to each other.
 
 =head2 C<timeout>
 
@@ -1098,6 +1235,14 @@ and used to sync multiple server processes.
 
 Maximum time in seconds our loop waits for new events to happen, defaults to
 C<0.25>.
+
+=head2 C<unlock_cb>
+
+    my $cb = $loop->unlock_cb;
+    $loop  = $loop->unlock_cb(sub {...});
+
+A callback to free the listen lock, called after accepting a new connection
+and used to sync multiple server processes.
 
 =head1 METHODS
 
@@ -1291,6 +1436,12 @@ The local port.
 Activate read only mode for a connection.
 Note that connections have no mode after they are created.
 
+=head2 C<one_tick>
+
+    $loop->one_tick;
+
+Run reactor for exactly one tick.
+
 =head2 C<read_cb>
 
     $loop = $loop->read_cb($id => sub {...});
@@ -1339,6 +1490,28 @@ everywhere inside the process.
 Start the loop, this will block until the loop is finished or return
 immediately if the loop is already running.
 
+=head2 C<start_tls>
+
+    my $id = $loop->start_tls($id);
+    my $id = $loop->start_tls($id => {tls_ca_file => '/etc/tls/cacerts.pem'});
+
+Start new TLS connection inside old connection.
+Note that TLS support depends on L<IO::Socket::SSL>.
+
+These options are currently available.
+
+=over 4
+
+=item C<tls_ca_file>
+
+CA file to use for TLS.
+
+=item C<tls_verify_cb>
+
+Callback to invoke for TLS verification.
+
+=back
+
 =head2 C<stop>
 
     $loop->stop;
@@ -1348,30 +1521,9 @@ and the loop can be restarted by running C<start> again.
 
 =head2 C<timer>
 
-    my $id = $loop->timer($id => (after => 5, cb => sub {...}));
-    my $id = $loop->timer($id => {interval => 5, cb => sub {...}}));
+    my $id = $loop->timer(5 => sub {...});
 
 Create a new timer, invoking the callback afer a given amount of seconds.
-Note that timers are bound to connections and will get destroyed together
-with them.
-
-These options are currently available.
-
-=over 4
-
-=item C<after>
-
-Start timer after this exact amount of seconds.
-
-=item C<cb>
-
-Callback to invoke.
-
-=item C<interval>
-
-Interval in seconds to run timer recurringly.
-
-=back
 
 =head2 C<write_cb>
 

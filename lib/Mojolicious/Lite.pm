@@ -249,6 +249,26 @@ Templates can have layouts.
         <body><%= content %></body>
     </html>
 
+Template blocks can be reused like functions in Perl scripts.
+
+    # GET /with_block
+    get '/with_block' => 'block';
+
+    __DATA__
+
+    @@ block.html.ep
+    %{ my $link =
+        <% my ($url, $name) = @_; %>
+        Try <a href="<%= $url %>"><%= $name %></a>!
+    %}
+    <!doctype html><html>
+        <head><title>Sebastians Frameworks!</title></head>
+        <body>
+            <%= $link->('http://mojolicious.org', 'Mojolicious') %>
+            <%= $link->('http://catalystframework.org', 'Catalyst') %>
+        </body>
+    </html>
+
 Templates can also pass around blocks of captured content and extend each
 other.
 
@@ -261,28 +281,19 @@ other.
     __DATA__
 
     @@ first.html.ep
-    % extends 'second';
-    %{ content header =>
-        <title>Howdy!</title>
-    %}
-    First!
+    <!doctype html><html>
+        <head><%{= content header => %><title>Hi!</title><%}%></head>
+        <body><%{= content body => %>First page!<%}%></body>
+    </html>
 
     @@ second.html.ep
-    % layout 'third';
+    % extends 'first';
     %{ content header =>
-        <title>Welcome!</title>
+    <title>Howdy!</title>
     %}
-    Second!
-
-    @@ layouts/third.html.ep
-    <!doctype html><html>
-        <head>
-            <%{= content header => %>
-                <title>Lame default title...</title>
-            <%}%>
-        </head>
-        <body><%= content %></body>
-    </html>
+    %{ content body =>
+    Second page!
+    %}
 
 Route placeholders allow capturing parts of a request path until a C</> or
 C<.> separator occurs, results will be stored by name in the C<stash> and

@@ -13,7 +13,7 @@ use Test::More;
 # Make sure sockets are working
 plan skip_all => 'working sockets required for this test!'
   unless Mojo::IOLoop->new->generate_port;
-plan tests => 363;
+plan tests => 381;
 
 # Wait you're the only friend I have...
 # You really want a robot for a friend?
@@ -127,6 +127,24 @@ get '/outerlayout' => sub {
     my $self = shift;
     $self->render(
         template => 'outerlayout',
+        layout   => 'layout',
+        handler  => 'ep'
+    );
+};
+
+# GET /outerlayouttwo
+get '/outerlayouttwo' => {layout => 'layout'} => sub {
+    my $self = shift;
+    is($self->stash->{layout}, 'layout');
+    $self->render(handler => 'ep');
+    is($self->stash->{layout}, 'layout');
+} => 'outerlayout';
+
+# GET /outerinnerlayout
+get '/outerinnerlayout' => sub {
+    my $self = shift;
+    $self->render(
+        template => 'outerinnerlayout',
         layout   => 'layout',
         handler  => 'ep'
     );
@@ -357,6 +375,11 @@ $t->get_ok('/')->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_is('/root.html/root.html/root.html/root.html/root.html');
 
+# HEAD /
+$t->head_ok('/')->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By'   => 'Mojolicious (Perl)')
+  ->header_is('Content-Length' => 50)->content_is('');
+
 # GET / (with body)
 $t->get_ok('/', '1234' x 1024)->status_is(200)
   ->content_is('/root.html/root.html/root.html/root.html/root.html');
@@ -497,6 +520,19 @@ $t->get_ok('/outerlayout')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_is("layouted Hello\n[\n  1,\n  2\n]\nthere<br/>!\n\n\n");
+
+# GET /outerlayouttwo
+$t->get_ok('/outerlayouttwo')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is("layouted Hello\n[\n  1,\n  2\n]\nthere<br/>!\n\n\n");
+
+# GET /outerinnerlayout
+$t->get_ok('/outerinnerlayout')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is(
+    "layouted Hello\nlayouted [\n  1,\n  2\n]\nthere<br/>!\n\n\n\n");
 
 # GET /session_cookie
 $t->get_ok('/session_cookie')->status_is(200)
@@ -844,7 +880,7 @@ $t->get_ok('/bridge2stash' => {'X-Flash2' => 1})->status_is(200)
 
 # GET /bridge2stash (with cookies and session cleared)
 $t->get_ok('/bridge2stash')->status_is(200)
-  ->content_is("stash too!cookie!signed_cookie!!bad_cookie--12345678!!!/!\n");
+  ->content_is("stash too!cookie!signed_cookie!!bad_cookie--12345678!!!!\n");
 
 __DATA__
 @@ template.txt.epl
@@ -905,6 +941,10 @@ Hello
 
 @@ outermenu.html.ep
 <%= dumper [1, 2] %>there<br/>!
+
+@@ outerinnerlayout.html.ep
+Hello
+<%= include 'outermenu', layout => 'layout' %>
 
 @@ not_found.html.epl
 Oops!

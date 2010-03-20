@@ -5,7 +5,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 3;
+use Test::More tests => 5;
 
 use Mojo;
 use MojoX::Dispatcher::Routes::Controller;
@@ -30,6 +30,14 @@ $c->stash->{partial}  = 1;
 $c->stash->{template} = 'something';
 $c->stash->{handler}  = 'debug';
 is($r->render($c), 'Hello Mojo!', 'normal rendering');
+
+# Normal rendering with layout
+$c->stash->{partial}  = 1;
+$c->stash->{template} = 'something';
+$c->stash->{layout}   = 'something';
+$c->stash->{handler}  = 'debug';
+is($r->render($c), 'Hello Mojo!Hello Mojo!', 'normal rendering with layout');
+is(delete $c->stash->{layout}, 'something');
 
 # Rendering a path with dots
 $c->stash->{partial}  = 1;

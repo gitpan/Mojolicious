@@ -1,5 +1,33 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+0.999924 2010-03-08 00:00:00
+        - Added default TLS cert and key to Mojo::IOLoop to make HTTPS
+          testing easier, so "mojo daemon --listen https://*:3000" now just
+          works.
+        - Added request limit support to the daemons.
+        - Added basic authorization and proxy authorization support to
+          Mojo::Message::Request. (esskar)
+        - Added tick callback to Mojo::IOLoop to make mixing multiple event
+          loops trivial.
+        - Added the ability to pass arguments to Mojo::Template blocks.
+        - Added layout support for partial rendering, in addition all render
+          arguments are now localized.
+        - Added more routes tests. (doubi)
+        - Cleaned up documentation.
+        - Cleaned up tests.
+        - Relaxed Mojo::Server::CGI read timeout.
+        - Fixed ioloop timers to actually work and added tests.
+        - Fixed PSGI environment auto detection and removed .psgi file
+          generator since it has become obsolete.
+        - Fixed Mojolicious sessions to remove the session cookie immediately
+          if it's not needed anymore. (ask)
+        - Fixed routes method condition to consider GET and HEAD equal.
+        - Fixed test requiring Perl 5.10.
+        - Fixed a loader bug. (mvuets)
+        - Fixed layout and extends scope in MojoX::Renderer. (korshak)
+        - Fixed daemons to create listen sockets before changing user and
+          group. (xantus)
+
 0.999923 2010-03-07 00:00:00
         - Made Mojo::Client sync by default with optional async support, this
           massively improves usability!
