@@ -58,13 +58,16 @@ sub helper {
       unless my $helper = $self->app->renderer->helper->{$name};
 
     # Run
-    return wantarray ? ($self->$helper(@_)) : scalar $self->$helper(@_);
+    return $self->$helper(@_);
 }
 
 sub pause { shift->tx->pause }
 
 sub receive_message {
     my $self = shift;
+
+    # Deactivate auto rendering
+    $self->stash->{rendered} = 1;
 
     # WebSocket check
     Carp::croak('No WebSocket connection to receive messages from')
@@ -78,27 +81,13 @@ sub receive_message {
 }
 
 sub redirect_to {
-    my $self   = shift;
-    my $target = shift;
-
-    # Prepare location
-    my $base     = $self->req->url->base->clone;
-    my $location = Mojo::URL->new->base($base);
-
-    # Path
-    if ($target =~ /^\//) { $location->path($target) }
-
-    # URL
-    elsif ($target =~ /^\w+\:\/\//) { $location = $target }
-
-    # Named
-    else { $location = $self->url_for($target, @_) }
+    my $self = shift;
 
     # Code
     $self->res->code(302);
 
     # Location header
-    $self->res->headers->location($location);
+    $self->res->headers->location($self->url_for(@_)->to_abs);
 
     return $self;
 }
@@ -141,20 +130,14 @@ sub render {
         my $controller = $stash->{controller};
         my $action     = $stash->{action};
 
-        # Try the route name if we don't have controller and action
-        unless ($controller && $action) {
-            my $endpoint = $self->match->endpoint;
-
-            # Use endpoint name as default template
-            $self->stash(template => $endpoint->name)
-              if $endpoint && $endpoint->name;
-        }
-
         # Normal default template
-        else {
+        if ($controller && $action) {
             $self->stash(
                 template => join('/', split(/-/, $controller), $action));
         }
+
+        # Try the route name if we don't have controller and action
+        elsif (my $name = $stash->{route}) { $self->stash(template => $name) }
     }
 
     # Render
@@ -203,13 +186,13 @@ sub render_inner {
     $name ||= 'content';
 
     # Set
-    $stash->{content}->{$name} ||= $content if $content;
+    $stash->{content}->{$name}
+      ||= ref $content eq 'CODE' ? $content->() : $content
+      if $content;
 
     # Get
-    $content = $stash->{content}->{$name};
-    my $result = ref $content eq 'CODE' ? $content->() : $content;
-    $result ||= '';
-    return Mojo::ByteStream->new("$result");
+    $content = $stash->{content}->{$name} || '';
+    return Mojo::ByteStream->new("$content");
 }
 
 sub render_json {
@@ -281,6 +264,9 @@ sub resume { shift->tx->resume }
 sub send_message {
     my $self = shift;
 
+    # Deactivate auto rendering
+    $self->stash->{rendered} = 1;
+
     # WebSocket check
     Carp::croak('No WebSocket connection to send message to')
       unless $self->tx->is_websocket;
@@ -291,13 +277,23 @@ sub send_message {
 
 sub url_for {
     my $self = shift;
+    my $target = shift || '';
 
     # Make sure we have a match for named routes
     $self->match(MojoX::Routes::Match->new->root($self->app->routes))
       unless $self->match;
 
+    # Path
+    if ($target =~ /^\//) {
+        my $url = Mojo::URL->new->base($self->req->url->base->clone);
+        return $url->path($target);
+    }
+
+    # URL
+    elsif ($target =~ /^\w+\:\/\//) { return Mojo::URL->new($target) }
+
     # Use match or root
-    my $url = $self->match->url_for(@_);
+    my $url = $self->match->url_for($target, @_);
 
     # Base
     $url->base($self->tx->req->url->base->clone);

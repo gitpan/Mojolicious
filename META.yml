@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Mojolicious
-version:            0.999924
+version:            0.999925
 abstract:           The Web In A Box!
 author:
     - Sebastian Riedel <sri@cpan.org>
@@ -31,11 +31,10 @@ requires:
     Locale::Maketext:     0
     MIME::Base64:         0
     MIME::QuotedPrint:    0
-    perl:                 5.008001
+    perl:                 5.008007
     POSIX:                0
     Scalar::Util:         0
     Storable:             0
-    Sys::Hostname:        0
     Test::Builder:        0
     Test::Harness:        0
     Test::More:           0
@@ -50,7 +49,7 @@ no_index:
         - t
         - inc
         - t
-generated_by:       ExtUtils::MakeMaker version 6.55_02
+generated_by:       ExtUtils::MakeMaker version 6.56
 meta-spec:
     url:      http://module-build.sourceforge.net/META-spec-v1.4.html
     version:  1.4

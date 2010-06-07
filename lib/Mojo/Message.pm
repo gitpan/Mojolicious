@@ -12,6 +12,7 @@ use Carp 'croak';
 use Mojo::Asset::Memory;
 use Mojo::ByteStream 'b';
 use Mojo::Content::Single;
+use Mojo::Loader;
 use Mojo::Parameters;
 use Mojo::Upload;
 
@@ -20,7 +21,9 @@ use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 8192;
 __PACKAGE__->attr(buffer  => sub { Mojo::ByteStream->new });
 __PACKAGE__->attr(content => sub { Mojo::Content::Single->new });
 __PACKAGE__->attr(default_charset => 'UTF-8');
+__PACKAGE__->attr(dom_class       => 'Mojo::DOM');
 __PACKAGE__->attr([qw/finish_cb progress_cb/]);
+__PACKAGE__->attr(json_class                        => 'Mojo::JSON');
 __PACKAGE__->attr([qw/major_version minor_version/] => 1);
 
 # I'll keep it short and sweet. Family. Religion. Friendship.
@@ -86,8 +89,7 @@ sub body_params {
 
     # Charset
     $params->charset($self->default_charset);
-    $type =~ /charset=\"?(\S+)\"?/;
-    $params->charset($1) if $1;
+    $type =~ /charset=\"?(\S+)\"?/ and $params->charset($1);
 
     # "x-application-urlencoded" and "application/x-www-form-urlencoded"
     if ($type =~ /(?:x-application|application\/x-www-form)-urlencoded/i) {
@@ -221,6 +223,29 @@ sub cookie {
     return wantarray ? @cookies : $cookies[0];
 }
 
+sub dom {
+    my $self = shift;
+
+    # Multipart
+    return if $self->is_multipart;
+
+    # Load DOM class
+    my $class = $self->dom_class;
+    if (my $e = Mojo::Loader->load($class)) {
+        croak ref $e
+          ? qq/Can't load DOM class "$class": $e/
+          : qq/DOM class "$class" doesn't exist./;
+    }
+
+    # Charset
+    my $charset = $self->default_charset;
+    ($self->headers->content_type || '') =~ /charset=\"?(\S+)\"?/
+      and $charset = $1;
+
+    # Parse
+    return $class->new(charset => $charset)->parse($self->body);
+}
+
 sub fix_headers {
     my $self = shift;
 
@@ -289,11 +314,40 @@ sub header_size {
     return $self->content->header_size;
 }
 
-sub headers { shift->content->headers(@_) }
+sub headers {
+    my $self = shift;
+
+    # Set
+    if (@_) {
+        $self->content->headers(@_);
+        return $self;
+    }
+
+    # Get
+    return $self->content->headers(@_);
+}
 
 sub is_chunked { shift->content->is_chunked }
 
 sub is_multipart { shift->content->is_multipart }
+
+sub json {
+    my $self = shift;
+
+    # Multipart
+    return if $self->is_multipart;
+
+    # Load JSON class
+    my $class = $self->json_class;
+    if (my $e = Mojo::Loader->load($class)) {
+        croak ref $e
+          ? qq/Can't load JSON class "$class": $e/
+          : qq/JSON class "$class" doesn't exist./;
+    }
+
+    # Decode
+    return $class->new->decode($self->body);
+}
 
 sub leftovers { shift->content->leftovers }
 
@@ -424,13 +478,13 @@ sub _parse {
     if ($self->is_state(qw/start headers/)) {
 
         # Check line size
-        $self->error(413)
+        $self->error('Maximum line size exceeded.', 413)
           if $buffer->size > ($ENV{MOJO_MAX_LINE_SIZE} || 10240);
     }
 
     # Check message size
-    $self->error(413)
-      if $buffer->raw_size > ($ENV{MOJO_MAX_MESSAGE_SIZE} || 524288);
+    $self->error('Maximum message size exceeded.', 413)
+      if $buffer->raw_size > ($ENV{MOJO_MAX_MESSAGE_SIZE} || 5242880);
 
     # Content
     if ($self->is_state(qw/content done done_with_leftovers/)) {
@@ -476,10 +530,8 @@ sub _parse_formdata {
 
     # Default charset
     my $default = $self->default_charset;
-    if (my $type = $self->headers->content_type) {
-        $type =~ /charset=\"?(\S+)\"?/;
-        $default = $1 if $1;
-    }
+    ($self->headers->content_type || '') =~ /charset=\"?(\S+)\"?/
+      and $default = $1;
 
     # Walk the tree
     my @parts;
@@ -494,10 +546,8 @@ sub _parse_formdata {
 
         # Charset
         my $charset = $default;
-        if (my $type = $part->headers->content_type) {
-            $type =~ /charset=\"?(\S+)\"?/;
-            $charset = $1 if $1;
-        }
+        ($part->headers->content_type || '') =~ /charset=\"?(\S+)\"?/
+          and $charset = $1;
 
         # "Content-Disposition"
         my $disposition = $part->headers->content_disposition;
@@ -598,6 +648,14 @@ Content container, defaults to a L<Mojo::Content::Single> object.
 
 Default charset used for form data parsing.
 
+=head2 C<dom_class>
+
+    my $class = $message->dom_class;
+    $message  = $message->dom_class('Mojo::DOM');
+
+Class to be used for DOM manipulation, defaults to L<Mojo::DOM>.
+Note that this attribute is EXPERIMENTAL and might change without warning!
+
 =head2 C<finish_cb>
 
     my $cb   = $message->finish_cb;
@@ -607,12 +665,14 @@ Default charset used for form data parsing.
 
 Callback called after message building or parsing is finished.
 
-=head2 C<headers>
+=head2 C<json_class>
 
-    my $headers = $message->headers;
-    $message    = $message->headers(Mojo::Headers->new);
+    my $class = $message->json_class;
+    $message  = $message->json_class('Mojo::JSON');
 
-Header container, defaults to a L<Mojo::Headers> object.
+Class to be used for JSON deserialization with C<json>, defaults to
+L<Mojo::JSON>.
+Note that this attribute is EXPERIMENTAL and might change without warning!
 
 =head2 C<major_version>
 
@@ -676,7 +736,7 @@ C<POST> parameters.
 
     my $size = $message->body_size;
 
-Size of the body.
+Size of the body in bytes.
 
 =head2 C<to_string>
 
@@ -710,6 +770,13 @@ Render start line.
     my @cookies = $message->cookie('foo');
 
 Access message cookies.
+
+=head2 C<dom>
+
+    my $dom = $message->dom;
+
+Parses content into a L<Mojo::DOM> object.
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<fix_headers>
 
@@ -745,7 +812,14 @@ CHeck if message parser has leftover data in the buffer.
 
     my $size = $message->header_size;
 
-Size of headers.
+Size of headers in bytes.
+
+=head2 C<headers>
+
+    my $headers = $message->headers;
+    $message    = $message->headers(Mojo::Headers->new);
+
+Header container, defaults to a L<Mojo::Headers> object.
 
 =head2 C<is_chunked>
 
@@ -758,6 +832,15 @@ Check if message content is chunked.
     my $multipart = $message->is_multipart;
 
 Check if message content is multipart.
+
+=head2 C<json>
+
+    my $object = $message->json;
+    my $array  = $message->json;
+
+Decode JSON message body directly using L<Mojo::JSON> if possible, returns
+C<undef> otherwise.
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<leftovers>
 
@@ -788,7 +871,7 @@ Parse message chunk until the body is reached.
 
     my $size = $message->start_line_size;
 
-Size of the start line.
+Size of the start line in bytes.
 
 =head2 C<upload>
 

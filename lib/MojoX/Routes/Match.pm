@@ -8,6 +8,7 @@ use warnings;
 use base 'Mojo::Base';
 
 use Carp 'croak';
+use Mojo::ByteStream 'b';
 use Mojo::URL;
 
 __PACKAGE__->attr(captures => sub { {} });
@@ -19,7 +20,9 @@ sub new {
     my $self = shift->SUPER::new();
     my $tx   = shift;
     $self->tx($tx);
-    $self->{_path} = $tx->req->url->path->to_string;
+    $self->{_path} =
+      b($tx->req->url->path->to_string)->url_unescape->decode('UTF-8')
+      ->to_string;
     return $self;
 }
 
@@ -100,7 +103,7 @@ sub match {
         $self->{_path} = $path;
 
         # Reset stack
-        if ($r->parent) { $self->stack($snapshot) }
+        if ($r->parent) { $self->stack([@$snapshot]) }
         else {
             $self->captures({});
             $self->stack([]);
@@ -218,7 +221,7 @@ MojoX::Routes::Match - Routes Visitor
 
 L<MojoX::Routes::Match> is a visitor for L<MojoX::Routes> structures.
 
-=head2 ATTRIBUTES
+=head1 ATTRIBUTES
 
 L<MojoX::Routes::Match> implements the following attributes.
 

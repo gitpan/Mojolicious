@@ -36,7 +36,7 @@ __PACKAGE__->attr(static  => sub { MojoX::Dispatcher::Static->new });
 __PACKAGE__->attr(types   => sub { MojoX::Types->new });
 
 our $CODENAME = 'Snowman';
-our $VERSION  = '0.999924';
+our $VERSION  = '0.999925';
 
 sub new {
     my $self = shift->SUPER::new(@_);
@@ -56,35 +56,47 @@ sub new {
         }
     );
 
+    # Routes
+    my $r = $self->routes;
+
     # Namespace
-    $self->routes->namespace(ref $self);
+    $r->namespace(ref $self);
+
+    # Renderer
+    my $renderer = $self->renderer;
+
+    # Static
+    my $static = $self->static;
 
     # Types
-    $self->renderer->types($self->types);
-    $self->static->types($self->types);
+    $renderer->types($self->types);
+    $static->types($self->types);
+
+    # Home
+    my $home = $self->home;
 
     # Root
-    $self->renderer->root($self->home->rel_dir('templates'));
-    $self->static->root($self->home->rel_dir('public'));
+    $renderer->root($home->rel_dir('templates'));
+    $static->root($home->rel_dir('public'));
 
     # Hide own controller methods
-    $self->routes->hide(qw/client cookie finish finished flash helper/);
-    $self->routes->hide(qw/param pause receive_message redirect_to render/);
-    $self->routes->hide(qw/render_data render_exception render_inner/);
-    $self->routes->hide(qw/render_json render_not_found render_partial/);
-    $self->routes->hide(qw/render_static render_text resume send_message/);
-    $self->routes->hide(qw/session signed_cookie url_for/);
+    $r->hide(qw/client cookie finish finished flash helper param pause/);
+    $r->hide(qw/receive_message redirect_to render render_data/);
+    $r->hide(qw/render_exception render_inner render_json render_not_found/);
+    $r->hide(qw/render_partial render_static render_text resume/);
+    $r->hide(qw/send_message session signed_cookie url_for/);
 
     # Mode
     my $mode = $self->mode;
 
-    # Log file
-    $self->log->path($self->home->rel_file("log/$mode.log"))
-      if -w $self->home->rel_file('log');
+    # Log
+    $self->log->path($home->rel_file("log/$mode.log"))
+      if -w $home->rel_file('log');
 
     # Plugins
     $self->plugin('agent_condition');
     $self->plugin('default_helpers');
+    $self->plugin('tag_helpers');
     $self->plugin('epl_renderer');
     $self->plugin('ep_renderer');
     $self->plugin('request_timer');
@@ -107,6 +119,9 @@ sub new {
 sub dispatch {
     my ($self, $c) = @_;
 
+    # Websocket handshake
+    $c->res->code(undef) if $c->tx->is_websocket;
+
     # Session
     $self->session->load($c);
 
@@ -119,19 +134,20 @@ sub dispatch {
     $self->log->debug(qq/*** Request for "$path" from "$ua". ***/);
 
     # Try to find a static file
-    my $e = $self->static->dispatch($c);
+    $self->static->dispatch($c);
 
     # Hook
     $self->plugins->run_hook_reverse(after_static_dispatch => $c);
 
-    # Use routes if we don't have a response yet
-    $e = $self->routes->dispatch($c) if $e;
+    # Routes
+    if ($self->routes->dispatch($c)) {
 
-    # Exception
-    if (ref $e) { $c->render_exception($e) }
+        # Nothing found
+        $c->render_not_found unless $c->res->code;
+    }
 
-    # Nothing found
-    elsif ($e) { $c->render_not_found }
+    # Websocket handshake
+    $c->res->code(101) if !$c->res->code && $c->tx->is_websocket;
 
     # Finish
     $self->finish($c);
@@ -266,7 +282,7 @@ An amazing MVC web framework supporting a simplified single file mode through
 L<Mojolicious::Lite>.
 
 Very clean, portable and Object Oriented pure Perl API without any hidden
-magic and no requirements besides Perl 5.8.1.
+magic and no requirements besides Perl 5.8.7.
 
 Full stack HTTP 1.1 and WebSocket client/server implementation with IPv6,
 TLS, IDNA, pipelining, chunking and multipart support.
@@ -290,6 +306,8 @@ Web development for humans, making hard things possible and everything fun.
 
     use Mojolicious::Lite;
 
+    get '/hello' => sub { shift->render(text => 'Hello World!') }
+
     get '/time' => 'clock';
 
     websocket '/echo' => sub {
@@ -302,19 +320,20 @@ Web development for humans, making hard things possible and everything fun.
         );
     };
 
-    get '/fetch' => sub {
+    get '/title' => sub {
         my $self = shift;
-        $self->render_data(
-            $self->client->get('http://mojolicious.org')->res->body);
+        my $url  = $self->param('url');
+        $self->render(text =>
+              $self->client->get($url)->success->dom->at('title')->text);
     };
 
-    post '/:name' => sub {
-        my $self = shift;
-        my $name = $self->param('name') || 'Mojo';
-        $self->render_text("Hello $name!");
+    post '/:offset' => sub {
+        my $self   = shift;
+        my $offset = $self->param('offset') || 23;
+        $self->render(json => {list => [0 .. $offset]});
     };
 
-    shagadelic;
+    app->start;
     __DATA__
 
     @@ clock.html.ep
@@ -324,7 +343,7 @@ Web development for humans, making hard things possible and everything fun.
 For more user friendly documentation see L<Mojolicious::Guides> and
 L<Mojolicious::Lite>.
 
-=head2 The Cake
+=head2 Have Some Cake
 
     .---------------------------------------------------------------.
     |                             Fun!                              |
@@ -349,6 +368,14 @@ L<Mojolicious::Lite>.
 
 L<Mojolicious> inherits all attributes from L<Mojo> and implements the
 following new ones.
+
+=head2 C<controller_class>
+
+    my $class = $mojo->controller_class;
+    $mojo     = $mojo->controller_class('Mojolicious::Controller');
+
+Class to be used for the default controller, defaults to
+L<Mojolicious::Controller>.
 
 =head2 C<mode>
 
@@ -534,6 +561,10 @@ startup.
 
 Sebastian Riedel, C<sri@cpan.org>.
 
+=head1 CORE DEVELOPERS
+
+Viacheslav Tykhanovskyi, C<vti@cpan.org>.
+
 =head1 CREDITS
 
 In alphabetical order:
@@ -549,6 +580,8 @@ Alexey Likhatskiy
 Anatoly Sharifulin
 
 Andre Vieth
+
+Andrew Fresh
 
 Andreas Koenig
 
@@ -568,6 +601,8 @@ Ch Lamprecht
 
 Christian Hansen
 
+Curt Tilmes
+
 David Davis
 
 Dmitry Konstantinov
@@ -578,11 +613,15 @@ Glen Hinkle
 
 Graham Barr
 
+Hideki Yamamura
+
 James Duncan
 
 Jaroslav Muhin
 
 Jesse Vincent
+
+Jonathan Yu
 
 Kazuhiro Shibuya
 
@@ -605,6 +644,8 @@ Maksym Komar
 Maxim Vuets
 
 Mirko Westermeier
+
+Oleg Zhelo
 
 Pascal Gaudette
 
@@ -631,8 +672,6 @@ Stanis Trendelenburg
 Tatsuhiko Miyagawa
 
 Uwe Voelker
-
-Viacheslav Tykhanovskyi
 
 Yaroslav Korshak
 

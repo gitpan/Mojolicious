@@ -13,7 +13,10 @@ use Test::More;
 # Make sure sockets are working
 plan skip_all => 'working sockets required for this test!'
   unless Mojo::IOLoop->new->generate_port;
-plan tests => 381;
+plan tests => 394;
+
+# Pollution
+123 =~ m/(\d+)/;
 
 # Wait you're the only friend I have...
 # You really want a robot for a friend?
@@ -42,17 +45,24 @@ plugin 'header_condition';
 # GET /
 get '/' => 'root';
 
+# GET /привет/мир
+get '/привет/мир' =>
+  sub { shift->render(text => 'привет мир') };
+
 # GET /root
 get '/root.html' => 'root_path';
 
 # GET /template.txt
 get '/template.txt' => 'template';
 
-# GET /address
-get '/address' => sub {
+# GET /0
+get ':number' => [number => qr/0/] => sub {
     my $self = shift;
-    $self->render_text($self->tx->remote_address);
+    $self->render_text($self->tx->remote_address . $self->param('number'));
 };
+
+# GET /tags
+get 'tags/:test' => 'tags';
 
 # POST /upload
 post '/upload' => sub {
@@ -150,6 +160,16 @@ get '/outerinnerlayout' => sub {
     );
 };
 
+# GET /withblocklayout
+get '/withblocklayout' => sub {
+    my $self = shift;
+    $self->render(
+        template => 'index',
+        layout   => 'with_block',
+        handler  => 'epl'
+    );
+};
+
 # GET /session_cookie
 get '/session_cookie' => sub {
     my $self = shift;
@@ -225,7 +245,7 @@ post '/malformed_utf8' => sub {
 };
 
 # GET /json
-get '/json' => sub { shift->render_json({foo => [1, -2, 3, 'bar']}) };
+get '/json' => sub { shift->render_json({foo => [1, -2, 3, 'b☃r']}) };
 
 # GET /autostash
 get '/autostash' => sub { shift->render(handler => 'ep', foo => 'bar') } =>
@@ -246,7 +266,7 @@ get '/subrequest' => sub {
     $self->client->post(
         '/template' => sub {
             my $client = shift;
-            $self->render_text($client->res->body);
+            $self->render_text($client->tx->success->body);
             $self->finish;
         }
     )->process;
@@ -314,26 +334,26 @@ get '/koi8-r' => sub {
 # GET /hello3.txt
 get '/hello3.txt' => sub { shift->render_static('hello2.txt') };
 
-ladder sub {
+under sub {
     my $self = shift;
     return unless $self->req->headers->header('X-Bender');
-    $self->res->headers->header('X-Ladder' => 23);
+    $self->res->headers->header('X-Under' => 23);
     return 1;
 };
 
-# GET /with_ladder
-get '/with_ladder' => sub {
+# GET /with_under
+get '/with_under' => sub {
     my $self = shift;
-    $self->render_text('Ladders are cool!');
+    $self->render_text('Unders are cool!');
 };
 
-# GET /with_ladder_too
-get '/with_ladder_too' => sub {
+# GET /with_under_too
+get '/with_under_too' => sub {
     my $self = shift;
-    $self->render_text('Ladders are cool too!');
+    $self->render_text('Unders are cool too!');
 };
 
-ladder sub {
+under sub {
     my $self = shift;
 
     # Authenticated
@@ -352,7 +372,7 @@ get '/param_auth' => 'param_auth';
 get '/param_auth/too' =>
   sub { shift->render_text('You could be Bender too!') };
 
-ladder sub {
+under sub {
     my $self = shift;
     $self->stash(_name => 'stash');
     $self->cookie(foo => 'cookie', {expires => (time + 60)});
@@ -384,6 +404,11 @@ $t->head_ok('/')->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
 $t->get_ok('/', '1234' x 1024)->status_is(200)
   ->content_is('/root.html/root.html/root.html/root.html/root.html');
 
+# GET / (IRI)
+$t->get_ok('/привет/мир')->status_is(200)
+  ->content_type_is('text/html');
+is(b($t->tx->res->body)->decode('UTF-8'), 'привет мир');
+
 # GET /root
 $t->get_ok('/root.html')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
@@ -395,12 +420,45 @@ $t->get_ok('/.html')->status_is(200)
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_is('/root.html/root.html/root.html/root.html/root.html');
 
-# GET /address (reverse proxy)
+# GET /0 (reverse proxy)
 my $backup = $ENV{MOJO_REVERSE_PROXY};
 $ENV{MOJO_REVERSE_PROXY} = 1;
-$t->get_ok('/address', {'X-Forwarded-For' => '192.168.2.2, 192.168.2.1'})
-  ->status_is(200)->content_is('192.168.2.1');
+$t->get_ok('/0', {'X-Forwarded-For' => '192.168.2.2, 192.168.2.1'})
+  ->status_is(200)->content_is('192.168.2.10');
 $ENV{MOJO_REVERSE_PROXY} = $backup;
+
+# GET /tags
+$t->get_ok('/tags/lala?a=b')->status_is(200)->content_is(<<EOF);
+<foo />
+<foo bar="baz" />
+<foo one="two" three="four">Hello</foo>
+<a href="/path">/path</a>
+<a href="http://example.com/" title="Foo">Foo</a>
+<a href="http://example.com/">Example</a>
+<a href="/template">Index</a>
+<a href="/tags/23" title="Foo">Tags</a>
+<form action="/template" method="post"><input name="foo" /></form>
+<form action="/tags/24" method="post">
+    <input name="foo" />
+    <input name="foo" type="checkbox" />
+    <input checked="checked" name="a" type="checkbox" />
+</form>
+<form action="/">
+    <label for="foo">Name</label>
+    <input name="foo" />
+</form>
+<input name="a" value="b" />
+<input name="a" value="b" />
+<script src="/script.js" type="text/javascript" />
+<script type="text/javascript">
+    var a = 'b';
+</script>
+<script type="foo">
+    var a = 'b';
+</script>
+<img src="/foo.jpg" />
+<img alt="image" src="/foo.jpg" />
+EOF
 
 # POST /upload (huge upload without appropriate max message size)
 $backup = $ENV{MOJO_MAX_MESSAGE_SIZE} || '';
@@ -533,6 +591,12 @@ $t->get_ok('/outerinnerlayout')->status_is(200)
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_is(
     "layouted Hello\nlayouted [\n  1,\n  2\n]\nthere<br/>!\n\n\n\n");
+
+# GET /withblocklayout
+$t->get_ok('/withblocklayout')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is("with_block \nOne: one\nTwo: two\n\n");
 
 # GET /session_cookie
 $t->get_ok('/session_cookie')->status_is(200)
@@ -685,13 +749,13 @@ app->log->level($level);
 $t->get_ok('/json')->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_type_is('application/json')
-  ->json_content_is({foo => [1, -2, 3, 'bar']});
+  ->json_content_is({foo => [1, -2, 3, 'b☃r']});
 
 # GET /autostash
 $t->get_ok('/autostash?bar=23')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_is("layouted bar23\n");
+  ->content_is("layouted bar2342autostash\n");
 
 # GET /helper
 $t->get_ok('/helper')->status_is(200)
@@ -713,6 +777,8 @@ $t->get_ok('/eperror')->status_is(500)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_like(qr/Internal Server Error/);
+is($client->get('/eperror')->success->dom->at('title')->text,
+    'Internal Server Error');
 app->log->level($level);
 
 # GET /subrequest
@@ -749,13 +815,13 @@ $t->get_ok('/redirect_url')->status_is(302)
 $t->get_ok('/redirect_path')->status_is(302)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->header_is(Location       => '/foo/bar')->content_is('Redirecting!');
+  ->header_like(Location => qr/\/foo\/bar$/)->content_is('Redirecting!');
 
 # GET /redirect_named
 $t->get_ok('/redirect_named')->status_is(302)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->header_is(Location       => '/template.txt')->content_is('Redirecting!');
+  ->header_like(Location => qr/\/template.txt$/)->content_is('Redirecting!');
 
 # GET /redirect_named (with redirecting enabled in client)
 $t->max_redirects(3);
@@ -764,10 +830,10 @@ $t->get_ok('/redirect_named')->status_is(200)
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->header_is(Location       => undef)->content_is("Redirect works!\n");
 $t->max_redirects(0);
-Test::Mojo->new(tx => $t->redirects->[0])->status_is(302)
+Test::Mojo->new(tx => $t->tx->previous->[-1])->status_is(302)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->header_is(Location       => '/template.txt')->content_is('Redirecting!');
+  ->header_like(Location => qr/\/template.txt$/)->content_is('Redirecting!');
 
 # GET /koi8-r
 my $koi8 =
@@ -779,20 +845,20 @@ $t->get_ok('/koi8-r')->status_is(200)
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_type_is('text/html; charset=koi8-r')->content_like(qr/^$koi8/);
 
-# GET /with_ladder
-$t->get_ok('/with_ladder', {'X-Bender' => 'Rodriguez'})->status_is(200)
+# GET /with_under
+$t->get_ok('/with_under', {'X-Bender' => 'Rodriguez'})->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->header_is('X-Ladder'     => 23)->content_is('Ladders are cool!');
+  ->header_is('X-Under'      => 23)->content_is('Unders are cool!');
 
-# GET /with_ladder_too
-$t->get_ok('/with_ladder_too', {'X-Bender' => 'Rodriguez'})->status_is(200)
+# GET /with_under_too
+$t->get_ok('/with_under_too', {'X-Bender' => 'Rodriguez'})->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->header_is('X-Ladder'     => 23)->content_is('Ladders are cool too!');
+  ->header_is('X-Under'      => 23)->content_is('Unders are cool too!');
 
-# GET /with_ladder_too
-$t->get_ok('/with_ladder_too')->status_is(404)
+# GET /with_under_too
+$t->get_ok('/with_under_too')->status_is(404)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_like(qr/Oops!/);
@@ -883,6 +949,37 @@ $t->get_ok('/bridge2stash')->status_is(200)
   ->content_is("stash too!cookie!signed_cookie!!bad_cookie--12345678!!!!\n");
 
 __DATA__
+@@ tags.html.ep
+<%= tag 'foo' %>
+<%= tag 'foo', bar => 'baz' %>
+<%= tag 'foo', one => 'two', three => 'four' => {%>Hello<%}%>
+<%= link_to '/path' %>
+<%= link_to 'http://example.com/', title => 'Foo', sub { 'Foo' } %>
+<%= link_to 'http://example.com/' => {%>Example<%}%>
+<%= link_to 'index' %>
+<%= link_to 'tags', {test => 23}, title => 'Foo' %>
+<%= form_for 'index', method => 'post' => {%><%= input 'foo' %><%}%>
+<%= form_for 'tags', {test => 24}, method => 'post' => {%>
+    <%= input 'foo' %>
+    <%= input 'foo', type => 'checkbox' %>
+    <%= input 'a', type => 'checkbox' %>
+<%}%>
+<%= form_for '/' => {%>
+    <%= label 'foo' => {%>Name<%}%>
+    <%= input 'foo' %>
+<%}%>
+<%= input 'a' %>
+<%= input 'a', value => 'c' %>
+<%= script '/script.js' %>
+<%= script {%>
+    var a = 'b';
+<%}%>
+<%= script type => 'foo' => {%>
+    var a = 'b';
+<%}%>
+<%= img '/foo.jpg' %>
+<%= img '/foo.jpg', alt => 'image' %>
+
 @@ template.txt.epl
 Redirect works!
 
@@ -940,7 +1037,8 @@ Hello
 <%= include 'outermenu' %>
 
 @@ outermenu.html.ep
-<%= dumper [1, 2] %>there<br/>!
+% stash test => 'there';
+<%= dumper [1, 2] %><%= stash 'test' %><br/>!
 
 @@ outerinnerlayout.html.ep
 Hello
@@ -962,9 +1060,20 @@ Just works!\
 % $self->helper(layout => 'layout');
 %= $foo
 %= param 'bar'
+% my $foo = 42;
+%= $foo
+%= $route
 
 @@ layouts/layout.html.ep
 layouted <%== content %>
+
+@@ layouts/with_block.html.epl
+%{ my $block =
+<% my ($one, $two) = @_; %>
+One: <%= $one %>
+Two: <%= $two %>
+%}
+with_block <%= $block->('one', 'two') %>
 
 @@ helper.html.ep
 %== '<br/>'

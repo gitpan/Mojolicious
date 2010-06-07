@@ -61,8 +61,8 @@ sub build_boundary {
     # Check for existing boundary
     my $headers = $self->headers;
     my $type = $headers->content_type || '';
-    $type =~ /boundary=\"?([^\s\"]+)\"?/i;
-    my $boundary = $1;
+    my $boundary;
+    $type =~ /boundary=\"?([^\s\"]+)\"?/i and $boundary = $1;
     return $boundary if $boundary;
 
     # Generate and check boundary
@@ -161,7 +161,7 @@ sub _parse_multipart {
     my $boundary = $1;
 
     # Boundary missing
-    return $self->error(400) unless $boundary;
+    return $self->error('Multipart boundary missing.', 400) unless $boundary;
 
     # Parse
     while (1) {

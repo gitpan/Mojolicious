@@ -35,6 +35,9 @@ sub auto_render {
 sub dispatch {
     my ($self, $c) = @_;
 
+    # Already rendered
+    return if $c->res->code;
+
     # Match
     my $m = MojoX::Routes::Match->new($c->tx);
     $m->match($self);
@@ -43,16 +46,18 @@ sub dispatch {
     # No match
     return 1 unless $m && @{$m->stack};
 
-    # Initialize stash with captures
-    $c->stash($m->captures);
+    # Params
+    my $p = $c->stash->{params} = $c->tx->req->params->clone;
+    $p->append(%{$m->captures});
 
-    # Prepare params
-    $c->stash->{params} = $c->tx->req->params->clone;
-    $c->stash->{params}->append(%{$m->captures});
+    # Route name
+    $c->stash->{route} = $m->endpoint->name;
+
+    # Merge in captures
+    $c->stash({%{$c->stash}, %{$m->captures}});
 
     # Walk the stack
-    my $e = $self->_walk_stack($c);
-    return $e if $e;
+    return 1 if $self->_walk_stack($c);
 
     # Render
     return $self->auto_render($c);
@@ -62,9 +67,6 @@ sub hide { push @{shift->hidden}, @_ }
 
 sub _dispatch_app {
     my ($self, $c) = @_;
-
-    # Debug
-    $c->app->log->debug(qq/Dispatching application./);
 
     # Prepare new path and base path for embedded application
     my $opath  = $c->req->url->path;
@@ -83,13 +85,46 @@ sub _dispatch_app {
         $c->req->url->base->path($bpath);
     }
 
+    # Load app
+    my $app = $c->match->captures->{app};
+    unless (ref $app && $self->{_loaded}->{$app}) {
+
+        # Debug
+        $c->app->log->debug(qq/Dispatching application "$app"./);
+
+        # Load
+        if (my $e = Mojo::Loader->load($app)) {
+
+            # Doesn't exist
+            return unless ref $e;
+
+            # Error
+            $c->app->log->error($e);
+            return $e;
+        }
+
+        # Loaded
+        $self->{_loaded}->{$app}++;
+    }
+
+    # Debug
+    else { $c->app->log->debug(qq/Dispatching application./) }
+
     # Dispatch
     my $continue;
-    eval { $continue = $c->match->captures->{app}->handler($c) };
+    eval {
+
+        # App
+        $app = $app->new unless ref $app;
+
+        # Handler
+        $continue = $app->handler($c);
+    };
 
     # Reset path and base path
-    $c->req->url->path($opath);
-    $c->req->url->base->path($obpath);
+    my $url = $c->req->url;
+    $url->path($opath);
+    $url->base->path($obpath);
 
     # Success!
     return 1 if $continue;
@@ -112,7 +147,7 @@ sub _dispatch_callback {
 
     # Dispatch
     my $continue;
-    my $cb = $c->match->captures->{callback};
+    my $cb = $c->match->captures->{cb};
     eval { $continue = $cb->($c) };
 
     # Success!
@@ -204,18 +239,7 @@ sub _generate_class {
     # Class
     my $class = $field->{class};
     my $controller = $field->{controller} || '';
-    unless ($class) {
-        my @class;
-        for my $part (split /-/, $controller) {
-
-            # Junk
-            next unless $part;
-
-            # Camelize
-            push @class, b($part)->camelize;
-        }
-        $class = join '::', @class;
-    }
+    $class = b($controller)->camelize->to_string unless $class;
 
     # Format
     my $namespace = $field->{namespace} || $self->namespace;
@@ -269,12 +293,15 @@ sub _walk_stack {
 
         # Dispatch
         my $e =
-            $field->{callback} ? $self->_dispatch_callback($c)
-          : $field->{app}      ? $self->_dispatch_app($c)
-          :                      $self->_dispatch_controller($c);
+            $field->{cb}  ? $self->_dispatch_callback($c)
+          : $field->{app} ? $self->_dispatch_app($c)
+          :                 $self->_dispatch_controller($c);
 
         # Exception
-        return $e if ref $e;
+        if (ref $e) {
+            $c->render_exception($e);
+            return 1;
+        }
 
         # Break the chain
         return unless $e;
@@ -305,7 +332,7 @@ MojoX::Dispatcher::Routes - Routes Dispatcher
 
 L<MojoX::Dispatcher::Routes> is a L<MojoX::Routes> based dispatcher.
 
-=head2 ATTRIBUTES
+=head1 ATTRIBUTES
 
 L<MojoX::Dispatcher::Routes> inherits all attributes from L<MojoX::Routes>
 and implements the following ones.

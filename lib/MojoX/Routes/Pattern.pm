@@ -9,8 +9,6 @@ use base 'Mojo::Base';
 
 use constant DEBUG => $ENV{MOJOX_ROUTES_DEBUG} || 0;
 
-use Mojo::ByteStream 'b';
-
 __PACKAGE__->attr(defaults => sub { {} });
 __PACKAGE__->attr([qw/format pattern regex/]);
 __PACKAGE__->attr(quote_end      => ')');
@@ -47,7 +45,10 @@ sub parse {
     my $pattern = shift;
 
     # Shortcut
-    return $self unless $pattern;
+    return $self unless defined $pattern;
+
+    # Make sure pattern starts with a slash
+    $pattern = "/$pattern" unless $pattern =~ /^\//;
 
     # Format
     if ($pattern =~ /\.([^\/\)]+)$/) { $self->format($1) }
@@ -134,11 +135,9 @@ sub shape_match {
             # No captures
             last unless @captures;
 
-            # Decode and unescape
+            # Merge
             my $capture = shift @captures;
-            $result->{$symbol} =
-              b($capture)->url_unescape->decode('UTF-8')->to_string
-              if $capture;
+            $result->{$symbol} = $capture if defined $capture;
         }
         return $result;
     }
@@ -332,7 +331,7 @@ MojoX::Routes::Pattern - Routes Pattern
 L<MojoX::Routes::Pattern> is a container for routes pattern which are used to
 match paths against.
 
-=head2 ATTRIBUTES
+=head1 ATTRIBUTES
 
 L<MojoX::Routes::Pattern> implements the following attributes.
 
@@ -420,7 +419,7 @@ implements the following ones.
 
 =head2 C<new>
 
-    my $pattern = MojoX::Routes::Pattern->new('/(controller)/(action)',
+    my $pattern = MojoX::Routes::Pattern->new('/:controller/:action',
         action => qr/\w+/
     );
 
@@ -434,7 +433,7 @@ Match pattern against a path.
 
 =head2 C<parse>
 
-    $pattern = $pattern->parse('/(controller)/(action)', action => qr/\w+/);
+    $pattern = $pattern->parse('/:controller/:action', action => qr/\w+/);
 
 Parse a raw pattern.
 
@@ -442,7 +441,7 @@ Parse a raw pattern.
 
     my $path = $pattern->render({action => 'foo'});
 
-Render pattern into a path with paramters.
+Render pattern into a path with parameters.
 
 =head2 C<shape_match>
 

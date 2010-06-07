@@ -45,9 +45,7 @@ sub run {
       unless $url =~ /^\w+:\/\//;
 
     # Transaction
-    my $tx = Mojo::Transaction::HTTP->new;
-    $tx->req->method('GET');
-    $tx->req->url->parse($url);
+    my $tx = $client->build_tx(GET => $url);
     $tx->res->body(
         sub {
             my ($tx, $chunk) = @_;
@@ -61,7 +59,11 @@ sub run {
     $client->process($tx);
 
     # Error
-    print qq/Couldn't open page "$url".\n/ if $tx->has_error;
+    if ($tx->has_error) {
+        my $message = ($tx->error)[1];
+        $message = $message ? " ($message)" : '';
+        print qq/Couldn't open page "$url".$message\n/;
+    }
 
     return $self;
 }

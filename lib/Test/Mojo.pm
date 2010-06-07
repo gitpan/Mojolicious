@@ -9,13 +9,11 @@ use base 'Mojo::Base';
 
 use Mojo::ByteStream 'b';
 use Mojo::Client;
-use Mojo::JSON;
 
 require Test::More;
 
 __PACKAGE__->attr(app => sub { return $ENV{MOJO_APP} if ref $ENV{MOJO_APP} });
-__PACKAGE__->attr(client    => sub { Mojo::Client->singleton });
-__PACKAGE__->attr(redirects => sub { [] });
+__PACKAGE__->attr(client => sub { Mojo::Client->singleton });
 __PACKAGE__->attr('tx');
 __PACKAGE__->attr(max_redirects => 0);
 
@@ -117,8 +115,7 @@ sub json_content_is {
 
     # Test
     local $Test::Builder::Level = $Test::Builder::Level + 1;
-    Test::More::is_deeply(Mojo::JSON->new->decode($tx->res->body),
-        $struct, $desc);
+    Test::More::is_deeply($tx->res->json, $struct, $desc);
 
     return $self;
 }
@@ -139,8 +136,7 @@ sub post_form_ok {
     $client->max_redirects($self->max_redirects);
 
     # Request
-    $client->post_form(@_,
-        sub { $self->tx($_[1]) and $self->redirects($_[2]) })->process;
+    $client->post_form(@_, sub { $self->tx($_[-1]) })->process;
 
     # Test
     local $Test::Builder::Level = $Test::Builder::Level + 1;
@@ -169,12 +165,9 @@ sub reset_session {
 sub status_is {
     my ($self, $status, $desc) = @_;
 
-    # Transaction
-    my $tx = $self->tx;
-
     # Test
     local $Test::Builder::Level = $Test::Builder::Level + 1;
-    Test::More::is($tx->res->code, $status, $desc);
+    Test::More::is($self->tx->res->code, $status, $desc);
 
     return $self;
 }
@@ -183,8 +176,9 @@ sub _get_content {
     my ($self, $tx) = @_;
 
     # Charset
-    ($tx->res->headers->content_type || '') =~ /charset=\"?([^"\s]+)\"?/;
-    my $charset = $1;
+    my $charset;
+    ($tx->res->headers->content_type || '') =~ /charset=\"?([^"\s]+)\"?/
+      and $charset = $1;
 
     # Content
     return $charset
@@ -209,8 +203,8 @@ sub _request_ok {
     $client->max_redirects($self->max_redirects);
 
     # Request
-    $client->$method($url, %$headers, $body,
-        sub { $self->tx($_[1]) and $self->redirects($_[2]) })->process;
+    $client->$method($url, %$headers, $body, sub { $self->tx($_[-1]) })
+      ->process;
 
     # Test
     local $Test::Builder::Level = $Test::Builder::Level + 2;
@@ -228,7 +222,9 @@ Test::Mojo - Testing Mojo!
 
 =head1 SYNOPSIS
 
+    use Test::More tests => 10;
     use Test::Mojo;
+
     my $t = Test::Mojo->new(app => 'MyApp');
 
     $t->get_ok('/welcome')
@@ -266,13 +262,6 @@ Application to be tested.
     $t         = $t->client(Mojo::Client->new);
 
 Client used for testing.
-
-=head2 C<redirects>
-
-    my $redirects = $t->redirects;
-    $t            = $t->redirects([]);
-
-History of redirected requests.
 
 =head2 C<tx>
 

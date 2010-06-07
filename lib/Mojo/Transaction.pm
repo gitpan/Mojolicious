@@ -10,7 +10,7 @@ use base 'Mojo::Stateful';
 use Carp 'croak';
 
 __PACKAGE__->attr([qw/connection kept_alive/]);
-__PACKAGE__->attr([qw/local_address local_port remote_port/]);
+__PACKAGE__->attr([qw/local_address local_port previous remote_port/]);
 __PACKAGE__->attr(keep_alive => 0);
 
 # Please don't eat me! I have a wife and kids. Eat them!
@@ -95,6 +95,12 @@ sub resume {
 sub server_read  { croak 'Method "server_read" not implemented by subclass' }
 sub server_write { croak 'Method "server_write" not implemented by subclass' }
 
+sub success {
+    my $self = shift;
+    return $self->res unless $self->has_error;
+    return;
+}
+
 1;
 __END__
 
@@ -149,6 +155,13 @@ Local interface address.
     $tx            = $tx->local_port($port);
 
 Local interface port.
+
+=head2 C<previous>
+
+    my $previous = $tx->previous;
+    $tx          = $tx->previous(Mojo::Transaction->new);
+
+Previous transaction that triggered this followup transaction.
 
 =head2 C<remote_address>
 
@@ -234,6 +247,25 @@ Read and process server data.
     my $chunk = $tx->server_write;
 
 Write server data.
+
+=head2 C<success>
+
+    my $res = $tx->success;
+
+Returns the L<Mojo::Message::Response> object (C<res>) if transaction was
+successful and had no connection/parser errors or C<undef> otherwise.
+Note that this method is EXPERIMENTAL and might change without warning!
+
+    if (my $res = $tx->success) {
+        print $res->body;
+    }
+    else {
+        my ($message, $code) = $tx->error;
+        print "Error $code: $message";
+    }
+
+Error messages can be accessed with the C<error> method of the transaction
+object.
 
 =head1 SEE ALSO
 

@@ -14,7 +14,6 @@ use IO::File;
 use Mojo::Command;
 use Mojo::IOLoop;
 use Scalar::Util 'weaken';
-use Sys::Hostname 'hostname';
 
 __PACKAGE__->attr(
     [qw/group listen listen_queue_size max_requests silent user/]);
@@ -300,12 +299,12 @@ sub _listen {
     my $options = {};
 
     # UNIX domain socket
-    if ($listen =~ /^file\:\/\/\/(.+)$/) { $options->{file} = $1 }
+    if ($listen =~ /^file\:\/\/(.+)$/) { $options->{file} = $1 }
 
     # Internet socket
     elsif ($listen =~ /^(http(?:s)?)\:\/\/(.+)\:(\d+)(?:\:(.*)\:(.*))?$/) {
         $options->{tls} = 1 if $1 eq 'https';
-        $options->{address}  = $2 unless $2 eq '*';
+        $options->{address}  = $2 if $2 ne '*';
         $options->{port}     = $3;
         $options->{tls_cert} = $4 if $4;
         $options->{tls_key}  = $5 if $5;
@@ -318,8 +317,8 @@ sub _listen {
     # Weaken
     weaken $self;
 
-    # Accept callback
-    $options->{cb} = sub {
+    # Callbacks
+    $options->{accept_cb} = sub {
         my ($loop, $id) = @_;
 
         # Add new connection
@@ -327,13 +326,11 @@ sub _listen {
 
         # Keep alive timeout
         $loop->connection_timeout($id => $self->keep_alive_timeout);
-
-        # Callbacks
-        $loop->error_cb($id => sub { $self->_error(@_) });
-        $loop->hup_cb($id => sub { $self->_hup(@_) });
-        $loop->read_cb($id => sub { $self->_read(@_) });
-        $loop->write_cb($id => sub { $self->_write(@_) });
     };
+    $options->{error_cb} = sub { $self->_error(@_) };
+    $options->{hup_cb}   = sub { $self->_hup(@_) };
+    $options->{read_cb}  = sub { $self->_read(@_) };
+    $options->{write_cb} = sub { $self->_write(@_) };
 
     # Listen
     my $id = $self->ioloop->listen($options);
@@ -341,15 +338,10 @@ sub _listen {
     push @{$self->{_listen}}, $id;
 
     # Log
-    my $file    = $options->{file};
-    my $address = $options->{address} || hostname;
-    my $port    = $options->{port};
-    my $scheme  = $options->{tls} ? 'https' : 'http';
-    my $started = $file ? $file : "$scheme://$address:$port";
-    $self->app->log->info("Server listening ($started)");
+    $self->app->log->info("Server listening ($listen)");
 
     # Friendly message
-    print "Server available at $started.\n" unless $self->silent;
+    print "Server available at $listen.\n" unless $self->silent;
 }
 
 sub _read {
@@ -518,7 +510,7 @@ Timeout for keep alive connections in seconds, defaults to C<15>.
 =head2 C<listen>
 
     my $listen = $daemon->listen;
-    $daemon    = $daemon->listen('https://localhost:3000,file:/my.sock');
+    $daemon    = $daemon->listen('https://localhost:3000,file:///my.sock');
 
 Ports and files to listen on, defaults to C<http://*:3000>.
 

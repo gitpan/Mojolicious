@@ -68,12 +68,11 @@ sub import {
         }
 
         # Defaults
-        $cb ||= sub {1};
         $constraints ||= [];
 
-        # Merge
+        # Defaults
         $defaults ||= {};
-        $defaults = {%$defaults, callback => $cb};
+        $defaults = {%$defaults, cb => $cb} if $cb;
 
         # Name
         $name ||= '';
@@ -82,7 +81,7 @@ sub import {
         return $routes =
           $app->routes->bridge($pattern, {@$constraints})->over($conditions)
           ->to($defaults)->name($name)
-          if !ref $methods && $methods eq 'ladder';
+          if !ref $methods && $methods eq 'under';
 
         # WebSocket
         my $websocket = 1 if !ref $methods && $methods eq 'websocket';
@@ -108,10 +107,11 @@ sub import {
     $app->renderer->default_template_class($caller);
 
     # Export
-    *{"${caller}::app"}       = sub {$app};
-    *{"${caller}::any"}       = sub { $route->(ref $_[0] ? shift : [], @_) };
-    *{"${caller}::get"}       = sub { $route->('get', @_) };
-    *{"${caller}::ladder"}    = sub { $route->('ladder', @_) };
+    *{"${caller}::new"} = *{"${caller}::app"} = sub {$app};
+    *{"${caller}::any"} = sub { $route->(ref $_[0] ? shift : [], @_) };
+    *{"${caller}::get"} = sub { $route->('get', @_) };
+    *{"${caller}::under"} = *{"${caller}::ladder"} =
+      sub { $route->('under', @_) };
     *{"${caller}::plugin"}    = sub { $app->plugin(@_) };
     *{"${caller}::post"}      = sub { $route->('post', @_) };
     *{"${caller}::websocket"} = sub { $route->('websocket', @_) };
@@ -138,28 +138,29 @@ Mojolicious::Lite - Micro Web Framework
     # Route with placeholder
     get '/:foo' => sub {
         my $self = shift;
-        $self->render_text('Yea baby!');
+        my $foo  = $self->param('foo');
+        $self->render(text => "Hello from $foo!");
     };
 
     # Start the Mojolicious command system
-    shagadelic;
+    app->start;
 
 =head1 DESCRIPTION
 
 L<Mojolicous::Lite> is a micro web framework built around L<Mojolicious>.
 
-A minimal application looks like this.
+A minimal Hello World application looks like this, L<strict> and L<warnings>
+are automatically enabled and a few functions imported when you use
+L<Mojolicious::Lite>, turning your script into a full featured web
+application.
 
     #!/usr/bin/env perl
 
     use Mojolicious::Lite;
 
-    get '/' => sub {
-        my $self = shift;
-        $self->render_text('Yea baby!');
-    };
+    get '/' => sub { shift->render(text => 'Hello World!') };
 
-    shagadelic;
+    app->start;
 
 There is also a helper command to generate a small example application.
 
@@ -185,10 +186,13 @@ will just work without commands.
     % ./myapp.pl fastcgi
     ...Blocking FastCGI main loop...
 
-The shagadelic call that starts the L<Mojolicious> command system can be
+    % ./myapp.pl
+    ...List of available commands (or automatically detected environment)...
+
+The app->start call that starts the L<Mojolicious> command system can be
 customized to override normal C<@ARGV> use.
 
-    shagadelic('cgi');
+    app->start('cgi');
 
 Your application will automatically reload itself if you set the C<--reload>
 option, so you don't have to restart the server after every change.
@@ -202,11 +206,12 @@ placeholders.
     # /foo
     get '/foo' => sub {
         my $self = shift;
-        $self->render_text('Yea baby!');
+        $self->render(text => 'Hello World!');
     };
 
 All routes can have a name associated with them, this allows automatic
-template detection and back referencing with C<url_for>.
+template detection and back referencing with C<url_for>, C<link_to> and
+C<form_for>.
 Names are always the last argument.
 
     # /
@@ -218,14 +223,14 @@ Names are always the last argument.
     # /bar
     get '/bar' => sub {
         my $self = shift;
-        $self->render_text('Hi!')
+        $self->render(text => 'Hi!')
     } => 'bar';
 
     __DATA__
 
     @@ index.html.ep
-    <a href="<%= url_for 'foo' %>">Foo</a>.
-    <a href="<%= url_for 'bar' %>">Bar</a>.
+    <%= link_to foo => {%>Foo<%}%>.
+    <%= link_to bar => {%>Bar<%}%>.
 
     @@ foo.html.ep
     <a href="<%= url_for 'index' %>">Home</a>.
@@ -257,10 +262,10 @@ Template blocks can be reused like functions in Perl scripts.
     __DATA__
 
     @@ block.html.ep
-    %{ my $link =
+    <% my $link = {%>
         <% my ($url, $name) = @_; %>
-        Try <a href="<%= $url %>"><%= $name %></a>!
-    %}
+        Try <%= link_to $url => {%><%= $name %><%}%>!
+    <%}%>
     <!doctype html><html>
         <head><title>Sebastians Frameworks!</title></head>
         <body>
@@ -282,41 +287,48 @@ other.
 
     @@ first.html.ep
     <!doctype html><html>
-        <head><%{= content header => %><title>Hi!</title><%}%></head>
-        <body><%{= content body => %>First page!<%}%></body>
+        <head><%= content header => {%><title>Hi!</title><%}%></head>
+        <body><%= content body => {%>First page!<%}%></body>
     </html>
 
     @@ second.html.ep
     % extends 'first';
-    %{ content header =>
-    <title>Howdy!</title>
-    %}
-    %{ content body =>
-    Second page!
-    %}
+    <% content header => {%>
+        <title>Howdy!</title>
+    <%}%>
+    <% content body => {%>
+        Second page!
+    <%}%>
 
 Route placeholders allow capturing parts of a request path until a C</> or
 C<.> separator occurs, results will be stored by name in the C<stash> and
 C<param>.
 
-    # /foo/*
+    # /foo/* (everything except "/" and ".")
+    # /foo/test
+    # /foo/test123
     get '/foo/:bar' => sub {
         my $self = shift;
         my $bar  = $self->stash('bar');
-        $self->render_text("Our :bar placeholder matched $bar");
+        $self->render(text => "Our :bar placeholder matched $bar");
     };
 
-    # /*something/foo
+    # /*something/foo (everything except "/" and ".")
+    # /test/foo
+    # /test123/foo
     get '/(:bar)something/foo' => sub {
         my $self = shift;
         my $bar  = $self->param('bar');
-        $self->render_text("Our :bar placeholder matched $bar");
+        $self->render(text => "Our :bar placeholder matched $bar");
     };
 
 Relaxed placeholders allow matching of everything until a C</> occurs.
 
-    # GET /hello/*
-    get '/hello/(.you)' => sub {
+    # /*/hello (everything except "/")
+    # /test/hello
+    # /test123/hello
+    # /test.123/hello
+    get '/(.you)/hello' => sub {
         shift->render('groovy');
     };
 
@@ -328,7 +340,10 @@ Relaxed placeholders allow matching of everything until a C</> occurs.
 Wildcard placeholders allow matching absolutely everything, including
 C</> and C<.>.
 
-    # /hello/*
+    # /hello/* (everything)
+    # /hello/test
+    # /hello/test123
+    # /hello/test.123/test/123
     get '/hello/(*you)' => sub {
         shift->render('groovy');
     };
@@ -341,21 +356,21 @@ C</> and C<.>.
 Routes can be restricted to specific request methods.
 
     # GET /bye
-    get '/bye' => sub { shift->render_text('Bye!') };
+    get '/bye' => sub { shift->render(text => 'Bye!') };
 
     # POST /bye
-    post '/bye' => sub { shift->render_text('Bye!') };
+    post '/bye' => sub { shift->render(text => 'Bye!') };
 
     # GET|POST|DELETE /bye
     any [qw/get post delete/] => '/bye' => sub {
-        shift->render_text('Bye!');
+        shift->render(text => 'Bye!');
     };
 
     # /baz
     any '/baz' => sub {
         my $self   = shift;
         my $method = $self->req->method;
-        $self->render_text("You called /baz with $method");
+        $self->render(text => "You called /baz with $method");
     };
 
 All placeholders get compiled to a regex internally, with regex constraints
@@ -365,7 +380,7 @@ this process can be easily customized.
     any '/:bar' => [bar => qr/\d+/] => sub {
         my $self = shift;
         my $bar  = $self->param('bar');
-        $self->render_text("Our :bar placeholder matched $bar");
+        $self->render(text => "Our :bar placeholder matched $bar");
     };
 
 Routes allow default values to make placeholders optional.
@@ -403,7 +418,7 @@ multiple features at once.
 
     get '/' => 'index';
 
-    post '/form' => sub {
+    post '/test' => sub {
         my $self = shift;
 
         my $groovy = $self->param('groovy') || 'Austin Powers';
@@ -414,25 +429,25 @@ multiple features at once.
             layout   => 'funky',
             groovy   => $groovy
         );
-    } => 'form';
+    } => 'test';
 
-    shagadelic;
+    app->start;
     __DATA__
 
     @@ index.html.ep
     % layout 'funky';
     Who is groovy?
-    <form action="<%= url_for 'form' %>" method="POST">
-        <input type="text" name="groovy" />
-        <input type="submit" value="Woosh!">
-    </form>
+    <%= form_for test => (method => 'post') => {%>
+        <%= input 'groovy', type => 'text' %>
+        <input type="submit" value="Woosh!" />
+    <%}%>
 
     @@ welcome.html.ep
     <%= $groovy %> is groovy!
     <%= include 'menu' %>
 
     @@ menu.html.ep
-    <a href="<%= url_for 'index' %>">Try again</a>
+    <%= link_to index => {%>Try again<%}%>
 
     @@ layouts/funky.html.ep
     <!doctype html><html>
@@ -441,15 +456,15 @@ multiple features at once.
         </body>
     </html>
 
-Ladders can be used for authentication and to share code between multiple
-routes.
-All routes following a ladder are only evaluated if the ladder returns a
+Authentication and code shared between multiple routes can be realized easily
+with the C<under> statement.
+All following routes are only evaluated if the C<under> callback returned a
 true value.
 
     use Mojolicious::Lite;
 
     # Authenticate based on name parameter
-    ladder sub {
+    under sub {
         my $self = shift;
 
         # Authenticated
@@ -461,10 +476,10 @@ true value.
         return;
     };
 
-    # GET / (with ladder authentication)
+    # GET / (with authentication)
     get '/' => 'index';
 
-    shagadelic;
+    app->start;
     __DATA__;
 
     @@ denied.html.ep
@@ -477,12 +492,14 @@ Conditions such as C<agent> allow even more powerful route constructs.
 
     # /foo
     get '/foo' => (agent => qr/Firefox/) => sub {
-        shift->render_text('Congratulations, you are using a cool browser!');
+        shift->render(
+            text => 'Congratulations, you are using a cool browser!');
     }
 
     # /foo
     get '/foo' => (agent => qr/Internet Explorer/) => sub {
-        shift->render_text('Dude, you really need to upgrade to Firefox!');
+        shift->render(
+            text => 'Dude, you really need to upgrade to Firefox!');
     }
 
 Formats can be automatically detected by looking at file extensions.
@@ -534,7 +551,7 @@ request, this is very useful in combination with C<redirect_to>.
         $self->redirect_to('index');
     } => 'logout';
 
-    shagadelic;
+    app->start;
     __DATA__
 
     @@ layouts/default.html.ep
@@ -545,16 +562,16 @@ request, this is very useful in combination with C<redirect_to>.
 
     @@ login.html.ep
     % layout 'default';
-    <form action="<%= url_for %>">
+    <%= form_for login => {%>
         <% if (param 'name') { %>
             <b>Wrong name or password, please try again.</b><br />
         <% } %>
         Name:<br />
-        <input type="text" name="name" value="<%= param 'name' %>" /><br />
+        <%= input name => (type => 'text') %><br />
         Password:<br />
-        <input type="text" name="pass" value="<%= param 'pass' %>" /><br />
-        <input type="submit" value="Login"/>
-    </form>
+        <%= input pass => (type => 'text') %><br />
+        <input type="submit" value="Login" />
+    <%}%>
 
     @@ index.html.ep
     % layout 'default';
@@ -562,7 +579,7 @@ request, this is very useful in combination with C<redirect_to>.
         <b><%= $message %></b><br />
     <% } %>
     Welcome <%= session 'name' %>!<br />
-    <a href="<%= url_for 'logout' %>">Logout</a>
+    <%= link_to logout => {%>Logout<%}%>
 
 Note that you should use a custom C<secret> to make signed cookies really secure.
 
@@ -574,8 +591,8 @@ tool.
 
     get '/test' => sub {
         my $self = shift;
-        $self->render_data(
-            $self->client->get('http://mojolicious.org')->res->body);
+        $self->render(
+            data => $self->client->get('http://mojolicious.org')->res->body);
     };
 
 WebSocket applications have never been this easy before.
@@ -612,7 +629,8 @@ it with normal Perl unit tests like C<t/funky.t>.
     use Test::Mojo;
 
     use FindBin;
-    require "$FindBin::Bin/../myapp.pl";
+    $ENV{MOJO_HOME} = "$FindBin::Bin/../";
+    require "$ENV{MOJO_HOME}/myapp.pl";
 
     my $t = Test::Mojo->new;
     $t->get_ok('/')->status_is(200)->content_like(qr/Funky!/);
@@ -639,9 +657,9 @@ C<log> directory exists.
 For more control the L<Mojolicious> instance can be accessed directly.
 
     app->log->level('error');
-    app->routes->route('/foo/:bar')->via('get')->to(callback => sub {
+    app->routes->route('/foo/:bar')->via('get')->to(cb => sub {
         my $self = shift;
-        $self->render_text('Hello Mojo!');
+        $self->render(text => 'Hello Mojo!');
     });
 
 In case a lite app needs to grow, lite and real L<Mojolicous> applications
@@ -650,17 +668,27 @@ can be easily mixed to make the transition process very smooth.
     package MyApp::Foo;
     use base 'Mojolicious::Controller';
 
-    sub index { shift->render_text('It works!') }
+    sub index { shift->render(text => 'It works!') }
 
     package main;
     use Mojolicious::Lite;
 
-    get '/bar' => sub { shift->render_text('This too!') };
+    get '/bar' => sub { shift->render(text => 'This too!') };
 
     app->routes->namespace('MyApp');
     app->routes->route('/foo/:action')->via('get')->to('foo#index');
 
-    shagadelic;
+    app->start;
+
+There is also a helper command to generate a full L<Mojolicious> example that
+will let you explore the astonishing similarities between
+L<Mojolicious::Lite> and L<Mojolicious> applications.
+Both share about 99% of the same code, so almost everything you learned in
+this tutorial applies there too. :)
+
+    % mojolicious generate app
+
+Have fun!
 
 =head1 ATTRIBUTES
 

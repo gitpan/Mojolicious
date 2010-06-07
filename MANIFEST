@@ -32,6 +32,7 @@ lib/Mojo/Cookie/Request.pm
 lib/Mojo/Cookie/Response.pm
 lib/Mojo/CookieJar.pm
 lib/Mojo/Date.pm
+lib/Mojo/DOM.pm
 lib/Mojo/Exception.pm
 lib/Mojo/Filter.pm
 lib/Mojo/Filter/Chunked.pm
@@ -86,6 +87,7 @@ lib/Mojolicious/Plugin/JsonConfig.pm
 lib/Mojolicious/Plugin/PodRenderer.pm
 lib/Mojolicious/Plugin/PoweredBy.pm
 lib/Mojolicious/Plugin/RequestTimer.pm
+lib/Mojolicious/Plugin/TagHelpers.pm
 lib/Mojolicious/Plugins.pm
 lib/MojoX/Controller.pm
 lib/MojoX/Dispatcher/Routes.pm
@@ -104,7 +106,7 @@ LICENSE
 Makefile.PL
 MANIFEST			This list of files
 MANIFEST.SKIP
-README
+README.md
 script/mojo
 script/mojolicious
 t/mojo/apache_cgi.t
@@ -121,6 +123,7 @@ t/mojo/cookiejar.t
 t/mojo/daemon.t
 t/mojo/daemon_prefork.t
 t/mojo/date.t
+t/mojo/dom.t
 t/mojo/fastcgi.t
 t/mojo/headers.t
 t/mojo/home.t
@@ -143,6 +146,7 @@ t/mojo/template.t
 t/mojo/url.t
 t/mojolicious/app.t
 t/mojolicious/charset_lite_app.t
+t/mojolicious/dispatcher_lite_app.t
 t/mojolicious/embedded_lite_app.t
 t/mojolicious/i18n_lite_app.t
 t/mojolicious/json_config_lite_app.json
@@ -170,10 +174,14 @@ t/mojolicious/templates/layouts/default.html.epl
 t/mojolicious/templates/layouts/green.html.epl
 t/mojolicious/templates/simple.html.pod
 t/mojolicious/templates/syntaxerror.html.epl
+t/mojolicious/templates/withblock.txt.epl
 t/mojolicious/templates/withlayout.html.epl
 t/mojolicious/twinkle_lite_app.json
 t/mojolicious/twinkle_lite_app.t
+t/mojolicious/upload_lite_app.t
 t/mojolicious/websocket_lite_app.t
+t/mojolicious/websocket_proxy_lite_app.t
+t/mojolicious/websocket_tls_proxy_lite_app.t
 t/mojox/dispatcher/routes.t
 t/mojox/dispatcher/routes/controller.t
 t/mojox/renderer.t

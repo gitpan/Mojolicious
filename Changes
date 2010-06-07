@@ -1,5 +1,62 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+0.999925 2010-06-07 00:00:00
+        - Updated WebSocket implementation to draft 76,
+          NOTE THAT THIS CHANGE IS NOT BACKWARDS COMPATIBLE!!!
+          (sadly we have no choice when the spec changes)
+        - Increased Perl version requirement to 5.8.7 due to unicode bugs in
+          earlier releases.
+        - Switched to app->start instead of shagadelic as default way to
+          start Mojolicious::Lite apps in the documentation.
+        - Made tutorial examples more business friendly.
+        - Added the ability to use Mojolicious::Lite apps as Mojolicious
+          controllers.
+        - Added EXPERIMENTAL XML DOM parser with CSS3 selector support.
+        - Added EXPERIMENTAL tag_helper plugin to Mojolicious. (vti)
+        - Added EXPERIMENTAL success method to Mojo::Transaction.
+        - Added EXPERIMENTAL json method and json_class attribute to
+          Mojo::Message.
+        - Added EXPERIMENTAL idle_cb attribute to Mojo::IOLoop.
+        - Added more perlish block syntax to Mojo::Template.
+        - Added non blocking TLS handshake support to Mojo::IOLoop.
+        - Added proxy support to Mojo::Client.
+        - Added the ability to have dispatch plugins.
+        - Added "under" to Mojolicious::Lite.
+        - Added file upload support to Mojo::Client. (yko)
+        - Added higher precision timers to Mojo::IOLoop. (vti)
+        - Improved exception handling.
+        - Improved documentation.
+        - Improved IIS compatibility of the CGI implementation.
+        - Improved routes by making the leading slash optional and storing
+          route names in the stash.
+        - Converted README to markdown. (memowe)
+        - Fixed connection keep alive with epoll.
+        - Fixed bridge bug in MojoX::Routes::Match.
+          (Oleg Zhelo, Dmitry Konstantinov)
+        - Fixed argument handling of Mojo::Template blocks. (afresh1)
+        - Fixed a stash localization bug. (und3f)
+        - Fixed Mojo::Log to use flock to sync log file writing.
+        - Fixed daemons to listen on "::" for IPv6 and "0.0.0.0" for IPv4
+          with a wildcard address.
+        - Fixed lock_cb and unlock_cb exceptions to be fatal in Mojo::IOLoop,
+          this makes Mojo::Server::Daemon::Prefork much more solid. (ask)
+        - Fixed a bug that prevented undef values in the stash. (garu)
+        - Fixed Mojo::Message::headers chaining. (markstos)
+        - Fixed a bug in Mojo::JSON that prevented BOM characters in strings.
+          (chansen)
+        - Fixed Mojo::JSON to not unescape broken surrogates. (chansen)
+        - Fixed UTF-8 bug in Mojolicious::Plugin::JsonConfig. (vti)
+        - Fixed Mojo::Parameters to accept array values. (konstantinov)
+        - Fixed IRI routes in Mojolicious.
+        - Fixed multiple path encoding bugs.
+        - Fixed a loader bug.
+        - Fixed reloading of inflated Mojolicious::Lite templates.
+        - Fixed the client transaction builder. (Curt Tilmes)
+        - Fixed unix domain socket support. (sharifulin)
+        - Fixed a few regex bugs. (vti)
+        - Fixed POD. (memowe)
+        - Fixed typos. (jawnsy)
+
 0.999924 2010-03-08 00:00:00
         - Added default TLS cert and key to Mojo::IOLoop to make HTTPS
           testing easier, so "mojo daemon --listen https://*:3000" now just

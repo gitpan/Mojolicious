@@ -56,24 +56,14 @@ sub new {
 }
 
 sub add_handler {
-    my $self = shift;
-
-    # Merge
-    my $handler = ref $_[0] ? $_[0] : {@_};
-    $handler = {%{$self->handler}, %$handler};
-    $self->handler($handler);
-
+    my ($self, $name, $cb) = @_;
+    $self->handler->{$name} = $cb;
     return $self;
 }
 
 sub add_helper {
-    my $self = shift;
-
-    # Merge
-    my $helper = ref $_[0] ? $_[0] : {@_};
-    $helper = {%{$self->helper}, %$helper};
-    $self->helper($helper);
-
+    my ($self, $name, $cb) = @_;
+    $self->helper->{$name} = $cb;
     return $self;
 }
 
@@ -196,7 +186,7 @@ sub render {
     my $req = $c->req;
     unless ($res->code) {
         $req->has_error
-          ? $res->code($req->error)
+          ? $res->code(($req->error)[1])
           : $res->code($c->stash('status') || $self->default_status);
     }
     $res->body($output) unless $res->body;
@@ -376,7 +366,7 @@ MojoX::Renderer - MIME Type Based Renderer
 L<MojoX::Renderer> is the standard L<Mojolicious> renderer.
 It turns your stashed data structures into content.
 
-=head2 ATTRIBUTES
+=head1 ATTRIBUTES
 
 L<MojoX::Types> implements the following attributes.
 

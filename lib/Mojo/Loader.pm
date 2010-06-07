@@ -21,10 +21,6 @@ BEGIN {
 
     # Debugger sub tracking
     $^P |= 0x10;
-
-    # Bug in pre-5.8.7 perl
-    # http://rt.perl.org/rt3/Ticket/Display.html?id=35059
-    eval 'sub DB::sub' if $] < 5.008007;
 }
 
 # Homer no function beer well without.
@@ -127,6 +123,7 @@ sub search {
         }
     }
 
+    return unless @$modules;
     return $modules;
 }
 
@@ -156,13 +153,6 @@ L<Mojo::Loader> is a class loader and plugin framework.
 
 L<Mojo::Loader> inherits all methods from L<Mojo::Base> and implements the
 following new ones.
-
-=head2 C<new>
-
-    my $loader = Mojo::Loader->new;
-    my $loader = Mojo::Loader->new('MyApp::Namespace');
-
-Construct a new L<Mojo::Loader> object.
 
 =head2 C<load>
 

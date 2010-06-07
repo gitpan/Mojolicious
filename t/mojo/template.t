@@ -25,7 +25,7 @@ package main;
 use strict;
 use warnings;
 
-use Test::More tests => 89;
+use Test::More tests => 94;
 
 use File::Spec;
 use File::Temp;
@@ -117,10 +117,24 @@ $output = $mt->render(<<'EOF');
 EOF
 is($output, "&lt;html&gt;\n");
 
+# Capture tags (alternative)
+$mt     = Mojo::Template->new;
+$output = $mt->render(<<'EOF');
+<% my $result = escape block {%><html><%}%><%= $result %>
+EOF
+is($output, "&lt;html&gt;\n");
+
 # Capture tags with appended code
 $mt     = Mojo::Template->new;
 $output = $mt->render(<<'EOF');
 <%{ my $result = escape( block %><html><%} ); %><%= $result %>
+EOF
+is($output, "&lt;html&gt;\n");
+
+# Capture tags with appended code (alternative)
+$mt     = Mojo::Template->new;
+$output = $mt->render(<<'EOF');
+<% my $result = escape( block {%><html><%} ); %><%= $result %>
 EOF
 is($output, "&lt;html&gt;\n");
 
@@ -131,6 +145,13 @@ $output = $mt->render(<<'EOF');
 EOF
 is($output, "&lt;html&gt;\n");
 
+# Nested capture tags (alternative)
+$mt     = Mojo::Template->new;
+$output = $mt->render(<<'EOF');
+<% my $result = block {%><%= escape block {%><html><%}%><%}%><%= $result %>
+EOF
+is($output, "&lt;html&gt;\n");
+
 # Advanced capturing
 $mt     = Mojo::Template->new;
 $output = $mt->render(<<'EOF');
@@ -138,8 +159,8 @@ $output = $mt->render(<<'EOF');
 % my $name = shift;
 Hello <%= $name %>.
 %}
-%= block $block, 'Baerbel'
-%= block $block, 'Wolfgang'
+%= $block->('Baerbel')
+%= $block->('Wolfgang')
 EOF
 is($output, <<EOF);
 Hello Baerbel.
@@ -153,12 +174,49 @@ $output = $mt->render(<<'EOF');
     <% my $name = shift; =%>
     Hello <%= $name %>.
 <%}=%>
-<%= block $block, 'Sebastian' %>
-<%= block $block, 'Sara' %>
+<%= $block->('Sebastian') %>
+<%= $block->('Sara') %>
 EOF
 is($output, <<EOF);
 Hello Sebastian.
 Hello Sara.
+EOF
+
+# Advanced capturing with tags (alternative)
+$mt     = Mojo::Template->new;
+$output = $mt->render(<<'EOF');
+<% my $block = ={%>
+    <% my $name = shift; =%>
+    Hello <%= $name %>.
+<%}=%>
+<%= $block->('Sebastian') %>
+<%= $block->('Sara') %>
+EOF
+is($output, <<EOF);
+Hello Sebastian.
+Hello Sara.
+EOF
+
+# More advanced capturing with tags (alternative)
+$mt     = Mojo::Template->new;
+$output = $mt->render(<<'EOF');
+<% my
+$block1 = ={%>
+    <% my $name = shift; =%>
+    Hello <%= $name %>.
+<%}=%>
+<% my
+$block2 =
+={%>
+    <% my $name = shift; =%>
+    Bye <%= $name %>.
+<%}=%>
+<%= $block1->('Sebastian') %>
+<%= $block2->('Sara') %>
+EOF
+is($output, <<EOF);
+Hello Sebastian.
+Bye Sara.
 EOF
 
 # Block loop
@@ -413,8 +471,10 @@ $mt->prepend('my $foo = shift; my $bar = "something\nelse"');
 $output = $mt->render(<<'EOF', 23);
 <%= $foo %>
 %= $bar
+% my $bar = 23;
+%= $bar
 EOF
-is($output, "23\nsomething\nelse");
+is($output, "23\nsomething\nelse23");
 $mt = Mojo::Template->new;
 $mt->prepend(
     q/{no warnings 'redefine'; no strict 'refs'; *foo = sub { 23 }}/);

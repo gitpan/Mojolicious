@@ -74,24 +74,25 @@ sub run {
         return $help ? $command->help : $command->run(@args);
     }
 
-    # Try all namspaces
+    # Try all namespaces
     my $commands = [];
     my $seen     = {};
     for my $namespace (@{$self->namespaces}) {
 
         # Search
-        my $found = Mojo::Loader->search($namespace);
+        if (my $modules = Mojo::Loader->search($namespace)) {
+            for my $module (@$modules) {
 
-        for my $module (@$found) {
+                # Load
+                if (my $e = Mojo::Loader->load($module)) { die $e }
 
-            # Load
-            if (my $e = Mojo::Loader->load($module)) { die $e }
-
-            # Seen
-            my $command = $module;
-            $command =~ s/^$namespace\:://;
-            push @$commands, [$command => $module] unless $seen->{$command};
-            $seen->{$command} = 1;
+                # Seen
+                my $command = $module;
+                $command =~ s/^$namespace\:://;
+                push @$commands, [$command => $module]
+                  unless $seen->{$command};
+                $seen->{$command} = 1;
+            }
         }
     }
 

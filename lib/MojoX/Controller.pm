@@ -114,11 +114,13 @@ sub stash {
     return $self->{stash} unless @_;
 
     # Get
-    return $self->{stash}->{$_[0]} unless defined $_[1] || ref $_[0];
+    return $self->{stash}->{$_[0]} unless @_ > 1 || ref $_[0];
 
     # Set
-    my $values = exists $_[1] ? {@_} : $_[0];
-    $self->{stash} = {%{$self->{stash}}, %$values};
+    my $values = ref $_[0] ? $_[0] : {@_};
+    for my $key (keys %$values) {
+        $self->{stash}->{$key} = $values->{$key};
+    }
 
     return $self;
 }
@@ -138,7 +140,7 @@ MojoX::Controller - Controller Base Class
 
 L<MojoX::Controller> is an abstract controllers base class.
 
-=head2 ATTRIBUTES
+=head1 ATTRIBUTES
 
 L<MojoX::Controller> implements the following attributes.
 

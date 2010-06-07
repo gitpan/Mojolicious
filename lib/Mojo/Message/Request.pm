@@ -91,7 +91,8 @@ sub is_secure {
 
     # Secure
     my $url = $self->url;
-    return 1 if $url->base->scheme eq 'https' || $url->scheme eq 'https';
+    my $scheme = $url->scheme || $url->base->scheme || '';
+    return 1 if $scheme eq 'https';
 
     # Not secure
     return;
@@ -304,7 +305,7 @@ sub _parse_env {
 
     # IIS is so fucked up, nobody should ever have to use it...
     my $software = $env->{SERVER_SOFTWARE} || '';
-    if ($software =~ /IIS\/\d+/ && $base =~ /^$path\/?$/) {
+    if ($software =~ /IIS\/\d+/ && $env->{SCRIPT_NAME} eq $env->{PATH_INFO}) {
 
         # This is a horrible hack, just like IIS itself
         if (my $t = $env->{PATH_TRANSLATED}) {
@@ -313,7 +314,10 @@ sub _parse_env {
 
             # Try to generate correct PATH_INFO and SCRIPT_NAME
             my @n;
-            while ($p[$#p] eq $t[$#t]) {
+            while (defined(my $p = $p[$#p])) {
+                $p ||= '';
+                my $t = $t[$#t] || '';
+                last unless $p eq $t;
                 pop @t;
                 unshift @n, pop @p;
             }
@@ -392,7 +396,7 @@ sub _parse_start_line {
                 $buffer->empty;
             }
         }
-        else { $self->error(400) }
+        else { $self->error('Bad request start line.', 400) }
     }
 }
 

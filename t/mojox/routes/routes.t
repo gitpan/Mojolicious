@@ -5,7 +5,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 177;
+use Test::More tests => 193;
 
 use Mojo::Transaction::HTTP;
 
@@ -42,6 +42,9 @@ $test4->route('/foo')->to(controller => 'baz');
 
 # /test2/bar
 $test4->route('/bar')->to(controller => 'lalala');
+
+# /test2/baz
+$test2->route('/baz')->to('just#works');
 
 # /test3
 my $test3 = $r->waypoint('/test3')->to(controller => 's', action => 'l');
@@ -123,6 +126,13 @@ $r->route('/method/post_get')->via(qw/POST get/)
 
 # /simple/form
 $r->route('/simple/form')->to('test-test#test');
+
+# /edge/gift
+my $edge = $r->route('/edge');
+my $auth = $edge->bridge('/auth')->to('auth#check');
+$auth->route('/about/')->to('pref#about');
+$auth->bridge->to('album#allow')->route('/album/create/')->to('album#create');
+$auth->route('/gift/')->to('gift#index');
 
 # Make sure stash stays clean
 my $tx = Mojo::Transaction::HTTP->new;
@@ -255,6 +265,15 @@ is($m->stack->[2]->{controller}, 'lalala');
 is($m->captures->{controller},   'lalala');
 is($m->url_for,                  '/test2/bar');
 is(@{$m->stack},                 3);
+$tx->req->url->parse('/test2/baz');
+$m = MojoX::Routes::Match->new($tx)->match($r);
+is($m->stack->[0]->{controller}, 'test2');
+is($m->stack->[1]->{controller}, 'just');
+is($m->stack->[1]->{action},     'works');
+is($m->stack->[2],               undef);
+is($m->captures->{controller},   'just');
+is($m->url_for,                  '/test2/baz');
+is(@{$m->stack},                 2);
 
 # Waypoints
 $tx = Mojo::Transaction::HTTP->new;
@@ -464,3 +483,18 @@ is($m->stack->[0]->{action},     'test');
 is($m->stack->[0]->{format},     undef);
 is($m->url_for,                  '/simple/form');
 is(@{$m->stack},                 1);
+
+# Special edge case with nested bridges
+$tx = Mojo::Transaction::HTTP->new;
+$tx->req->method('GET');
+$tx->req->url->parse('/edge/auth/gift');
+$m = MojoX::Routes::Match->new($tx)->match($r);
+is($m->stack->[0]->{controller}, 'auth');
+is($m->stack->[0]->{action},     'check');
+is($m->stack->[0]->{format},     undef);
+is($m->stack->[1]->{controller}, 'gift');
+is($m->stack->[1]->{action},     'index');
+is($m->stack->[1]->{format},     undef);
+is($m->stack->[2],               undef);
+is($m->url_for,                  '/edge/auth/gift');
+is(@{$m->stack},                 2);

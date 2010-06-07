@@ -2,7 +2,7 @@
 
 # Copyright (C) 2008-2010, Sebastian Riedel.
 
-use 5.008001;
+use 5.008007;
 
 use strict;
 use warnings;
@@ -14,7 +14,7 @@ use ExtUtils::MakeMaker;
 my $mm = $ExtUtils::MakeMaker::VERSION;
 
 # We only use core modules, so you shouldn't have to install anything besides
-# Perl 5.8.1!
+# Perl 5.8.7!
 WriteMakefile(
     NAME         => 'Mojolicious',
     VERSION_FROM => 'lib/Mojolicious.pm',
@@ -26,7 +26,7 @@ WriteMakefile(
     (   $mm < 6.46
         ? ()
         : ( META_MERGE => {
-                requires  => {perl => '5.008001'},
+                requires  => {perl => '5.008007'},
                 resources => {
                     homepage => 'http://mojolicious.org',
                     license  => 'http://dev.perl.org/licenses/',
@@ -70,7 +70,6 @@ WriteMakefile(
         'POSIX'                 => 0,
         'Scalar::Util'          => 0,
         'Storable'              => 0,
-        'Sys::Hostname'         => 0,
         'Test::Builder'         => 0,
         'Test::Harness'         => 0,
         'Test::More'            => 0,

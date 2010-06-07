@@ -103,12 +103,14 @@ sub _read_config {
     my $mt = Mojo::Template->new($template);
     $mt->prepend($prepend);
     $encoded = $mt->render($encoded, $app);
+    utf8::encode $encoded;
 
     # Parse
     my $json   = Mojo::JSON->new;
     my $config = $json->decode($encoded);
     my $error  = $json->error;
     die qq/Couldn't parse config file "$file": $error/ if !$config && $error;
+    die qq/Invalid config file "$file"./ if !$config || ref $config ne 'HASH';
 
     return $config;
 }

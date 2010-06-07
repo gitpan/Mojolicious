@@ -39,10 +39,10 @@ get '/' => 'index';
 
 get '/:groovy' => sub {
     my $self = shift;
-    $self->render_text($self->param('groovy'), layout => 'funky');
+    $self->render(text => $self->param('groovy'), layout => 'funky');
 };
 
-shagadelic;
+app->start;
 <%%= '__DATA__' %%>
 
 <%%= '@@ index.html.ep' %%>
