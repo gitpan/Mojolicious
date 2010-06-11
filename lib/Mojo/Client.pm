@@ -359,12 +359,16 @@ sub process {
     # Add transactions from queue
     else { $self->_prepare_pipeline(@$_) for @$queue }
 
-    # Start loop
-    my $loop = $self->ioloop;
-    $loop->start;
+    # Sync
+    unless ($self->{_is_async}) {
 
-    # Cleanup
-    $loop->one_tick(0);
+        # Start loop
+        my $loop = $self->ioloop;
+        $loop->start;
+
+        # Cleanup
+        $loop->one_tick(0);
+    }
 
     return $self;
 }
@@ -1232,13 +1236,13 @@ Mojo::Client - Async IO HTTP 1.1 And WebSocket Client
     my $home = 'http://mojolicious.org';
     print $client->get($home)->success->dom->at('title')->text;
 
-    # Form post with excepton handling
+    # Form post with exception handling
     my $cpan   = 'http://search.cpan.org/search';
     my $search = {q => 'mojo'};
     my $tx     = $client->post_form($cpan => $search);
     if (my $res = $tx->success) { print $res->body }
     else {
-        my ($code, $message) = $tx->error;
+        my ($message, $code) = $tx->error;
         print "Error: $message";
     }
 

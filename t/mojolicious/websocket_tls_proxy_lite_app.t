@@ -9,7 +9,9 @@ use Mojo::IOLoop;
 use Test::More;
 
 # Make sure sockets are working
-plan skip_all => 'IO::Socket::SSL required for this test!'
+plan skip_all => 'set TEST_TLS to enable this test (developer only!)'
+  unless $ENV{TEST_TLS};
+plan skip_all => 'IO::Socket::SSL 1.33 required for this test!'
   unless Mojo::IOLoop::TLS;
 plan skip_all => 'working sockets required for this test!'
   unless my $proxy = Mojo::IOLoop->new->generate_port;
