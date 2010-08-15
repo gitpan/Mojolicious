@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Command::Get;
 
 use strict;
@@ -20,7 +18,7 @@ __PACKAGE__->attr(usage => <<"EOF");
 usage: $0 get [OPTIONS] [URL]
 
 These options are available:
-  --headers    Print response headers to STDERR.
+  --verbose   Print response start line and headers to STDERR.
 EOF
 
 # I hope this has taught you kids a lesson: kids never learn.
@@ -28,17 +26,20 @@ sub run {
     my $self = shift;
 
     # Options
-    @ARGV = @_ if @_;
-    my $headers = 0;
-    GetOptions('headers' => sub { $headers = 1 });
+    local @ARGV = @_ if @_;
+    my $verbose = 0;
+    GetOptions('verbose' => sub { $verbose = 1 });
 
     # URL
-    my $url = shift;
+    my $url = $ARGV[0];
     die $self->usage unless $url;
     $url = b($url)->decode('UTF-8')->to_string;
 
     # Client
     my $client = Mojo::Client->new;
+
+    # Silence
+    $client->log->level('fatal');
 
     # Application
     $client->app($ENV{MOJO_APP} || 'Mojo::HelloWorld')
@@ -48,10 +49,11 @@ sub run {
     my $tx = $client->build_tx(GET => $url);
     $tx->res->body(
         sub {
-            my ($tx, $chunk) = @_;
-            print STDERR $tx->headers->to_string . "\n\n" if $headers;
+            my ($res, $chunk) = @_;
+            print STDERR $tx->res->build_start_line if $verbose;
+            print STDERR $res->headers->to_string, "\n\n" if $verbose;
             print $chunk;
-            $headers = 0;
+            $verbose = 0;
         }
     );
 
@@ -59,11 +61,8 @@ sub run {
     $client->process($tx);
 
     # Error
-    if ($tx->has_error) {
-        my $message = ($tx->error)[1];
-        $message = $message ? " ($message)" : '';
-        print qq/Couldn't open page "$url".$message\n/;
-    }
+    my ($message, $code) = $tx->error;
+    print qq/Couldn't open page "$url". ($message)\n/ if $message && !$code;
 
     return $self;
 }

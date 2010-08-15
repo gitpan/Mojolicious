@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Server;
 
 use strict;
@@ -37,30 +35,10 @@ __PACKAGE__->attr(
                 local $ENV{MOJO_RELOAD} = $reload;
                 if (my $e = Mojo::Loader->reload) { warn $e }
                 delete $self->{app};
-
-                # Reset if this reload was triggered by a USR1 signal
-                $self->reload(0) if $reload == 2;
             }
 
             return $self->app->build_tx_cb->($self->app);
           }
-    }
-);
-__PACKAGE__->attr(
-    continue_handler_cb => sub {
-        sub {
-            my ($self, $tx) = @_;
-            if ($self->app->can('continue_handler')) {
-                $self->app->continue_handler($tx);
-
-                # Close connection to prevent potential race condition
-                unless ($tx->res->code == 100) {
-                    $tx->keep_alive(0);
-                    $tx->res->headers->connection('Close');
-                }
-            }
-            else { $tx->res->code(100) }
-        };
     }
 );
 __PACKAGE__->attr(
@@ -85,16 +63,6 @@ __PACKAGE__->attr(
 # Pork chops?
 # Dad, those all come from the same animal.
 # Heh heh heh. Ooh, yeah, right, Lisa. A wonderful, magical animal.
-sub new {
-    my $self = shift->SUPER::new(@_);
-
-    # Reload on USR1 signal (does not work on win32)
-    $SIG{USR1} = sub { $self->reload(2) }
-      if $^O ne 'MSWin32';
-
-    return $self;
-}
-
 sub run { croak 'Method "run" not implemented by subclass' }
 
 1;
@@ -151,15 +119,6 @@ L<Mojo::HelloWorld>.
 
 Transaction builder callback.
 
-=head2 C<continue_handler_cb>
-
-    my $handler = $server->continue_handler_cb;
-    $server     = $server->continue_handler_cb(sub {
-        my ($self, $tx) = @_;
-    });
-
-Callback handling C<100 Continue> requests.
-
 =head2 C<handler_cb>
 
     my $handler = $server->handler_cb;
@@ -189,12 +148,6 @@ WebSocket handshake callback.
 
 L<Mojo::Server> inherits all methods from L<Mojo::Base> and implements the
 following new ones.
-
-=head2 C<new>
-
-    my $server = Mojo::Server->new;
-
-Construct a new L<Mojo::Server> object.
 
 =head2 C<run>
 

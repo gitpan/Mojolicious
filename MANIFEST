@@ -1,5 +1,6 @@
 .perltidyrc
 Changes
+examples/.DS_Store
 examples/connect-proxy.pl
 examples/flash-policy-server.pl
 examples/microhttpd.pl
@@ -54,7 +55,6 @@ lib/Mojo/Server/Daemon.pm
 lib/Mojo/Server/Daemon/Prefork.pm
 lib/Mojo/Server/FastCGI.pm
 lib/Mojo/Server/PSGI.pm
-lib/Mojo/Stateful.pm
 lib/Mojo/Template.pm
 lib/Mojo/Transaction.pm
 lib/Mojo/Transaction/HTTP.pm
@@ -73,7 +73,10 @@ lib/Mojolicious/Controller.pm
 lib/Mojolicious/Guides.pod
 lib/Mojolicious/Guides/Cheatsheet.pod
 lib/Mojolicious/Guides/CodingGuidelines.pod
+lib/Mojolicious/Guides/Cookbook.pod
 lib/Mojolicious/Guides/FAQ.pod
+lib/Mojolicious/Guides/Rendering.pod
+lib/Mojolicious/Guides/Routing.pod
 lib/Mojolicious/Lite.pm
 lib/Mojolicious/Plugin.pm
 lib/Mojolicious/Plugin/AgentCondition.pm
@@ -100,6 +103,7 @@ lib/MojoX/Routes/Pattern.pm
 lib/MojoX/Session/Cookie.pm
 lib/MojoX/Session/Cookie/Controller.pm
 lib/MojoX/Types.pm
+lib/ojo.pm
 lib/Test/Mojo.pm
 lib/Test/Mojo/Server.pm
 LICENSE
@@ -117,6 +121,7 @@ t/mojo/base.t
 t/mojo/bytestream.t
 t/mojo/cgi.t
 t/mojo/client.t
+t/mojo/client_online.t
 t/mojo/content.t
 t/mojo/cookie.t
 t/mojo/cookiejar.t
@@ -141,7 +146,6 @@ t/mojo/parameters.t
 t/mojo/path.t
 t/mojo/psgi.t
 t/mojo/server.t
-t/mojo/stateful.t
 t/mojo/template.t
 t/mojo/url.t
 t/mojolicious/app.t
@@ -151,6 +155,7 @@ t/mojolicious/embedded_lite_app.t
 t/mojolicious/i18n_lite_app.t
 t/mojolicious/json_config_lite_app.json
 t/mojolicious/json_config_lite_app.t
+t/mojolicious/lib/EmbeddedTestApp.pm
 t/mojolicious/lib/MojoliciousTest.pm
 t/mojolicious/lib/MojoliciousTest/Foo.pm
 t/mojolicious/lib/MojoliciousTest/Foo/Bar.pm
@@ -168,6 +173,7 @@ t/mojolicious/secret.txt
 t/mojolicious/templates/23.html.epl
 t/mojolicious/templates/encoding.koi8-r.ep
 t/mojolicious/templates/exception.html.epl
+t/mojolicious/templates/foo/bar.rss.ep
 t/mojolicious/templates/foo/bar/index.html.epl
 t/mojolicious/templates/foo/index.html.xpl
 t/mojolicious/templates/layouts/default.html.epl
@@ -176,7 +182,7 @@ t/mojolicious/templates/simple.html.pod
 t/mojolicious/templates/syntaxerror.html.epl
 t/mojolicious/templates/withblock.txt.epl
 t/mojolicious/templates/withlayout.html.epl
-t/mojolicious/twinkle_lite_app.json
+t/mojolicious/twinkle_lite_app.conf
 t/mojolicious/twinkle_lite_app.t
 t/mojolicious/upload_lite_app.t
 t/mojolicious/websocket_lite_app.t

@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Filter::Chunked;
 
 use strict;
@@ -12,7 +10,7 @@ sub build {
     my ($self, $chunk) = @_;
 
     # Done
-    return '' if $self->is_done;
+    return '' if ($self->{_state} || '') eq 'done';
 
     # Shortcut
     return unless defined $chunk;
@@ -25,7 +23,7 @@ sub build {
     # End
     my $formatted = '';
     if ($headers || ($chunk_length == 0)) {
-        $self->done;
+        $self->{_state} = 'done';
 
         # Normal end
         $formatted = "\x0d\x0a0\x0d\x0a";
@@ -38,8 +36,8 @@ sub build {
     else {
 
         # First chunk has no leading CRLF
-        $formatted = "\x0d\x0a" unless $self->is_state('start');
-        $self->state('chunks');
+        $formatted = "\x0d\x0a" if $self->{_state};
+        $self->{_state} = 'chunks';
 
         # Chunk
         $formatted .= sprintf('%x', length $chunk) . "\x0d\x0a$chunk";
@@ -48,11 +46,16 @@ sub build {
     return $formatted;
 }
 
+sub is_done {
+    return 1 if (shift->{_state} || '') eq 'done';
+    return;
+}
+
 sub parse {
     my $self = shift;
 
     # Trailing headers
-    if ($self->is_state('trailing_headers')) {
+    if (($self->{_state} || '') eq 'trailing_headers') {
         $self->_parse_trailing_headers;
         return $self;
     }
@@ -68,7 +71,7 @@ sub parse {
         # Last chunk
         if ($length == 0) {
             $filter->remove(length $header);
-            $self->state('trailing_headers');
+            $self->{_state} = 'trailing_headers';
             last;
         }
 
@@ -96,7 +99,8 @@ sub parse {
     }
 
     # Trailing headers
-    $self->_parse_trailing_headers if $self->is_state('trailing_headers');
+    $self->_parse_trailing_headers
+      if ($self->{_state} || '') eq 'trailing_headers';
 }
 
 sub _parse_trailing_headers {
@@ -104,13 +108,12 @@ sub _parse_trailing_headers {
 
     # Parse
     my $headers = $self->headers;
-    $headers->state('headers');
     $headers->parse;
 
     # Done
     if ($headers->is_done) {
         $self->_remove_chunked_encoding;
-        $self->done;
+        $self->{_state} = 'done';
     }
 }
 
@@ -169,6 +172,12 @@ implements the following new ones.
     my $formatted = $filter->build('Hello World!');
 
 Build chunked content.
+
+=head2 C<is_done>
+
+    my $done = $filter->is_done;
+
+Check if filter is done.
 
 =head2 C<parse>
 

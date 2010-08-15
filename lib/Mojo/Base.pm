@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Base;
 
 use strict;
@@ -41,7 +39,7 @@ sub attr {
     no strict 'refs';
 
     # Create attributes
-    $attrs = ref $attrs eq 'ARRAY' ? $attrs : [$attrs];
+    $attrs = [$attrs] unless ref $attrs eq 'ARRAY';
     my $ws = '    ';
     for my $attr (@$attrs) {
 

@@ -1,9 +1,10 @@
 #!/usr/bin/env perl
 
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 use strict;
 use warnings;
+
+# Disable epoll, kqueue and IPv6
+BEGIN { $ENV{MOJO_POLL} = $ENV{MOJO_NO_IPV6} = 1 }
 
 use Mojo::IOLoop;
 use Test::More;
@@ -40,10 +41,10 @@ my $twinkle = {
 plugin ep_renderer => {name => 'twinkle', template => $twinkle};
 plugin 'pod_renderer';
 plugin pod_renderer => {name => 'teapod', preprocess => 'twinkle'};
-my $config =
-  plugin json_config => {default => {foo => 'bar'}, template => $twinkle};
-is($config->{foo},  'bar');
-is($config->{test}, 23);
+my $config = plugin json_config =>
+  {default => {foo => 'bar'}, ext => 'conf', template => $twinkle};
+is($config->{foo},  'bar', 'right value');
+is($config->{test}, 23,    'right value');
 
 # GET /
 get '/' => {name => '<sebastian>'} => 'index';

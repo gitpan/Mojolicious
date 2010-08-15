@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojolicious::Plugin::HeaderCondition;
 
 use strict;
@@ -16,7 +14,7 @@ sub register {
     # Header
     $app->routes->add_condition(
         headers => sub {
-            my ($r, $tx, $captures, $patterns) = @_;
+            my ($r, $c, $captures, $patterns) = @_;
 
             # Patterns
             return unless $patterns && ref $patterns eq 'HASH';
@@ -24,7 +22,7 @@ sub register {
             # Match
             my $passed;
             while (my ($k, $v) = each(%$patterns)) {
-                my $header = $tx->req->headers->header($k);
+                my $header = $c->req->headers->header($k);
                 if ($header && $v && ref $v eq 'Regexp' && $header =~ $v) {
                     $passed = 1;
                     next;

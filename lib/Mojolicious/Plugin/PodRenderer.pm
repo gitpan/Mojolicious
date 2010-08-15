@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojolicious::Plugin::PodRenderer;
 
 use strict;
@@ -98,21 +96,23 @@ Mojolicious::Plugin::PodRenderer - POD Renderer Plugin
 
 L<Mojolicous::Plugin::PodRenderer> is a renderer for true Perl hackers, rawr!
 
-=head1 OPTIONS
+=head2 Options
 
-=head2 C<name>
+=over 4
+
+=item name
 
     # Mojolicious::Lite
     plugin pod_renderer => {name => 'foo'};
 
-=head2 C<preprocess>
+=item preprocess
 
     # Mojolicious::Lite
     plugin pod_renderer => {preprocess => 'epl'};
 
-=head2 HELPERS
+=back
 
-=head2 HELPERS
+=head2 Helpers
 
 =over 4
 

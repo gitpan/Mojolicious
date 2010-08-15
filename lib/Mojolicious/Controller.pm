@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojolicious::Controller;
 
 use strict;
@@ -20,30 +18,26 @@ sub client { shift->app->client }
 sub finish {
     my $self = shift;
 
-    # Resume
-    $self->resume;
+    # Transaction
+    my $tx = $self->tx;
 
     # Finish WebSocket
-    return $self->tx->finish if $self->tx->is_websocket;
+    return $tx->finish if $tx->is_websocket;
 
     # Render
     $self->app->routes->auto_render($self);
 
     # Finish
     $self->app->finish($self);
+
+    # Resume
+    $self->resume if $tx->is_paused;
 }
 
 sub finished {
-    my $self = shift;
+    my ($self, $cb) = @_;
 
-    # WebSocket check
-    Carp::croak('No WebSocket connection in progress')
-      unless $self->tx->is_websocket;
-
-    # Callback
-    my $cb = shift;
-
-    # Connection finished
+    # Transaction finished
     $self->tx->finished(sub { shift and $self->$cb(@_) });
 }
 
@@ -67,7 +61,7 @@ sub receive_message {
     my $self = shift;
 
     # Deactivate auto rendering
-    $self->stash->{rendered} = 1;
+    $self->stash->{'mojo.rendered'} = 1;
 
     # WebSocket check
     Carp::croak('No WebSocket connection to receive messages from')
@@ -78,6 +72,8 @@ sub receive_message {
 
     # Receive
     $self->tx->receive_message(sub { shift and $self->$cb(@_) });
+
+    return $self;
 }
 
 sub redirect_to {
@@ -92,6 +88,8 @@ sub redirect_to {
     return $self;
 }
 
+# Mamma Mia! The cruel meatball of war has rolled onto our laps and ruined
+# our white pants of peace!
 sub render {
     my $self = shift;
 
@@ -106,25 +104,8 @@ sub render {
     # Template
     $args->{template} = $template if $template;
 
-    # Localize layout and extends for partials
-    if (!$stash->{'mojo.render'} && $args->{partial}) {
-        $stash->{'mojo.render'} = 1;
-        local $stash->{layout}  = undef;
-        local $stash->{extends} = undef;
-        return $self->render($args);
-    }
-
-    # Localize render arguments
-    for my $key (keys %$args) {
-        local $stash->{$key} = delete $args->{$key};
-        return $self->render($args);
-    }
-
-    # Render
-    delete $stash->{'mojo.render'};
-
     # Template
-    unless ($stash->{template}) {
+    unless ($stash->{template} || $args->{template}) {
 
         # Default template
         my $controller = $stash->{controller};
@@ -137,11 +118,36 @@ sub render {
         }
 
         # Try the route name if we don't have controller and action
-        elsif (my $name = $stash->{route}) { $self->stash(template => $name) }
+        elsif ($self->match && (my $name = $self->match->endpoint->name)) {
+            $self->stash(template => $name);
+        }
     }
 
     # Render
-    return $self->app->renderer->render($self);
+    my ($output, $type) = $self->app->renderer->render($self, $args);
+
+    # Failed
+    return unless defined $output;
+
+    # Partial
+    return $output if delete $stash->{partial};
+
+    # Response
+    my $res = $self->res;
+
+    # Status
+    $res->code($stash->{status}) if $stash->{status};
+    $res->code(200) unless $res->code;
+
+    # Output
+    $res->body($output) unless $res->body;
+
+    # Type
+    my $headers = $res->headers;
+    $headers->content_type($type) unless $headers->content_type;
+
+    # Success
+    return 1;
 }
 
 sub render_data {
@@ -163,18 +169,22 @@ sub render_exception {
     # Exception
     $e = Mojo::Exception->new($e) unless ref $e;
 
-    # Resume for exceptions
-    $self->resume if $self->tx->is_paused;
+    # Error
+    $self->app->log->error($e);
 
     # Render exception template
     my $options = {
-        template  => 'exception',
-        format    => 'html',
-        status    => 500,
-        exception => $e
+        template         => 'exception',
+        format           => 'html',
+        status           => 500,
+        exception        => $e,
+        'mojo.exception' => 1
     };
     $self->app->static->serve_500($self)
-      if $self->stash->{exception} || !$self->render($options);
+      if $self->stash->{'mojo.exception'} || !$self->render($options);
+
+    # Resume for exceptions
+    $self->resume if $self->tx->is_paused;
 }
 
 sub render_inner {
@@ -182,16 +192,16 @@ sub render_inner {
 
     # Initialize
     my $stash = $self->stash;
-    $stash->{content} ||= {};
+    $stash->{'mojo.content'} ||= {};
     $name ||= 'content';
 
     # Set
-    $stash->{content}->{$name}
+    $stash->{'mojo.content'}->{$name}
       ||= ref $content eq 'CODE' ? $content->() : $content
       if defined $content;
 
     # Get
-    $content = $stash->{content}->{$name};
+    $content = $stash->{'mojo.content'}->{$name};
     $content = '' unless defined $content;
     return Mojo::ByteStream->new("$content");
 }
@@ -210,15 +220,18 @@ sub render_json {
 }
 
 sub render_not_found {
-    my $self = shift;
+    my ($self, $resource) = @_;
+
+    # Debug
+    $self->app->log->debug(qq/Resource "$resource" not found./) if $resource;
 
     # Render not found template
     my $options = {
         template  => 'not_found',
         format    => 'html',
-        status    => 404,
         not_found => 1
     };
+    $options->{status} = 404 unless $self->stash->{status};
     $self->app->static->serve_404($self)
       if $self->stash->{not_found} || !$self->render($options);
 }
@@ -266,7 +279,7 @@ sub send_message {
     my $self = shift;
 
     # Deactivate auto rendering
-    $self->stash->{rendered} = 1;
+    $self->stash->{'mojo.rendered'} = 1;
 
     # WebSocket check
     Carp::croak('No WebSocket connection to send message to')
@@ -274,6 +287,8 @@ sub send_message {
 
     # Send
     $self->tx->send_message(@_);
+
+    return $self;
 }
 
 sub url_for {
@@ -287,7 +302,7 @@ sub url_for {
     # Path
     if ($target =~ /^\//) {
         my $url = Mojo::URL->new->base($self->req->url->base->clone);
-        return $url->path($target);
+        return $url->parse($target);
     }
 
     # URL
@@ -297,7 +312,10 @@ sub url_for {
     my $url = $self->match->url_for($target, @_);
 
     # Base
-    $url->base($self->tx->req->url->base->clone);
+    unless ($url->is_abs) {
+        $url->base($self->tx->req->url->base->clone);
+        $url->base->userinfo(undef);
+    }
 
     # Fix paths
     unshift @{$url->path->parts}, @{$url->base->path->parts};
@@ -372,8 +390,7 @@ For WebSockets it will gracefully end the connection.
 
     $c->finished(sub {...});
 
-Callback signaling that peer finished the WebSocket connection, only works if
-there is currently a WebSocket connection in progress.
+Callback signaling that the transaction has been finished.
 
     $c->finished(sub {
         my $self = shift;
@@ -400,7 +417,7 @@ transaction.
 
 =head2 C<receive_message>
 
-    $c->receive_message(sub {...});
+    $c = $c->receive_message(sub {...});
 
 Receive messages via WebSocket, only works if there is currently a WebSocket
 connection in progress.
@@ -476,6 +493,7 @@ Render a data structure as JSON.
 =head2 C<render_not_found>
 
     $c->render_not_found;
+    $c->render_not_found($resource);
     
 Render the not found template C<not_found.html.$handler>.
 Also sets the response status code to C<404>, will fall back to rendering a
@@ -499,7 +517,7 @@ Render a static asset using L<MojoX::Dispatcher::Static>.
     $c->render_text('Hello World!');
     $c->render_text('Hello World', layout => 'green');
 
-Render the givent content as plain text, note that text will be encoded.
+Render the given content as plain text, note that text will be encoded.
 See C<render_data> for an alternative without encoding.
 
 =head2 C<resume>
@@ -511,7 +529,7 @@ applications.
 
 =head2 C<send_message>
 
-    $c->send_message('Hi there!');
+    $c = $c->send_message('Hi there!');
 
 Send a message via WebSocket, only works if there is currently a WebSocket
 connection in progress.

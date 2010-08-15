@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Content::Single;
 
 use strict;
@@ -42,24 +40,27 @@ sub parse {
     $self->SUPER::parse(@_);
 
     # Still parsing headers or using a custom body parser
-    return $self if $self->is_state('headers') || $self->body_cb;
+    return $self if ($self->{_state} || '') eq 'headers' || $self->body_cb;
 
     # Headers
     my $headers = $self->headers;
 
+    # Content-Length
+    my $length = $self->headers->content_length;
+
     # WebSocket handshakes have a static Content-Length
-    my $length =
+    $length ||=
         $headers->sec_websocket_key1     ? 8
       : $headers->sec_websocket_location ? 16
       :                                    undef;
 
     # Don't waste memory
     if ($self->asset->isa('Mojo::Asset::Memory')) {
-        $length ||= $self->headers->content_length;
 
         # Upgrade to file storage
         $self->asset(Mojo::Asset::File->new)
-          if !$length || $length > ($ENV{MOJO_MAX_MEMORY_SIZE} || 24576);
+          if !defined $length
+              || $length > ($ENV{MOJO_MAX_MEMORY_SIZE} || 262144);
     }
 
     # Content needs to be upgraded to multipart
@@ -87,12 +88,7 @@ sub parse {
         $asset->add_chunk($self->buffer->remove($need)) if $need > 0;
 
         # Done
-        $self->done if $length <= $self->raw_body_size;
-    }
-
-    # With leftovers, maybe pipelined
-    if ($self->is_done) {
-        $self->state('done_with_leftovers') if $self->has_leftovers;
+        $self->{_state} = 'done' if $length <= $self->raw_body_size;
     }
 
     return $self;

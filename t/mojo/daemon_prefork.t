@@ -1,9 +1,10 @@
 #!/usr/bin/env perl
 
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 use strict;
 use warnings;
+
+# Disable epoll, kqueue and IPv6
+BEGIN { $ENV{MOJO_POLL} = $ENV{MOJO_NO_IPV6} = 1 }
 
 use Test::More;
 
@@ -20,7 +21,7 @@ use_ok('Mojo::Server::Daemon::Prefork');
 
 # Start
 my $server = Test::Mojo::Server->new;
-$server->start_daemon_prefork_ok('server started');
+$server->start_daemon_prefork_ok;
 
 # Request
 my $port = $server->port;
@@ -30,7 +31,7 @@ $tx->req->url->parse("http://127.0.0.1:$port/");
 my $client = Mojo::Client->new;
 $client->process($tx);
 is($tx->res->code, 200, 'right status');
-like($tx->res->body, qr/Mojo is working/, 'right content');
+like($tx->res->body, qr/Mojo/, 'right content');
 
 # Stop
-$server->stop_server_ok('server stopped');
+$server->stop_server_ok;

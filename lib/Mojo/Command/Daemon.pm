@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Command::Daemon;
 
 use strict;
@@ -27,8 +25,6 @@ These options are available:
   --listen <locations>           Set a comma separated list of locations you
                                  want to listen on, defaults to
                                  http://*:3000.
-  --lock <path>                  Set path to lock file, defaults to a random
-                                 temporary file.
   --pid <path>                   Set path to pid file, defaults to a random
                                  temporary file.
   --queue <size>                 Set listen queue size, defaults to
@@ -39,6 +35,7 @@ These options are available:
                                  daemon is allowed to handle, not used by
                                  default.
   --user <name>                  Set user name for process.
+  --websocket <seconds>          Set WebSocket timeout, defaults to 300.
 EOF
 
 
@@ -49,20 +46,20 @@ sub run {
     my $daemon = Mojo::Server::Daemon->new;
 
     # Options
-    @ARGV = @_ if @_;
+    local @ARGV = @_ if @_;
     GetOptions(
         'clients=i'   => sub { $daemon->max_clients($_[1]) },
         'group=s'     => sub { $daemon->group($_[1]) },
         'keepalive=i' => sub { $daemon->keep_alive_timeout($_[1]) },
         'keepaliverequests=i' =>
           sub { $daemon->max_keep_alive_requests($_[1]) },
-        'listen=s'   => sub { $daemon->listen($_[1]) },
-        'lock=s'     => sub { $daemon->lock_file($_[1]) },
-        'pid=s'      => sub { $daemon->pid_file($_[1]) },
-        'queue=i'    => sub { $daemon->listen_queue_size($_[1]) },
-        reload       => sub { $daemon->reload(1) },
-        'requests=i' => sub { $daemon->max_requests($_[1]) },
-        'user=s'     => sub { $daemon->user($_[1]) }
+        'listen=s'    => sub { $daemon->listen($_[1]) },
+        'pid=s'       => sub { $daemon->pid_file($_[1]) },
+        'queue=i'     => sub { $daemon->listen_queue_size($_[1]) },
+        reload        => sub { $daemon->reload(1) },
+        'requests=i'  => sub { $daemon->max_requests($_[1]) },
+        'user=s'      => sub { $daemon->user($_[1]) },
+        'websocket=i' => sub { $daemon->websocket_timeout($_[1]) }
     );
 
     # Run

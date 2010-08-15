@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package MojoX::Routes;
 
 use strict;
@@ -11,7 +9,7 @@ use Mojo::URL;
 use MojoX::Routes::Pattern;
 use Scalar::Util 'weaken';
 
-__PACKAGE__->attr([qw/block inline name parent/]);
+__PACKAGE__->attr([qw/block inline parent partial/]);
 __PACKAGE__->attr([qw/children conditions/] => sub { [] });
 __PACKAGE__->attr(dictionary                => sub { {} });
 __PACKAGE__->attr(pattern => sub { MojoX::Routes::Pattern->new });
@@ -25,13 +23,13 @@ sub new {
     # Method condition
     $self->add_condition(
         method => sub {
-            my ($r, $tx, $captures, $methods) = @_;
+            my ($r, $c, $captures, $methods) = @_;
 
             # Methods
             return unless $methods && ref $methods eq 'ARRAY';
 
             # Match
-            my $m = lc $tx->req->method;
+            my $m = lc $c->req->method;
             $m = 'get' if $m eq 'head';
             for my $method (@$methods) {
                 return $captures if $method eq $m;
@@ -45,10 +43,10 @@ sub new {
     # WebSocket condition
     $self->add_condition(
         websocket => sub {
-            my ($r, $tx, $captures) = @_;
+            my ($r, $c, $captures) = @_;
 
             # WebSocket
-            return $captures if $tx->is_websocket;
+            return $captures if $c->tx->is_websocket;
 
             # Not a WebSocket
             return;
@@ -58,13 +56,24 @@ sub new {
     return $self;
 }
 
-sub add_condition {
-    my $self = shift;
+sub add_child {
+    my ($self, $route) = @_;
 
-    # Merge
-    my $dictionary = ref $_[0] ? $_[0] : {@_};
-    $dictionary = {%{$self->dictionary}, %$dictionary};
-    $self->dictionary($dictionary);
+    # We are the parent
+    $route->parent($self);
+    weaken $route->{parent};
+
+    # Add to tree
+    push @{$self->children}, $route;
+
+    return $self;
+}
+
+sub add_condition {
+    my ($self, $name, $condition) = @_;
+
+    # Add
+    $self->dictionary->{$name} = $condition;
 
     return $self;
 }
@@ -77,6 +86,25 @@ sub is_endpoint {
     return 1 if $self->block;
     return   if @{$self->children};
     return 1;
+}
+
+sub name {
+    my ($self, $name) = @_;
+
+    # New name
+    if (defined $name) {
+
+        # Generate
+        if ($name eq '*') {
+            $name = $self->pattern->pattern;
+            $name =~ s/\W+//g;
+        }
+        $self->{_name} = $name;
+
+        return $self;
+    }
+
+    return $self->{_name};
 }
 
 sub over {
@@ -122,21 +150,14 @@ sub render {
     return $path;
 }
 
+# Morbo forget how you spell that letter that looks like a man wearing a hat.
+# Hello, tiny man. I will destroy you!
 sub route {
     my $self = shift;
 
     # New route
     my $route = $self->new(@_);
-
-    # Inherit conditions
-    $route->add_condition($self->dictionary);
-
-    # We are the parent
-    $route->parent($self);
-    weaken $route->{parent};
-
-    # Add to tree
-    push @{$self->children}, $route;
+    $self->add_child($route);
 
     return $route;
 }
@@ -179,14 +200,27 @@ sub to {
         }
     }
 
-    # Controller and action
-    if ($shortcut && $shortcut =~ /^([\w\-]+)?\#(\w+)?$/) {
-        $defaults->{controller} = $1 if defined $1;
-        $defaults->{action}     = $2 if defined $2;
+    # Shortcut
+    if ($shortcut) {
+
+        # App
+        if (ref $shortcut || $shortcut =~ /^[\w\:]+$/) {
+            $defaults->{app} = $shortcut;
+        }
+
+        # Controller and action
+        elsif ($shortcut =~ /^([\w\-]+)?\#(\w+)?$/) {
+            $defaults->{controller} = $1 if defined $1;
+            $defaults->{action}     = $2 if defined $2;
+        }
     }
 
+    # Pattern
+    my $pattern = $self->pattern;
+
     # Defaults
-    $self->pattern->defaults($defaults) if $defaults;
+    my $old = $pattern->defaults;
+    $pattern->defaults({%$old, %$defaults}) if $defaults;
 
     return $self;
 }
@@ -312,19 +346,21 @@ There are currently two conditions built in, C<method> and C<websocket>.
 
 Allow C<bridge> semantics for this route.
 
-=head2 C<name>
-
-    my $name = $r->name;
-    $r       = $r->name('foo');
-
-The name of this route.
-
 =head2 C<parent>
 
     my $parent = $r->parent;
     $r         = $r->parent(MojoX::Routes->new);
 
 The parent of this route, used for nesting routes.
+
+=head2 C<partial>
+
+    my $partial = $r->partial;
+    $r          = $r->partial('path');
+
+Route has no specific end, remaining characters will be captured with the
+partial name.
+Note that this attribute is EXPERIMENTAL and might change without warning!
 
 =head2 C<pattern>
 
@@ -346,6 +382,12 @@ following ones.
 
 Construct a new route object.
 
+=head2 C<add_child>
+
+    $r = $r->add_child(MojoX::Route->new);
+
+Add a new child to this route.
+
 =head2 C<add_condition>
 
     $r = $r->add_condition(foo => sub { ... });
@@ -364,6 +406,14 @@ Add a new bridge to this route as a nested child.
     my $is_endpoint = $r->is_endpoint;
 
 Returns true if this route qualifies as an endpoint.
+
+=head2 C<name>
+
+    my $name = $r->name;
+    $r       = $r->name('foo');
+    $r       = $r->name('*');
+
+The name of this route.
 
 =head2 C<over>
 
@@ -399,6 +449,12 @@ Add a new nested child to this route.
     $r = $r->to('controller#action');
     $r = $r->to('controller#action', foo => 'bar');
     $r = $r->to('controller#action', {foo => 'bar'});
+    $r = $r->to($app);
+    $r = $r->to($app, foo => 'bar');
+    $r = $r->to($app, {foo => 'bar'});
+    $r = $r->to('MyApp');
+    $r = $r->to('MyApp', foo => 'bar');
+    $r = $r->to('MyApp', {foo => 'bar'});
 
 Set default parameters for this route.
 

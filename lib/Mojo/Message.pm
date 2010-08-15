@@ -1,11 +1,9 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Message;
 
 use strict;
 use warnings;
 
-use base 'Mojo::Stateful';
+use base 'Mojo::Base';
 use overload '""' => sub { shift->to_string }, fallback => 1;
 
 use Carp 'croak';
@@ -16,7 +14,7 @@ use Mojo::Loader;
 use Mojo::Parameters;
 use Mojo::Upload;
 
-use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 8192;
+use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 262144;
 
 __PACKAGE__->attr(buffer  => sub { Mojo::ByteStream->new });
 __PACKAGE__->attr(content => sub { Mojo::Content::Single->new });
@@ -148,6 +146,7 @@ sub build_body {
     my $body = $self->content->build_body(@_);
 
     # Finished
+    $self->{_state} = 'done';
     if (my $cb = $self->finish_cb) { $self->$cb }
 
     return $body;
@@ -239,23 +238,37 @@ sub dom {
 
     # Charset
     my $charset = $self->default_charset;
-    ($self->headers->content_type || '') =~ /charset=\"?(\S+)\"?/
+    ($self->headers->content_type || '') =~ /charset=\"?([^\s;]+)\"?/
       and $charset = $1;
 
     # Parse
     return $class->new(charset => $charset)->parse($self->body);
 }
 
+sub error {
+    my $self = shift;
+
+    # Get
+    unless (@_) {
+        return unless my $error = $self->{_error};
+        return wantarray ? @$error : $error->[0];
+    }
+
+    # Set
+    $self->{_error} = [@_];
+    $self->{_state} = 'done';
+
+    return $self;
+}
+
 sub fix_headers {
     my $self = shift;
 
-    # Content-Length header is required in HTTP 1.0 (and above) messages if
-    # there's a body, sadly many clients are expecting broken server behavior
-    # if the Content-Length header is missing, so we are defaulting to
-    # "Content-Length: 0" which has proven to just work in the real world
+    # Content-Length header is required in HTTP 1.0 (and above)
     if ($self->at_least_version('1.0') && !$self->is_chunked) {
-        $self->headers->content_length($self->body_size)
-          unless $self->headers->content_length;
+        my $size = $self->body_size;
+        $self->headers->content_length($size)
+          if $size && !$self->headers->content_length;
     }
 
     return $self;
@@ -268,14 +281,14 @@ sub get_body_chunk {
     if (my $cb = $self->progress_cb) { $self->$cb('body', @_) }
 
     # Chunk
-    if (defined(my $chunk = $self->content->get_body_chunk(@_))) {
-        return $chunk;
-    }
+    my $chunk = $self->content->get_body_chunk(@_);
+    return $chunk if length $chunk || !defined $chunk;
 
-    # Finished
+    # Finish
+    $self->{_state} = 'done';
     if (my $cb = $self->finish_cb) { $self->$cb }
 
-    return;
+    return $chunk;
 }
 
 sub get_header_chunk {
@@ -290,7 +303,7 @@ sub get_header_chunk {
     # Fix headers
     $self->fix_headers;
 
-    $self->content->get_header_chunk(@_);
+    return $self->content->get_header_chunk(@_);
 }
 
 sub get_start_line_chunk {
@@ -328,6 +341,11 @@ sub headers {
 }
 
 sub is_chunked { shift->content->is_chunked }
+
+sub is_done {
+    return 1 if (shift->{_state} || '') eq 'done';
+    return;
+}
 
 sub is_multipart { shift->content->is_multipart }
 
@@ -475,7 +493,7 @@ sub _parse {
 
     # Start line and headers
     my $buffer = $self->buffer;
-    if ($self->is_state(qw/start headers/)) {
+    if (!$self->{_state} || $self->{_state} eq 'headers') {
 
         # Check line size
         $self->error('Maximum line size exceeded.', 413)
@@ -487,11 +505,9 @@ sub _parse {
       if $buffer->raw_size > ($ENV{MOJO_MAX_MESSAGE_SIZE} || 5242880);
 
     # Content
-    if ($self->is_state(qw/content done done_with_leftovers/)) {
+    my $state = $self->{_state} || '';
+    if ($state eq 'body' || $state eq 'content' || $state eq 'done') {
         my $content = $self->content;
-
-        # HTTP 0.9 has no headers
-        $content->state('body') if $self->version eq '0.9';
 
         # Parse
         $content->filter_buffer($buffer);
@@ -500,21 +516,22 @@ sub _parse {
         if ($until_body) { $self->content($content->parse_until_body) }
 
         # Whole message
-        else { $self->content($content->parse) }
+        else {
 
-        # HTTP 0.9 has no defined length
-        $content->state('done') if $self->version eq '0.9';
+            # HTTP 0.9 and CGI have no headers
+            $self->content(
+                  $self->version  eq '0.9'  ? $content->parse_body_once
+                : $self->{_state} eq 'body' ? $content->parse_body
+                : $content->parse
+            );
+        }
     }
 
     # Done
-    $self->done if $self->content->is_done;
-
-    # Done with leftovers, maybe pipelined
-    $self->state('done_with_leftovers')
-      if $self->content->is_state('done_with_leftovers');
+    $self->{_state} = 'done' if $self->content->is_done;
 
     # Finished
-    if ((my $cb = $self->finish_cb) && $self->is_finished) { $self->$cb }
+    if ((my $cb = $self->finish_cb) && $self->is_done) { $self->$cb }
 
     return $self;
 }
@@ -608,8 +625,7 @@ in RFC 2616 and RFC 2388.
 
 =head1 ATTRIBUTES
 
-L<Mojo::Message> inherits all attributes from L<Mojo::Stateful> and
-implements the following new ones.
+L<Mojo::Message> implements the following attributes.
 
 =head2 C<body_cb>
 
@@ -700,8 +716,8 @@ Progress callback.
 
 =head1 METHODS
 
-L<Mojo::Message> inherits all methods from L<Mojo::Stateful> and implements
-the following new ones.
+L<Mojo::Message> inherits all methods from L<Mojo::Base> and implements the
+following new ones.
 
 =head2 C<at_least_version>
 
@@ -778,6 +794,15 @@ Access message cookies.
 Parses content into a L<Mojo::DOM> object.
 Note that this method is EXPERIMENTAL and might change without warning!
 
+=head2 C<error>
+
+    my $message          = $message->error;
+    my ($message, $code) = $message->error;
+    $message             = $message->error('Parser error.');
+    $message             = $message->error('Parser error.', 500);
+
+Parser errors and codes.
+
 =head2 C<fix_headers>
 
     $message = $message->fix_headers;
@@ -826,6 +851,12 @@ Header container, defaults to a L<Mojo::Headers> object.
     my $chunked = $message->is_chunked;
 
 Check if message content is chunked.
+
+=head2 C<is_done>
+
+    my $done = $message->is_done;
+
+Check if parser is done.
 
 =head2 C<is_multipart>
 

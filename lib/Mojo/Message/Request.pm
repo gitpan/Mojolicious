@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Message::Request;
 
 use strict;
@@ -72,14 +70,14 @@ sub fix_headers {
 
     # Basic authorization
     if ((my $u = $url->userinfo) && !$headers->authorization) {
-        $headers->authorization('Basic ' . b($u)->b64_encode->to_string);
+        $headers->authorization('Basic ' . b($u)->b64_encode('')->to_string);
     }
 
     # Basic proxy authorization
     if (my $proxy = $self->proxy) {
         if ((my $u = $proxy->userinfo) && !$headers->proxy_authorization) {
             $headers->proxy_authorization(
-                'Basic ' . b($u)->b64_encode->to_string);
+                'Basic ' . b($u)->b64_encode('')->to_string);
         }
     }
 
@@ -95,6 +93,19 @@ sub is_secure {
     return 1 if $scheme eq 'https';
 
     # Not secure
+    return;
+}
+
+sub is_xhr {
+    my $self = shift;
+
+    # No ajax
+    return unless my $with = $self->headers->header('X-Requested-With');
+
+    # Ajax
+    return 1 if $with =~ /XMLHttpRequest/i;
+
+    # No ajax
     return;
 }
 
@@ -124,13 +135,13 @@ sub parse {
     $env ? $self->_parse_env($env) : $self->buffer->add_chunk($chunk);
 
     # Start line
-    $self->_parse_start_line if $self->is_state('start');
+    $self->_parse_start_line unless $self->{_state};
 
     # Pass through
     $self->SUPER::parse();
 
     # Fix things we only know after parsing headers
-    unless ($self->is_state(qw/start headers/)) {
+    if (!$self->{_state} || $self->{_state} ne 'headers') {
 
         # Base URL
         my $base = $self->url->base;
@@ -196,7 +207,7 @@ sub _build_start_line {
     }
 
     # Method
-    my $method = $self->method;
+    my $method = uc $self->method;
 
     # CONNECT
     if ($method eq 'CONNECT') {
@@ -355,8 +366,7 @@ sub _parse_env {
 
     # There won't be a start line or header when you parse environment
     # variables
-    $self->state('content');
-    $self->content->state('body');
+    $self->{_state} = 'body';
 }
 
 # Bart, with $10,000, we'd be millionaires!
@@ -384,12 +394,12 @@ sub _parse_start_line {
             if (defined $3 && defined $4) {
                 $self->major_version($3);
                 $self->minor_version($4);
-                $self->state('content');
+                $self->{_state} = 'content';
             }
             else {
                 $self->major_version(0);
                 $self->minor_version(9);
-                $self->done;
+                $self->{_state} = 'done';
 
                 # HTTP 0.9 has no headers or body and does not support
                 # pipelining
@@ -486,6 +496,12 @@ Make sure message has all required headers for the current HTTP version.
     my $secure = $req->is_secure;
 
 Check if connection is secure.
+
+=head2 C<is_xhr>
+
+    my $xhr = $req->is_xhr;
+
+Check C<X-Requested-With> header for C<XMLHttpRequest> value.
 
 =head2 C<param>
 

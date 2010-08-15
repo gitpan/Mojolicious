@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package MojoX::Renderer;
 
 use strict;
@@ -10,13 +8,14 @@ use base 'Mojo::Base';
 use File::Spec;
 use Mojo::ByteStream 'b';
 use Mojo::Command;
+use Mojo::Home;
 use Mojo::JSON;
 use MojoX::Types;
 
 __PACKAGE__->attr(default_format => 'html');
-__PACKAGE__->attr([qw/default_handler default_template_class encoding/]);
-__PACKAGE__->attr(default_status   => 200);
+__PACKAGE__->attr([qw/default_handler default_template_class/]);
 __PACKAGE__->attr(detect_templates => 1);
+__PACKAGE__->attr(encoding         => 'UTF-8');
 __PACKAGE__->attr(handler          => sub { {} });
 __PACKAGE__->attr(helper           => sub { {} });
 __PACKAGE__->attr(layout_prefix    => 'layouts');
@@ -68,22 +67,36 @@ sub add_helper {
 }
 
 sub get_inline_template {
-    my ($self, $c, $template) = @_;
+    my ($self, $options, $template) = @_;
     return Mojo::Command->new->get_data($template,
-        $self->_detect_template_class($c->stash));
+        $self->_detect_template_class($options));
 }
 
 # Bodies are for hookers and fat people.
 sub render {
-    my ($self, $c) = @_;
+    my ($self, $c, $args) = @_;
+
+    # Stash
+    my $stash = $c->stash;
+
+    # Arguments
+    $args ||= {};
 
     # We got called
-    my $stash = $c->stash;
-    $stash->{rendered} = 1;
-    $stash->{content} ||= {};
+    $stash->{'mojo.rendered'} = 1;
+    my $content = $stash->{'mojo.content'} ||= {};
 
     # Partial
-    my $partial = delete $stash->{partial};
+    my $partial = $stash->{partial} || $args->{partial};
+
+    # Localize extends and layout
+    local $stash->{layout}  = $partial ? undef : $stash->{layout};
+    local $stash->{extends} = $partial ? undef : $stash->{extends};
+
+    # Merge stash and arguments
+    while (my ($key, $value) = each %$args) {
+        $stash->{$key} = $value;
+    }
 
     # Template
     my $template = delete $stash->{template};
@@ -103,13 +116,14 @@ sub render {
     # Text
     my $text = delete $stash->{text};
 
-    my $options =
-      {template => $template, format => $format, handler => $handler};
+    my $options = {
+        template       => $template,
+        format         => $format,
+        handler        => $handler,
+        encoding       => $self->encoding,
+        template_class => $stash->{template_class}
+    };
     my $output;
-
-    # Localize extends and layout
-    local $stash->{layout}  = $stash->{layout};
-    local $stash->{extends} = $stash->{extends};
 
     # Text
     if (defined $text) {
@@ -118,7 +132,7 @@ sub render {
         $self->handler->{text}->($self, $c, \$output, {text => $text});
 
         # Extends
-        $c->stash->{content}->{content} = b("$output")
+        $content->{content} = b("$output")
           if ($c->stash->{extends} || $c->stash->{layout});
     }
 
@@ -129,7 +143,7 @@ sub render {
         $self->handler->{data}->($self, $c, \$output, {data => $data});
 
         # Extends
-        $c->stash->{content}->{content} = b("$output")
+        $content->{content} = b("$output")
           if ($c->stash->{extends} || $c->stash->{layout});
     }
 
@@ -141,7 +155,7 @@ sub render {
         $format = 'json';
 
         # Extends
-        $c->stash->{content}->{content} = b("$output")
+        $content->{content} = b("$output")
           if ($c->stash->{extends} || $c->stash->{layout});
     }
 
@@ -152,12 +166,12 @@ sub render {
         return unless $self->_render_template($c, \$output, $options);
 
         # Extends
-        $c->stash->{content}->{content} = b("$output")
+        $content->{content} = b("$output")
           if ($c->stash->{extends} || $c->stash->{layout});
     }
 
     # Extends
-    while (my $extends = $self->_extends($c)) {
+    while ((my $extends = $self->_extends($c)) && !$json && !$data) {
 
         # Handler
         $handler = $c->stash->{handler};
@@ -174,29 +188,17 @@ sub render {
         $self->_render_template($c, \$output, $options);
     }
 
-    # Partial
-    return $output if $partial;
-
     # Encoding (JSON is already encoded)
-    $output = b($output)->encode($self->encoding)->to_string
-      if $self->encoding && !$json && !$data;
-
-    # Response
-    my $res = $c->res;
-    my $req = $c->req;
-    unless ($res->code) {
-        $req->has_error
-          ? $res->code(($req->error)[1])
-          : $res->code($c->stash('status') || $self->default_status);
+    unless ($partial) {
+        my $encoding = $options->{encoding};
+        $output = b($output)->encode($encoding)->to_string
+          if $encoding && !$json && !$data;
     }
-    $res->body($output) unless $res->body;
 
     # Type
     my $type = $self->types->type($format) || 'text/plain';
-    $res->headers->content_type($type) unless $res->headers->content_type;
 
-    # Success!
-    return 1;
+    return ($output, $type);
 }
 
 sub template_name {
@@ -231,13 +233,13 @@ sub _detect_handler {
     return unless $self->detect_templates;
 
     # Template class
-    my $class = $self->_detect_template_class;
+    my $class = $self->_detect_template_class($options);
 
     # Templates
     my $templates = $self->{_templates};
     unless ($templates) {
-        $templates = $self->_list_templates;
-        $self->{_templates} = $templates;
+        $templates = $self->{_templates} =
+          Mojo::Home->new->parse($self->root)->list_files;
     }
 
     # Inline templates
@@ -283,43 +285,6 @@ sub _list_inline_templates {
 
     # List
     return [keys %$all];
-}
-
-sub _list_templates {
-    my ($self, $dir) = @_;
-
-    # Root
-    my $root = $self->root;
-    $dir ||= $root;
-
-    # Read directory
-    my (@files, @dirs);
-    opendir DIR, $dir or return [];
-    for my $file (readdir DIR) {
-
-        # Hidden file
-        next if $file =~ /^\./;
-
-        # File
-        my $path = File::Spec->catfile($dir, $file);
-        if (-f $path) {
-            $path = File::Spec->abs2rel($path, $root);
-            push @files, $path;
-            next;
-        }
-
-        # Directory
-        push @dirs, $path if -d $path;
-    }
-    closedir DIR;
-
-    # Walk directories
-    for my $path (@dirs) {
-        my $new = $self->_list_templates($path);
-        push @files, @$new;
-    }
-
-    return [sort @files];
 }
 
 # Well, at least here you'll be treated with dignity.
@@ -398,19 +363,12 @@ C<Embedded Perl> handled by L<Mojolicious::Plugin::EpRenderer>.
 
 =back
 
-=head2 C<default_status>
-
-    my $default = $renderer->default_status;
-    $renderer   = $renderer->default_status(404);
-
-The default status to set when rendering content, defaults to C<200>.
-
 =head2 C<default_template_class>
 
     my $default = $renderer->default_template_class;
     $renderer   = $renderer->default_template_class('main');
 
-The renderer will use this class to look for templates in the C<__DATA__>
+The renderer will use this class to look for templates in the C<DATA>
 section.
 
 =head2 C<detect_templates>
@@ -428,7 +386,7 @@ multiple template systems.
     my $encoding = $renderer->encoding;
     $renderer    = $renderer->encoding('koi8-r');
 
-Will encode the content if set.
+Will encode the content if set, defaults to C<UTF-8>.
 
 =head2 C<handler>
 
@@ -492,16 +450,19 @@ See L<Mojolicious::Plugin::EpRenderer> for sample helpers.
 
 =head2 C<get_inline_template>
 
-    my $template = $renderer->get_inline_template($c, 'foo.html.ep');
+    my $template = $renderer->get_inline_template({
+        template       => 'foo/bar',
+        format         => 'html',
+        handler        => 'epl'
+        template_class => 'main'
+    }, 'foo.html.ep');
 
 Get an inline template by name, usually used by handlers.
 
 =head2 C<render>
 
-    my $success = $renderer->render($c);
-
-    $c->stash->{partial} = 1;
-    my $output = $renderer->render($c);
+    my ($output, $type) = $renderer->render($c);
+    my ($output, $type) = $renderer->render($c, $args);
 
 Render output through one of the Mojo renderers.
 This renderer requires some configuration, at the very least you will need to

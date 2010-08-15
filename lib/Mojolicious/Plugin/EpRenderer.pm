@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojolicious::Plugin::EpRenderer;
 
 use strict;
@@ -45,10 +43,6 @@ sub register {
             # Cache
             $r->{_epl_cache} ||= {};
             unless ($r->{_epl_cache}->{$cache}) {
-
-                # Debug
-                $c->app->log->debug(
-                    qq/Caching template "$path" with stash "$list"./);
 
                 # Initialize
                 $template->{namespace} ||= "Mojo::Template::$cache";
@@ -126,17 +120,21 @@ sugar designed specifically for L<Mojolicious>.
 It supports L<Mojolicious> template helpers and exposes the stash directly as
 perl variables.
 
-=head1 OPTIONS
+=head2 Options
 
-=head2 C<name>
+=over 4
+
+=item name
 
     # Mojolicious::Lite
     plugin ep_renderer => {name => 'foo'};
 
-=head2 C<template>
+=item template
 
     # Mojolicious::Lite
     plugin ep_renderer => {template => {line_start => '.'}};
+
+=back
 
 =head1 METHODS
 

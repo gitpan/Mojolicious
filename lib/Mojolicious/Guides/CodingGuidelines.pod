@@ -1,4 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
 
 =head1 NAME
 
@@ -32,6 +31,8 @@ distribution an example application.
 
 =over 4
 
+Web development should be easy and fun, this is what we optimize for.
+
 Keep it simple, no magic unless absolutely necessary.
 
 Code should be written with a Perl6 port in mind.
@@ -48,7 +49,7 @@ release.
 Deprecating a feature should be avoided at all costs.
 
 A major release can be version number independent and is signaled by a new
-unique code name.
+unique code name based on a unicode character.
 
 New features can be marked as experimental to be excluded from deprecation
 policies.

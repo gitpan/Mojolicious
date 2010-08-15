@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Commands;
 
 use strict;
@@ -30,8 +28,7 @@ sub run {
     my ($self, $name, @args) = @_;
 
     # Try to detect environment
-    my $detect = $self->_detect;
-    $name = $detect if $detect && !$ENV{MOJO_NO_DETECT};
+    $name = $self->_detect($name) unless $ENV{MOJO_NO_DETECT};
 
     # Run command
     if ($name && $name =~ /^\w+$/ && ($name ne 'help' || $args[0])) {
@@ -143,13 +140,17 @@ sub start {
 }
 
 sub _detect {
-    my $self = shift;
+    my ($self, $name) = @_;
 
     # PSGI (Plack only for now)
     return 'psgi' if defined $ENV{PLACK_ENV};
 
+    # No further detection if we have a name
+    return $name if $name;
+
     # CGI
-    return 'cgi' if defined $ENV{PATH_INFO};
+    return 'cgi'
+      if defined $ENV{PATH_INFO} || defined $ENV{GATEWAY_INTERFACE};
 
     # FastCGI
     return 'fastcgi' unless defined $ENV{PATH};

@@ -1,7 +1,5 @@
 #!/usr/bin/env perl
 
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 use 5.008007;
 
 use strict;
@@ -11,7 +9,7 @@ use warnings;
 # it's not whether you win or lose, it's how drunk you get.
 use ExtUtils::MakeMaker;
 
-my $mm = $ExtUtils::MakeMaker::VERSION;
+my ($mm) = $ExtUtils::MakeMaker::VERSION =~ /^([^_]+)/;
 
 # We only use core modules, so you shouldn't have to install anything besides
 # Perl 5.8.7!
@@ -70,6 +68,7 @@ WriteMakefile(
         'POSIX'                 => 0,
         'Scalar::Util'          => 0,
         'Storable'              => 0,
+        'Sys::Hostname'         => 0,
         'Test::Builder'         => 0,
         'Test::Harness'         => 0,
         'Test::More'            => 0,

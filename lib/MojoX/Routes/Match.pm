@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package MojoX::Routes::Match;
 
 use strict;
@@ -10,19 +8,26 @@ use base 'Mojo::Base';
 use Carp 'croak';
 use Mojo::ByteStream 'b';
 use Mojo::URL;
+use Scalar::Util 'weaken';
 
 __PACKAGE__->attr(captures => sub { {} });
-__PACKAGE__->attr([qw/endpoint root tx/]);
+__PACKAGE__->attr([qw/endpoint root/]);
 __PACKAGE__->attr(stack => sub { [] });
 
 # I'm Bender, baby, please insert liquor!
 sub new {
     my $self = shift->SUPER::new();
-    my $tx   = shift;
-    $self->tx($tx);
-    $self->{_path} =
-      b($tx->req->url->path->to_string)->url_unescape->decode('UTF-8')
+    my $c    = shift;
+
+    # Controller
+    $self->{_controller} = $c;
+    weaken $self->{_controller};
+
+    # Path
+    $self->{_path} = shift
+      || b($c->req->url->path->to_string)->url_unescape->decode('UTF-8')
       ->to_string;
+
     return $self;
 }
 
@@ -33,6 +38,9 @@ sub match {
     # Shortcut
     return unless $r;
 
+    # Dictionary
+    my $dictionary = $self->{_dictionary} ||= $r->dictionary;
+
     # Root
     $self->root($r) unless $self->root;
 
@@ -40,13 +48,14 @@ sub match {
     for (my $i = 0; $i < @{$r->conditions}; $i += 2) {
         my $name      = $r->conditions->[$i];
         my $value     = $r->conditions->[$i + 1];
-        my $condition = $r->dictionary->{$name};
+        my $condition = $dictionary->{$name};
 
         # No condition
         return unless $condition;
 
         # Match
-        my $captures = $condition->($r, $self->tx, $self->captures, $value);
+        my $captures =
+          $condition->($r, $self->{_controller}, $self->captures, $value);
 
         # Matched
         return unless $captures && ref $captures eq 'HASH';
@@ -61,10 +70,16 @@ sub match {
     # Match
     my $captures = $r->pattern->shape_match(\$path);
 
+    # No match
+    return unless $captures;
+
+    # Partial
+    if (my $partial = $r->partial) {
+        $captures->{$partial} = $path;
+        $path = '';
+    }
     $self->{_path} = $path;
 
-    # Shaped path
-    return unless $captures;
 
     # Merge captures
     $captures = {%{$self->captures}, %$captures};
@@ -77,11 +92,14 @@ sub match {
             $self->{_path} = '';
         }
     }
-    $self->captures->{format} = $r->pattern->format if $r->pattern->format;
+    $self->captures->{format} ||= $r->pattern->format if $r->pattern->format;
 
     # Update stack
-    push @{$self->stack}, $captures
-      if $r->inline || ($r->is_endpoint && $self->_is_path_empty);
+    if ($r->inline || ($r->is_endpoint && $self->_is_path_empty)) {
+        push @{$self->stack}, {%$captures};
+        delete $captures->{cb};
+        delete $captures->{app};
+    }
 
     # Waypoint match
     if ($r->block && $self->_is_path_empty) {
@@ -212,7 +230,7 @@ MojoX::Routes::Match - Routes Visitor
     use MojoX::Routes::Match;
 
     # New match object
-    my $m = MojoX::Routes::Match->new($tx);
+    my $m = MojoX::Routes::Match->new($c);
 
     # Match
     $m->match($routes);
@@ -253,13 +271,6 @@ The root of the routes tree.
 
 Captured parameters with nesting history.
 
-=head2 C<tx>
-
-    my $tx = $m->tx;
-    $m     = $m->tx(Mojo::Transaction::HTTP->new);
-
-Transaction object used for matching.
-
 =head1 METHODS
 
 L<MojoX::Routes::Match> inherits all methods from L<Mojo::Base> and
@@ -268,7 +279,7 @@ implements the following ones.
 =head2 C<new>
 
     my $m = MojoX::Routes::Match->new;
-    my $m = MojoX::Routes::Match->new(Mojo::Transaction::HTTP->new);
+    my $m = MojoX::Routes::Match->new(MojoX:Controller->new);
 
 Construct a new match object.
 

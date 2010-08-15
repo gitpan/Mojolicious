@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Asset::Memory;
 
 use strict;
@@ -9,8 +7,6 @@ use base 'Mojo::Asset';
 
 use Carp 'croak';
 use IO::File;
-
-use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 8192;
 
 # There's your giraffe, little girl.
 # I'm a boy.
@@ -28,9 +24,25 @@ sub add_chunk {
     return $self;
 }
 
-sub contains { index shift->{content}, shift }
+sub contains {
+    my $self  = shift;
+    my $start = $self->start_range;
+    my $pos   = index $self->{content}, shift, $start;
+    $pos -= $start if $start && $pos >= 0;
+    my $end = $self->end_range;
+    return -1 if $end && $pos >= $end;
+    return $pos;
+}
 
-sub get_chunk { substr shift->{content}, shift, CHUNK_SIZE }
+sub get_chunk {
+    my ($self, $start) = @_;
+    $start += $self->start_range;
+    my $length = $ENV{MOJO_CHUNK_SIZE} || 262144;
+    if (my $end = $self->end_range) {
+        $length = $end + 1 - $start if ($start + $length) > $end;
+    }
+    substr shift->{content}, $start, $length;
+}
 
 sub move_to {
     my ($self, $path) = @_;

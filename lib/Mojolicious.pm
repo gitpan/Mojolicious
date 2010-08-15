@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojolicious;
 
 use strict;
@@ -35,9 +33,11 @@ __PACKAGE__->attr(session => sub { MojoX::Session::Cookie->new });
 __PACKAGE__->attr(static  => sub { MojoX::Dispatcher::Static->new });
 __PACKAGE__->attr(types   => sub { MojoX::Types->new });
 
-our $CODENAME = 'Snowman';
-our $VERSION  = '0.999926';
+our $CODENAME = 'Comet';
+our $VERSION  = '0.999927';
 
+# I personalized each of your meals.
+# For example, Amy: you're cute, so I baked you a pony.
 sub new {
     my $self = shift->SUPER::new(@_);
 
@@ -80,8 +80,8 @@ sub new {
     $static->root($home->rel_dir('public'));
 
     # Hide own controller methods
-    $r->hide(qw/client cookie finish finished flash helper param pause/);
-    $r->hide(qw/receive_message redirect_to render render_data/);
+    $r->hide(qw/client cookie finish finished flash handler helper param/);
+    $r->hide(qw/pause receive_message redirect_to render render_data/);
     $r->hide(qw/render_exception render_inner render_json render_not_found/);
     $r->hide(qw/render_partial render_static render_text resume/);
     $r->hide(qw/send_message session signed_cookie url_for/);
@@ -115,6 +115,27 @@ sub new {
     return $self;
 }
 
+sub defaults {
+    my $self = shift;
+
+    # Initialize
+    $self->{defaults} ||= {};
+
+    # Hash
+    return $self->{defaults} unless @_;
+
+    # Get
+    return $self->{defaults}->{$_[0]} unless @_ > 1 || ref $_[0];
+
+    # Set
+    my $values = ref $_[0] ? $_[0] : {@_};
+    for my $key (keys %$values) {
+        $self->{defaults}->{$key} = $values->{$key};
+    }
+
+    return $self;
+}
+
 # The default dispatchers with exception handling
 sub dispatch {
     my ($self, $c) = @_;
@@ -129,9 +150,11 @@ sub dispatch {
     $self->plugins->run_hook(before_dispatch => $c);
 
     # New request
-    my $path = $c->req->url->path           || '/';
-    my $ua   = $c->req->headers->user_agent || 'Anonymojo';
-    $self->log->debug(qq/*** Request for "$path" from "$ua". ***/);
+    my $req    = $c->req;
+    my $method = $req->method;
+    my $path   = $req->url->path || '/';
+    my $ua     = $req->headers->user_agent || 'Anonymojo';
+    $self->log->debug(qq/$method $path ($ua)./);
 
     # Try to find a static file
     $self->static->dispatch($c);
@@ -145,9 +168,6 @@ sub dispatch {
         # Nothing found
         $c->render_not_found unless $c->res->code;
     }
-
-    # Websocket handshake
-    $c->res->code(101) if !$c->res->code && $c->tx->is_websocket;
 
     # Finish
     $self->finish($c);
@@ -192,6 +212,10 @@ sub handler {
         $stash = $tx->stash;
         $tx    = $tx->tx;
     }
+
+    # Defaults
+    my $defaults = $self->defaults;
+    $stash = {%$stash, %$defaults};
 
     # Build default controller and process
     eval {
@@ -281,22 +305,28 @@ art technology.
 An amazing MVC web framework supporting a simplified single file mode through
 L<Mojolicious::Lite>.
 
+=over 4
+
+Powerful out of the box with RESTful routes, plugins, Perl-ish templates,
+session management, signed cookies, testing framework, static file server,
+I18N, first class unicode support and much more for you to discover.
+
+=back
+
 Very clean, portable and Object Oriented pure Perl API without any hidden
 magic and no requirements besides Perl 5.8.7.
 
 Full stack HTTP 1.1 and WebSocket client/server implementation with IPv6,
-TLS, IDNA, pipelining, chunking and multipart support.
+TLS, Bonjour, IDNA, chunking and multipart support.
 
 Builtin async IO and prefork web server supporting epoll, kqueue, hot
 deployment and UNIX domain socket sharing, perfect for embedding.
 
-CGI, FastCGI and L<PSGI> support.
+Automatic CGI, FastCGI and L<PSGI> detection.
 
-Fresh code, based upon years of experience developing Catalyst.
+JSON and XML/HTML5 parser with CSS3 selector support.
 
-Powerful out of the box with RESTful routes, plugins, sessions, signed
-cookies, static file server, testing framework, Perl-ish templates, JSON,
-I18N, first class Unicode support and much more for you to discover!
+Fresh code based upon years of experience developing L<Catalyst>.
 
 =back
 
@@ -324,7 +354,7 @@ Web development for humans, making hard things possible and everything fun.
         my $self = shift;
         my $url  = $self->param('url');
         $self->render(text =>
-              $self->client->get($url)->success->dom->at('title')->text);
+              $self->client->get($url)->res->dom->at('title')->text);
     };
 
     post '/:offset' => sub {
@@ -477,6 +507,20 @@ Will automatically detect your home directory and set up logging based on
 your current operating mode.
 Also sets up the renderer, static dispatcher and a default set of plugins.
 
+=head2 C<defaults>
+
+    my $defaults = $mojo->default;
+    my $foo      = $mojo->defaults('foo');
+    $mojo        = $mojo->defaults({foo => 'bar'});
+    $mojo        = $mojo->defaults(foo => 'bar');
+
+Default values for the stash.
+Note that this method is EXPERIMENTAL and might change without warning!
+
+    $mojo->defaults->{foo} = 'bar';
+    my $foo = $mojo->defaults->{foo};
+    delete $mojo->defaults->{foo};
+
 =head2 C<dispatch>
 
     $mojo->dispatch($c);
@@ -589,6 +633,8 @@ Andy Grundman
 
 Aristotle Pagaltzis
 
+Ashley Dev
+
 Ask Bjoern Hansen
 
 Audrey Tang
@@ -603,9 +649,13 @@ Christian Hansen
 
 Curt Tilmes
 
+Danijel Tasov
+
 David Davis
 
 Dmitry Konstantinov
+
+Eugene Toropov
 
 Gisle Aas
 
@@ -620,6 +670,8 @@ James Duncan
 Jaroslav Muhin
 
 Jesse Vincent
+
+John Kingsley
 
 Jonathan Yu
 
@@ -651,7 +703,11 @@ Pascal Gaudette
 
 Pedro Melo
 
+Peter Edwards
+
 Pierre-Yves Ritschard
+
+Quentin Carbonneaux
 
 Rafal Pocztarski
 
@@ -671,11 +727,19 @@ Stanis Trendelenburg
 
 Tatsuhiko Miyagawa
 
+The Perl Foundation
+
+Tomas Znamenacek
+
+Ulrich Kautz
+
 Uwe Voelker
 
 Yaroslav Korshak
 
 Yuki Kimoto
+
+Zak B. Elep
 
 =head1 COPYRIGHT AND LICENSE
 

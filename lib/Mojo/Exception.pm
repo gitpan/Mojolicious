@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Exception;
 
 use strict;
@@ -11,7 +9,7 @@ use overload '""' => sub { shift->to_string }, fallback => 1;
 use IO::File;
 
 __PACKAGE__->attr([qw/line lines_before lines_after/] => sub { [] });
-__PACKAGE__->attr(message => 'Exception!');
+__PACKAGE__->attr([qw/message raw_message/] => 'Exception!');
 __PACKAGE__->attr(verbose => sub { $ENV{MOJO_EXCEPTION_VERBOSE} || 0 });
 
 # Attempted murder? Now honestly, what is that?
@@ -21,9 +19,10 @@ sub new {
 
     # Message
     $self->message(shift);
+    my $message = $self->message;
+    $self->raw_message($message);
 
     # Trace name and line
-    my $message = $self->message;
     my @trace;
     while ($message =~ /at\s+(.+)\s+line\s+(\d+)/g) {
         push @trace, {file => $1, line => $2};
@@ -52,12 +51,20 @@ sub new {
     }
 
     # Parse specific file
-    my $lines = shift;
-    return $self unless $lines;
+    return $self unless my $lines = shift;
+    my @lines = split /\n/, $lines;
 
     # Cleanup plain messages
     unless (ref $message) {
-        $message =~ s/\(eval\s+\d+\)/template/;
+        my $filter = sub {
+            my $num  = shift;
+            my $new  = "template line $num";
+            my $line = $lines[$num];
+            $new .= qq/, near "$line"/ if defined $line;
+            $new .= '.';
+            return $new;
+        };
+        $message =~ s/\(eval\s+\d+\) line (\d+).*/$filter->($1)/ge;
         $self->message($message);
     }
 
@@ -66,7 +73,6 @@ sub new {
     $line = $1 if $self->message =~ /at\s+template\s+line\s+(\d+)/;
 
     # Context
-    my @lines = split /\n/, $lines;
     $self->_parse_context(\@lines, $line) if $line;
 
     return $self;
@@ -199,6 +205,13 @@ Lines before the line where the exception occured.
     $e          = $e->message('Oops!');
 
 Exception message.
+
+=head2 C<raw_message>
+
+    my $message = $e->raw_message;
+    $e          = $e->raw_message('Oops!');
+
+Raw unprocessed exception message.
 
 =head2 C<verbose>
 

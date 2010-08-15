@@ -1,15 +1,11 @@
 #!/usr/bin/env perl
 
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 use strict;
 use warnings;
 
 use utf8;
 
-use Test::More tests => 111;
-
-use Mojo::ByteStream 'b';
+use Test::More tests => 113;
 
 # I don't want you driving around in a car you built yourself.
 # You can sit there complaining, or you can knit me some seat belts.
@@ -95,6 +91,14 @@ is( $rel->to_abs,
     'http://kraih.com/foo/index.html?foo=bar#23',
     'right absolute version'
 );
+
+# Relative path
+$url = Mojo::URL->new('http://kraih.com/foo/?foo=bar#23');
+$url->path('bar');
+is("$url", 'http://kraih.com/foo/bar?foo=bar#23');
+$url = Mojo::URL->new('http://kraih.com?foo=bar#23');
+$url->path('bar');
+is("$url", 'http://kraih.com/bar?foo=bar#23');
 
 # Absolute (base without trailing slash)
 $url = Mojo::URL->new('/foo?foo=bar#23');

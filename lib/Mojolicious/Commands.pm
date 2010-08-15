@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojolicious::Commands;
 
 use strict;
@@ -68,7 +66,7 @@ Generate a fully functional L<Mojolicious::Lite> application.
 
     myapp.pl inflate
 
-Turn embedded files from the C<__DATA__> section into real files.
+Turn embedded files from the C<DATA> section into real files.
 
 =item C<routes>
 

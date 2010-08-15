@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Command;
 
 use strict;
@@ -118,6 +116,11 @@ sub get_all_data {
     my $all = {};
     while (@data) {
         my ($name, $content) = splice @data, 0, 2;
+
+        # Base 64
+        $content = b($content)->b64_decode->to_string
+          if $name =~ s/\s*\(\s*base64\s*\)$//;
+
         $all->{$name} = $content;
     }
 
@@ -265,7 +268,7 @@ Mojo::Command - Command Base Class
         my $self = shift;
 
         # Handle options
-        @ARGV = @_ if @_;
+        local @ARGV = @_ if @_;
         GetOptions('something' => sub { $something = 1 });
 
         # Magic here! :)
@@ -351,14 +354,14 @@ Portably create a relative directory.
     my $all = $command->get_all_data;
     my $all = $command->get_all_data('Some::Class');
 
-Extract all embedded files from the C<__DATA__> section of a class.
+Extract all embedded files from the C<DATA> section of a class.
 
 =head2 C<get_data>
 
     my $data = $command->get_data('foo_bar');
     my $data = $command->get_data('foo_bar', 'Some::Class');
 
-Extract embedded file from the C<__DATA__> section of a class.
+Extract embedded file from the C<DATA> section of a class.
 
 =head2 C<help>
 
@@ -382,21 +385,20 @@ Portably generate an absolute path from a relative UNIX style path.
 
     my $data = $command->render_data('foo_bar', @arguments);
 
-Render a template from the C<__DATA__> section of the command class.
+Render a template from the C<DATA> section of the command class.
 
 =head2 C<render_to_file>
 
     $command = $command->render_to_file('foo_bar', '/foo/bar.txt');
 
-Render a template from the C<__DATA__> section of the command class to a
-file.
+Render a template from the C<DATA> section of the command class to a file.
 
 =head2 C<render_to_rel_file>
 
     $command = $command->render_to_rel_file('foo_bar', 'foo/bar.txt');
 
-Portably render a template from the C<__DATA__> section of the command class
-to a relative file.
+Portably render a template from the C<DATA> section of the command class to a
+relative file.
 
 =head2 C<run>
 

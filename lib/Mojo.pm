@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo;
 
 use strict;
@@ -26,41 +24,15 @@ __PACKAGE__->attr(log    => sub { Mojo::Log->new });
 __PACKAGE__->attr(
     websocket_handshake_cb => sub {
         sub {
-            my ($self, $tx) = @_;
-
-            # Request
-            my $req = $tx->req;
-
-            # Response
-            my $res = $tx->res;
-
-            # Handshake
-            $res->code(101);
-            $res->headers->upgrade('WebSocket');
-            $res->headers->connection('Upgrade');
-            my $scheme = $req->url->to_abs->scheme eq 'https' ? 'wss' : 'ws';
-            $res->headers->sec_websocket_origin($req->headers->origin);
-            $res->headers->sec_websocket_location(
-                $tx->req->url->to_abs->scheme($scheme)->to_string);
-            $res->headers->sec_websocket_protocol(
-                $req->headers->sec_websocket_protocol);
-            $res->body(
-                $self->client->websocket_challenge(
-                    scalar $req->headers->sec_websocket_key1,
-                    scalar $req->headers->sec_websocket_key2,
-                    $req->body
-                )
-            );
-
-            # WebSocket transaction
-            return Mojo::Transaction::WebSocket->new(handshake => $tx);
+            return Mojo::Transaction::WebSocket->new(handshake => pop)
+              ->server_handshake;
           }
     }
 );
 
 # DEPRECATED in Snowman!
-# Use $Mojolicious::VERSION instead.
-our $VERSION = '0.999926';
+# Use $Mojolicious::VERSION instead
+our $VERSION = '0.999927';
 
 # Oh, so they have internet on computers now!
 sub new {

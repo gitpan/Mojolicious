@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Asset;
 
 use strict;
@@ -8,6 +6,9 @@ use warnings;
 use base 'Mojo::Base';
 
 use Carp 'croak';
+
+__PACKAGE__->attr('end_range');
+__PACKAGE__->attr(start_range => 0);
 
 # Marge, it takes two to lie. One to lie and one to listen.
 sub add_chunk { croak 'Method "add_chunk" not implemented by subclass' }
@@ -31,6 +32,24 @@ Mojo::Asset - Asset Base Class
 =head1 DESCRIPTION
 
 L<Mojo::Asset> is an abstract base class for assets.
+
+=head1 ATTRIBUTES
+
+L<Mojo::Asset> implements the following attributes.
+
+=head2 C<end_range>
+
+    my $end = $asset->end_range;
+    $asset  = $asset->end_range(8);
+
+Pretend file ends earlier.
+
+=head2 C<start_range>
+
+    my $start = $asset->start_range;
+    $asset    = $asset->start_range(0);
+
+Pretend file starts later.
 
 =head1 METHODS
 

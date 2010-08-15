@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Command::Cgi;
 
 use strict;
@@ -27,7 +25,7 @@ sub run {
     my $cgi  = Mojo::Server::CGI->new;
 
     # Options
-    @ARGV = @_ if @_;
+    local @ARGV = @_ if @_;
     GetOptions(nph => sub { $cgi->nph(1) });
 
     # Run

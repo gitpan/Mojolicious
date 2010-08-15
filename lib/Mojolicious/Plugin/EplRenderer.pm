@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojolicious::Plugin::EplRenderer;
 
 use strict;
@@ -47,15 +45,13 @@ sub register {
                 if (-r $path) { $$output = $mt->render_file($path, $c) }
 
                 # Try DATA section
-                elsif (my $d = $r->get_inline_template($c, $t)) {
+                elsif (my $d = $r->get_inline_template($options, $t)) {
                     $$output = $mt->render($d, $c);
                 }
 
                 # No template
                 else {
-                    $c->app->log->error(
-                        qq/Template "$t" missing or not readable./);
-                    $c->render_not_found;
+                    $c->render_not_found($t);
                     return;
                 }
 
@@ -67,7 +63,6 @@ sub register {
             if (ref $$output) {
                 my $e = $$output;
                 $$output = '';
-                $c->app->log->error(qq/Template error in "$t": $e/);
                 $c->render_exception($e);
             }
 

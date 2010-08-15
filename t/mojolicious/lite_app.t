@@ -1,11 +1,12 @@
 #!/usr/bin/env perl
 
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 use strict;
 use warnings;
 
 use utf8;
+
+# Disable epoll, kqueue and IPv6
+BEGIN { $ENV{MOJO_POLL} = $ENV{MOJO_NO_IPV6} = 1 }
 
 use Mojo::IOLoop;
 use Test::More;
@@ -13,7 +14,7 @@ use Test::More;
 # Make sure sockets are working
 plan skip_all => 'working sockets required for this test!'
   unless Mojo::IOLoop->new->generate_port;
-plan tests => 399;
+plan tests => 495;
 
 # Pollution
 123 =~ m/(\d+)/;
@@ -23,15 +24,19 @@ plan tests => 399;
 # Yeah ever since I was six.
 # Well, ok but I don't want people thinking we're robosexuals,
 # so if anyone asks you're my debugger.
-use Mojo::ByteStream 'b';
 use Mojo::Client;
 use Mojo::Content::MultiPart;
 use Mojo::Content::Single;
 use Mojo::Cookie::Response;
+use Mojo::Date;
+use Mojo::Filter::Chunked;
 use Mojo::JSON;
 use Mojo::Transaction::HTTP;
 use Mojolicious::Lite;
 use Test::Mojo;
+
+# Mojolicious::Lite and ojo
+use ojo;
 
 # Silence
 app->log->level('error');
@@ -42,13 +47,55 @@ app->renderer->default_handler('epl');
 # Header condition plugin
 plugin 'header_condition';
 
+# Default
+app->defaults(default => 23);
+
 # GET /
 get '/' => 'root';
+
+# /ojo
+a '/ojo' => {json => {hello => 'world'}};
 
 # GET /null/0
 get '/null/:null' => sub {
     my $self = shift;
     $self->render(text => $self->param('null'), layout => 'layout');
+};
+
+# GET /maybe/ajax
+get '/maybe/ajax' => sub {
+    my $self = shift;
+    return $self->render(text => 'is ajax') if $self->req->is_xhr;
+    $self->render(text => 'not ajax');
+};
+
+# GET /stream
+get '/stream' => sub {
+    my $self    = shift;
+    my $counter = 0;
+    my $chunks  = [qw/foo bar/, $self->req->url->to_abs->userinfo,
+        $self->url_for->to_abs];
+    my $chunked = Mojo::Filter::Chunked->new;
+    $self->res->code(200);
+    $self->res->headers->content_type('text/plain');
+    $self->res->headers->transfer_encoding('chunked');
+    $self->res->body(
+        sub {
+            my $self = shift;
+            my $chunk = $chunks->[$counter] || '';
+            $counter++;
+            return $chunked->build($chunk);
+        }
+    );
+};
+
+# GET /finished
+my $finished;
+get '/finished' => sub {
+    my $self = shift;
+    $self->finished(sub { $finished += 3 });
+    $finished = 20;
+    $self->render(text => 'so far so good!');
 };
 
 # GET /привет/мир
@@ -73,11 +120,11 @@ get 'tags/:test' => 'tags';
 # POST /upload
 post '/upload' => sub {
     my $self = shift;
+    $self->stash('mojo.rendered' => 1);
     my $body = $self->res->body || '';
     $self->res->body("called, $body");
-    return if $self->req->has_error;
+    return if $self->req->error;
     if (my $u = $self->req->upload('Вячеслав')) {
-        $self->stash(rendered => 1);
         $self->res->body($self->res->body . $u->filename . $u->size);
     }
 };
@@ -151,9 +198,9 @@ get '/outerlayout' => sub {
 # GET /outerlayouttwo
 get '/outerlayouttwo' => {layout => 'layout'} => sub {
     my $self = shift;
-    is($self->stash->{layout}, 'layout');
+    is($self->stash->{layout}, 'layout', 'right value');
     $self->render(handler => 'ep');
-    is($self->stash->{layout}, 'layout');
+    is($self->stash->{layout}, 'layout', 'right value');
 } => 'outerlayout';
 
 # GET /outerinnerlayout
@@ -251,11 +298,15 @@ post '/malformed_utf8' => sub {
 };
 
 # GET /json
-get '/json' => sub { shift->render_json({foo => [1, -2, 3, 'b☃r']}) };
+get '/json' =>
+  sub { shift->render_json({foo => [1, -2, 3, 'b☃r']}, layout => 'layout') };
 
 # GET /autostash
 get '/autostash' => sub { shift->render(handler => 'ep', foo => 'bar') } =>
-  'autostash';
+  '*';
+
+# GET /app
+get '/app' => {layout => 'app'} => '*';
 
 # GET /helper
 get '/helper' => sub { shift->render(handler => 'ep') } => 'helper';
@@ -280,9 +331,7 @@ get '/subrequest' => sub {
 
 # GET /subrequest_simple
 get '/subrequest_simple' => sub {
-    my $self = shift;
-    my $tx   = $self->client->post('/template');
-    $self->render_text($tx->res->body);
+    shift->render_text(p('/template')->body);
 };
 
 # GET /subrequest_sync
@@ -305,13 +354,15 @@ get '/subrequest_sync' => sub {
 get '/subrequest_async' => sub {
     my $self = shift;
     $self->pause;
+    my $async = '';
     $self->client->async->post(
         '/template' => sub {
             my $client = shift;
-            $self->render_text($client->res->body);
+            $self->render_text($client->res->body . $async);
             $self->finish;
         }
     )->process;
+    $async .= 'success!';
 };
 
 # GET /redirect_url
@@ -321,7 +372,7 @@ get '/redirect_url' => sub {
 
 # GET /redirect_path
 get '/redirect_path' => sub {
-    shift->redirect_to('/foo/bar')->render_text('Redirecting!');
+    shift->redirect_to('/foo/bar?foo=bar')->render_text('Redirecting!');
 };
 
 # GET /redirect_named
@@ -339,6 +390,22 @@ get '/koi8-r' => sub {
 
 # GET /hello3.txt
 get '/hello3.txt' => sub { shift->render_static('hello2.txt') };
+
+# Condition
+app->routes->add_condition(
+    default => sub {
+        my ($r, $c, $captures, $num) = @_;
+        return $captures if $c->stash->{default} == $num;
+        return;
+    }
+);
+
+# GET /default/condition
+get '/default/condition' => (default => 23) => sub {
+    my $self    = shift;
+    my $default = $self->stash('default');
+    $self->render(text => "works $default");
+};
 
 under sub {
     my $self = shift;
@@ -372,7 +439,7 @@ under sub {
 };
 
 # GET /param_auth
-get '/param_auth' => 'param_auth';
+get '/param_auth' => '*';
 
 # GET /param_auth/too
 get '/param_auth/too' =>
@@ -391,10 +458,35 @@ under sub {
 get '/bridge2stash' =>
   sub { shift->render(template => 'bridge2stash', handler => 'ep'); };
 
+# Counter
+my $under = 0;
+under sub {
+    shift->res->headers->header('X-Under' => ++$under);
+    return 1;
+};
+
+# GET /with_under_count
+get '/with/under/count' => '*';
+
 # Oh Fry, I love you more than the moon, and the stars,
 # and the POETIC IMAGE NUMBER 137 NOT FOUND
 my $client = app->client;
 my $t      = Test::Mojo->new;
+
+# Client timer
+my $timer;
+$client->ioloop->timer(
+    '0.1' => sub {
+        my $async = '';
+        $client->async->get(
+            '/' => sub {
+                my $self = shift;
+                $timer = $self->res->body . $async;
+            }
+        )->process;
+        $async = 'works!';
+    }
+);
 
 # GET /
 $t->get_ok('/')->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
@@ -410,16 +502,105 @@ $t->head_ok('/')->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
 $t->get_ok('/', '1234' x 1024)->status_is(200)
   ->content_is('/root.html/root.html/root.html/root.html/root.html');
 
+# GET /ojo (ojo)
+$t->get_ok('/ojo')->status_is(200)->json_content_is({hello => 'world'});
+
+# GET /static.txt (static inline file)
+$t->get_ok('/static.txt')->status_is(200)
+  ->header_is(Server          => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By'  => 'Mojolicious (Perl)')
+  ->header_is('Accept-Ranges' => 'bytes')->content_is("Just some\ntext!\n\n");
+
+# GET /static.txt (static inline file, If-Modified-Since)
+my $modified = Mojo::Date->new->epoch(time - 3600);
+$t->get_ok('/static.txt', {'If-Modified-Since' => $modified})->status_is(200)
+  ->header_is(Server          => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By'  => 'Mojolicious (Perl)')
+  ->header_is('Accept-Ranges' => 'bytes')->content_is("Just some\ntext!\n\n");
+$modified = $t->tx->res->headers->last_modified;
+$t->get_ok('/static.txt', {'If-Modified-Since' => $modified})->status_is(304)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is('');
+
+# GET /static.txt (partial inline file)
+$t->get_ok('/static.txt', {'Range' => 'bytes=2-5'})->status_is(206)
+  ->header_is(Server          => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By'  => 'Mojolicious (Perl)')
+  ->header_is('Accept-Ranges' => 'bytes')->header_is('Content-Length' => 4)
+  ->content_is('st s');
+
+# GET /static.txt (base 64 static inline file)
+$t->get_ok('/static2.txt')->status_is(200)
+  ->header_is(Server          => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By'  => 'Mojolicious (Perl)')
+  ->header_is('Accept-Ranges' => 'bytes')->content_is("test 123\nlalala");
+
+# GET /static.txt (base 64 static inline file, If-Modified-Since)
+$modified = Mojo::Date->new->epoch(time - 3600);
+$t->get_ok('/static2.txt', {'If-Modified-Since' => $modified})->status_is(200)
+  ->header_is(Server          => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By'  => 'Mojolicious (Perl)')
+  ->header_is('Accept-Ranges' => 'bytes')->content_is("test 123\nlalala");
+$modified = $t->tx->res->headers->last_modified;
+$t->get_ok('/static2.txt', {'If-Modified-Since' => $modified})->status_is(304)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is('');
+
+# GET /static.txt (base 64 partial inline file)
+$t->get_ok('/static2.txt', {'Range' => 'bytes=2-5'})->status_is(206)
+  ->header_is(Server          => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By'  => 'Mojolicious (Perl)')
+  ->header_is('Accept-Ranges' => 'bytes')->header_is('Content-Length' => 4)
+  ->content_is('st 1');
+
+# GET /template.txt.epl (protected inline template)
+$t->get_ok('/template.txt.epl')->status_is(404)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_like(qr/Oops!/);
+
 # GET /null/0
 $t->get_ok('/null/0')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_like(qr/layouted 0/);
 
+# GET /stream (with basic auth)
+my $port = $t->client->test_server;
+$t->get_ok("sri:foo\@localhost:$port/stream?foo=bar")->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_like(qr/^foobarsri\:foohttp:\/\/localhost\:\d+\/stream$/);
+
+# GET /stream (with basic auth and ojo)
+my $b = g("http://sri:foo\@localhost:$port/stream?foo=bar")->body;
+like($b, qr/^foobarsri\:foohttp:\/\/localhost\:\d+\/stream$/,
+    'right content');
+
+# GET /maybe/ajax (not ajax)
+$t->get_ok('/maybe/ajax')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is('not ajax');
+
+# GET /maybe/ajax (is ajax)
+$t->get_ok('/maybe/ajax', {'X-Requested-With' => 'XMLHttpRequest'})
+  ->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is('is ajax');
+
+# GET /finished (with finished callback)
+$t->get_ok('/finished')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is('so far so good!');
+is($finished, 23, 'finished');
+
 # GET / (IRI)
 $t->get_ok('/привет/мир')->status_is(200)
   ->content_type_is('text/html');
-is(b($t->tx->res->body)->decode('UTF-8'), 'привет мир');
+is( b($t->tx->res->body)->decode('UTF-8'),
+    'привет мир',
+    'right content'
+);
 
 # GET /root
 $t->get_ok('/root.html')->status_is(200)
@@ -492,8 +673,8 @@ $tx->req->method('POST');
 $tx->req->url->parse('/upload');
 $tx->req->content($content);
 $client->process($tx);
-is($tx->res->code, 413);
-is($tx->res->body, 'called, ');
+is($tx->res->code, 413,        'right status');
+is($tx->res->body, 'called, ', 'right content');
 app->log->level($backup2);
 $ENV{MOJO_MAX_MESSAGE_SIZE} = $backup;
 
@@ -515,10 +696,12 @@ $tx->req->method('POST');
 $tx->req->url->parse('/upload');
 $tx->req->content($content);
 $client->process($tx);
-is($tx->state,     'done');
-is($tx->res->code, 200);
-is(b($tx->res->body)->decode('UTF-8')->to_string,
-    'called, Вячеслав.jpg4096');
+ok($tx->is_done, 'transaction is done');
+is($tx->res->code, 200, 'right status');
+is( b($tx->res->body)->decode('UTF-8')->to_string,
+    'called, Вячеслав.jpg4096',
+    'right content'
+);
 $ENV{MOJO_MAX_MESSAGE_SIZE} = $backup;
 
 # GET / (with body and max message size)
@@ -630,7 +813,7 @@ $t->get_ok('/session_cookie/2')->status_is(200)
 
 # GET /session_cookie/2 (session reset)
 $t->reset_session;
-ok(!$t->tx);
+ok(!$t->tx, 'session reset');
 $t->get_ok('/session_cookie/2')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
@@ -746,15 +929,20 @@ $tx->req->method('POST');
 $tx->req->url->parse('/malformed_utf8');
 $tx->req->headers->content_type('application/x-www-form-urlencoded');
 $tx->req->body('foo=%E1');
+my ($code, $server, $powered, $body);
 $client->queue(
     $tx => sub {
         my ($self, $tx) = @_;
-        is($tx->res->code,                            200);
-        is($tx->res->headers->server,                 'Mojolicious (Perl)');
-        is($tx->res->headers->header('X-Powered-By'), 'Mojolicious (Perl)');
-        is($tx->res->body,                            '%E1');
+        $code    = $tx->res->code;
+        $server  = $tx->res->headers->server;
+        $powered = $tx->res->headers->header('X-Powered-By');
+        $body    = $tx->res->body;
     }
 )->process;
+is($code,    200,                  'right status');
+is($server,  'Mojolicious (Perl)', 'right "Server" value');
+is($powered, 'Mojolicious (Perl)', 'right "X-Powered-By" value');
+is($body,    '%E1',                'right content');
 app->log->level($level);
 
 # GET /json
@@ -769,18 +957,22 @@ $t->get_ok('/autostash?bar=23')->status_is(200)
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_is("layouted bar2342autostash\n");
 
+# GET /app
+$t->get_ok('/app')->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is("app layout app23\ndevelopment\n");
+
 # GET /helper
 $t->get_ok('/helper')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_is(
-    '<br/>&lt;.../template(Mozilla/5.0 (compatible; Mojolicious; Perl))');
+  ->content_is('23<br/>&lt;.../template(Mojolicious (Perl))');
 
 # GET /helper
 $t->get_ok('/helper', {'User-Agent' => 'Explorer'})->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_is('<br/>&lt;.../template(Explorer)');
+  ->content_is('23<br/>&lt;.../template(Explorer)');
 
 # GET /eperror
 $level = app->log->level;
@@ -788,9 +980,7 @@ app->log->level('fatal');
 $t->get_ok('/eperror')->status_is(500)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_like(qr/Internal Server Error/);
-is($client->get('/eperror')->success->dom->at('title')->text,
-    'Internal Server Error');
+  ->text_is('title', 'Internal Server Error');
 app->log->level($level);
 
 # GET /subrequest
@@ -815,7 +1005,7 @@ $t->get_ok('/subrequest_sync')->status_is(200)
 $t->get_ok('/subrequest_async')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_is('Just works!');
+  ->content_is('Just works!success!');
 
 # GET /redirect_url
 $t->get_ok('/redirect_url')->status_is(302)
@@ -827,7 +1017,8 @@ $t->get_ok('/redirect_url')->status_is(302)
 $t->get_ok('/redirect_path')->status_is(302)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->header_like(Location => qr/\/foo\/bar$/)->content_is('Redirecting!');
+  ->header_like(Location => qr/\/foo\/bar\?foo=bar$/)
+  ->content_is('Redirecting!');
 
 # GET /redirect_named
 $t->get_ok('/redirect_named')->status_is(302)
@@ -840,9 +1031,11 @@ $t->max_redirects(3);
 $t->get_ok('/redirect_named')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->header_is(Location       => undef)->content_is("Redirect works!\n");
+  ->header_is(Location       => undef)->element_exists('#foo')
+  ->text_is('div' => 'Redirect works!')
+  ->text_like('[id="foo"]' => qr/^Redirect/);
 $t->max_redirects(0);
-Test::Mojo->new(tx => $t->tx->previous->[-1])->status_is(302)
+Test::Mojo->new(tx => $t->tx->previous)->status_is(302)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->header_like(Location => qr/\/template.txt$/)->content_is('Redirecting!');
@@ -941,6 +1134,11 @@ $t->get_ok('/hello3.txt', {'Range' => 'bytes=0-0'})->status_is(206)
   ->header_is('Accept-Ranges' => 'bytes')->header_is('Content-Length' => 1)
   ->content_is('X');
 
+# GET /default/condition
+$t->get_ok('/default/condition')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is('works 23');
+
 # GET /bridge2stash
 $t->get_ok('/bridge2stash' => {'X-Flash' => 1})->status_is(200)
   ->content_is("stash too!!!!!!!!\n");
@@ -959,6 +1157,19 @@ $t->get_ok('/bridge2stash' => {'X-Flash2' => 1})->status_is(200)
 # GET /bridge2stash (with cookies and session cleared)
 $t->get_ok('/bridge2stash')->status_is(200)
   ->content_is("stash too!cookie!signed_cookie!!bad_cookie--12345678!!!!\n");
+
+# GET /with/under/count
+$t->get_ok('/with/under/count', {'X-Bender' => 'Rodriguez'})->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->header_is('X-Under'      => 1)->content_is("counter\n");
+
+# Client timer
+$client->ioloop->one_tick('0.1');
+is( $timer,
+    '/root.html/root.html/root.html/root.html/root.htmlworks!',
+    'right content'
+);
 
 __DATA__
 @@ tags.html.ep
@@ -992,8 +1203,15 @@ __DATA__
 <%= img '/foo.jpg' %>
 <%= img '/foo.jpg', alt => 'image' %>
 
+@@ static.txt
+Just some
+text!
+
 @@ template.txt.epl
-Redirect works!
+<div id="foo">Redirect works!</div>
+
+@@ static2.txt (base64)
+dGVzdCAxMjMKbGFsYWxh
 
 @@ with_header_condition.html.epl
 Test ok
@@ -1074,7 +1292,7 @@ Just works!\
 %= param 'bar'
 % my $foo = 42;
 %= $foo
-%= $route
+%= $self->match->endpoint->name;
 
 @@ layouts/layout.html.ep
 layouted <%== content %>
@@ -1087,7 +1305,14 @@ Two: <%= $two %>
 %}
 with_block <%= $block->('one', 'two') %>
 
+@@ layouts/app23.html.ep
+app layout <%= content %><%= app->mode %>
+
+@@ app.html.ep
+<% layout layout . 23; %><%= layout %>
+
 @@ helper.html.ep
+%= $default
 %== '<br/>'
 %= '<...'
 %= url_for 'index'
@@ -1103,8 +1328,12 @@ with_block <%= $block->('one', 'two') %>
 <%= $self->cookie('bad') %>!<%= session 'foo' %>!\
 <%= flash 'foo' %>!<%= $cookie->path if $cookie %>!
 % $self->session(foo => 'session');
-% $self->flash(foo => 'flash') if $self->req->headers->header('X-Flash');
-% $self->stash->{session} = {} if $self->req->headers->header('X-Flash2');
+% my $headers = $self->req->headers;
+% $self->flash(foo => 'flash') if $headers->header('X-Flash');
+% $self->session(expires => 1) if $headers->header('X-Flash2');
+
+@@ withundercount.html.ep
+counter
 
 __END__
 This is not a template!

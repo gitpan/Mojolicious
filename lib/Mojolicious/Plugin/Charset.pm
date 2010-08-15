@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojolicious::Plugin::Charset;
 
 use strict;
@@ -65,6 +63,14 @@ Mojolicious::Plugin::Charset - Charset Plugin
 
 L<Mojolicous::Plugin::Charset> is a plugin to easily set the default charset
 and encoding on all layers of L<Mojolicious>.
+
+=head2 Options
+
+=over 4
+
+=item charset
+
+=back
 
 =head1 METHODS
 

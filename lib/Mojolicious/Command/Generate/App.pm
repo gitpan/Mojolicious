@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojolicious::Command::Generate::App;
 
 use strict;
@@ -66,10 +64,11 @@ __DATA__
 use strict;
 use warnings;
 
-use FindBin;
+use File::Basename 'dirname';
+use File::Spec;
 
-use lib "$FindBin::Bin/../lib";
-use lib "$FindBin::Bin/../../lib";
+use lib join '/', File::Spec->splitdir(dirname(__FILE__)), 'lib';
+use lib join '/', File::Spec->splitdir(dirname(__FILE__)), '..', 'lib';
 
 # Check if Mojo is installed
 eval 'use Mojolicious::Commands';
@@ -158,13 +157,8 @@ $t->get_ok('/')->status_is(200)->content_type_is('text/html')
     </body>
 </html>
 @@ exception
+% my $e = delete $self->stash->{'exception'};
 <!doctype html><html>
-% my $s = $self->stash;
-% my $e = $self->stash('exception');
-% delete $s->{inner_template};
-% delete $s->{exception};
-% my $dump = dumper $s;
-% $s->{exception} = $e;
     <head>
 	    <title>Exception</title>
 	    <style type="text/css">
@@ -200,7 +194,7 @@ $t->get_ok('/')->status_is(200)->content_type_is('text/html')
                     </div>
                 <% } %>
             </div>
-            <div class="snippet"><pre><%= $dump %></pre></div>
+            <div class="snippet"><pre><%= dumper $self->stash %></pre></div>
         <% } else { %>
             <div>Page temporarily unavailable, please come back later.</div>
         <% } %>

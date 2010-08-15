@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package MojoX::Dispatcher::Routes;
 
 use strict;
@@ -11,6 +9,7 @@ use Mojo::ByteStream 'b';
 use Mojo::Exception;
 use Mojo::Loader;
 use MojoX::Routes::Match;
+use Scalar::Util 'weaken';
 
 __PACKAGE__->attr(
     controller_base_class => 'MojoX::Dispatcher::Routes::Controller');
@@ -22,39 +21,65 @@ __PACKAGE__->attr('namespace');
 sub auto_render {
     my ($self, $c) = @_;
 
+    # Transaction
+    my $tx = $c->tx;
+
     # Render
     return !$c->render
-      unless $c->stash->{rendered}
-          || $c->res->code
-          || $c->tx->is_paused;
+      unless $c->stash->{'mojo.rendered'}
+          || $tx->is_paused
+          || $tx->is_websocket;
 
     # Nothing to render
     return;
 }
 
+sub detour {
+    my $self = shift;
+
+    # Partial
+    $self->partial('path');
+
+    # Defaults
+    $self->to(@_);
+
+    return $self;
+}
+
 sub dispatch {
     my ($self, $c) = @_;
 
+    # Response
+    my $res = $c->res;
+
     # Already rendered
-    return if $c->res->code;
+    return if $res->code;
+
+    # Path
+    my $path = $c->stash->{path};
+    $path = "/$path" if defined $path && $path !~ /^\//;
 
     # Match
-    my $m = MojoX::Routes::Match->new($c->tx);
+    my $m = MojoX::Routes::Match->new($c, $path);
     $m->match($self);
     $c->match($m);
 
     # No match
     return 1 unless $m && @{$m->stack};
 
+    # Status
+    unless ($res->code) {
+
+        # Websocket handshake
+        $res->code(101) if !$res->code && $c->tx->is_websocket;
+
+        # Error or 200
+        my ($error, $code) = $c->req->error;
+        $res->code($code) if $code;
+    }
+
     # Params
-    my $p = $c->stash->{params} = $c->tx->req->params->clone;
-    $p->append(%{$m->captures});
-
-    # Route name
-    $c->stash->{route} = $m->endpoint->name;
-
-    # Merge in captures
-    $c->stash({%{$c->stash}, %{$m->captures}});
+    my $p = $c->stash->{'mojo.params'} ||= $c->tx->req->params->clone;
 
     # Walk the stack
     return 1 if $self->_walk_stack($c);
@@ -65,32 +90,56 @@ sub dispatch {
 
 sub hide { push @{shift->hidden}, @_ }
 
-sub _dispatch_app {
-    my ($self, $c) = @_;
+sub _dispatch_callback {
+    my ($self, $c, $staging) = @_;
 
-    # Prepare new path and base path for embedded application
-    my $opath  = $c->req->url->path;
-    my $obpath = $c->req->url->base->path;
-    if (my $path = $c->match->captures->{path}) {
+    # Debug
+    $c->app->log->debug(qq/Dispatching callback./);
 
-        # Make sure new path starts with a slash
-        $path = "/$path" unless $path =~ /^\//;
+    # Dispatch
+    my $continue;
+    my $cb      = $c->match->captures->{cb};
+    my $success = eval {
 
-        # Generate new base path
-        my $bpath = "$opath$obpath";
-        $bpath =~ s/$path$//;
+        # Callback
+        $continue = $cb->($c);
 
-        # Set new path and base path
-        $c->req->url->path($path);
-        $c->req->url->base->path($bpath);
+        # Success
+        1;
+    };
+
+    # Callback error
+    if (!$success && $@) {
+        my $e = Mojo::Exception->new($@);
+        $c->app->log->error($e);
+        return $e;
     }
 
-    # Load app
-    my $app = $c->match->captures->{app};
-    unless (ref $app && $self->{_loaded}->{$app}) {
+    # Success!
+    return 1 unless $staging;
+    return 1 if $continue;
 
-        # Debug
-        $c->app->log->debug(qq/Dispatching application "$app"./);
+    return;
+}
+
+sub _dispatch_controller {
+    my ($self, $c, $staging) = @_;
+
+    # Application
+    my $app = $c->match->captures->{app};
+
+    # Class
+    $app ||= $self->_generate_class($c);
+    return unless $app;
+
+    # Method
+    my $method = $self->_generate_method($c);
+
+    # Debug
+    $c->app->log->debug('Dispatching controller.');
+
+    # Load class
+    unless (ref $app && $self->{_loaded}->{$app}) {
 
         # Load
         if (my $e = Mojo::Loader->load($app)) {
@@ -107,125 +156,53 @@ sub _dispatch_app {
         $self->{_loaded}->{$app}++;
     }
 
-    # Debug
-    else { $c->app->log->debug(qq/Dispatching application./) }
-
     # Dispatch
     my $continue;
-    eval {
-
-        # App
-        $app = $app->new unless ref $app;
-
-        # Handler
-        $continue = $app->handler($c);
-    };
-
-    # Reset path and base path
-    my $url = $c->req->url;
-    $url->path($opath);
-    $url->base->path($obpath);
-
-    # Success!
-    return 1 if $continue;
-
-    # Callback error
-    if ($@) {
-        my $e = Mojo::Exception->new($@);
-        $c->app->log->error($e);
-        return $e;
-    }
-
-    return;
-}
-
-sub _dispatch_callback {
-    my ($self, $c) = @_;
-
-    # Debug
-    $c->app->log->debug(qq/Dispatching callback./);
-
-    # Dispatch
-    my $continue;
-    my $cb = $c->match->captures->{cb};
-    eval { $continue = $cb->($c) };
-
-    # Success!
-    return 1 if $continue;
-
-    # Callback error
-    if ($@) {
-        my $e = Mojo::Exception->new($@);
-        $c->app->log->error($e);
-        return $e;
-    }
-
-    return;
-}
-
-sub _dispatch_controller {
-    my ($self, $c) = @_;
-
-    # Method
-    my $method = $self->_generate_method($c);
-    return unless $method;
-
-    # Class
-    my $class = $self->_generate_class($c);
-    return unless $class;
-
-    # Debug
-    $c->app->log->debug(qq/Dispatching "${class}::$method"./);
-
-    # Load class
-    unless ($self->{_loaded}->{$class}) {
-
-        # Load
-        if (my $e = Mojo::Loader->load($class)) {
-
-            # Doesn't exist
-            return unless ref $e;
-
-            # Error
-            $c->app->log->error($e);
-            return $e;
-        }
-
-        # Loaded
-        $self->{_loaded}->{$class}++;
-    }
-
-    # Not a controller
-    $c->app->log->debug(qq/"$class" is not a controller./) and return
-      unless $class->isa($self->controller_base_class);
-
-    # Dispatch
-    my $continue;
-    eval {
+    my $success = eval {
 
         # Instantiate
-        my $new = $class->new($c);
+        $app = $app->new($c) unless ref $app;
 
-        # Get action
-        if (my $code = $new->can($method)) {
+        # Action
+        if ($method && $app->isa($self->controller_base_class)) {
 
             # Call action
-            $continue = $new->$code;
+            $continue = $app->$method if $app->can($method);
 
             # Copy stash
-            $c->stash($new->stash);
+            $c->stash($app->stash);
         }
+
+        # Handler
+        elsif ($app->isa('Mojo')) {
+
+            # Connect routes
+            if ($app->can('routes')) {
+                my $r = $app->routes;
+                unless ($r->parent) {
+                    $r->parent($c->match->endpoint);
+                    weaken $r->{parent};
+                }
+            }
+
+            # Handler
+            $app->handler($c);
+        }
+
+        # Success
+        1;
     };
 
-    # Success!
-    return 1 if $continue;
-
     # Controller error
-    if ($@) {
+    if (!$success && $@) {
         my $e = Mojo::Exception->new($@);
         $c->app->log->error($e);
         return $e;
     }
+
+    # Success!
+    return 1 unless $staging;
+    return 1 if $continue;
 
     return;
 }
@@ -241,9 +218,11 @@ sub _generate_class {
     my $controller = $field->{controller} || '';
     $class = b($controller)->camelize->to_string unless $class;
 
-    # Format
-    my $namespace = $field->{namespace} || $self->namespace;
-    $class = length $class ? "${namespace}::$class" : $namespace;
+    # Namespace
+    my $namespace = $field->{namespace};
+    $namespace = $self->namespace unless defined $namespace;
+    $class = length $class ? "${namespace}::$class" : $namespace
+      if length $namespace;
 
     # Invalid
     return unless $class =~ /^[a-zA-Z0-9_:]+$/;
@@ -270,11 +249,16 @@ sub _generate_method {
     return unless $method;
 
     # Shortcut for hidden methods
-    return if $self->{_hidden}->{$method};
-    return if index($method, '_') == 0;
+    if ($self->{_hidden}->{$method} || index($method, '_') == 0) {
+        $c->app->log->debug(qq/Action "$method" is not allowed./);
+        return;
+    }
 
     # Invalid
-    return unless $method =~ /^[a-zA-Z0-9_:]+$/;
+    unless ($method =~ /^[a-zA-Z0-9_:]+$/) {
+        $c->app->log->debug(qq/Action "$method" is invalid./);
+        return;
+    }
 
     return $method;
 }
@@ -283,19 +267,23 @@ sub _walk_stack {
     my ($self, $c) = @_;
 
     # Walk the stack
+    my $staging = $#{$c->match->stack};
     for my $field (@{$c->match->stack}) {
 
-        # Don't cache errors
-        local $@;
+        # Params
+        $c->stash->{'mojo.params'}->append(%{$field});
+
+        # Merge in captures
+        $c->stash({%{$c->stash}, %{$field}});
 
         # Captures
         $c->match->captures($field);
 
         # Dispatch
         my $e =
-            $field->{cb}  ? $self->_dispatch_callback($c)
-          : $field->{app} ? $self->_dispatch_app($c)
-          :                 $self->_dispatch_controller($c);
+            $field->{cb}
+          ? $self->_dispatch_callback($c, $staging)
+          : $self->_dispatch_controller($c, $staging);
 
         # Exception
         if (ref $e) {
@@ -373,6 +361,24 @@ implements the following ones.
     $dispatcher->auto_render(MojoX::Dispatcher::Routes::Controller->new);
 
 Automatic rendering.
+
+=head2 C<detour>
+
+    $dispatcher = $dispatcher->detour(action => 'foo');
+    $dispatcher = $dispatcher->detour({action => 'foo'});
+    $dispatcher = $dispatcher->detour('controller#action');
+    $dispatcher = $dispatcher->detour('controller#action', foo => 'bar');
+    $dispatcher = $dispatcher->detour('controller#action', {foo => 'bar'});
+    $dispatcher = $dispatcher->detour($app);
+    $dispatcher = $dispatcher->detour($app, foo => 'bar');
+    $dispatcher = $dispatcher->detour($app, {foo => 'bar'});
+    $dispatcher = $dispatcher->detour('MyApp');
+    $dispatcher = $dispatcher->detour('MyApp', foo => 'bar');
+    $dispatcher = $dispatcher->detour('MyApp', {foo => 'bar'});
+
+Set default parameters for this route and allow partial matching to simplify
+application embedding.
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<dispatch>
 

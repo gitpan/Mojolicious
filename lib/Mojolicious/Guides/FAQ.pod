@@ -1,4 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
 
 =head1 NAME
 
@@ -10,6 +9,10 @@ This document contains the most frequently asked questions about
 L<Mojolicious> together with the right answers.
 
 =head1 QUESTIONS
+
+=head2 I think L<Mojolicious> is awesome, how can i support you guys?
+
+Blog and tweet about it, get other people hooked! :)
 
 =head2 I think i have found a bug, what should i do now?
 

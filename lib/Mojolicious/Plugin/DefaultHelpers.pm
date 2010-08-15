@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojolicious::Plugin::DefaultHelpers;
 
 use strict;
@@ -13,6 +11,9 @@ require Data::Dumper;
 # the show that doesn't condone the cool crime of robbery.
 sub register {
     my ($self, $app) = @_;
+
+    # Add "app" helper
+    $app->renderer->add_helper(app => sub { shift->app });
 
     # Add "content" helper
     $app->renderer->add_helper(content => sub { shift->render_inner(@_) });
@@ -72,7 +73,7 @@ Mojolicious::Plugin::DefaultHelpers - Default Helpers Plugin
 L<Mojolicous::Plugin::DefaultHelpers> is a collection of renderer helpers for
 L<Mojolicious>.
 
-=head2 HELPERS
+=head2 Helpers
 
 =over 4
 

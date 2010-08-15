@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package MojoliciousTest;
 
 use strict;
@@ -41,6 +39,17 @@ sub startup {
     # Routes
     my $r = $self->routes;
 
+    # /auth (authentication bridge)
+    my $auth = $r->bridge('/auth')->to(
+        cb => sub {
+            return 1 if shift->req->headers->header('X-Bender');
+            return;
+        }
+    );
+
+    # /auth/authenticated
+    $auth->route('/authenticated')->to('foo#authenticated');
+
     # /stash_config
     $r->route('/stash_config')
       ->to(controller => 'foo', action => 'config', config => {test => 123});
@@ -66,6 +75,19 @@ sub startup {
         method    => 'test'
     );
 
+    # /test5 - only namespace test
+    $r->route('/test5')->to(
+        namespace => 'MojoliciousTest2::Foo',
+        method    => 'test'
+    );
+
+    # /test6 - no namespace test
+    $r->route('/test6')->to(
+        namespace  => '',
+        controller => 'mojolicious_test2-foo',
+        action     => 'test'
+    );
+
     # /withblock - template with blocks
     $r->route('/withblock')->to('foo#withblock');
 
@@ -86,6 +108,9 @@ sub startup {
 
     # /foo/session - session cookie with domain
     $r->route('/foo/session')->to('foo#session_domain');
+
+    # /rss.xml - mixed formats
+    $r->route('/rss.xml')->to('foo#bar', format => 'rss');
 
     # /*/* - the default route
     $r->route('/(controller)/(action)')->to(action => 'index');

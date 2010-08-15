@@ -1,29 +1,54 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Transaction;
 
 use strict;
 use warnings;
 
-use base 'Mojo::Stateful';
+use base 'Mojo::Base';
 
 use Carp 'croak';
 
-__PACKAGE__->attr([qw/connection kept_alive/]);
-__PACKAGE__->attr([qw/local_address local_port previous remote_port/]);
+__PACKAGE__->attr([qw/connection kept_alive local_address local_port/]);
+__PACKAGE__->attr([qw/previous remote_port/]);
+__PACKAGE__->attr(
+    [qw/finished resume_cb/] => sub {
+        sub { }
+    }
+);
 __PACKAGE__->attr(keep_alive => 0);
 
 # Please don't eat me! I have a wife and kids. Eat them!
 sub client_read  { croak 'Method "client_read" not implemented by subclass' }
 sub client_write { croak 'Method "client_write" not implemented by subclass' }
 
-sub is_paused { shift->is_state('paused') }
+sub error {
+    my $self = shift;
+    my $req  = $self->req;
+    return $req->error if $req->error;
+    my $res = $self->res;
+    return $res->error if $res->error;
+    return;
+}
+
+sub is_done {
+    return 1 if (shift->{_state} || '') eq 'done';
+    return;
+}
+
+sub is_paused {
+    return 1 if (shift->{_state} || '') eq 'paused';
+    return;
+}
 
 sub is_websocket {0}
 
 sub is_writing {
-    shift->is_state(
-        qw/start write write_start_line write_headers write_body/);
+    return 1 unless my $state = shift->{_state};
+    return 1
+      if $state eq 'write'
+          || $state eq 'write_start_line'
+          || $state eq 'write_headers'
+          || $state eq 'write_body';
+    return;
 }
 
 sub pause {
@@ -33,10 +58,10 @@ sub pause {
     return $self if $self->{_real_state};
 
     # Save state
-    $self->{_real_state} = $self->state;
+    $self->{_real_state} = $self->{_state};
 
     # Pause
-    $self->state('paused');
+    $self->{_state} = 'paused';
 
     return $self;
 }
@@ -83,11 +108,22 @@ sub resume {
     my $self = shift;
 
     # Not paused
-    return unless my $state = $self->{_real_state};
+    return unless $self->{_real_state};
 
     # Resume
-    delete $self->{_real_state};
-    $self->state($state);
+    $self->{_state} = delete $self->{_real_state};
+
+    # Callback
+    $self->resume_cb->($self);
+
+    return $self;
+}
+
+sub server_close {
+    my $self = shift;
+
+    # Transaction finished
+    $self->finished->($self);
 
     return $self;
 }
@@ -97,7 +133,7 @@ sub server_write { croak 'Method "server_write" not implemented by subclass' }
 
 sub success {
     my $self = shift;
-    return $self->res unless $self->has_error;
+    return $self->res unless $self->error;
     return;
 }
 
@@ -118,8 +154,7 @@ L<Mojo::Transaction> is an abstract base class for transactions.
 
 =head1 ATTRIBUTES
 
-L<Mojo::Transaction> inherits all attributes from L<Mojo::Stateful> and
-implements the following new ones.
+L<Mojo::Transaction> implements the following attributes.
 
 =head2 C<connection>
 
@@ -127,6 +162,17 @@ implements the following new ones.
     $tx            = $tx->connection($connection);
 
 Connection identifier or socket.
+
+=head2 C<finished>
+
+    my $cb = $tx->finished;
+    $tx    = $tx->finished(sub {...});
+
+Callback signaling that the transaction has been finished.
+
+    $tx->finsihed(sub {
+        my $self = shift;
+    });
 
 =head2 C<keep_alive>
 
@@ -177,10 +223,17 @@ Remote interface address.
 
 Remote interface port.
 
+=head2 C<resume_cb>
+
+    my $cb = $tx->resume_cb;
+    $tx    = $tx->resume_cb(sub {...});
+
+Callback to be invoked whenever the transaction is resumed.
+
 =head1 METHODS
 
-L<Mojo::Transaction> inherits all methods from L<Mojo::Stateful> and
-implements the following new ones.
+L<Mojo::Transaction> inherits all methods from L<Mojo::Base> and implements
+the following new ones.
 
 =head2 C<client_read>
 
@@ -193,6 +246,19 @@ Read and process client data.
     my $chunk = $tx->client_write;
 
 Write client data.
+
+=head2 C<error>
+
+    my $message          = $message->error;
+    my ($message, $code) = $message->error;
+
+Parser errors and codes.
+
+=head2 C<is_done>
+
+    my $done = $tx->is_done;
+
+Check if transaction is done.
 
 =head2 C<is_paused>
 
@@ -236,6 +302,12 @@ Transaction response.
 
 Resume transaction.
 
+=head2 C<server_close>
+
+    $tx = $tx->server_close;
+
+Transaction closed.
+
 =head2 C<server_read>
 
     $tx = $tx->server_read($chunk);
@@ -253,7 +325,9 @@ Write server data.
     my $res = $tx->success;
 
 Returns the L<Mojo::Message::Response> object (C<res>) if transaction was
-successful and had no connection/parser errors or C<undef> otherwise.
+successful or C<undef> otherwise.
+Connection and parser errors have only a message in C<error>, 400 and 500
+responses also a code.
 Note that this method is EXPERIMENTAL and might change without warning!
 
     if (my $res = $tx->success) {
@@ -261,7 +335,12 @@ Note that this method is EXPERIMENTAL and might change without warning!
     }
     else {
         my ($message, $code) = $tx->error;
-        print "Error $code: $message";
+        if ($code) {
+            print "$code $message response.\n";
+        }
+        else {
+            print "Connection error: $message\n";
+        }
     }
 
 Error messages can be accessed with the C<error> method of the transaction

@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojolicious::Lite;
 
 use strict;
@@ -30,6 +28,7 @@ sub import {
 
     # Initialize routes
     my $routes = $app->routes;
+    $routes->namespace('');
 
     # Route generator
     my $route = sub {
@@ -72,7 +71,7 @@ sub import {
 
         # Defaults
         $defaults ||= {};
-        $defaults = {%$defaults, cb => $cb} if $cb;
+        $defaults->{cb} = $cb if $cb;
 
         # Name
         $name ||= '';
@@ -103,7 +102,8 @@ sub import {
     no strict 'refs';
     no warnings 'redefine';
 
-    # Default template class
+    # Default static and template class
+    $app->static->default_static_class($caller);
     $app->renderer->default_template_class($caller);
 
     # Export
@@ -212,13 +212,14 @@ placeholders.
 All routes can have a name associated with them, this allows automatic
 template detection and back referencing with C<url_for>, C<link_to> and
 C<form_for>.
-Names are always the last argument.
+Names are always the last argument, the value C<*> means that the name is
+simply equal to the route without non-word characters.
 
     # /
     get '/' => 'index';
 
     # /foo
-    get '/foo' => 'foo';
+    get '/foo' => '*';
 
     # /bar
     get '/bar' => sub {
@@ -229,8 +230,12 @@ Names are always the last argument.
     __DATA__
 
     @@ index.html.ep
-    <%= link_to foo => {%>Foo<%}%>.
-    <%= link_to bar => {%>Bar<%}%>.
+    <%= link_to foo => {%>
+        Foo
+    <%}%>.
+    <%= link_to bar => {%>
+        Bar
+    <%}%>.
 
     @@ foo.html.ep
     <a href="<%= url_for 'index' %>">Home</a>.
@@ -269,8 +274,8 @@ Template blocks can be reused like functions in Perl scripts.
     <!doctype html><html>
         <head><title>Sebastians Frameworks!</title></head>
         <body>
-            <%= $link->('http://mojolicious.org', 'Mojolicious') %>
-            <%= $link->('http://catalystframework.org', 'Catalyst') %>
+            <%== $link->('http://mojolicious.org', 'Mojolicious') %>
+            <%== $link->('http://catalystframework.org', 'Catalyst') %>
         </body>
     </html>
 
@@ -447,7 +452,9 @@ multiple features at once.
     <%= include 'menu' %>
 
     @@ menu.html.ep
-    <%= link_to index => {%>Try again<%}%>
+    <%= link_to index => {%>
+        Try again
+    <%}%>
 
     @@ layouts/funky.html.ep
     <!doctype html><html>
@@ -579,15 +586,17 @@ request, this is very useful in combination with C<redirect_to>.
         <b><%= $message %></b><br />
     <% } %>
     Welcome <%= session 'name' %>!<br />
-    <%= link_to logout => {%>Logout<%}%>
+    <%= link_to logout => {%>
+        Logout
+    <%}%>
 
 Note that you should use a custom C<secret> to make signed cookies really secure.
 
     app->secret('My secret passphrase here!');
 
 A full featured HTTP 1.1 and WebSocket client is built right in.
-Especially in combination with L<Mojo::JSON> this can be a very powerful
-tool.
+Especially in combination with L<Mojo::JSON> and L<Mojo::DOM> this can be a
+very powerful tool.
 
     get '/test' => sub {
         my $self = shift;
@@ -616,8 +625,14 @@ directory.
         $self->render('foo/bar');
     };
 
-Static files will be automatically served from the C<public> directory if it
-exists.
+Static files will be automatically served from the C<DATA> section
+(even Base 64 encoded) or a C<public> directory if it exists.
+
+    @@ something.js
+    alert('hello!');
+
+    @@ test.txt (base64)
+    dGVzdCAxMjMKbGFsYWxh
 
     % mkdir public
     % mv something.js public/something.js
@@ -642,7 +657,7 @@ Run all unit tests with the C<test> command.
 To make your tests less noisy you can also change the application log level
 directly in your test files.
 
-    app->log->level('error');
+    $t->app->log->level('error');
 
 To disable debug messages later in a production setup you can change the
 L<Mojolicious> mode, default will be C<development>.

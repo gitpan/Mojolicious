@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::DOM;
 
 use strict;
@@ -9,7 +7,7 @@ use base 'Mojo::Base';
 use overload '""' => sub { shift->to_xml }, fallback => 1;
 
 use Mojo::ByteStream 'b';
-use Scalar::Util qw/isweak weaken/;
+use Scalar::Util 'weaken';
 
 # How are the kids supposed to get home?
 # I dunno. Internet?
@@ -17,50 +15,70 @@ __PACKAGE__->attr(charset => 'UTF-8');
 __PACKAGE__->attr(tree => sub { ['root'] });
 
 # Regex
-my $CSS_ATTR_RE = qr/
+my $CSS_ESCAPE_RE = qr/\\[^0-9a-fA-F]|\\[0-9a-fA-F]{1,6}/;
+my $CSS_ATTR_RE   = qr/
     \[
-    (\w+)       # Key
+    ((?:$CSS_ESCAPE_RE|\w)+)   # Key
     (?:
-    (\W)?       # Operator
+    (\W)?                      # Operator
     =
-    "([^"]+)"   # Value
+    "((?:\\"|[^"])+)"          # Value
     )?
     \]
 /x;
-my $CSS_CLASS_RE        = qr/\.([^\.]+)/;
-my $CSS_ELEMENT_RE      = qr/^([^\.\#]+)/;
-my $CSS_ID_RE           = qr/\#([^\#]+)/;
+my $CSS_CLASS_RE        = qr/\.((?:\\\.|[^\.])+)/;
+my $CSS_ELEMENT_RE      = qr/^((?:\\\.|\\\#|[^\.\#])+)/;
+my $CSS_ID_RE           = qr/\#((?:\\\#|[^\#])+)/;
 my $CSS_PSEUDO_CLASS_RE = qr/(?:\:(\w+)(?:\(([^\)]+)\))?)/;
 my $CSS_TOKEN_RE        = qr/
-    (\s*,\s*)?                        # Separator
-    ([\w\.\*\#]+)?                    # Element
-    ((?:\:\w+(?:\([^\)]+\))?)*)?      # Pseudo Class
-    ((?:\[\w+(?:\W?="[^"]+")?\])*)?   # Attributes
+    (\s*,\s*)?                                                   # Separator
+    ((?:[^\[\\\:\s]|$CSS_ESCAPE_RE\s?)+)?                        # Element
+    ((?:\:\w+(?:\([^\)]+\))?)*)?                                 # Pseudoclass
+    ((?:\[(?:$CSS_ESCAPE_RE|\w)+(?:\W?="(?:\\"|[^"])+")?\])*)?   # Attributes
     (?:
     \s*
-    ([\>\+\~])                        # Combinator
+    ([\>\+\~])                                                   # Combinator
     )?
 /x;
 my $XML_ATTR_RE = qr/
-    ([^=\s]+)         # Key
-    (?:="([^"]+)")?   # Value
+    ([^=\s]+)                                   # Key
+    (?:\s*=\s*(?:"([^"]+)"|'([^']+)'|(\S+)))?   # Value
 /x;
 my $XML_END_RE   = qr/^\s*\/\s*(.+)\s*/;
-my $XML_START_RE = qr/(\S+)\s*(.*)/;
+my $XML_START_RE = qr/(\S+)([\s\S]*)/;
 my $XML_TOKEN_RE = qr/
-    ([^<]*)                 # Text
+    ([^<]*)                  # Text
     (?:
-    <\?(\S+.*)\?>           # Processing Instruction
+    <\?(.*?)\?>              # Processing Instruction
     |
-    <\!--(.+)-->            # Comment
+    <\!--(.*?)-->            # Comment
     |
-    <\!\[CDATA\[(.*)\]\]>   # CDATA
+    <\!\[CDATA\[(.*?)\]\]>   # CDATA
     |
-    <\!DOCTYPE(.*)>         # DOCTYPE
+    <\!DOCTYPE([^>]*)>       # DOCTYPE
     |
-    <([^>]+)>               # Tag
-    )?
-/xi;
+    <(
+    \s*
+    [^>\s]+                  # Tag
+    (?:
+        \s*
+        [^=\s>"']+           # Key
+        (?:
+            \s*
+            =
+            \s*
+            (?:
+            "[^"]+?"         # Quotation marks
+            |
+            '[^']+?'         # Apostrophes
+            |
+            [^>\s]+          # Unquoted
+            )
+        )?
+    )*
+    )>
+    )??
+/xis;
 
 sub all_text {
     my $self = shift;
@@ -68,17 +86,18 @@ sub all_text {
     # Text
     my $text = '';
 
-    # Walk tree
-    my @stack = @{$self->tree};
-    while (my $e = shift @stack) {
+    # Tree
+    my $tree = $self->tree;
 
-        # Meta data
-        next unless ref $e eq 'ARRAY';
+    # Walk tree
+    my $start = $tree->[0] eq 'root' ? 1 : 4;
+    my @stack = @$tree[$start .. $#$tree];
+    while (my $e = shift @stack) {
 
         # Type
         my $type = $e->[0];
 
-        push @stack, @$e[4 .. $#$e] and next if $type eq 'tag';
+        unshift @stack, @$e[4 .. $#$e] and next if $type eq 'tag';
 
         # Text or CDATA
         if ($type eq 'text' || $type eq 'cdata') {
@@ -90,9 +109,9 @@ sub all_text {
     return $text;
 }
 
-sub at { shift->search(@_)->[0] }
+sub at { shift->find(@_)->[0] }
 
-sub attributes {
+sub attrs {
     my $self = shift;
 
     # Tree
@@ -110,11 +129,12 @@ sub children {
     # Children
     my @children;
 
-    # Walk stack
-    for my $e (@{$self->tree}) {
+    # Tree
+    my $tree = $self->tree;
 
-        # Meta data
-        next unless ref $e eq 'ARRAY';
+    # Walk tree
+    my $start = $tree->[0] eq 'root' ? 1 : 4;
+    for my $e (@$tree[$start .. $#$tree]) {
 
         # Tag
         next unless $e->[0] eq 'tag';
@@ -124,6 +144,16 @@ sub children {
     }
 
     return \@children;
+}
+
+sub find {
+    my ($self, $css) = @_;
+
+    # Parse CSS selectors
+    my $pattern = $self->_parse_css($css);
+
+    # Filter tree
+    return $self->_select($self->tree, $pattern);
 }
 
 sub name {
@@ -142,6 +172,41 @@ sub name {
     $tree->[1] = $name;
 
     return $self;
+}
+
+sub namespace {
+    my $self = shift;
+
+    # Current
+    my $current = $self->tree;
+    return if $current->[0] eq 'root';
+
+    # Prefix
+    my $prefix = '';
+    if ($current->[1] =~ /^(.*?)\:/) { $prefix = $1 }
+
+    # Walk tree
+    while ($current) {
+
+        # Root
+        return if $current->[0] eq 'root';
+
+        # Attributes
+        my $attrs = $current->[2];
+
+        # Namespace for prefix
+        if ($prefix) {
+            for my $key (keys %$attrs) {
+                return $attrs->{$key} if $key =~ /^xmlns\:$prefix$/;
+            }
+        }
+
+        # Namespace attribute
+        if (my $namespace = $attrs->{xmlns}) { return $namespace }
+
+        # Parent
+        $current = $current->[3];
+    }
 }
 
 sub parent {
@@ -164,14 +229,77 @@ sub parse {
     $self->tree($self->_parse_xml($xml));
 }
 
-sub search {
-    my ($self, $css) = @_;
+sub replace {
+    my ($self, $new) = @_;
 
-    # Parse CSS selectors
-    my $pattern = $self->_parse_css($css);
+    # Parse
+    $new = ref $new ? $new->tree : $self->_parse_xml($new);
 
-    # Filter tree
-    return $self->_select($self->tree, $pattern);
+    # Tree
+    my $tree = $self->tree;
+
+    # Root
+    return $self->replace_content(
+        $self->new(charset => $self->charset, tree => $new))
+      if $tree->[0] eq 'root';
+
+    # Parent
+    my $parent = $tree->[3];
+
+    # Replacements
+    my @new;
+    for my $e (@$new[1 .. $#$new]) {
+        $e->[3] = $parent if $e->[0] eq 'tag';
+        push @new, $e;
+    }
+
+    # Find
+    my $i = $parent->[0] eq 'root' ? 1 : 4;
+    for my $e (@$parent[$i .. $#$parent]) {
+        last if $e == $tree;
+        $i++;
+    }
+
+    # Replace
+    splice @$parent, $i, 1, @new;
+
+    return $self;
+}
+
+sub replace_content {
+    my ($self, $new) = @_;
+
+    # Parse
+    $new = ref $new ? $new->tree : $self->_parse_xml($new);
+
+    # Tree
+    my $tree = $self->tree;
+
+    # Replacements
+    my @new;
+    for my $e (@$new[1 .. $#$new]) {
+        $e->[3] = $tree if $e->[0] eq 'tag';
+        push @new, $e;
+    }
+
+    # Replace
+    my $start = $tree->[0] eq 'root' ? 1 : 4;
+    splice @$tree, $start, $#$tree, @new;
+
+    return $self;
+}
+
+sub root {
+    my $self = shift;
+
+    # Find root
+    my $root = $self->tree;
+    while ($root->[0] eq 'tag') {
+        last unless my $parent = $root->[3];
+        $root = $parent;
+    }
+
+    return $self->new(charset => $self->charset, tree => $root);
 }
 
 sub text {
@@ -242,22 +370,25 @@ sub _compare {
             # Wildcard
             next if $name eq '*';
 
-            # Name
-            next if $name eq $current->[1];
+            # Name (ignore namespace prefix)
+            next if $current->[1] =~ /\:?$name$/;
         }
 
         # Attribute
         elsif ($type eq 'attribute') {
             my $key   = $c->[1];
+            my $regex = $c->[2];
             my $attrs = $current->[2];
 
-            # Regex
-            if (my $regex = $c->[2]) {
-                next if ($attrs->{$key} || '') =~ /$regex/;
+            # Find attributes (ignore namespace prefix)
+            my $found = 0;
+            for my $name (keys %$attrs) {
+                if ($name =~ /\:?$key$/) {
+                    ++$found and last
+                      if !$regex || ($attrs->{$name} || '') =~ /$regex/;
+                }
             }
-
-            # Exists
-            else { next if exists $attrs->{$key} }
+            next if $found;
         }
 
         # Pseudo class
@@ -276,6 +407,21 @@ sub _compare {
     }
 
     return 1;
+}
+
+sub _css_unescape {
+    my ($self, $value) = @_;
+
+    # Remove escaped newlines
+    $value =~ s/\\\n//g;
+
+    # Unescape unicode characters
+    $value =~ s/\\([0-9a-fA-F]{1,6})\s?/pack('U', hex $1)/gex;
+
+    # Remove backslash
+    $value =~ s/\\//g;
+
+    return $value;
 }
 
 sub _doctype {
@@ -308,8 +454,8 @@ sub _end {
 
         # Update parent reference
         for my $e (@buffer) {
-            weaken $$current unless isweak $$current;
             $e->[3] = $$current if $e->[0] eq 'tag';
+            weaken $e->[3];
         }
 
         # Move children
@@ -321,6 +467,7 @@ sub _match {
     my ($self, $candidate, $pattern) = @_;
 
     # Parts
+    my $first = 2;
     for my $part (@$pattern) {
 
         # Selectors
@@ -348,6 +495,7 @@ sub _match {
             }
 
             while (1) {
+                $first-- if $first != 0;
 
                 # Next parent
                 return
@@ -358,6 +506,9 @@ sub _match {
 
                 # Compare part to element
                 last if $self->_compare($selector, $current);
+
+                # First selector needs to match
+                return if $first;
 
                 # Parent only
                 if ($parentonly) {
@@ -403,19 +554,22 @@ sub _parse_css {
         # Element
         $element ||= '';
         my $tag = '*';
-        $element =~ s/$CSS_ELEMENT_RE// and $tag = $1;
+        $element =~ s/$CSS_ELEMENT_RE// and $tag = $self->_css_unescape($1);
 
         # Tag
         push @$selector, ['tag', $tag];
 
         # Classes
         while ($element =~ /$CSS_CLASS_RE/g) {
-            push @$selector, ['attribute', 'class', qr/(?:^|\W+)$1(?:\W+|$)/];
+            my $class = $self->_css_unescape($1);
+            push @$selector,
+              ['attribute', 'class', qr/(?:^|\W+)$class(?:\W+|$)/];
         }
 
         # ID
         if ($element =~ /$CSS_ID_RE/) {
-            push @$selector, ['attribute', 'id', qr/^$1$/];
+            my $id = $self->_css_unescape($1);
+            push @$selector, ['attribute', 'id', qr/^$id$/];
         }
 
         # Pseudo classes
@@ -425,7 +579,7 @@ sub _parse_css {
 
         # Attributes
         while ($attributes =~ /$CSS_ATTR_RE/g) {
-            my $key   = $1;
+            my $key   = $self->_css_unescape($1);
             my $op    = $2 || '';
             my $value = $3;
 
@@ -436,7 +590,7 @@ sub _parse_css {
             if ($value) {
 
                 # Quote
-                $value = quotemeta $value;
+                $value = quotemeta $self->_css_unescape($value);
 
                 # "^=" (begins with)
                 if ($op eq '^') { $regex = qr/^$value/ }
@@ -468,6 +622,7 @@ sub _parse_xml {
     # Decode
     my $charset = $self->charset;
     $xml = b($xml)->decode($charset)->to_string if $charset;
+    return $tree unless $xml;
 
     # Tokenize
     while ($xml =~ /$XML_TOKEN_RE/g) {
@@ -505,12 +660,12 @@ sub _parse_xml {
 
         # End
         if ($tag =~ /$XML_END_RE/) {
-            if (my $end = $1) { $self->_end($end, \$current) }
+            if (my $end = lc $1) { $self->_end($end, \$current) }
         }
 
         # Start
         elsif ($tag =~ /$XML_START_RE/) {
-            my $start = $1;
+            my $start = lc $1;
             my $attr  = $2;
 
             # Attributes
@@ -518,6 +673,8 @@ sub _parse_xml {
             while ($attr =~ /$XML_ATTR_RE/g) {
                 my $key   = $1;
                 my $value = $2;
+                $value = $3 unless defined $value;
+                $value = $4 unless defined $value;
 
                 # End
                 next if $key eq '/';
@@ -633,7 +790,7 @@ sub _select {
         if ($type eq 'root') {
 
             # Fill queue
-            push @queue, @$current[1 .. $#$current];
+            unshift @queue, @$current[1 .. $#$current];
             next;
         }
 
@@ -641,7 +798,7 @@ sub _select {
         elsif ($type eq 'tag') {
 
             # Fill queue
-            push @queue, @$current[4 .. $#$current];
+            unshift @queue, @$current[4 .. $#$current];
 
             # Match
             push @results, $current if $self->_match($current, $pattern);
@@ -652,7 +809,8 @@ sub _select {
     @results =
       map { $self->new(charset => $self->charset, tree => $_) } @results;
 
-    return \@results;
+    # Collection
+    return bless \@results, 'Mojo::DOM::_Collection';
 }
 
 # It's not important to talk about who got rich off of whom,
@@ -660,11 +818,9 @@ sub _select {
 sub _start {
     my ($self, $start, $attrs, $current) = @_;
 
-    # Parent
-    weaken $$current unless isweak $$current;
-
     # New
     my $new = ['tag', $start, $attrs, $$current];
+    weaken $new->[3];
 
     # Append
     push @$$current, $new;
@@ -678,6 +834,23 @@ sub _text {
     push @$$current, ['text', $text];
 }
 
+package Mojo::DOM::_Collection;
+
+sub each {
+    my ($self, $cb) = @_;
+
+    # Shortcut
+    return @$self unless $cb;
+
+    # Iterate
+    my $i = 1;
+    $_->$cb($i++) for @$self;
+
+    # Root
+    return unless my $start = $self->[0];
+    return $start->root;
+}
+
 1;
 __END__
 
@@ -689,10 +862,16 @@ Mojo::DOM - Minimalistic XML DOM Parser With CSS3 Selectors
 
     use Mojo::DOM;
 
+    # Parse
     my $dom = Mojo::DOM->new;
     $dom->parse('<div><div id="a">A</div><div id="b">B</div></div>');
+
+    # Find
     my $b = $dom->at('#b');
     print $b->text;
+
+    # Iterate
+    $dom->find('div[id]')->each(sub { print shift->text });
 
 =head1 DESCRIPTION
 
@@ -718,26 +897,26 @@ An element of type C<E>.
 
 =item C<E[foo]>
 
-    my $links = $dom->search('a[href]');
+    my $links = $dom->find('a[href]');
 
 An C<E> element with a C<foo> attribute.
 
 =item C<E[foo="bar"]>
 
-    my $fields = $dom->search('input[name="foo"]');
+    my $fields = $dom->find('input[name="foo"]');
 
 An C<E> element whose C<foo> attribute value is exactly equal to C<bar>.
 
 =item C<E[foo^="bar"]>
 
-    my $fields = $dom->search('input[name^="f"]');
+    my $fields = $dom->find('input[name^="f"]');
 
 An C<E> element whose C<foo> attribute value begins exactly with the string
 C<bar>.
 
 =item C<E[foo$="bar"]>
 
-    my $fields = $dom->search('input[name$="o"]');
+    my $fields = $dom->find('input[name$="o"]');
 
 An C<E> element whose C<foo> attribute value ends exactly with the string
 C<bar>.
@@ -750,13 +929,13 @@ An C<E> element, root of the document.
 
 =item C<E F>
 
-    my $headlines = $dom->search('div h1');
+    my $headlines = $dom->find('div h1');
 
 An C<F> element descendant of an C<E> element.
 
 =item C<E E<gt> F>
 
-    my $headlines = $dom->search('html > body > div > h1');
+    my $headlines = $dom->find('html > body > div > h1');
 
 An C<F> element child of an C<E> element.
 
@@ -795,11 +974,11 @@ Extract all text content from DOM structure.
 
     my $result = $dom->at('html title');
 
-Search for a single element with CSS3 selectors.
+Find a single element with CSS3 selectors.
 
-=head2 C<attributes>
+=head2 C<attrs>
 
-    my $attrs = $dom->attributes;
+    my $attrs = $dom->attrs;
 
 Element attributes.
 
@@ -809,12 +988,26 @@ Element attributes.
 
 Children of element.
 
+=head2 C<find>
+
+    my $results = $dom->find('html title');
+
+Find elements with CSS3 selectors.
+
+    $dom->find('div')->each(sub { print shift->text });
+
 =head2 C<name>
 
     my $name = $dom->name;
     $dom     = $dom->name('html');
 
 Element name.
+
+=head2 C<namespace>
+
+    my $namespace = $dom->namespace;
+
+Element namespace.
 
 =head2 C<parent>
 
@@ -828,11 +1021,23 @@ Parent of element.
 
 Parse XML document.
 
-=head2 C<search>
+=head2 C<replace>
 
-    my $results = $dom->search('html title');
+    $dom = $dom->replace('<div>test</div>');
 
-Search for elements with CSS3 selectors.
+Replace elements.
+
+=head2 C<replace_content>
+
+    $dom = $dom->replace_content('test');
+
+Replace element content.
+
+=head2 C<root>
+
+    my $root = $dom->root;
+
+Find root element.
 
 =head2 C<text>
 

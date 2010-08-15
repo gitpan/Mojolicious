@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::URL;
 
 use strict;
@@ -153,7 +151,24 @@ sub path {
 
     # Set
     if ($path) {
-        $self->{path} = ref $path ? $path : Mojo::Path->new($path);
+
+        # Plain path
+        if (!ref $path) {
+
+            # Absolute path
+            if ($path =~ /^\//) { $path = Mojo::Path->new($path) }
+
+            # Relative path
+            else {
+                my $new = Mojo::Path->new($path);
+                $path = $self->{path} || Mojo::Path->new;
+                push @{$path->parts}, @{$new->parts};
+                $path->leading_slash(1);
+                $path->trailing_slash($new->trailing_slash);
+            }
+        }
+        $self->{path} = $path;
+
         return $self;
     }
 
@@ -169,7 +184,7 @@ sub query {
     if (@_) {
 
         # Multiple values
-        if (@_ > 1) {
+        if (@_ > 1 || (ref $_[0] && ref $_[0] eq 'ARRAY')) {
             $self->{query} = Mojo::Parameters->new(ref $_[0] ? @{$_[0]} : @_);
         }
 
@@ -301,8 +316,9 @@ Mojo::URL - Uniform Resource Locator
     $url->userinfo('sri:foobar');
     $url->host('kraih.com');
     $url->port(3000);
-    $url->path->parts(qw/foo bar/);
-    $url->query->params(foo => 'bar');
+    $url->path('/foo/bar');
+    $url->path('baz');
+    $url->query->param(foo => 'bar');
     $url->fragment(23);
     print "$url";
 
@@ -405,9 +421,11 @@ Parse URL.
 
     my $path = $url->path;
     $url     = $url->path('/foo/bar');
+    $url     = $url->path('foo/bar');
     $url     = $url->path(Mojo::Path->new);
 
-Path part of this URL, defaults to a L<Mojo::Path> object.
+Path part of this URL, relative paths will be appended to the existing path,
+defaults to a L<Mojo::Path> object.
 
 =head2 C<query>
 

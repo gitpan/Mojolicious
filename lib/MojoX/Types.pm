@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package MojoX::Types;
 
 use strict;
@@ -7,6 +5,8 @@ use warnings;
 
 use base 'Mojo::Base';
 
+# Once again, the conservative, sandwich-heavy portfolio pays off for the
+# hungry investor.
 __PACKAGE__->attr(
     types => sub {
         return {

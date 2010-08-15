@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Server::FastCGI;
 
 use strict;
@@ -7,7 +5,7 @@ use warnings;
 
 use base 'Mojo::Server';
 
-use IO::Poll 'POLLIN';
+use Errno qw/EAGAIN EWOULDBLOCK/;
 use IO::Socket;
 
 use constant DEBUG => $ENV{MOJO_SERVER_DEBUG} || 0;
@@ -192,7 +190,7 @@ sub read_request {
             $req->parse($body);
 
             # Error
-            return $tx if $req->has_error;
+            return $tx if $req->error;
         }
     }
 
@@ -218,6 +216,8 @@ sub run {
     $self->app;
 
     while (my $c = $self->accept_connection) {
+
+        # Request
         my $tx = $self->read_request($c);
 
         # Error
@@ -232,7 +232,11 @@ sub run {
         # Handle
         $self->handler_cb->($self, $tx);
 
+        # Response
         $self->write_response($tx);
+
+        # Finish transaction
+        $tx->finished->($tx);
     }
 }
 
@@ -284,7 +288,17 @@ sub write_records {
         my $woffset = 0;
         while ($woffset < length $record) {
             my $written = $c->syswrite($record, undef, $woffset);
-            return unless defined $written;
+
+            # Error
+            unless (defined $written) {
+
+                # Retry
+                next if $! == EAGAIN || $! == EWOULDBLOCK;
+
+                # Write error
+                return;
+            }
+
             $woffset += $written;
         }
 
@@ -381,16 +395,12 @@ sub _read_chunk {
     # Read
     my $chunk = '';
     while (length $chunk < $length) {
-
-        # We don't wait forever
-        my $poll = IO::Poll->new;
-        $poll->mask($c, POLLIN);
-        $poll->poll(1);
-        my @readers = $poll->handles(POLLIN);
-        return unless @readers;
-
-        # Slurp
-        $c->sysread(my $buffer, $length - length $chunk, 0);
+        my $read = $c->sysread(my $buffer, $length - length $chunk, 0);
+        unless (defined $read) {
+            next if $! == EAGAIN || $! == EWOULDBLOCK;
+            last;
+        }
+        last unless $read;
         $chunk .= $buffer;
     }
 

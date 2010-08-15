@@ -1,9 +1,10 @@
 #!/usr/bin/env perl
 
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 use strict;
 use warnings;
+
+# Disable epoll, kqueue and IPv6
+BEGIN { $ENV{MOJO_POLL} = $ENV{MOJO_NO_IPV6} = 1 }
 
 use Test::More;
 
@@ -26,8 +27,8 @@ use_ok('Mojo::Server::CGI');
 
 # Apache setup
 my $server = Test::Mojo::Server->new;
-my $port   = $server->generate_port_ok('found free port');
-my $dir    = File::Temp::tempdir;
+my $port   = $server->generate_port_ok;
+my $dir    = File::Temp::tempdir(CLEANUP => 1);
 my $config = File::Spec->catfile($dir, 'cgi.config');
 my $mt     = Mojo::Template->new;
 
@@ -51,7 +52,7 @@ DocumentRoot  <%= $dir %>
 
 ScriptAlias /cgi-bin <%= $dir %>
 EOF
-$server->command("/usr/sbin/httpd -X -f '$config'");
+$server->command(['/usr/sbin/httpd', '-X', '-f', $config]);
 
 # CGI setup
 my $lib = $server->home->lib_dir;
@@ -74,7 +75,7 @@ chmod 0777, $cgi;
 ok(-x $cgi, 'script is executable');
 
 # Start
-$server->start_server_ok('server started');
+$server->start_server_ok;
 
 # Request
 my $client = Mojo::Client->new;
@@ -82,9 +83,9 @@ $client->get(
     "http://127.0.0.1:$port/cgi-bin/test.cgi" => sub {
         my $self = shift;
         is($self->res->code, 200, 'right status');
-        like($self->res->body, qr/Mojo is working/, 'right content');
+        like($self->res->body, qr/Mojo/, 'right content');
     }
 )->process;
 
 # Stop
-$server->stop_server_ok('server stopped');
+$server->stop_server_ok;

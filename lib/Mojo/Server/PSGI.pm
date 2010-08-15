@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Server::PSGI;
 
 use strict;
@@ -7,7 +5,7 @@ use warnings;
 
 use base 'Mojo::Server';
 
-use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 8192;
+use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 262144;
 
 # Things aren't as happy as they used to be down here at the unemployment
 # office.
@@ -27,7 +25,7 @@ sub run {
     $tx->local_port($env->{SERVER_PORT});
 
     # Request body
-    while (!$req->is_finished) {
+    while (!$req->is_done) {
         my $read = $env->{'psgi.input'}->read(my $buffer, CHUNK_SIZE, 0);
         last if $read == 0;
         $req->parse($buffer);
@@ -52,6 +50,9 @@ sub run {
 
     # Response body
     my $body = Mojo::Server::PSGI::_Handle->new(_res => $res);
+
+    # Finish transaction
+    $tx->finished->($tx);
 
     return [$status, \@headers, $body];
 }

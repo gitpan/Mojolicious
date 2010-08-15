@@ -1,9 +1,10 @@
 #!/usr/bin/env perl
 
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 use strict;
 use warnings;
+
+# Disable epoll, kqueue and IPv6
+BEGIN { $ENV{MOJO_POLL} = $ENV{MOJO_NO_IPV6} = 1 }
 
 use Test::More;
 
@@ -24,8 +25,8 @@ use_ok('Mojo::Server::FastCGI');
 
 # Setup
 my $server = Test::Mojo::Server->new;
-my $port   = $server->generate_port_ok('found free port');
-my $dir    = File::Temp::tempdir;
+my $port   = $server->generate_port_ok;
+my $dir    = File::Temp::tempdir(CLEANUP => 1);
 my $config = File::Spec->catfile($dir, 'fcgi.config');
 my $mt     = Mojo::Template->new;
 
@@ -74,8 +75,8 @@ Alias / <%= $fcgi %>/
 EOF
 
 # Start
-$server->command("/usr/sbin/httpd -X -f '$config'");
-$server->start_server_ok('server started');
+$server->command(['/usr/sbin/httpd', '-X', '-f', $config]);
+$server->start_server_ok;
 
 # Request
 my $client = Mojo::Client->new;
@@ -83,9 +84,9 @@ $client->get(
     "http://127.0.0.1:$port/" => sub {
         my $self = shift;
         is($self->res->code, 200, 'right status');
-        like($self->res->body, qr/Mojo is working/, 'right content');
+        like($self->res->body, qr/Mojo/, 'right content');
     }
 )->process;
 
 # Stop
-$server->stop_server_ok('server stopped');
+$server->stop_server_ok;

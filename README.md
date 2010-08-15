@@ -13,22 +13,24 @@ Features
 * An amazing MVC web framework supporting a simplified single file mode
   through Mojolicious::Lite.
 
+  Powerful out of the box with RESTful routes, plugins, Perl-ish templates,
+  session management, signed cookies, testing framework, static file server,
+  I18N, first class unicode support and much more for you to discover.
+
 * Very clean, portable and Object Oriented pure Perl API without any hidden
   magic and no requirements besides Perl 5.8.7.
 
 * Full stack HTTP 1.1 and WebSocket client/server implementation with IPv6,
-  TLS, IDNA, pipelining, chunking and multipart support.
+  TLS, Bonjour, IDNA, chunking and multipart support.
 
 * Builtin async IO and prefork web server supporting epoll, kqueue, hot
   deployment and UNIX domain socket sharing, perfect for embedding.
 
-* CGI, FastCGI and PSGI support.
+* Automatic CGI, FastCGI and PSGI detection.
 
-* Fresh code, based upon years of experience developing Catalyst.
+* JSON and XML/HTML5 parser with CSS3 selector support.
 
-* Powerful out of the box with RESTful routes, plugins, sessions, signed
-  cookies, static file server, testing framework, Perl-ish templates, JSON,
-  I18N, first class Unicode support and much more for you to discover!
+* Fresh code based upon years of experience developing Catalyst.
 
 Duct Tape For The HTML5 Web
 ---------------------------
@@ -55,7 +57,7 @@ Web development for humans, making hard things possible and everything fun.
         my $self = shift;
         my $url  = $self->param('url');
         $self->render(text =>
-              $self->client->get($url)->success->dom->at('title')->text);
+              $self->client->get($url)->res->dom->at('title')->text);
     };
 
     post '/:offset' => sub {

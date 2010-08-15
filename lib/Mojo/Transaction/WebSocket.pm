@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Transaction::WebSocket;
 
 use strict;
@@ -13,13 +11,55 @@ use Mojo::ByteStream 'b';
 use Mojo::Transaction::HTTP;
 
 __PACKAGE__->attr(
-    [qw/finished receive_message/] => sub {
+    receive_message => sub {
         sub { }
     }
 );
 __PACKAGE__->attr(handshake => sub { Mojo::Transaction::HTTP->new });
 
+sub client_challenge {
+    my $self = shift;
+
+    # Request
+    my $req = $self->req;
+
+    # Headers
+    my $headers = $self->req->headers;
+
+    # WebSocket challenge
+    my $solution = $self->_challenge(scalar $headers->sec_websocket_key1,
+        scalar $headers->sec_websocket_key2, $req->body);
+    return unless $solution eq $self->res->body;
+    return 1;
+}
+
 sub client_close { shift->server_close(@_) }
+
+sub client_handshake {
+    my $self = shift;
+
+    # Request
+    my $req = $self->req;
+
+    # Headers
+    my $headers = $req->headers;
+
+    # Default headers
+    $headers->upgrade('WebSocket')  unless $headers->upgrade;
+    $headers->connection('Upgrade') unless $headers->connection;
+    $headers->sec_websocket_protocol('mojo')
+      unless $headers->sec_websocket_protocol;
+
+    # Generate challenge
+    $headers->sec_websocket_key1($self->_generate_key)
+      unless $headers->sec_websocket_key1;
+    $headers->sec_websocket_key2($self->_generate_key)
+      unless $headers->sec_websocket_key2;
+    $req->body(pack 'N*', int(rand 9999999) + 1, int(rand 9999999) + 1);
+
+    return $self;
+}
+
 sub client_read  { shift->server_read(@_) }
 sub client_write { shift->server_write(@_) }
 sub connection   { shift->handshake->connection(@_) }
@@ -53,11 +93,43 @@ sub send_message {
     $self->_send_bytes("\x00$message\xff");
 }
 
-sub server_close {
+sub server_handshake {
     my $self = shift;
 
-    # Connection finished
-    $self->finished->($self);
+    # Request
+    my $req = $self->req;
+
+    # Response
+    my $res = $self->res;
+
+    # Request headers
+    my $rqh = $req->headers;
+
+    # Response headers
+    my $rsh = $res->headers;
+
+    # URL
+    my $url = $req->url;
+
+    # Handshake
+    $res->code(101);
+    $rsh->upgrade('WebSocket');
+    $rsh->connection('Upgrade');
+    my $scheme   = $url->to_abs->scheme eq 'https' ? 'wss' : 'ws';
+    my $location = $url->to_abs->scheme($scheme)->to_string;
+    my $origin   = $rqh->origin;
+    $rsh->sec_websocket_origin($origin);
+    $rsh->sec_websocket_location($location);
+    $rsh->sec_websocket_protocol($rqh->sec_websocket_protocol);
+    $res->body(
+        $self->_challenge(
+            scalar $rqh->sec_websocket_key1,
+            scalar $rqh->sec_websocket_key2,
+            $req->body
+        )
+    );
+
+    return $self;
 }
 
 # Being eaten by crocodile is just like going to sleep... in a giant blender.
@@ -86,6 +158,11 @@ sub server_read {
             $self, b($message)->decode('UTF-8')->to_string
         );
     }
+
+    # Resume
+    $self->resume_cb->($self);
+
+    return $self;
 }
 
 sub server_write {
@@ -94,11 +171,48 @@ sub server_write {
     # Not writing anymore
     my $write = $self->{_write} ||= Mojo::ByteStream->new;
     unless ($write->size) {
-        $self->{_finished} ? $self->state('done') : $self->state('read');
+        $self->{_state} = $self->{_finished} ? 'done' : 'read';
     }
 
     # Empty buffer
     return $write->empty;
+}
+
+sub _challenge {
+    my ($self, $key1, $key2, $key3) = @_;
+
+    # Shortcut
+    return unless $key1 && $key2 && $key3;
+
+    # Calculate solution for challenge
+    my $c1 = pack 'N', join('', $key1 =~ /(\d)/g) / ($key1 =~ tr/\ //);
+    my $c2 = pack 'N', join('', $key2 =~ /(\d)/g) / ($key2 =~ tr/\ //);
+    return b("$c1$c2$key3")->md5_bytes->to_string;
+}
+
+sub _generate_key {
+    my $self = shift;
+
+    # Number of spaces
+    my $spaces = int(rand 12) + 1;
+
+    # Number
+    my $number = int(rand 99999) + 10;
+
+    # Key
+    my $key = $number * $spaces;
+
+    # Insert whitespace
+    while ($spaces--) {
+
+        # Random position
+        my $pos = int(rand(length($key) - 2)) + 1;
+
+        # Insert a space at $pos position
+        substr($key, $pos, 0) = ' ';
+    }
+
+    return $key;
 }
 
 sub _send_bytes {
@@ -109,7 +223,10 @@ sub _send_bytes {
     $write->add_chunk($bytes);
 
     # Writing
-    $self->state('write');
+    $self->{_state} = 'write';
+
+    # Resume
+    $self->resume_cb->($self);
 }
 
 1;
@@ -125,24 +242,13 @@ Mojo::Transaction::WebSocket - WebSocket Transaction Container
 
 =head1 DESCRIPTION
 
-L<Mojo::Transaction::WebSocket> is a container and state machine for
-WebSocket transactions as described in C<The Web Socket protocol>.
+L<Mojo::Transaction::WebSocket> is a container for WebSocket transactions as
+described in C<The WebSocket protocol>.
 
 =head1 ATTRIBUTES
 
 L<Mojo::Transaction::WebSocket> inherits all attributes from
 L<Mojo::Transaction> and implements the following new ones.
-
-=head2 C<finished>
-
-    my $cb = $ws->finished;
-    $ws    = $ws->finsihed(sub {...});
-
-Callback signaling that peer finished the connection.
-
-    $ws->finsihed(sub {
-        my $self = shift;
-    });
 
 =head2 C<handshake>
 
@@ -167,15 +273,29 @@ The callback that receives decoded messages one by one.
 L<Mojo::Transaction::WebSocket> inherits all methods from
 L<Mojo::Transaction> and implements the following new ones.
 
+=head2 C<client_challenge>
+
+    my $success = $ws->client_challenge;
+
+Check WebSocket handshake challenge, only used by client.
+Note that this method is EXPERIMENTAL and might change without warning!
+
 =head2 C<client_close>
 
-    $ws->client_close;
+    $ws = $ws->client_close;
 
-Connection got closed.
+Connection got closed, only used by clients.
+
+=head2 C<client_handshake>
+
+    $ws = $ws->client_handshake;
+
+WebSocket handshake, only used by clients.
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<client_read>
 
-    $ws->client_read($data);
+    $ws = $ws->client_read($data);
 
 Read raw WebSocket data, only used by clients.
 
@@ -246,15 +366,16 @@ The original handshake response.
 Send a message over the WebSocket, encoding and framing will be handled
 transparently.
 
-=head2 C<server_close>
+=head2 C<server_handshake>
 
-    $ws->server_close;
+    $ws = $ws->server_handshake;
 
-Connection got closed.
+WebSocket handshake, only used by servers.
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<server_read>
 
-    $ws->server_read($data);
+    $ws = $ws->server_read($data);
 
 Read raw WebSocket data, only used by servers.
 

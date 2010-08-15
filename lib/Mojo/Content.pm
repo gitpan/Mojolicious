@@ -1,18 +1,16 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Content;
 
 use strict;
 use warnings;
 
-use base 'Mojo::Stateful';
+use base 'Mojo::Base';
 
 use Carp 'croak';
 use Mojo::ByteStream;
 use Mojo::Filter::Chunked;
 use Mojo::Headers;
 
-use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 8192;
+use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 262144;
 
 __PACKAGE__->attr([qw/body_cb filter/]);
 __PACKAGE__->attr([qw/buffer filter_buffer/] => sub { Mojo::ByteStream->new }
@@ -137,12 +135,22 @@ sub is_chunked {
     return $encoding =~ /chunked/i ? 1 : 0;
 }
 
+sub is_done {
+    return 1 if (shift->{_state} || '') eq 'done';
+    return;
+}
+
 sub is_multipart {
     my $self = shift;
 
     # Multipart
     my $type = $self->headers->content_type || '';
     return $type =~ /multipart/i ? 1 : 0;
+}
+
+sub is_parsing_body {
+    return 1 if (shift->{_state} || '') eq 'body';
+    return;
 }
 
 sub leftovers {
@@ -167,10 +175,10 @@ sub parse {
     $self->parse_until_body;
 
     # Still parsing headers
-    return $self if $self->is_state('headers');
+    return $self if $self->{_state} eq 'headers';
 
     # Chunked, need to filter
-    if ($self->is_chunked && !$self->is_state('headers')) {
+    if ($self->is_chunked && ($self->{_state} || '') ne 'headers') {
 
         # Initialize filter
         $self->filter(
@@ -183,7 +191,7 @@ sub parse {
 
         # Filter
         $self->filter->parse;
-        $self->done if $self->filter->is_done;
+        $self->{_state} = 'done' if $self->filter->is_done;
     }
 
     # Not chunked, pass through
@@ -213,15 +221,23 @@ sub parse {
             }
 
             # Done
-            $self->done if $length <= $self->raw_body_size;
+            $self->{_state} = 'done' if $length <= $self->raw_body_size;
         }
     }
 
-    # Leftovers
-    if ($self->is_done) {
-        $self->state('done_with_leftovers') if $self->has_leftovers;
-    }
+    return $self;
+}
 
+sub parse_body {
+    my $self = shift;
+    $self->{_state} = 'body';
+    $self->parse(@_);
+}
+
+sub parse_body_once {
+    my $self = shift;
+    $self->parse_body(@_);
+    $self->{_state} = 'done';
     return $self;
 }
 
@@ -233,7 +249,7 @@ sub parse_until_body {
     $fbuffer->add_chunk($chunk);
 
     # Parser started
-    if ($self->is_state('start')) {
+    unless ($self->{_state}) {
 
         # Update size
         my $length            = $fbuffer->size;
@@ -242,11 +258,11 @@ sub parse_until_body {
         $self->raw_header_size($raw_header_length);
 
         # Headers
-        $self->state('headers');
+        $self->{_state} = 'headers';
     }
 
     # Parse headers
-    $self->_parse_headers if $self->is_state('headers');
+    $self->_parse_headers if ($self->{_state} || '') eq 'headers';
 
     return $self;
 }
@@ -288,7 +304,7 @@ sub _parse_headers {
     $self->raw_header_size($raw_header_length);
 
     # Done
-    $self->state('body') if $headers->is_done;
+    $self->{_state} = 'body' if $headers->is_done;
 }
 
 1;
@@ -309,8 +325,7 @@ in RFC 2616.
 
 =head1 ATTRIBUTES
 
-L<Mojo::Content> inherits all attributes from L<Mojo::Stateful> and
-implements the following new ones.
+L<Mojo::Content> implements the following attributes.
 
 =head2 C<body_cb>
 
@@ -371,8 +386,8 @@ Raw size of headers in bytes.
 
 =head1 METHODS
 
-L<Mojo::Content> inherits all methods from L<Mojo::Stateful> and implements
-the following new ones.
+L<Mojo::Content> inherits all methods from L<Mojo::Base> and implements the
+following new ones.
 
 =head2 C<body_contains>
 
@@ -434,11 +449,23 @@ Size of headers in bytes.
 
 Chunked transfer encoding.
 
+=head2 C<is_done>
+
+    my $done = $content->is_done;
+
+Check if parser is done.
+
 =head2 C<is_multipart>
 
     my $multipart = $content->is_multipart;
 
 Multipart content.
+
+=head2 C<is_parsing_body>
+
+    my $body = $content->is_parsing_body;
+
+Check if body parsing started yet.
 
 =head2 C<leftovers>
 
@@ -451,6 +478,18 @@ Leftovers for next HTTP message in buffer.
     $content = $content->parse("Content-Length: 12\r\n\r\nHello World!");
 
 Parse content.
+
+=head2 C<parse_body>
+
+    $content = $content->parse_body("Hi!");
+
+Parse body.
+
+=head2 C<parse_body_once>
+
+    $content = $content->parse_body_once("Hi!");
+
+Parse body once.
 
 =head2 C<parse_until_body>
 

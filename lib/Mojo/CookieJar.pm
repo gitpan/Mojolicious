@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel
-
 package Mojo::CookieJar;
 
 use strict;
@@ -35,7 +33,8 @@ sub add {
         $cookie->max_age(0) unless $cookie->expires || $cookie->max_age;
 
         # Cookie too big
-        next if length $cookie->value > $self->max_cookie_size;
+        my $value = $cookie->value;
+        next if length(defined $value ? $value : '') > $self->max_cookie_size;
 
         # Initialize
         $self->{_jar}->{$domain} ||= [];
@@ -60,6 +59,27 @@ sub add {
 }
 
 sub empty { shift->{_jar} = {} }
+
+sub extract {
+    my ($self, $tx) = @_;
+
+    # URL
+    my $url = $tx->req->url;
+
+    # Fix cookies
+    my @cookies = @{$tx->res->cookies};
+    for my $cookie (@cookies) {
+
+        # Domain
+        $cookie->domain($url->host) unless $cookie->domain;
+
+        # Path
+        $cookie->path($url->path) unless $cookie->path;
+    }
+
+    # Store
+    $self->add(@cookies);
+}
 
 sub find {
     my ($self, $url) = @_;
@@ -117,6 +137,20 @@ sub find {
     return @found;
 }
 
+sub inject {
+    my ($self, $tx) = @_;
+
+    # Request
+    my $req = $tx->req;
+
+    # URL
+    my $url = $req->url->clone;
+    if (my $host = $req->headers->host) { $url->host($host) }
+
+    # Fetch
+    $req->cookies($self->find($url));
+}
+
 1;
 __END__
 
@@ -161,11 +195,23 @@ Add multiple cookies to the jar.
 
 Empty the jar.
 
+=head2 C<extract>
+
+    $jar = $jar->extract($tx);
+
+Extract cookies from transaction.
+
 =head2 C<find>
 
     my @cookies = $jar->find($url);
 
 Find cookies in the jar.
+
+=head2 C<inject>
+
+    $jar = $jar->inject($tx);
+
+Inject cookies into transaction.
 
 =head1 SEE ALSO
 

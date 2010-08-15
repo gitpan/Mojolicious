@@ -1,4 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
 
 =head1 NAME
 
@@ -21,6 +20,18 @@ Mojolicious is the tutorial in L<Mojolicious::Lite>, you should take a look.
 New guides will be added over time, so keep a close eye on this.
 
 =over 4
+
+=item L<Mojolicious::Guides::Routing>
+
+Simple and fun introduction to the L<Mojolicious> router.
+
+=item L<Mojolicious::Guides::Rendering>
+
+Generating content with the L<Mojolicious> renderer.
+
+=item L<Mojolicious::Guides::Cookbook>
+
+Cooking with L<Mojolicious>, recipes for every taste.
 
 =item L<Mojolicious::Guides::Cheatsheet>
 

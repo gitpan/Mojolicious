@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Server::Daemon::Prefork;
 
 use strict;
@@ -8,22 +6,32 @@ use warnings;
 use base 'Mojo::Server::Daemon';
 
 use Carp 'croak';
+use Fcntl ':flock';
+use File::Spec;
 use IO::File;
 use IO::Poll 'POLLIN';
 use IO::Socket;
+use Mojo::Command;
 use POSIX qw/setsid WNOHANG/;
 
 use constant DEBUG => $ENV{MOJO_SERVER_DEBUG} || 0;
 
-__PACKAGE__->attr(cleanup_interval                      => 15);
-__PACKAGE__->attr(idle_timeout                          => 30);
+__PACKAGE__->attr(cleanup_interval => 15);
+__PACKAGE__->attr(idle_timeout     => 30);
+__PACKAGE__->attr(
+    lock_file => sub {
+        my $self = shift;
+        return File::Spec->catfile($ENV{MOJO_TMPDIR} || File::Spec->tmpdir,
+            Mojo::Command->class_to_file(ref $self->app) . ".$$.lock");
+    }
+);
 __PACKAGE__->attr(max_clients                           => 1);
 __PACKAGE__->attr(max_requests                          => 1000);
 __PACKAGE__->attr(max_servers                           => 100);
 __PACKAGE__->attr(max_spare_servers                     => 10);
 __PACKAGE__->attr([qw/min_spare_servers start_servers/] => 5);
 
-use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 8192;
+use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 262144;
 
 # Marge? Since I'm not talking to Lisa,
 # would you please ask her to pass me the syrup?
@@ -39,21 +47,6 @@ use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 8192;
 # Lisa, tell your mother to get off my case.
 # Uhhh, dad, Lisa's the one you're not talking to.
 # Bart, go to your room.
-sub accept_lock {
-    my ($self, $blocking) = @_;
-
-    # Idle
-    $self->child_status('idle') if $blocking;
-
-    # Lock
-    my $lock = $self->SUPER::accept_lock($blocking);
-
-    # Busy
-    $self->child_status('busy') if $lock;
-
-    return $lock;
-}
-
 sub child { shift->ioloop->start }
 
 sub child_status {
@@ -96,6 +89,9 @@ sub run {
     # PID file
     $self->prepare_pid_file;
 
+    # Generate lock file name
+    $self->lock_file;
+
     # No windows support
     die "Prefork daemon not available for Windows.\n" if $^O eq 'MSWin32';
 
@@ -106,19 +102,10 @@ sub run {
     $self->{_child_poll}->mask($self->{_child_read}, POLLIN);
 
     # Parent signals
-    my $done = 0;
+    my ($done, $graceful) = 0;
     $SIG{INT} = $SIG{TERM} = sub { $done++ };
     $SIG{CHLD} = sub { $self->_reap_child };
-    $SIG{USR1} = sub {
-
-        # Reload app
-        delete $self->{app};
-        $self->app;
-
-        # Bring all children to a greceful shutdown
-        my $children = $self->{_children} || {};
-        kill 'HUP', $_ for keys %$children;
-    };
+    $SIG{USR1} = sub { $done = $graceful = 1 };
 
     # Preload application
     $self->app;
@@ -142,7 +129,7 @@ sub run {
     }
 
     # Kill em all
-    $self->_kill_children;
+    $self->_kill_children($graceful);
     exit 0;
 }
 
@@ -150,12 +137,12 @@ sub _cleanup_children {
     my $self = shift;
     my $children = $self->{_children} || {};
     for my $pid (keys %$children) {
-        delete $self->_children->{$pid} unless kill 0, $pid;
+        delete $self->{_children}->{$pid} unless kill 0, $pid;
     }
 }
 
 sub _kill_children {
-    my $self = shift;
+    my ($self, $graceful) = @_;
 
     # Close pipe
     $self->{_child_read} = undef;
@@ -167,7 +154,7 @@ sub _kill_children {
         # Die die die
         for my $pid (keys %$children) {
             $self->app->log->debug("Killing prefork child $pid.") if DEBUG;
-            kill 'TERM', $pid;
+            kill $graceful ? 'HUP' : 'TERM', $pid;
         }
 
         # Cleanup
@@ -235,6 +222,41 @@ sub _manage_children {
     }
 }
 
+sub _prepare_lock_file {
+    my $self = shift;
+
+    # Shortcut
+    return unless my $file = $self->lock_file;
+
+    # Create lock file
+    my $fh = IO::File->new("> $file")
+      or croak qq/Can't open lock file "$file"/;
+    $self->{_lock} = $fh;
+
+    # Lock callback
+    my $loop = $self->ioloop;
+    $loop->lock_cb(
+        sub {
+            my $blocking = $_[1];
+
+            # Idle
+            $self->child_status('idle') if $blocking;
+
+            # Lock
+            my $flags = $blocking ? LOCK_EX : LOCK_EX | LOCK_NB;
+            my $lock = flock($self->{_lock}, $flags);
+
+            # Busy
+            $self->child_status('busy') if $lock;
+
+            return $lock;
+        }
+    );
+
+    # Unlock callback
+    $loop->unlock_cb(sub { flock($self->{_lock}, LOCK_UN) });
+}
+
 sub _read_messages {
     my $self = shift;
 
@@ -296,7 +318,7 @@ sub _spawn_child {
     else {
 
         # Prepare environment
-        $self->prepare_lock_file;
+        $self->_prepare_lock_file;
 
         # Signal handlers
         $SIG{HUP} = $SIG{INT} = $SIG{TERM} = sub { exit 0 };
@@ -352,12 +374,13 @@ Mojo::Server::Daemon::Prefork - Preforking HTTP 1.1 And WebSocket Server
 =head1 DESCRIPTION
 
 L<Mojo::Server::Daemon::Prefork> is a full featured preforking HTTP 1.1 and
-WebSocket server using a dynamic worker pool with C<IPv6>, C<TLS>, C<epoll>,
-C<kqueue>, hot deployment, UNIX domain socket sharing and optional async io
-support.
+WebSocket server using a dynamic worker pool with C<IPv6>, C<TLS>,
+C<Bonjour>, C<epoll>, C<kqueue>, hot deployment, UNIX domain socket sharing
+and optional async io support.
 
-Optional modules L<IO::KQueue>, L<IO::Epoll>, L<IO::Socket::INET6> and
-L<IO::Socket::SSL> are supported transparently and used if installed.
+Optional modules L<IO::KQueue>, L<IO::Epoll>, L<IO::Socket::INET6>,
+L<IO::Socket::SSL> and L<Net::Rendezvous::Publish> are supported
+transparently and used if installed.
 
 =head1 ATTRIBUTES
 
@@ -377,6 +400,13 @@ Cleanup interval for workers in seconds, defaults to C<15>.
     $daemon          = $daemon->idle_timeout(30);
 
 Timeout for workers to be idle in seconds, defaults to C<30>.
+
+=head2 C<lock_file>
+
+    my $lock_file = $daemon->lock_file;
+    $daemon       = $daemon->lock_file('/tmp/mojo_daemon.lock');
+
+Path to lock file, defaults to a random temporary file.
 
 =head2 C<max_clients>
 
@@ -426,12 +456,6 @@ Number of workers to spawn at server startup, defaults to C<5>.
 
 L<Mojo::Server::Daemon::Prefork> inherits all methods from
 L<Mojo::Server::Daemon> and implements the following new ones.
-
-=head2 C<accept_lock>
-
-    my $lock = $daemon->accept_lock($blocking);
-
-Try to get the accept lock.
 
 =head2 C<child>
 

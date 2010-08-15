@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Template;
 
 use strict;
@@ -13,7 +11,7 @@ use IO::File;
 use Mojo::ByteStream;
 use Mojo::Exception;
 
-use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 8192;
+use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 262144;
 
 __PACKAGE__->attr([qw/auto_escape compiled namespace/]);
 __PACKAGE__->attr([qw/append code prepend/] => '');

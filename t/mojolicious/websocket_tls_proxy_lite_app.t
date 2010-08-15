@@ -1,16 +1,15 @@
 #!/usr/bin/env perl
 
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 use strict;
 use warnings;
+
+# Disable epoll, kqueue and IPv6
+BEGIN { $ENV{MOJO_POLL} = $ENV{MOJO_NO_IPV6} = 1 }
 
 use Mojo::IOLoop;
 use Test::More;
 
 # Make sure sockets are working
-plan skip_all => 'set TEST_TLS to enable this test (developer only!)'
-  unless $ENV{TEST_TLS};
 plan skip_all => 'IO::Socket::SSL 1.33 required for this test!'
   unless Mojo::IOLoop::TLS;
 plan skip_all => 'working sockets required for this test!'
@@ -21,6 +20,7 @@ plan tests => 16;
 # about being damaged if I'm not?
 # That's like Christina Aguilera singing Spanish.
 # Ooh, wait! That's it! I'll fake it!
+use Mojo::ByteStream 'b';
 use Mojo::Client;
 use Mojo::Server::Daemon;
 use Mojolicious::Lite;
@@ -62,37 +62,29 @@ $server->prepare_ioloop;
 my $c = {};
 my $connected;
 my ($read, $sent, $fail) = 0;
+my $nf = "HTTP/1.1 404 NOT FOUND\x0d\x0aConnection: close\x0d\x0a\x0d\x0a";
+my $ok = "HTTP/1.1 200 OK\x0d\x0aConnection: keep-alive\x0d\x0a\x0d\x0a";
 $loop->listen(
     port    => $proxy,
     read_cb => sub {
         my ($loop, $client, $chunk) = @_;
-        $c->{$client}->{client} ||= '';
-        $c->{$client}->{client} .= $chunk;
         if (my $server = $c->{$client}->{connection}) {
-            $loop->writing($server);
-            return;
+            return $loop->write($server, $chunk);
         }
+        $c->{$client}->{client} = b unless exists $c->{$client}->{client};
+        $c->{$client}->{client}->add_chunk($chunk);
         if ($c->{$client}->{client} =~ /\x0d?\x0a\x0d?\x0a$/) {
-            my $buffer = delete $c->{$client}->{client};
+            my $buffer = $c->{$client}->{client}->empty;
             if ($buffer =~ /CONNECT (\S+):(\d+)?/) {
                 $connected = "$1:$2";
-                if ($2 == $port + 1) {
-                    $fail = 1;
-                    $2    = $port;
-                }
+                $fail = 1 if $2 == $port + 1;
                 my $server = $loop->connect(
                     address    => $1,
-                    port       => $2 || 80,
+                    port       => $fail ? $port : $2,
                     connect_cb => sub {
                         my ($loop, $server) = @_;
                         $c->{$client}->{connection} = $server;
-                        $c->{$client}->{server} =
-                          $fail
-                          ? "HTTP/1.1 404 NOT FOUND\x0d\x0a"
-                          . "Connection: close\x0d\x0a\x0d\x0a"
-                          : "HTTP/1.1 200 OK\x0d\x0a"
-                          . "Connection: keep-alive\x0d\x0a\x0d\x0a";
-                        $loop->writing($client);
+                        $loop->write($client, $fail ? $nf : $ok);
                     },
                     error_cb => sub {
                         shift->drop($client);
@@ -101,26 +93,13 @@ $loop->listen(
                     read_cb => sub {
                         my ($loop, $server, $chunk) = @_;
                         $read += length $chunk;
-                        $c->{$client}->{server} ||= '';
-                        $c->{$client}->{server} .= $chunk;
-                        $loop->writing($client);
-                    },
-                    write_cb => sub {
-                        my ($loop, $server) = @_;
-                        $loop->not_writing($server);
-                        my $chunk = delete $c->{$client}->{client} || '';
                         $sent += length $chunk;
-                        return $chunk;
+                        $loop->write($client, $chunk);
                     }
                 );
             }
             else { $loop->drop($client) }
         }
-    },
-    write_cb => sub {
-        my ($loop, $client) = @_;
-        $loop->not_writing($client);
-        return delete $c->{$client}->{server};
     },
     error_cb => sub {
         my ($self, $client) = @_;
@@ -131,7 +110,8 @@ $loop->listen(
 );
 
 # GET / (normal request)
-is($client->get("https://localhost:$port/")->success->body, 'Hello World!');
+is($client->get("https://localhost:$port/")->success->body,
+    'Hello World!', 'right content');
 
 # WebSocket /test (normal websocket)
 my $result;
@@ -148,18 +128,21 @@ $client->websocket(
         $self->send_message('test1');
     }
 )->process;
-is($result, 'test1test2');
+is($result, 'test1test2', 'right result');
 
-# GET http://kraih.com/proxy (proxy request)
+# GET /proxy (proxy request)
 $client->https_proxy("http://localhost:$proxy");
-is($client->get("https://localhost:$port/")->success->body, 'Hello World!');
+is( $client->get("https://localhost:$port/proxy")->success->body,
+    "https://localhost:$port/proxy",
+    'right content'
+);
 
-# GET http://kraih.com/proxy (kept alive proxy request)
+# GET /proxy (kept alive proxy request)
 $client->https_proxy("http://localhost:$proxy");
-my $tx = $client->build_tx(GET => "https://localhost:$port/");
+my $tx = $client->build_tx(GET => "https://localhost:$port/proxy");
 $client->process($tx);
-is($tx->success->body, 'Hello World!');
-is($tx->kept_alive,    1);
+is($tx->success->body, "https://localhost:$port/proxy", 'right content');
+is($tx->kept_alive, 1, 'kept alive');
 
 # WebSocket /test (kept alive proxy websocket)
 $client->https_proxy("http://localhost:$proxy");
@@ -179,11 +162,11 @@ $client->websocket(
         $self->send_message('test1');
     }
 )->process;
-is($kept_alive, 1);
-is($connected,  "localhost:$port");
-is($result,     'test1test2');
-ok($read > 25);
-ok($sent > 25);
+is($kept_alive, 1,                 'kept alive');
+is($connected,  "localhost:$port", 'connected');
+is($result,     'test1test2',      'right result');
+ok($read > 25, 'read enough');
+ok($sent > 25, 'sent enough');
 
 # WebSocket /test (proxy websocket)
 $client->https_proxy("http://localhost:$proxy");
@@ -201,10 +184,10 @@ $client->websocket(
         $self->send_message('test1');
     }
 )->process;
-is($connected, "localhost:$port");
-is($result,    'test1test2');
-ok($read > 25);
-ok($sent > 25);
+is($connected, "localhost:$port", 'connected');
+is($result,    'test1test2',      'right result');
+ok($read > 25, 'read enough');
+ok($sent > 25, 'sent enough');
 
 # WebSocket /test (proxy websocket with bad target)
 $client->https_proxy("http://localhost:$proxy");
@@ -217,5 +200,5 @@ $client->websocket(
         $error   = $tx->error;
     }
 )->process;
-is($success, undef);
-is($error,   'Proxy connection failed.');
+is($success, undef, 'no success');
+is($error, 'Proxy connection failed.', 'right message');

@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojolicious::Plugin::I18n;
 
 use strict;
@@ -8,9 +6,7 @@ use warnings;
 use base 'Mojolicious::Plugin';
 
 use I18N::LangTags;
-
-# Core module since Perl 5.8.5
-use constant DETECT => eval { require I18N::LangTags::Detect; 1 };
+use I18N::LangTags::Detect;
 
 # Can we have Bender burgers again?
 # No, the cat shelter’s onto me.
@@ -23,8 +19,13 @@ sub register {
     # Namespace
     my $namespace = $conf->{namespace} || ((ref $app) . "::I18N");
 
+    # Default
+    my $default = $conf->{default} || 'en';
+
     # Initialize
     eval "package $namespace; use base 'Locale::Maketext'; 1;";
+    eval "package ${namespace}::$default; use base '$namespace';"
+      . 'our %Lexicon = (_AUTO => 1); 1;';
     die qq/Couldn't initialize I18N class "$namespace": $@/ if $@;
 
     # Start timer
@@ -32,15 +33,12 @@ sub register {
         before_dispatch => sub {
             my ($self, $c) = @_;
 
-            # Languages
-            my @languages = ('en');
-
             # Header detection
-            @languages = I18N::LangTags::implicate_supers(
+            my @languages = I18N::LangTags::implicate_supers(
                 I18N::LangTags::Detect->http_accept_langs(
                     scalar $c->req->headers->accept_language
                 )
-            ) if DETECT;
+            );
 
             # Handler
             $c->stash->{i18n} =
@@ -48,7 +46,7 @@ sub register {
                 _namespace => $namespace);
 
             # Languages
-            $c->stash->{i18n}->languages(@languages);
+            $c->stash->{i18n}->languages(@languages, $default);
         }
     );
 
@@ -66,36 +64,32 @@ package Mojolicious::Plugin::I18n::_Handler;
 
 use base 'Mojo::Base';
 
-__PACKAGE__->attr([qw/_handle _language _namespace/]);
-
 sub languages {
     my ($self, @languages) = @_;
 
     # Shortcut
-    return $self->_language unless @languages;
+    return $self->{_language} unless @languages;
 
     # Namespace
-    my $namespace = $self->_namespace;
+    my $namespace = $self->{_namespace};
 
     # Handle
     if (my $handle = $namespace->get_handle(@languages)) {
-        $self->_handle($handle);
-        $self->_language($handle->language_tag);
+        $handle->fail_with(sub { $_[1] });
+        $self->{_handle}   = $handle;
+        $self->{_language} = $handle->language_tag;
     }
-    else { $self->_language('en') }
 
     return $self;
 }
 
 sub localize {
     my $self = shift;
+    my $key  = shift;
 
     # Localize
-    my $handle = $self->_handle;
-    return $handle->maketext(@_) if $handle;
-
-    # Pass through
-    return join '', @_;
+    return $key unless my $handle = $self->{_handle};
+    return $handle->maketext($key, @_);
 }
 
 1;
@@ -128,6 +122,44 @@ Mojolicious::Plugin::I18n - Intenationalization Plugin
 
 L<Mojolicous::Plugin::I18n> adds L<Locale::Maketext> support to
 L<Mojolicious>.
+All you have to do besides using this plugin is to add as many lexicon
+classes as you need.
+Languages can usually be detected automatically from the C<Accept-Languages>
+request header.
+
+=head2 Options
+
+=over 4
+
+=item default
+
+    # Mojolicious::Lite
+    plugin i18n => {default => 'en'};
+
+=item namespace
+
+    # Mojolicious::Lite
+    plugin i18n => {namespace => 'MyApp::I18N'};
+
+=back
+
+=head2 Helpers
+
+=over 4
+
+=item l
+
+    <%=l 'hello' %>
+
+Translate sentence.
+
+=item languages
+
+    <% languages 'de'; %>
+
+Change languages.
+
+=back
 
 =head1 METHODS
 

@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Test::Mojo;
 
 use strict;
@@ -9,6 +7,7 @@ use base 'Mojo::Base';
 
 use Mojo::ByteStream 'b';
 use Mojo::Client;
+use Mojo::Message::Response;
 
 require Test::More;
 
@@ -22,6 +21,9 @@ __PACKAGE__->attr(max_redirects => 0);
 sub content_is {
     my ($self, $value, $desc) = @_;
 
+    # Description
+    $desc ||= 'exact match for content';
+
     # Transaction
     my $tx = $self->tx;
 
@@ -34,6 +36,9 @@ sub content_is {
 
 sub content_like {
     my ($self, $regex, $desc) = @_;
+
+    # Description
+    $desc ||= 'content is similar';
 
     # Transaction
     my $tx = $self->tx;
@@ -49,20 +54,24 @@ sub content_like {
 # Everybody wears white shirts.
 # I'm not popular enough to be different.
 sub content_type_is {
-    my ($self, $type, $desc) = @_;
+    my ($self, $type) = @_;
 
     # Transaction
     my $tx = $self->tx;
 
     # Test
     local $Test::Builder::Level = $Test::Builder::Level + 1;
-    Test::More::is($tx->res->headers->content_type, $type, $desc);
+    Test::More::is($tx->res->headers->content_type,
+        $type, "Content-Type: $type");
 
     return $self;
 }
 
 sub content_type_like {
     my ($self, $regex, $desc) = @_;
+
+    # Description
+    $desc ||= 'Content-Type is similar';
 
     # Transaction
     my $tx = $self->tx;
@@ -78,24 +87,42 @@ sub content_type_like {
 # If my plant pollutes the water and poisons the town,
 # by your logic, that would make me a criminal.
 sub delete_ok { shift->_request_ok('delete', @_) }
-sub get_ok    { shift->_request_ok('get',    @_) }
-sub head_ok   { shift->_request_ok('head',   @_) }
+
+sub element_exists {
+    my ($self, $selector, $desc) = @_;
+
+    # Description
+    $desc ||= $selector;
+
+    # Test
+    local $Test::Builder::Level = $Test::Builder::Level + 1;
+    Test::More::ok($self->tx->res->dom->at($selector), $desc);
+
+    return $self;
+}
+
+sub get_ok  { shift->_request_ok('get',  @_) }
+sub head_ok { shift->_request_ok('head', @_) }
 
 sub header_is {
-    my ($self, $name, $value, $desc) = @_;
+    my ($self, $name, $value) = @_;
 
     # Transaction
     my $tx = $self->tx;
 
     # Test
     local $Test::Builder::Level = $Test::Builder::Level + 1;
-    Test::More::is($tx->res->headers->header($name), $value, $desc);
+    Test::More::is($tx->res->headers->header($name),
+        $value, "$name: " . ($value ? $value : ''));
 
     return $self;
 }
 
 sub header_like {
     my ($self, $name, $regex, $desc) = @_;
+
+    # Description
+    $desc ||= "$name is similar";
 
     # Transaction
     my $tx = $self->tx;
@@ -109,6 +136,9 @@ sub header_like {
 
 sub json_content_is {
     my ($self, $struct, $desc) = @_;
+
+    # Description
+    $desc ||= 'exact match for JSON structure';
 
     # Transaction
     my $tx = $self->tx;
@@ -126,9 +156,11 @@ sub post_ok { shift->_request_ok('post', @_) }
 # Hey, I asked for ketchup! I'm eatin' salad here!
 sub post_form_ok {
     my $self = shift;
+    my $url  = $_[0];
 
     # Description
-    my $desc = ref $_[-1] ? undef : pop @_;
+    my $desc = "post $url";
+    utf8::encode $desc;
 
     # Client
     my $client = $self->client;
@@ -163,11 +195,53 @@ sub reset_session {
 
 # Internet! Is that thing still around?
 sub status_is {
-    my ($self, $status, $desc) = @_;
+    my ($self, $status) = @_;
+
+    # Description
+    my $message =
+      Mojo::Message::Response->new(code => $status)->default_message;
 
     # Test
     local $Test::Builder::Level = $Test::Builder::Level + 1;
-    Test::More::is($self->tx->res->code, $status, $desc);
+    Test::More::is($self->tx->res->code, $status, "$status $message");
+
+    return $self;
+}
+
+sub text_is {
+    my ($self, $selector, $value, $desc) = @_;
+
+    # Description
+    $desc ||= $selector;
+
+    # Text
+    my $text;
+    if (my $element = $self->tx->res->dom->at($selector)) {
+        $text = $element->text;
+    }
+
+    # Test
+    local $Test::Builder::Level = $Test::Builder::Level + 1;
+    Test::More::is($text, $value, $desc);
+
+    return $self;
+}
+
+sub text_like {
+    my ($self, $selector, $regex, $desc) = @_;
+
+    # Description
+    $desc ||= $selector;
+
+    # Text
+    my $text;
+    if (my $element = $self->tx->res->dom->at($selector)) {
+        $text = $element->text;
+    }
+
+    # Test
+    local $Test::Builder::Level = $Test::Builder::Level + 1;
+    Test::More::like($text, $regex, $desc);
 
     return $self;
 }
@@ -188,13 +262,14 @@ sub _get_content {
 
 # Are you sure this is the Sci-Fi Convention? It's full of nerds!
 sub _request_ok {
-    my ($self, $method, $url, $headers, $body, $desc) = @_;
+    my ($self, $method, $url, $headers, $body) = @_;
+
+    # Description
+    my $desc = "$method $url";
+    utf8::encode $desc;
 
     # Body without headers
-    if (!ref $headers && @_ > 3) {
-        $desc = $body;
-        $body = $headers;
-    }
+    $body = $headers if !ref $headers && @_ > 3;
     $headers = {} if !ref $headers;
 
     # Client
@@ -208,7 +283,7 @@ sub _request_ok {
 
     # Test
     local $Test::Builder::Level = $Test::Builder::Level + 2;
-    Test::More::ok($self->tx->is_finished, $desc);
+    Test::More::ok($self->tx->is_done, $desc);
 
     return $self;
 }
@@ -299,7 +374,6 @@ Check response content for similar match.
 =head2 C<content_type_is>
 
     $t = $t->content_type_is('text/html');
-    $t = $t->content_type_is('text/html', 'right content type!');
 
 Check response content type for exact match.
 
@@ -313,59 +387,48 @@ Check response content type for similar match.
 =head2 C<delete_ok>
 
     $t = $t->delete_ok('/foo');
-    $t = $t->delete_ok('/foo', {Expect => '100-continue'});
-    $t = $t->delete_ok('/foo', 'Hi there!');
-    $t = $t->delete_ok('/foo', {Expect => '100-continue'}, 'Hi there!');
-    $t = $t->delete_ok(
-       '/foo',
-       {Expect => '100-continue'},
-       'Hi there!',
-       'request worked!'
-    );
+    $t = $t->delete_ok('/foo', {Expect => 'fun'});
+    $t = $t->delete_ok('/foo', 'Hi!');
+    $t = $t->delete_ok('/foo', {Expect => 'fun'}, 'Hi!');
 
 Perform a C<DELETE> request.
+
+=head2 C<element_exists>
+
+    $t = $t->element_exists('div.foo[x=y]');
+    $t = $t->element_exists('html head title', 'has a title');
+
+Checks for existence of the CSS3 selectors XML/HTML element.
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<get_ok>
 
     $t = $t->get_ok('/foo');
-    $t = $t->get_ok('/foo', {Expect => '100-continue'});
-    $t = $t->get_ok('/foo', 'Hi there!');
-    $t = $t->get_ok('/foo', {Expect => '100-continue'}, 'Hi there!');
-    $t = $t->get_ok(
-        '/foo',
-        {Expect => '100-continue'},
-        'Hi there!',
-        'request worked!'
-    );
+    $t = $t->get_ok('/foo', {Expect => 'fun'});
+    $t = $t->get_ok('/foo', 'Hi!');
+    $t = $t->get_ok('/foo', {Expect => 'fun'}, 'Hi!');
 
 Perform a C<GET> request.
 
 =head2 C<head_ok>
 
     $t = $t->head_ok('/foo');
-    $t = $t->head_ok('/foo', {Expect => '100-continue'});
-    $t = $t->head_ok('/foo', 'Hi there!');
-    $t = $t->head_ok('/foo', {Expect => '100-continue'}, 'Hi there!');
-    $t = $t->head_ok(
-        '/foo',
-        {Expect => '100-continue'},
-        'Hi there!',
-        'request worked!'
-    );
+    $t = $t->head_ok('/foo', {Expect => 'fun'});
+    $t = $t->head_ok('/foo', 'Hi!');
+    $t = $t->head_ok('/foo', {Expect => 'fun'}, 'Hi!');
 
 Perform a C<HEAD> request.
 
 =head2 C<header_is>
 
-    $t = $t->header_is(Expect => '100-continue');
-    $t = $t->header_is(Expect => '100-continue', 'right header!');
+    $t = $t->header_is(Expect => 'fun');
 
 Check response header for exact match.
 
 =head2 C<header_like>
 
-    $t = $t->header_like(Expect => qr/100-continue/);
-    $t = $t->header_like(Expect => qr/100-continue/, 'right header!');
+    $t = $t->header_like(Expect => qr/fun/);
+    $t = $t->header_like(Expect => qr/fun/, 'right header!');
 
 Check response header for similar match.
 
@@ -379,16 +442,10 @@ Check response content for JSON data.
 =head2 C<post_ok>
 
     $t = $t->post_ok('/foo');
-    $t = $t->post_ok('/foo', {Expect => '100-continue'});
-    $t = $t->post_ok('/foo', 'Hi there!');
-    $t = $t->post_ok('/foo', {Expect => '100-continue'}, 'Hi there!');
-    $t = $t->post_ok('/foo', 'Hi there!', 'request worked!');
-    $t = $t->post_ok(
-        '/foo',
-        {Expect => '100-continue'},
-        'Hi there!',
-        'request worked!'
-    );
+    $t = $t->post_ok('/foo', {Expect => 'fun'});
+    $t = $t->post_ok('/foo', 'Hi!');
+    $t = $t->post_ok('/foo', {Expect => 'fun'}, 'Hi!');
+    $t = $t->post_ok('/foo', 'Hi!', 'request worked!');
 
 Perform a C<POST> request.
 
@@ -396,27 +453,17 @@ Perform a C<POST> request.
 
     $t = $t->post_form_ok('/foo' => {test => 123});
     $t = $t->post_form_ok('/foo' => 'UTF-8' => {test => 123});
-    $t = $t->post_form_ok('/foo', {test => 123}, {Expect => '100-continue'});
-    $t = $t->post_form_ok(
-        '/foo',
-        'UTF-8',
-        {test => 123},
-        {Expect => '100-continue'}
-    );
-    $t = $t->post_form_ok('/foo', {test => 123}, 'Hi there!');
-    $t = $t->post_form_ok('/foo', 'UTF-8', {test => 123}, 'Hi there!');
-    $t = $t->post_form_ok(
-        '/foo',
-        {test   => 123},
-        {Expect => '100-continue'},
-        'Hi there!'
-    );
+    $t = $t->post_form_ok('/foo', {test => 123}, {Expect => 'fun'});
+    $t = $t->post_form_ok('/foo', 'UTF-8', {test => 123}, {Expect => 'fun'});
+    $t = $t->post_form_ok('/foo', {test => 123}, 'Hi!');
+    $t = $t->post_form_ok('/foo', 'UTF-8', {test => 123}, 'Hi!');
+    $t = $t->post_form_ok('/foo', {test   => 123}, {Expect => 'fun'}, 'Hi!');
     $t = $t->post_form_ok(
         '/foo',
         'UTF-8',
         {test   => 123},
-        {Expect => '100-continue'},
-        'Hi there!'
+        {Expect => 'fun'},
+        'Hi!'
     );
 
 Submit a C<POST> form.
@@ -424,15 +471,9 @@ Submit a C<POST> form.
 =head2 C<put_ok>
 
     $t = $t->put_ok('/foo');
-    $t = $t->put_ok('/foo', {Expect => '100-continue'});
-    $t = $t->put_ok('/foo', 'Hi there!');
-    $t = $t->put_ok('/foo', {Expect => '100-continue'}, 'Hi there!');
-    $t = $t->put_ok(
-        '/foo',
-        {Expect => '100-continue'},
-        'Hi there!',
-        'request worked!'
-    );
+    $t = $t->put_ok('/foo', {Expect => 'fun'});
+    $t = $t->put_ok('/foo', 'Hi!');
+    $t = $t->put_ok('/foo', {Expect => 'fun'}, 'Hi!');
 
 Perform a C<PUT> request.
 
@@ -445,9 +486,24 @@ Reset user agent session.
 =head2 C<status_is>
 
     $t = $t->status_is(200);
-    $t = $t->status_is(200, 'right status!');
 
 Check response status for exact match.
+
+=head2 C<text_is>
+
+    $t = $t->text_is('div.foo[x=y]' => 'Hello!');
+    $t = $t->text_is('html head title' => 'Hello!', 'right title');
+
+Checks text content of the CSS3 selectors XML/HTML element for exact match.
+Note that this method is EXPERIMENTAL and might change without warning!
+
+=head2 C<text_like>
+
+    $t = $t->text_like('div.foo[x=y]' => qr/Hello/);
+    $t = $t->text_like('html head title' => qr/Hello/, 'right title');
+
+Checks text content of the CSS3 selectors XML/HTML element for similar match.
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head1 SEE ALSO
 

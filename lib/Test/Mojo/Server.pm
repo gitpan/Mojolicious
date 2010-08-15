@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Test::Mojo::Server;
 
 use strict;
@@ -19,8 +17,9 @@ require Test::More;
 use constant DEBUG => $ENV{MOJO_SERVER_DEBUG} || 0;
 
 __PACKAGE__->attr([qw/command pid/]);
+__PACKAGE__->attr(delay      => 1);
 __PACKAGE__->attr(executable => 'mojo');
-__PACKAGE__->attr(home => sub { Mojo::Home->new });
+__PACKAGE__->attr(home       => sub { Mojo::Home->new });
 __PACKAGE__->attr(port    => sub { Mojo::IOLoop->singleton->generate_port });
 __PACKAGE__->attr(timeout => 5);
 
@@ -28,89 +27,90 @@ __PACKAGE__->attr(timeout => 5);
 # Mr Gumble, this is a girl scouts meeting.
 # Is it, or is it you girls can't admit that you have a problem?
 sub find_executable_ok {
-    my ($self, $desc) = @_;
+    my $self = shift;
     my $path = $self->_find_executable;
     local $Test::Builder::Level = $Test::Builder::Level + 1;
-    Test::More::ok($path ? 1 : 0, $desc);
+    Test::More::ok($path ? 1 : 0, 'executable found');
     return $path;
 }
 
 sub generate_port_ok {
-    my ($self, $desc) = @_;
+    my $self = shift;
 
     local $Test::Builder::Level = $Test::Builder::Level + 1;
 
     my $port = Mojo::IOLoop->singleton->generate_port;
     if ($port) {
-        Test::More::ok(1, $desc);
+        Test::More::ok(1, 'port generated');
         return $port;
     }
 
-    Test::More::ok(0, $desc);
+    Test::More::ok(0, 'port generated');
     return;
 }
 
 sub server_ok {
-    my ($self, $desc) = @_;
+    my $self = shift;
 
     local $Test::Builder::Level = $Test::Builder::Level + 1;
 
     # Not running
     unless ($self->port) {
-        return Test::More::ok(0, $desc);
+        return Test::More::ok(0, 'server still running');
     }
 
     # Test
     my $ok = $self->_check_server(1) ? 1 : 0;
-    Test::More::ok($ok, $desc);
+    Test::More::ok($ok, 'server still running');
 }
 
 sub start_daemon_ok {
-    my ($self, $desc) = @_;
+    my $self = shift;
 
     local $Test::Builder::Level = $Test::Builder::Level + 1;
 
     # Port
     my $port = $self->port;
-    return Test::More::ok(0, $desc) unless $port;
+    return Test::More::ok(0, 'server started') unless $port;
 
     # Path
     my $path = $self->_find_executable;
-    return Test::More::ok(0, $desc) unless $path;
+    return Test::More::ok(0, 'server started') unless $path;
 
     # Prepare command
-    $self->command(qq/$^X "$path" daemon --listen http:\/\/*:$port/);
+    $self->command([$^X, $path, 'daemon', '--listen', "http:\/\/*:$port"]);
 
-    return $self->start_server_ok($desc);
+    return $self->start_server_ok;
 }
 
 sub start_daemon_prefork_ok {
-    my ($self, $desc) = @_;
+    my $self = shift;
 
     local $Test::Builder::Level = $Test::Builder::Level + 1;
 
     # Port
     my $port = $self->port;
-    return Test::More::ok(0, $desc) unless $port;
+    return Test::More::ok(0, 'server started') unless $port;
 
     # Path
     my $path = $self->_find_executable;
-    return Test::More::ok(0, $desc) unless $path;
+    return Test::More::ok(0, 'server started') unless $path;
 
     # Prepare command
-    $self->command(qq/$^X "$path" daemon_prefork --listen http:\/\/*:$port/);
+    $self->command(
+        [$^X, $path, 'daemon_prefork', '--listen', "http:\/\/*:$port"]);
 
-    return $self->start_server_ok($desc);
+    return $self->start_server_ok;
 }
 
 sub start_server_ok {
-    my ($self, $desc) = @_;
+    my $self = shift;
 
     local $Test::Builder::Level = $Test::Builder::Level + 1;
 
     # Start server
     my $pid = $self->_start_server;
-    return Test::More::ok(0, $desc) unless $pid;
+    return Test::More::ok(0, 'server started') unless $pid;
 
     # Wait for server
     my $timeout     = $self->timeout;
@@ -121,7 +121,7 @@ sub start_server_ok {
         $timeout -= time - $time_before;
         if ($timeout <= 0) {
             $self->_stop_server;
-            return Test::More::ok(0, $desc);
+            return Test::More::ok(0, 'server started');
         }
 
         # Wait
@@ -129,39 +129,39 @@ sub start_server_ok {
     }
 
     # Done
-    Test::More::ok(1, $desc);
+    Test::More::ok(1, 'server started');
 
     return $self->port;
 }
 
 sub start_server_untested_ok {
-    my ($self, $desc) = @_;
+    my $self = shift;
 
     local $Test::Builder::Level = $Test::Builder::Level + 1;
 
     # Start server
-    my $pid = $self->_start_server($desc);
-    return Test::More::ok(0, $desc) unless $pid;
+    my $pid = $self->_start_server;
+    return Test::More::ok(0, 'server started') unless $pid;
 
     # Done
-    Test::More::ok(1, $desc);
+    Test::More::ok(1, 'server started');
 
     return $self->port;
 }
 
 sub stop_server_ok {
-    my ($self, $desc) = @_;
+    my $self = shift;
 
     local $Test::Builder::Level = $Test::Builder::Level + 1;
 
     # Running
     unless ($self->pid && kill 0, $self->pid) {
-        return Test::More::ok(0, $desc);
+        return Test::More::ok(0, 'server stopped');
     }
 
     # Debug
     if (DEBUG) {
-        sysread $self->{_server}, my $buffer, 8192;
+        sysread $self->{_server}, my $buffer, 262144;
         warn "\nSERVER STDOUT: $buffer\n";
     }
 
@@ -174,15 +174,19 @@ sub stop_server_ok {
             sleep 1;
         }
         else {
-            Test::More::ok(1, $desc);
+            Test::More::ok(1, 'server stopped');
             return;
         }
     }
-    Test::More::ok(0, $desc);
+    Test::More::ok(0, 'server stopped');
 }
 
 sub _check_server {
     my $self = shift;
+
+    # Delay
+    my $delay = $self->delay;
+    sleep $delay if $delay;
 
     # Create socket
     my $server = IO::Socket::INET->new(
@@ -231,11 +235,12 @@ sub _find_executable {
 sub _start_server {
     my $self = shift;
 
+    # Command
     my $command = $self->command;
-    warn "\nSERVER COMMAND: $command\n" if DEBUG;
+    my @command = ref $command eq 'ARRAY' ? @$command : $command;
 
     # Run server
-    my $pid = open($self->{_server}, "$command |");
+    my $pid = open $self->{_server}, '-|', @command;
     $self->pid($pid);
 
     # Process started
@@ -283,9 +288,17 @@ L<Test::Mojo::Server> implements the following attributes.
 =head2 C<command>
 
     my $command = $server->command;
-    $server     = $server->command("lighttpd -D -f $config");
+    $server     = $server->command("/usr/sbin/httpd -X -f 'x.cfg'");
+    $server     = $server->command(['/usr/sbin/httpd', '-X', '-f', 'x.cfg']);
 
 Command for external server start.
+
+=head2 C<delay>
+
+    my $delay = $server->delay;
+    $server   = $server->delay(2);
+
+Time to wait between server checks in seconds, defaults to C<1>.
 
 =head2 C<executable>
 
@@ -335,48 +348,46 @@ Construct a new L<Test::Mojo::Server> object.
 =head2 C<find_executable_ok>
 
     my $path = $server->find_executable_ok;
-    my $path = $server->find_executable_ok('executable found');
 
 Try to find L<Mojo> executable.
 
 =head2 C<generate_port_ok>
 
     my $port = $server->generate_port_ok;
-    my $port = $server->generate_port_ok('port test');
 
 =head2 C<server_ok>
 
-    $server->server_ok('server running');
+    $server->server_ok;
 
 Check if server is still running.
 
 =head2 C<start_daemon_ok>
 
-    my $port = $server->start_daemon_ok('daemon test');
+    my $port = $server->start_daemon_ok;
 
 Start external L<Mojo::Server::Daemon> server.
 
 =head2 C<start_daemon_prefork_ok>
 
-    my $port = $server->start_daemon_prefork_ok('prefork daemon test');
+    my $port = $server->start_daemon_prefork_ok;
 
 Start external L<Mojo::Server::Daemon::Prefork> server.
 
 =head2 C<start_server_ok>
 
-    my $port = $server->start_server_ok('server test');
+    my $port = $server->start_server_ok;
 
 Start external server.
 
 =head2 C<start_server_untested_ok>
 
-    my $port = $server->start_server_untested_ok('server test');
+    my $port = $server->start_server_untested_ok;
 
 Start external server without testing the port.
 
 =head2 C<stop_server_ok>
 
-    $server->stop_server_ok('server stopped');
+    $server->stop_server_ok;
 
 Stop external server.
 

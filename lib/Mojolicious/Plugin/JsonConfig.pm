@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojolicious::Plugin::JsonConfig;
 
 use strict;
@@ -32,7 +30,7 @@ sub register {
         $file =~ s/(?:\.p(?:l|6))|\.t$//i;
 
         # Default extension
-        $file .= '.json';
+        $file .= '.' . ($conf->{ext} || 'json');
     }
 
     # Absolute path
@@ -62,15 +60,21 @@ sub register {
     # Merge
     $config = {%{$conf->{default}}, %$config} if $conf->{default};
 
-    # Add hook
-    $app->plugins->add_hook(
-        before_dispatch => sub {
-            my ($self, $c) = @_;
+    # Default
+    $app->defaults($stash_key => $config);
 
-            # Stash
-            $c->stash($stash_key => $config);
-        }
-    );
+    return $config;
+}
+
+sub _parse_config {
+    my ($self, $encoded, $name) = @_;
+
+    # Parse
+    my $json   = Mojo::JSON->new;
+    my $config = $json->decode($encoded);
+    my $error  = $json->error;
+    die qq/Couldn't parse config "$name": $error/ if !$config && $error;
+    die qq/Invalid config "$name"./ if !$config || ref $config ne 'HASH';
 
     return $config;
 }
@@ -86,6 +90,14 @@ sub _read_config {
       or die qq/Couldn't open config file "$file": $!/;
     my $encoded = do { local $/; <FILE> };
     close FILE;
+
+    # Process
+    $encoded = $self->_render_config($encoded, $template, $app);
+    return $self->_parse_config($encoded, $file, $app);
+}
+
+sub _render_config {
+    my ($self, $encoded, $template, $app) = @_;
 
     # Instance
     my $prepend = 'my $app = shift;';
@@ -105,14 +117,7 @@ sub _read_config {
     $encoded = $mt->render($encoded, $app);
     utf8::encode $encoded;
 
-    # Parse
-    my $json   = Mojo::JSON->new;
-    my $config = $json->decode($encoded);
-    my $error  = $json->error;
-    die qq/Couldn't parse config file "$file": $error/ if !$config && $error;
-    die qq/Invalid config file "$file"./ if !$config || ref $config ne 'HASH';
-
-    return $config;
+    return $encoded;
 }
 
 1;
@@ -152,14 +157,23 @@ preprocesses it's input with L<Mojo::Template>.
 
 The application object can be accessed via C<$app> or the C<app> helper.
 
-=head1 OPTIONS
+=head2 Options
 
-=head2 C<default>
+=over 4
+
+=item default
 
     # Mojolicious::Lite
     plugin json_config => {default => {foo => 'bar'}};
 
-=head2 C<file>
+=item ext
+
+    # Mojolicious::Lite
+    plugin json_config => {ext => 'conf'};
+
+File extension of config file, defaults to C<json>.
+
+=item file
 
     # Mojolicious::Lite
     plugin json_config => {file => 'myapp.conf'};
@@ -167,15 +181,17 @@ The application object can be accessed via C<$app> or the C<app> helper.
 
 By default C<myapp.json> is searched in the application home directory.
 
-=head2 C<stash_key>
+=item stash_key
 
     # Mojolicious::Lite
     plugin json_config => {stash_key => 'conf'};
 
-=head2 C<template>
+=item template
 
     # Mojolicious::Lite
     plugin json_config => {template => {line_start => '.'}};
+
+=back
 
 =head1 METHODS
 

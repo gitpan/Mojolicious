@@ -1,20 +1,13 @@
 #!/usr/bin/env perl
 
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 use strict;
 use warnings;
 
-use Cwd 'getcwd';
+use File::Basename 'dirname';
 use File::Spec;
-use FindBin;
 
-# Dist
-use lib "$FindBin::Bin/lib";
-use lib "$FindBin::Bin/../lib";
-
-# App
-use lib join '/', File::Spec->splitdir(getcwd), 'lib';
+use lib join '/', File::Spec->splitdir(dirname(__FILE__)), 'lib';
+use lib join '/', File::Spec->splitdir(dirname(__FILE__)), '..', 'lib';
 
 # Check if Mojo is installed
 eval 'use Mojolicious::Commands';
@@ -26,6 +19,8 @@ EOF
 
 # Start the command system
 Mojolicious::Commands->start;
+
+__END__
 
 =head1 NAME
 

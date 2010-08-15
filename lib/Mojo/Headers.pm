@@ -1,23 +1,19 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Headers;
 
 use strict;
 use warnings;
 
-use base 'Mojo::Stateful';
+use base 'Mojo::Base';
 use overload '""' => sub { shift->to_string }, fallback => 1;
 
 use Mojo::ByteStream;
 
 __PACKAGE__->attr(buffer => sub { Mojo::ByteStream->new });
 
-# Filter regex
-my $FILTER_RE = qr/[[:cntrl:]\(\|\)\<\>\@\,\;\:\\\"\/\[\]\?\=\{\}\s]/;
-
+# Headers
 my @GENERAL_HEADERS = qw/
-  Cache-Control
   Connection
+  Cache-Control
   Date
   Pragma
   Trailer
@@ -78,57 +74,35 @@ my @WEBSOCKET_HEADERS = qw/
   Sec-WebSocket-Location
   Sec-WebSocket-Protocol
   /;
+my @HEADERS = (
+    @GENERAL_HEADERS, @REQUEST_HEADERS, @RESPONSE_HEADERS,
+    @ENTITY_HEADERS,  @WEBSOCKET_HEADERS
+);
 
-my (%ORDERED_HEADERS, %NORMALCASE_HEADERS);
-{
-    my $i       = 1;
-    my @headers = (
-        @GENERAL_HEADERS, @REQUEST_HEADERS, @RESPONSE_HEADERS,
-        @ENTITY_HEADERS,  @WEBSOCKET_HEADERS
-    );
-    for my $name (@headers) {
-        my $lowercase = lc $name;
-        $ORDERED_HEADERS{$lowercase}    = $i;
-        $NORMALCASE_HEADERS{$lowercase} = $name;
-        $i++;
-    }
+# Lower case headers
+my %NORMALCASE_HEADERS;
+for my $name (@HEADERS) {
+    my $lowercase = lc $name;
+    $NORMALCASE_HEADERS{$lowercase} = $name;
 }
 
 sub accept_language { shift->header('Accept-Language' => @_) }
+sub accept_ranges   { shift->header('Accept-Ranges'   => @_) }
 sub authorization   { shift->header('Authorization'   => @_) }
 
 sub add {
     my $self = shift;
     my $name = shift;
 
-    # Filter illegal characters from header name
-    # (1*<any CHAR except CTLs or separators>)
-    $name =~ s/$FILTER_RE//go;
-
     # Make sure we have a normal case entry for name
     my $lcname = lc $name;
-    unless ($NORMALCASE_HEADERS{$lcname}) {
-        $NORMALCASE_HEADERS{$lcname} = $name;
-    }
+    $NORMALCASE_HEADERS{$lcname} = $name
+      unless exists $NORMALCASE_HEADERS{$lcname};
     $name = $lcname;
 
-    # Filter values
-    my @values;
-    for my $v (@_) {
-        push @values, [];
-
-        for my $value (@{ref $v eq 'ARRAY' ? $v : [$v]}) {
-
-            # Filter control characters
-            $value = '' unless defined $value;
-            $value =~ s/[[:cntrl:]]//g;
-
-            push @{$values[-1]}, $value;
-        }
-    }
-
-    # Add line
-    push @{$self->{_headers}->{$name}}, @values;
+    # Add lines
+    push @{$self->{_headers}->{$name}}, (ref $_ || '') eq 'ARRAY' ? $_ : [$_]
+      for @_;
 
     return $self;
 }
@@ -155,6 +129,7 @@ sub build {
 sub connection          { shift->header(Connection            => @_) }
 sub content_disposition { shift->header('Content-Disposition' => @_) }
 sub content_length      { shift->header('Content-Length'      => @_) }
+sub content_range       { shift->header('Content-Range'       => @_) }
 
 sub content_transfer_encoding {
     shift->header('Content-Transfer-Encoding' => @_);
@@ -216,24 +191,23 @@ sub header {
     return @$headers;
 }
 
-sub host     { shift->header(Host     => @_) }
-sub location { shift->header(Location => @_) }
+sub host { shift->header(Host => @_) }
+sub if_modified_since { shift->header('If-Modified-Since' => @_) }
+
+sub is_done {
+    return 1 if (shift->{_state} || '') eq 'done';
+    return;
+}
+
+sub last_modified { shift->header('Last-Modified' => @_) }
+sub location      { shift->header(Location        => @_) }
 
 sub names {
     my $self = shift;
 
-    # Names
-    my @names = keys %{$self->{_headers}};
-
-    # Sort
-    @names = sort {
-        ($ORDERED_HEADERS{$a} || 999) <=> ($ORDERED_HEADERS{$b} || 999)
-          || $a cmp $b
-    } @names;
-
     # Normal case
     my @headers;
-    for my $name (@names) {
+    for my $name (keys %{$self->{_headers}}) {
         push @headers, $NORMALCASE_HEADERS{$name} || $name;
     }
 
@@ -251,20 +225,14 @@ sub parse {
     # Parse headers
     my $buffer = $self->buffer;
     my $headers = $self->{_buffer} || [];
-    $self->state('headers') if $self->is_state('start');
-    while (1) {
-
-        # Line
-        my $line = $buffer->get_line;
-        last unless defined $line;
+    $self->{_state} = 'headers';
+    while (defined(my $line = $buffer->get_line)) {
 
         # New header
         if ($line =~ /^(\S+)\s*:\s*(.*)/) { push @$headers, $1, $2 }
 
         # Multiline
-        elsif (@$headers && $line =~ s/^\s+//) {
-            $headers->[-1] .= " " . $line;
-        }
+        elsif (@$headers && $line =~ s/^\s+//) { $headers->[-1] .= " $line" }
 
         # Empty line
         else {
@@ -275,7 +243,7 @@ sub parse {
             }
 
             # Done
-            $self->done;
+            $self->{_state}  = 'done';
             $self->{_buffer} = [];
             return $buffer;
         }
@@ -287,6 +255,7 @@ sub parse {
 
 sub proxy_authenticate  { shift->header('Proxy-Authenticate'  => @_) }
 sub proxy_authorization { shift->header('Proxy-Authorization' => @_) }
+sub range               { shift->header(Range                 => @_) }
 sub referrer            { shift->header(Referer               => @_) }
 
 sub remove {
@@ -361,8 +330,7 @@ L<Mojo::Headers> is a container and parser for HTTP headers.
 
 =head1 ATTRIBUTES
 
-L<Mojo::Headers> inherits all attributes from L<Mojo::Stateful> and
-implements the following new ones.
+L<Mojo::Headers> implements the following attributes.
 
 =head2 C<buffer>
 
@@ -374,8 +342,8 @@ object.
 
 =head1 METHODS
 
-L<Mojo::Headers> inherits all methods from L<Mojo::Stateful> and implements
-the following new ones.
+L<Mojo::Headers> inherits all methods from L<Mojo::Base> and implements the
+following new ones.
 
 =head2 C<accept_language>
 
@@ -383,6 +351,13 @@ the following new ones.
     $headers            = $headers->accept_language('de, en');
 
 Shortcut for the C<Accept-Language> header.
+
+=head2 C<accept_ranges>
+
+    my $ranges = $headers->accept_ranges;
+    $headers   = $headers->accept_ranges('bytes');
+
+Shortcut for the C<Accept-Ranges> header.
 
 =head2 C<add>
 
@@ -427,6 +402,13 @@ Shortcut for the C<Content-Disposition> header.
     $headers           = $headers->content_length(4000);
 
 Shortcut for the C<Content-Length> header.
+
+=head2 C<content_range>
+
+    my $range = $headers->content_range;
+    $headers  = $headers->content_range('bytes 2-8/100');
+
+Shortcut for the C<Content-Range> header.
 
 =head2 C<content_transfer_encoding>
 
@@ -486,6 +468,26 @@ into a single one in scalar context.
 
 Shortcut for the C<Host> header.
 
+=head2 C<if_modified_since>
+
+    my $m    = $headers->if_modified_since;
+    $headers = $headers->if_modified_since('Sun, 17 Aug 2008 16:27:35 GMT');
+
+Shortcut for the C<If-Modified-Since> header.
+
+=head2 C<is_done>
+
+    my $done = $headers->is_done;
+
+Check if header parser is done.
+
+=head2 C<last_modified>
+
+    my $m    = $headers->last_modified;
+    $headers = $headers->last_modified('Sun, 17 Aug 2008 16:27:35 GMT');
+
+Shortcut for the C<Last-Modified> header.
+
 =head2 C<location>
 
     my $location = $headers->location;
@@ -525,6 +527,13 @@ Shortcut for the C<Proxy-Authenticate> header.
     $headers = $headers->proxy_authorization('Basic Zm9vOmJhcg==');
 
 Shortcut for the C<Proxy-Authorization> header.
+
+=head2 C<range>
+
+    my $range = $headers->range;
+    $headers  = $headers->range('bytes=2-8');
+
+Shortcut for the C<Range> header.
 
 =head2 C<referrer>
 

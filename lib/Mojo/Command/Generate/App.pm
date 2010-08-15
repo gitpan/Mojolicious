@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Command::Generate::App;
 
 use strict;
@@ -47,10 +45,11 @@ __DATA__
 use strict;
 use warnings;
 
-use FindBin;
+use File::Basename 'dirname';
+use File::Spec;
 
-use lib "$FindBin::Bin/../lib";
-use lib "$FindBin::Bin/../../lib";
+use lib join '/', File::Spec->splitdir(dirname(__FILE__)), 'lib';
+use lib join '/', File::Spec->splitdir(dirname(__FILE__)), '..', 'lib';
 
 # Check if Mojo is installed
 eval 'use Mojo::Commands';
@@ -78,6 +77,7 @@ sub handler {
     my ($self, $tx) = @_;
 
     # Hello world!
+    $tx->res->code(200);
     $tx->res->headers->content_type('text/plain');
     $tx->res->body('Hello Mojo!');
 }

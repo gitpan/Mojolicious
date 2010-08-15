@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Server::CGI;
 
 use strict;
@@ -7,9 +5,7 @@ use warnings;
 
 use base 'Mojo::Server';
 
-use IO::Poll 'POLLIN';
-
-use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 8192;
+use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 262144;
 
 __PACKAGE__->attr(nph => 0);
 
@@ -29,13 +25,9 @@ sub run {
     $tx->local_port($ENV{SERVER_PORT});
 
     # Request body
-    my $poll = IO::Poll->new;
-    $poll->mask(\*STDIN, POLLIN);
-    while (!$req->is_finished) {
-        $poll->poll(1);
-        my @readers = $poll->handles(POLLIN);
-        last unless @readers;
+    while (!$req->is_done) {
         my $read = STDIN->sysread(my $buffer, CHUNK_SIZE, 0);
+        last unless $read;
         $req->parse($buffer);
     }
 
@@ -114,6 +106,9 @@ sub run {
         return unless defined $written;
         $offset += $written;
     }
+
+    # Finish transaction
+    $tx->finished->($tx);
 
     return $res->code;
 }

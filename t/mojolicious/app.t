@@ -1,9 +1,10 @@
 #!/usr/bin/env perl
 
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 use strict;
 use warnings;
+
+# Disable epoll, kqueue and IPv6
+BEGIN { $ENV{MOJO_POLL} = $ENV{MOJO_NO_IPV6} = 1 }
 
 use Mojo::IOLoop;
 use Test::More;
@@ -11,7 +12,7 @@ use Test::More;
 # Make sure sockets are working
 plan skip_all => 'working sockets required for this test!'
   unless Mojo::IOLoop->new->generate_port;
-plan tests => 166;
+plan tests => 194;
 
 use FindBin;
 use lib "$FindBin::Bin/lib";
@@ -51,6 +52,18 @@ $t->get_ok('/foo/syntaxerror')->status_is(500)
 # Foo::badtemplate (template missing)
 $t->get_ok('/foo/badtemplate')->status_is(404)
   ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_like(qr/File Not Found/);
+
+# Foo::authenticated (authentication bridge)
+$t->get_ok('/auth/authenticated', {'X-Bender' => 'Hi there!'})->status_is(200)
+  ->header_is('X-Bender' => undef)->header_is(Server => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is('authenticated');
+
+# Foo::authenticated (authentication bridge)
+$t->get_ok('/auth/authenticated')->status_is(404)
+  ->header_is('X-Bender' => undef)->header_is(Server => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_like(qr/File Not Found/);
 
@@ -103,7 +116,7 @@ $t->get_ok('/foo/withblock.txt', {'X-Test' => 'Hi there!'})->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_type_is('text/plain')
-  ->content_is("\nHello Baerbel.\nHello Wolfgang.\n");
+  ->content_like(qr/Hello Baerbel\.\s+Hello Wolfgang\./);
 
 # MojoliciousTest2::Foo::test
 $t->get_ok('/test2', {'X-Test' => 'Hi there!'})->status_is(200)
@@ -118,6 +131,18 @@ $t->get_ok('/test3', {'X-Test' => 'Hi there!'})->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_like(qr/No class works!/);
+
+# MojoliciousTestController::index (only namespace)
+$t->get_ok('/test5', {'X-Test' => 'Hi there!'})->status_is(200)
+  ->header_is('X-Bender'     => 'Bite my shiny metal ass!')
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is('/test5');
+
+# MojoliciousTestController::index (no namespace)
+$t->get_ok('/test6', {'X-Test' => 'Hi there!'})->status_is(200)
+  ->header_is('X-Bender'     => 'Bite my shiny metal ass!')
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is('/test6');
 
 # 404
 $t->get_ok('/', {'X-Test' => 'Hi there!'})->status_is(404)
@@ -152,11 +177,11 @@ $t->get_ok('/hello.txt', {'If-Modified-Since' => $mtime})->status_is(304)
 
 # Check develpment mode log level
 my $app = Mojolicious->new;
-is($app->log->level, 'debug');
+is($app->log->level, 'debug', 'right log level');
 
 # Make sure we can override attributes with constructor arguments
 $app = MojoliciousTest->new({mode => 'test'});
-is($app->mode, 'test');
+is($app->mode, 'test', 'right mode');
 
 # Persistent error
 $app = MojoliciousTest->new;
@@ -164,20 +189,28 @@ my $tx = Mojo::Transaction::HTTP->new;
 $tx->req->method('GET');
 $tx->req->url->parse('/foo');
 $app->handler($tx);
-is($tx->res->code, 200);
-like($tx->res->body, qr/Hello Mojo from the template \/foo! Hello World!/);
+is($tx->res->code, 200, 'right status');
+like(
+    $tx->res->body,
+    qr/Hello Mojo from the template \/foo! Hello World!/,
+    'right content'
+);
 $tx = Mojo::Transaction::HTTP->new;
 $tx->req->method('GET');
 $tx->req->url->parse('/foo/willdie');
 $app->handler($tx);
-is($tx->res->code, 500);
-like($tx->res->body, qr/Foo\.pm/);
+is($tx->res->code, 500, 'right status');
+like($tx->res->body, qr/Foo\.pm/, 'right content');
 $tx = Mojo::Transaction::HTTP->new;
 $tx->req->method('GET');
 $tx->req->url->parse('/foo');
 $app->handler($tx);
-is($tx->res->code, 200);
-like($tx->res->body, qr/Hello Mojo from the template \/foo! Hello World!/);
+is($tx->res->code, 200, 'right status');
+like(
+    $tx->res->body,
+    qr/Hello Mojo from the template \/foo! Hello World!/,
+    'right content'
+);
 
 $t = Test::Mojo->new(app => 'SingleFileTestApp');
 
@@ -243,3 +276,7 @@ $t->get_ok('/shortcut/act')->status_is(200)
 $t->get_ok('/foo/session')->status_is(200)
   ->header_like('Set-Cookie' => qr/; Domain=\.example\.com/)
   ->content_is('Bender rockzzz!');
+
+# Mixed formats
+$t->get_ok('/rss.xml')->status_is(200)->content_type_is('application/rss+xml')
+  ->content_like(qr/<\?xml version="1.0" encoding="UTF-8"\?><rss \/>/)

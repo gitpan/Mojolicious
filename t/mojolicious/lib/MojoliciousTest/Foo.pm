@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package MojoliciousTest::Foo;
 
 use strict;
@@ -9,6 +7,11 @@ use base 'Mojolicious::Controller';
 
 # If you're programmed to jump off a bridge, would you do it?
 # Let me check my program... Yep.
+sub authenticated {
+    my $self = shift;
+    $self->render(text => $self->stash('action'));
+}
+
 sub badtemplate { shift->render(template => 'badtemplate') }
 
 sub config {

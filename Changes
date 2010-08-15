@@ -1,5 +1,79 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+0.999927 2010-08-15 00:00:00
+        - Code name "Comet", this is a major release.
+        - Added EXPERIMENTAL method defaults to Mojolicious.
+        - Added EXPERIMENTAL method detour to MojoX::Dispatcher::Routes.
+        - Added EXPERIMENTAL attribute partial to MojoX::Routes.
+        - Added EXPERIMENTAL CSS3 selector tests to Test::Mojo.
+        - Added EXPERIMENTAL method test_server to Mojo::Client.
+        - Added EXPERIMENTAL oneliner module ojo.
+        - Added EXPERIMENTAL support for static files in the DATA section of
+          Mojolicious applications.
+        - Added EXPERIMENTAL Bonjour support.
+        - Added EXPERIMENTAL support for route name generation.
+        - Added graceful shutdown support to Mojo::Server::Daemon.
+        - Added multiple guides and improved documentation substantially.
+        - Added finished callback support for HTTP transactions.
+        - Added relative path support to Mojo::URL. (marcus)
+        - Added simple iterator support to Mojo::DOM.
+        - Added XML namespace support to Mojo::DOM.
+        - Added is_xhr method to Mojo::Message::Request.
+        - Added detect_proxy method to Mojo::Client. (DaTa)
+        - Added say and trim methods to Mojo::ByteStream.
+        - Added custom socket support to Mojo::Client.
+        - Added SHA1 support to Mojo::ByteStream. (vti)
+        - Added app helper.
+        - Renamed attributes method in Mojo::DOM to attrs.
+        - Renamed search method in Mojo::DOM to find.
+        - Cleaned up tests. (memowe)
+        - Cleaned up regular expressions in Mojo::DOM. (mpu)
+        - Improved Mojo::Client error logging.
+        - Improved Mojo::Template error messages.
+        - Improved generated multipart messages to be 2 bytes shorter.
+          (John Kingsley)
+        - Improved conditions by allowing them to access the stash.
+        - Fixed memory and file descriptor leaks in Mojo::Client.
+        - Fixed Mojo::Server::Daemon::Prefork to use a random lock file by
+          default.
+        - Fixed Mojo::DOM to support escaped selectors.
+        - Fixed Mojo::DOM parser bugs.
+        - Fixed Mojo::DOM child listing bug. (evt)
+        - Fixed Mojo::DOM multiline attribute bug. (tempire)
+        - Fixed charset detection of the dom builder in Mojo::Message.
+          (und3f)
+        - Fixed json/data rendering with layouts in MojoX::Renderer.
+        - Fixed Mojo::IOLoop to not stop unexpectedly.
+        - Fixed graceful shutdown in Mojo::Server::Daemon::Prefork.
+        - Fixed Mojo::Server::CGI and Mojo::Server::FastCGI to be more
+          portable.
+        - Fixed poll + tls support.
+        - Fixed language switching in Mojolicious::Plugin::I18n.
+        - Fixed async Mojo::Client tests.
+        - Fixed HTML1 and HTML5 compatibility of Mojo::DOM.
+        - Fixed a selector bug in Mojo::DOM.
+        - Fixed environment detection.
+        - Fixed Mojolicious application embedding.
+        - Fixed a tutorial bug. (zoul)
+        - Fixed tests to not use any optional modules.
+        - Fixed small Mojolicious::Lite bug. (sharifulin)
+        - Fixed Mojo application generator. (zakame)
+        - Fixed edgy stringified return value bug in
+          MojoX::Dispatcher::Routes. (DaTa)
+        - Fixed route rendering bug. (koban)
+        - Fixed route without namespace bug.
+        - Fixed route with mixed format bug. (sharifulin)
+        - Fixed small url_for bug.
+        - Fixed Mojo::IOLoop to not connect to TLS hosts without checking TLS
+          support first. (ashleydev)
+        - Fixed multiple WebSocket bugs.
+        - Fixed Test::Mojo::Server to be more portable. (afresh1)
+        - Fixed url_for to not expose userinfo in absolute URLs.
+        - Fixed path detection bug in generated scripts. (merlyn)
+        - Fixed a small redirect bug in Mojo::Client.
+        - Fixed a route callback inheritance bug.
+        - Fixed a security problem in the HMAC MD5 implementation. (vti)
+
 0.999926 2010-06-07 00:00:00
         - Added version requirement for all optional dependencies.
         - Improved documentation.

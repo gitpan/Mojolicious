@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Asset::File;
 
 use strict;
@@ -15,8 +13,7 @@ use File::Spec;
 use IO::File;
 use Mojo::ByteStream 'b';
 
-__PACKAGE__->attr([qw/cleanup path end_range/]);
-__PACKAGE__->attr(start_range => 0);
+__PACKAGE__->attr([qw/cleanup path/]);
 __PACKAGE__->attr(tmpdir => sub { $ENV{MOJO_TMPDIR} || File::Spec->tmpdir });
 __PACKAGE__->attr(
     handle => sub {
@@ -128,7 +125,7 @@ sub get_chunk {
     my $buffer;
 
     # Chunk size
-    my $size = $ENV{MOJO_CHUNK_SIZE} || 8192;
+    my $size = $ENV{MOJO_CHUNK_SIZE} || 262144;
 
     # Range support
     if (defined $end) {
@@ -181,7 +178,7 @@ sub slurp {
 
     # Slurp
     my $content = '';
-    while ($self->handle->sysread(my $buffer, 8192)) { $content .= $buffer }
+    while ($self->handle->sysread(my $buffer, 262144)) { $content .= $buffer }
 
     return $content;
 }
@@ -219,13 +216,6 @@ L<Mojo::Asset::File> implements the following attributes.
 
 Delete file automatically once it's not used anymore.
 
-=head2 C<end_range>
-
-    my $end = $asset->end_range;
-    $asset  = $asset->end_range(8);
-
-Pretend file ends earlier.
-
 =head2 C<handle>
 
     my $handle = $asset->handle;
@@ -239,13 +229,6 @@ Actual file handle.
     $asset   = $asset->path('/foo/bar/baz.txt');
 
 Actual file path.
-
-=head2 C<start_range>
-
-    my $start = $asset->start_range;
-    $asset    = $asset->start_range(0);
-
-Pretend file starts later.
 
 =head2 C<tmpdir>
 

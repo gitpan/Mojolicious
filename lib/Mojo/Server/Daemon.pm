@@ -1,5 +1,3 @@
-# Copyright (C) 2008-2010, Sebastian Riedel.
-
 package Mojo::Server::Daemon;
 
 use strict;
@@ -8,24 +6,25 @@ use warnings;
 use base 'Mojo::Server';
 
 use Carp 'croak';
-use Fcntl ':flock';
 use File::Spec;
 use IO::File;
 use Mojo::Command;
 use Mojo::IOLoop;
 use Scalar::Util 'weaken';
+use Sys::Hostname;
+
+# Bonjour
+use constant BONJOUR => $ENV{MOJO_NO_BONJOUR}
+  ? 0
+  : eval 'use Net::Rendezvous::Publish 0.04 (); 1';
+
+# Debug
+use constant DEBUG => $ENV{MOJO_DAEMON_DEBUG} || 0;
 
 __PACKAGE__->attr(
     [qw/group listen listen_queue_size max_requests silent user/]);
 __PACKAGE__->attr(ioloop => sub { Mojo::IOLoop->singleton });
-__PACKAGE__->attr(keep_alive_timeout => 15);
-__PACKAGE__->attr(
-    lock_file => sub {
-        my $self = shift;
-        return File::Spec->catfile($ENV{MOJO_TMPDIR} || File::Spec->tmpdir,
-            Mojo::Command->class_to_file(ref $self->app) . '.lock');
-    }
-);
+__PACKAGE__->attr(keep_alive_timeout      => 15);
 __PACKAGE__->attr(max_clients             => 1000);
 __PACKAGE__->attr(max_keep_alive_requests => 100);
 __PACKAGE__->attr(
@@ -52,24 +51,14 @@ sub DESTROY {
     for my $id (@$listen) { $loop->drop($id) }
 }
 
-sub accept_lock {
-    my ($self, $blocking) = @_;
-
-    # Lock
-    my $flags = $blocking ? LOCK_EX : LOCK_EX | LOCK_NB;
-    my $lock = flock($self->{_lock}, $flags);
-
-    return $lock;
-}
-
-sub accept_unlock { flock(shift->{_lock}, LOCK_UN) }
-
 sub prepare_ioloop {
     my $self = shift;
 
-    # Stop ioloop on HUP signal
+    # Signals
     my $loop = $self->ioloop;
-    $SIG{HUP} = sub { $loop->stop };
+    $SIG{HUP}  = sub { $loop->stop };
+    $SIG{USR1} = sub { $loop->max_connections(0) }
+      if $^O ne 'MSWin32';
 
     # Listen
     my $listen = $self->listen || 'http://*:3000';
@@ -77,24 +66,6 @@ sub prepare_ioloop {
 
     # Max clients
     $loop->max_connections($self->max_clients);
-}
-
-sub prepare_lock_file {
-    my $self = shift;
-
-    return unless my $file = $self->lock_file;
-
-    # Create lock file
-    my $fh = IO::File->new("> $file")
-      or croak qq/Can't open lock file "$file"/;
-    $self->{_lock} = $fh;
-
-    # Lock callback
-    my $loop = $self->ioloop;
-    $loop->lock_cb(sub { $self->accept_lock($_[1]) });
-
-    # Unlock callback
-    $loop->unlock_cb(sub { $self->accept_unlock });
 }
 
 sub prepare_pid_file {
@@ -145,9 +116,6 @@ sub run {
 
     # Prepare PID file
     $self->prepare_pid_file;
-
-    # Prepare lock file
-    $self->prepare_lock_file;
 
     # Start loop
     $self->ioloop->start;
@@ -200,10 +168,10 @@ sub _build_tx {
     # Store connection information
     my $loop  = $self->ioloop;
     my $local = $loop->local_info($id);
-    $tx->local_address($local->{address});
+    $tx->local_address($local->{address} || '127.0.0.1');
     $tx->local_port($local->{port});
     my $remote = $loop->remote_info($id);
-    $tx->remote_address($remote->{address});
+    $tx->remote_address($remote->{address} || '127.0.0.1');
     $tx->remote_port($remote->{port});
 
     # TLS
@@ -216,8 +184,8 @@ sub _build_tx {
     # Weaken
     weaken $self;
 
-    # State change callback
-    $tx->state_cb(sub { $self->_state($id, @_) });
+    # Resume callback
+    $tx->resume_cb(sub { $self->_write($id) });
 
     # Handler callback
     $tx->handler_cb(
@@ -226,16 +194,6 @@ sub _build_tx {
 
             # Handler
             $self->handler_cb->($self, $tx);
-        }
-    );
-
-    # Continue handler callback
-    $tx->continue_handler_cb(
-        sub {
-            my $tx = shift;
-
-            # Continue handler
-            $self->continue_handler_cb->($self, $tx);
         }
     );
 
@@ -276,10 +234,57 @@ sub _error {
     my ($self, $loop, $id, $error) = @_;
 
     # Log
-    $self->app->log->error($error) if $error;
+    $self->app->log->error($error);
 
     # Drop
     $self->_drop($id);
+}
+
+sub _finish {
+    my ($self, $id, $tx) = @_;
+
+    # WebSocket
+    if ($tx->is_websocket) {
+        $self->_drop($id);
+        return $self->ioloop->drop($id);
+    }
+
+    # Connection
+    my $c = $self->{_cs}->{$id};
+
+    # Finish transaction
+    delete $c->{transaction};
+    $tx->server_close;
+
+    # WebSocket
+    my $s = 0;
+    if (my $ws = $c->{websocket}) {
+
+        # Successful upgrade
+        if ($ws->res->code eq '101') {
+
+            # Make sure connection stays active
+            $tx->keep_alive(1);
+        }
+
+        # Failed upgrade
+        else {
+            delete $c->{websocket};
+            $ws->server_close;
+        }
+    }
+
+    # Close connection
+    if ($tx->req->error || !$tx->keep_alive) {
+        $self->_drop($id);
+        $self->ioloop->drop($id);
+    }
+
+    # Leftovers
+    elsif (defined(my $leftovers = $tx->server_leftovers)) {
+        $tx = $c->{transaction} = $self->_build_tx($id, $c);
+        $tx->server_read($leftovers);
+    }
 }
 
 sub _hup {
@@ -330,12 +335,23 @@ sub _listen {
     $options->{error_cb} = sub { $self->_error(@_) };
     $options->{hup_cb}   = sub { $self->_hup(@_) };
     $options->{read_cb}  = sub { $self->_read(@_) };
-    $options->{write_cb} = sub { $self->_write(@_) };
 
     # Listen
     my $id = $self->ioloop->listen($options);
     $self->{_listen} ||= [];
     push @{$self->{_listen}}, $id;
+
+    # Bonjour
+    if (BONJOUR && (my $p = Net::Rendezvous::Publish->new)) {
+        my $port = $options->{port};
+        my $name = $options->{address} || Sys::Hostname::hostname();
+        $p->publish(
+            name   => "Mojolicious ($name:$port)",
+            type   => '_http._tcp',
+            domain => 'local',
+            port   => $port
+        ) if $port && !$options->{tls};
+    }
 
     # Log
     $self->app->log->info("Server listening ($listen)");
@@ -346,6 +362,9 @@ sub _listen {
 
 sub _read {
     my ($self, $loop, $id, $chunk) = @_;
+
+    # Debug
+    warn "< $chunk\n" if DEBUG;
 
     # Connection
     my $c = $self->{_cs}->{$id};
@@ -362,49 +381,12 @@ sub _read {
     # Last keep alive request
     $tx->res->headers->connection('Close')
       if ($c->{requests} || 0) >= $self->max_keep_alive_requests;
-}
-
-sub _state {
-    my ($self, $id, $tx) = @_;
 
     # Finish
-    if ($tx->is_finished) {
-
-        # Connection
-        my $c = $self->{_cs}->{$id};
-
-        # Successful WebSocket upgrade
-        my $upgraded = 0;
-        $upgraded = 1
-          if $c->{websocket} && $c->{websocket}->res->code eq '101';
-
-        # Close connection
-        if ($tx->req->has_error || (!$tx->keep_alive && !$upgraded)) {
-            $self->_drop($id);
-            $self->ioloop->drop($id);
-        }
-
-        # Cleanup connection
-        else {
-            delete $c->{transaction};
-            delete $c->{websocket} unless $upgraded;
-
-            # Allow early writing from the server side
-            return $self->ioloop->writing($id)
-              if $upgraded && $c->{websocket}->is_writing;
-
-            # Leftovers
-            if (defined(my $leftovers = $tx->server_leftovers)) {
-                $tx = $c->{transaction} = $self->_build_tx($id, $c);
-                $tx->server_read($leftovers);
-            }
-        }
-    }
+    if ($tx->is_done) { $self->_finish($id, $tx) }
 
     # Writing
-    return $tx->is_writing
-      ? $self->ioloop->writing($id)
-      : $self->ioloop->not_writing($id);
+    elsif ($tx->is_writing) { $self->_write($id) }
 }
 
 sub _upgrade {
@@ -422,28 +404,15 @@ sub _upgrade {
     # Upgrade connection timeout
     $self->ioloop->connection_timeout($id, $self->websocket_timeout);
 
-    # State change callback
-    $ws->state_cb(
-        sub {
-            my $ws = shift;
+    # Weaken
+    weaken $self;
 
-            # Writing
-            return $self->ioloop->writing($id) if $ws->is_writing;
-
-            # Finish
-            if ($ws->is_finished) {
-                $self->_drop($id);
-                $self->ioloop->drop($id);
-            }
-
-            # Not writing
-            $self->ioloop->not_writing($id);
-        }
-    );
+    # Resume callback
+    $ws->resume_cb(sub { $self->_write($id) });
 }
 
 sub _write {
-    my ($self, $loop, $id) = @_;
+    my ($self, $id) = @_;
 
     # Connection
     my $c = $self->{_cs}->{$id};
@@ -451,10 +420,33 @@ sub _write {
     # Transaction
     return unless my $tx = $c->{transaction} || $c->{websocket};
 
+    # Not writing
+    return unless $tx->is_writing;
+
     # Get chunk
     my $chunk = $tx->server_write;
 
-    return $chunk;
+    # Weaken
+    weaken $self;
+
+    # Callback
+    my $cb = sub { $self->_write($id) };
+
+    # Done
+    if ($tx->is_done) {
+
+        # Finish
+        $self->_finish($id, $tx);
+
+        # No followup
+        $cb = undef unless $c->{transaction} || $c->{websocket};
+    }
+
+    # Write
+    $self->ioloop->write($id, $chunk, $cb);
+
+    # Debug
+    warn "> $chunk\n" if DEBUG;
 }
 
 1;
@@ -475,11 +467,12 @@ Mojo::Server::Daemon - Async IO HTTP 1.1 And WebSocket Server
 =head1 DESCRIPTION
 
 L<Mojo::Server::Daemon> is a full featured async io HTTP 1.1 and WebSocket
-server with C<IPv6>, C<TLS>, C<epoll>, C<kqueue>, hot deployment and UNIX
-domain socket sharing support.
+server with C<IPv6>, C<TLS>, C<Bonjour>, C<epoll>, C<kqueue>, hot deployment
+and UNIX domain socket sharing support.
 
-Optional modules L<IO::KQueue>, L<IO::Epoll>, L<IO::Socket::INET6> and
-L<IO::Socket::SSL> are supported transparently and used if installed.
+Optional modules L<IO::KQueue>, L<IO::Epoll>, L<IO::Socket::INET6>,
+L<IO::Socket::SSL> and L<Net::Rendezvous::Publish> are supported
+transparently and used if installed.
 
 =head1 ATTRIBUTES
 
@@ -520,13 +513,6 @@ Ports and files to listen on, defaults to C<http://*:3000>.
     $daemon               = $daemon->listen_queue_zise(128);
 
 Listen queue size, defaults to C<SOMAXCONN>.
-
-=head2 C<lock_file>
-
-    my $lock_file = $daemon->lock_file;
-    $daemon       = $daemon->lock_file('/tmp/mojo_daemon.lock');
-
-Path to lock file, defaults to a random temporary file.
 
 =head2 C<max_clients>
 
@@ -583,29 +569,11 @@ Timeout in seconds for WebSockets to be idle, defaults to C<300>.
 L<Mojo::Server::Daemon> inherits all methods from L<Mojo::Server> and
 implements the following new ones.
 
-=head2 C<accept_lock>
-
-    my $lock = $daemon->accept_lock($blocking);
-
-Try to get the accept lock.
-
-=head2 C<accept_unlock>
-
-    $daemon->accept_unlock;
-
-Free the accept lock.
-
 =head2 C<prepare_ioloop>
 
     $daemon->prepare_ioloop;
 
 Prepare event loop.
-
-=head2 C<prepare_lock_file>
-
-    $daemon->prepare_lock_file;
-
-Prepare the lock file.
 
 =head2 C<prepare_pid_file>
 
