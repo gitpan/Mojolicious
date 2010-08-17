@@ -75,6 +75,7 @@ lib/Mojolicious/Guides/Cheatsheet.pod
 lib/Mojolicious/Guides/CodingGuidelines.pod
 lib/Mojolicious/Guides/Cookbook.pod
 lib/Mojolicious/Guides/FAQ.pod
+lib/Mojolicious/Guides/Growing.pod
 lib/Mojolicious/Guides/Rendering.pod
 lib/Mojolicious/Guides/Routing.pod
 lib/Mojolicious/Lite.pm

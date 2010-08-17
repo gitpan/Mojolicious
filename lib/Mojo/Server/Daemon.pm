@@ -184,9 +184,6 @@ sub _build_tx {
     # Weaken
     weaken $self;
 
-    # Resume callback
-    $tx->resume_cb(sub { $self->_write($id) });
-
     # Handler callback
     $tx->handler_cb(
         sub {
@@ -194,6 +191,9 @@ sub _build_tx {
 
             # Handler
             $self->handler_cb->($self, $tx);
+
+            # Resume callback
+            $tx->resume_cb(sub { $self->_write($id) });
         }
     );
 
@@ -265,6 +265,12 @@ sub _finish {
 
             # Make sure connection stays active
             $tx->keep_alive(1);
+
+            # Weaken
+            weaken $self;
+
+            # Resume callback
+            $ws->resume_cb(sub { $self->_write($id) });
         }
 
         # Failed upgrade
@@ -404,11 +410,8 @@ sub _upgrade {
     # Upgrade connection timeout
     $self->ioloop->connection_timeout($id, $self->websocket_timeout);
 
-    # Weaken
-    weaken $self;
-
-    # Resume callback
-    $ws->resume_cb(sub { $self->_write($id) });
+    # Not resumable yet
+    $ws->resume_cb(sub {1});
 }
 
 sub _write {

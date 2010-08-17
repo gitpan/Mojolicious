@@ -5,7 +5,7 @@ use warnings;
 
 use utf8;
 
-use Test::More tests => 151;
+use Test::More tests => 155;
 
 # Homer gave me a kidney: it wasn't his, I didn't need it,
 # and it came postage due- but I appreciated the gesture!
@@ -385,3 +385,13 @@ $dom->parse(qq/<div id="<a>" \n test='='>Test<div id='><' \/><\/div>/);
 is($dom->at('div[id="<a>"]')->attrs->{test}, '=',    'right attribute');
 is($dom->at('[id="<a>"]')->text,             'Test', 'right text');
 is($dom->at('[id="><"]')->attrs->{id},       '><',   'right attribute');
+
+# Empty attributes
+$dom->parse(qq/<div test="" test2='' \/>/);
+is($dom->at('div')->attrs->{test},  '', 'empty attribute value');
+is($dom->at('div')->attrs->{test2}, '', 'empty attribute value');
+
+# Whitespaces before closing bracket
+$dom->parse(qq/<div >content<\/div>/);
+ok($dom->at('div'), 'tag found');
+is($dom->at('div')->text, 'content', 'right text');

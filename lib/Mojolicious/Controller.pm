@@ -79,11 +79,19 @@ sub receive_message {
 sub redirect_to {
     my $self = shift;
 
-    # Code
-    $self->res->code(302);
+    # Rendered
+    $self->stash->{'mojo.rendered'} = 1;
 
-    # Location header
-    $self->res->headers->location($self->url_for(@_)->to_abs);
+    # Response
+    my $res = $self->res;
+
+    # Code
+    $res->code(302);
+
+    # Headers
+    my $headers = $res->headers;
+    $headers->location($self->url_for(@_)->to_abs);
+    $headers->content_length(0);
 
     return $self;
 }
@@ -103,8 +111,6 @@ sub render {
 
     # Template
     $args->{template} = $template if $template;
-
-    # Template
     unless ($stash->{template} || $args->{template}) {
 
         # Default template
@@ -130,7 +136,7 @@ sub render {
     return unless defined $output;
 
     # Partial
-    return $output if delete $stash->{partial};
+    return $output if $args->{partial};
 
     # Response
     my $res = $self->res;
@@ -257,6 +263,11 @@ sub render_partial {
 
 sub render_static {
     my $self = shift;
+
+    # Rendered
+    $self->stash->{'mojo.rendered'} = 1;
+
+    # Static
     $self->app->static->serve($self, @_);
 }
 
