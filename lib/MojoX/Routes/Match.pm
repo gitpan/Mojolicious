@@ -44,6 +44,15 @@ sub match {
     # Root
     $self->root($r) unless $self->root;
 
+    # Path
+    my $path = $self->{_path};
+
+    # Match
+    my $captures = $r->pattern->shape_match(\$path);
+
+    # No match
+    return unless $captures;
+
     # Conditions
     for (my $i = 0; $i < @{$r->conditions}; $i += 2) {
         my $name      = $r->conditions->[$i];
@@ -54,24 +63,9 @@ sub match {
         return unless $condition;
 
         # Match
-        my $captures =
-          $condition->($r, $self->{_controller}, $self->captures, $value);
-
-        # Matched
-        return unless $captures && ref $captures eq 'HASH';
-
-        # Merge captures
-        $self->captures($captures);
+        return
+          if !$condition->($r, $self->{_controller}, $self->captures, $value);
     }
-
-    # Path
-    my $path = $self->{_path};
-
-    # Match
-    my $captures = $r->pattern->shape_match(\$path);
-
-    # No match
-    return unless $captures;
 
     # Partial
     if (my $partial = $r->partial) {
@@ -79,7 +73,6 @@ sub match {
         $path = '';
     }
     $self->{_path} = $path;
-
 
     # Merge captures
     $captures = {%{$self->captures}, %$captures};
@@ -175,21 +168,43 @@ sub url_for {
 
     # Named
     if ($name) {
-        croak qq/Route "$name" used in url_for does not exist/
-          unless $endpoint = $self->_find_route($name);
+
+        # Current route
+        if ($name eq 'current') { $name = undef }
+
+        # Find
+        else {
+            croak qq/Route "$name" used in url_for does not exist/
+              unless $endpoint = $self->_find_route($name);
+        }
     }
 
     # Merge values
-    $values = {%{$self->captures}, %$values};
+    $values = {%{$self->captures}, format => undef, %$values};
 
+    # URL
     my $url = Mojo::URL->new;
 
     # No endpoint
     return $url unless $endpoint;
 
+    # Base
+    $url->base($self->{_controller}->req->url->base->clone);
+    my $base = $url->base;
+    $url->base->userinfo(undef);
+
     # Render
     my $path = $endpoint->render($url->path->to_string, $values);
     $url->path->parse($path);
+
+    # Fix scheme
+    if ($endpoint->is_websocket) {
+        $base->scheme(($base->scheme || '') eq 'https' ? 'wss' : 'ws');
+    }
+
+    # Fix paths
+    unshift @{$url->path->parts}, @{$base->path->parts};
+    $base->path->parts([]);
 
     return $url;
 }
@@ -278,7 +293,6 @@ implements the following ones.
 
 =head2 C<new>
 
-    my $m = MojoX::Routes::Match->new;
     my $m = MojoX::Routes::Match->new(MojoX:Controller->new);
 
 Construct a new match object.

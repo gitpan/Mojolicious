@@ -70,15 +70,15 @@ usually look a bit better.
 
     <% my $i = 10; %>
     Text before.
-    <% for (1 .. $i) { %>
-    Insert this text 10 times!
+    <% for my $j (1 .. $i) { %>
+        <%= $j %>
     <% } %>
     Text after.
 
     % my $i = 10;
     Text before.
-    % for (1 .. $i) {
-    Insert this text 10 times!
+    % for my $j (1 .. $i) {
+        %= $j
     % }
     Text after.
 
@@ -92,7 +92,7 @@ Semicolons get automatically appended to all expressions.
 
 Only L<Mojo::ByteStream> objects are excluded from automatic escaping.
 
-    <%= Mojo::ByteStream->new('<p>test</p>') %>
+    <%= b('<p>test</p>') %>
 
 You can also add an additional equal sign to the end of a tag to have it
 automatically remove all surrounding whitespaces, this allows free indenting
@@ -165,6 +165,17 @@ shortcut.
 All values passed to the C<render> call are only temporarily assigned to the
 stash and get reset again once rendering is finished.
 
+=head2 Rendering Inline Templates (C<inline>)
+
+Some renderers such as C<ep> allow templates to be passed inline.
+
+    $self->render(inline => 'The result is <%= 1 + 1%>!');
+
+Since auto detection depends on a path you might have to supply a C<handler>
+too.
+
+    $self->render(inline => "<%= shift->param('foo') %>", handler => 'epl');
+
 =head2 Rendering Text (C<text>)
 
 Plain text can be rendered with the C<text> stash value, characters get
@@ -221,27 +232,48 @@ These mappings can be easily extended or changed.
 
     1;
 
+=head2 Stash Data
+
+Data can be passed to templates through the C<stash> in any of the native
+Perl data types.
+
+    $self->stash(author => 'Sebastian');
+    $self->stash(frameworks => [qw/Catalyst Mojolicious/]);
+    $self->stash(examples => {tweetylicious => 'a microblogging app'});
+
+    <%= $author %>
+    <%= $frameworks->[1] %>
+    <%= $examples->{tweetylicious} %>
+
+Since everything is just Perl normal control structures just work.
+
+    <% for my $framework (@$frameworks) { %>
+        <%= $framework %> was written by <%= $author %>.
+    <% } %>
+
+    <% while (my ($app, $description) = each %$examples) { %>
+        <%= $app %> is a <%= $description %>.
+    <% } %>
+
 =head2 Helpers
 
-Helpers are little functions that are stored in the renderer, not all of them
-are strictly template specific, thats why you can also use the C<helper>
-controller method to call them.
+Helpers are little functions you can use in templates and controller code.
 
     <%= dumper [1, 2, 3] %>
 
-    my $serialized = $self->helper(dumper => [1, 2, 3]);
+    my $serialized = $self->dumper([1, 2, 3]);
 
-The C<dumper> helper will use L<Data::Dumper> to serialize whatever data
-structure you pass it, this can be very useful for debugging.
+The C<dumper> helper for example will use L<Data::Dumper> to serialize
+whatever data structure you pass it, this can be very useful for debugging.
 We differentiate between C<default helpers> which are more general purpose
 like C<dumper> and C<tag helpers>, which are template specific and mostly
 used to generate C<HTML> tags.
 
     <%= script '/script.js' %>
 
-    <%= script {%>
+    <%= script begin %>
         var a = 'b';
-    <%}%>
+    <% end %>
 
 The plugins L<Mojolicious::Plugin::DefaultHelpers> and
 L<Mojolicious::Plugin::TagHelpers> contain all of them.
@@ -318,25 +350,22 @@ Of course you can also pass stash values.
 It's never fun to repeat yourself, thats why you can build reusable template
 blocks in C<ep> that work very similar normal Perl functions.
 
-    <% my $block = {%>
+    <% my $block = begin %>
         <% my $name = shift; %>
         Hello <%= $name %>.
-    <%}%>
+    <% end %>
     <%= $block->('Sebastian') %>
     <%= $block->('Sara') %>
 
-Blocks start with an opening bracket in the first tag and end with a mini tag
-containing only the closing bracket.
-Whitespace characters between bracket and tag are not allowed, to
-differentiate between template blocks and normal Perl code.
+Blocks are always delimited by the C<begin> and C<end> keywords.
 
-    <% my $block = {%>
-        <% my $name = shift; %>
+    % my $block = begin
+        % my $name = shift;
         Hello <%= $name %>.
-    <%}%>
-    <% for (1 .. 10) { %>
-        <%= $block->('Sebastian') %>
-    <% } %>
+    % end
+    % for (1 .. 10) {
+        %= $block->('Sebastian')
+    % }
 
 A naive translation to equivalent Perl code could look like this.
 
@@ -359,9 +388,9 @@ the template to the layout.
 
    @@ foo/bar.html.ep
    % layout 'mylayout';
-   <% content header => {%>
+   <% content header => begin %>
        <title>MyApp!</title>
-   <%}%>
+   <% end %>
    Hello World!
 
    @@ layouts/mylayout.html.ep
@@ -381,29 +410,39 @@ extended templates don't get prefixed with C<layout/>.
     @@ first.html.ep
     %# "<div>First header!First footer!</div>"
     <div>
-    <%= content header => {%>
+    <%= content header => begin %>
         First header!
-    <%}%>
-    <%= content footer => {%>
+    <% end %>
+    <%= content footer => begin %>
         First footer!
-    <%}%>
+    <% end %>
     </div>
 
     @@ second.html.ep
     %# "<div>Second header!First footer!</div>"
     % extends 'first';
-    <% content header => {%>
+    <% content header => begin %>
         Second header!
-    <%}%>
+    <% end %>
 
     @@ third.html.ep
     %# "<div>Second header!Third footer!</div>"
     % extends 'second';
-    <% content footer => {%>
+    <% content footer => begin %>
         Third footer!
-    <%}%>
+    <% end %>
 
 This chain could go on and on to allow a very high level of template reuse.
+
+=head2 Memorizing Template Blocks
+
+Compiled templates are always cached in memory, but with the C<memorize>
+helper you can go one step further and prevent template blocks from being
+executed more than once.
+
+    <%= memorize begin %>
+        This template was compiled at <%= localtime time %>.
+    <% end %>
 
 =head1 ADVANCED
 
@@ -430,13 +469,22 @@ can be easily changed.
 All templates from the DATA section are bound to the encoding of the Perl
 script, so don't forget to use the L<utf8> pragma if necessary.
 
+=head2 Base64 Encoded DATA Files
+
+Base64 encoded static files such as images can be easily stored in the
+C<DATA> section of your application, similar to templates.
+    
+    @@ favicon.ico (base64)
+    ...base64 encoded image...
+
 =head2 Inflating DATA Templates
 
 Templates stored in files get preferred over files from the C<DATA> section,
 this allows you to include a default set of templates in your application
 that the user can later customize.
-The C<inflate> command will write all templates from the C<DATA> section into
-actual files in the C<templates> directory.
+The C<inflate> command will write all templates and static files from the
+C<DATA> section into actual files in the C<templates> and C<public>
+directories.
 
     % ./myapp.pl inflate
     ...
@@ -473,10 +521,35 @@ much everything.
 
     use Mojolicious::Lite;
 
-    app->renderer->add_helper(
-        echo => sub {
+    app->helper(
+        debug => sub {
             my ($self, $string) = @_;
-            return "ECHO: $string";
+            $self->app->log->debug($string);
+        }
+    );
+
+    get '/' => sub {
+        my $self = shift;
+        $self->debug('action');
+    } => 'index';
+
+    app->start;
+    __DATA__
+
+    @@ index.html.ep
+    % debug 'template';
+
+Helpers can also accept template blocks as last argument, this for example
+allows very pleasant to use tag helpers and filters.
+
+    use Mojolicious::Lite;
+
+    app->helper(
+        trim_newline => sub {
+            my ($self, $block) = @_;
+            my $result = $block->();
+            $result =~ s/\n//g;
+            return $result;
         }
     );
 
@@ -486,7 +559,11 @@ much everything.
     __DATA__
 
     @@ index.html.ep
-    <%= echo 'lalala' %>
+    <%= trim_newline begin %>
+        Some text.
+        <%= 1 + 1 %>
+        More text.
+    <% end %>
 
 =head2 Adding Your Favorite Template System
 

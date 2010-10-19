@@ -6,9 +6,53 @@ use warnings;
 # Scalpel... blood bucket... priest.
 use base 'Mojo::Base';
 
-# If we don't go back there and make that event happen,
-# the entire universe will be destroyed...
-# And as an environmentalist, I'm against that.
+__PACKAGE__->attr('app');
+
+# Reserved stash values
+my $STASH_RE = qr/
+    ^
+    (?:
+    action
+    |
+    app
+    |
+    cb
+    |
+    class
+    |
+    controller
+    |
+    data
+    |
+    exception
+    |
+    extends
+    |
+    format
+    |
+    handler
+    |
+    json
+    |
+    layout
+    |
+    method
+    |
+    namespace
+    |
+    partial
+    |
+    path
+    |
+    status
+    |
+    template
+    |
+    text
+    )
+    $
+    /x;
+
 sub render_exception { }
 sub render_not_found { }
 
@@ -27,6 +71,8 @@ sub stash {
     # Set
     my $values = ref $_[0] ? $_[0] : {@_};
     for my $key (keys %$values) {
+        $self->app->log->debug(qq/Careful, "$key" is a reserved stash value./)
+          if $key =~ $STASH_RE;
         $self->{stash}->{$key} = $values->{$key};
     }
 
@@ -47,6 +93,15 @@ MojoX::Controller - Controller Base Class
 =head1 DESCRIPTION
 
 L<MojoX::Controller> is an abstract controllers base class.
+
+=head1 L<MojoX::Controller> implements the following attributes.
+
+=head2 C<app>
+
+    my $app = $c->app;
+    $c      = $c->app(MojoSubclass->new);
+
+A reference back to the application that dispatched to this controller.
 
 =head1 METHODS
 

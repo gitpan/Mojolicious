@@ -7,8 +7,9 @@ use base 'MojoX::Controller';
 
 use Mojo::ByteStream;
 use Mojo::Cookie::Response;
+use Mojo::Transaction::HTTP;
 
-__PACKAGE__->attr([qw/app tx/]);
+__PACKAGE__->attr(tx => sub { Mojo::Transaction::HTTP->new });
 
 # For the last time, I don't like lilacs!
 # Your first wife was the one who liked lilacs!
@@ -172,20 +173,15 @@ L<MojoX::Session::Cookie::Controller> is a controller base class.
 
 =head1 ATTRIBUTES
 
-L<MojoX::Session::Cookie::Controller> implements the following attributes.
-
-=head2 C<app>
-
-    my $app = $c->app;
-    $c      = $c->app(MojoSubclass->new);
-
-A reference back to the application that dispatched to this controller.
+L<MojoX::Session::Cookie::Controller> inherits all attributes from
+L<MojoX::Controller> and implements the following new ones.
 
 =head2 C<tx>
 
     my $tx = $c->tx;
 
-The transaction that is currently being processed.
+The transaction that is currently being processed, defaults to a
+L<Mojo::Transaction::HTTP> object.
 
 =head1 METHODS
 
@@ -208,7 +204,7 @@ Access request cookie values and create new response cookies.
     $c        = $c->flash({foo => 'bar'});
     $c        = $c->flash(foo => 'bar');
 
-Data storage persistent for a single request, stored in the session.
+Data storage persistent for the next request, stored in the session.
 
     $c->flash->{foo} = 'bar';
     my $foo = $c->flash->{foo};

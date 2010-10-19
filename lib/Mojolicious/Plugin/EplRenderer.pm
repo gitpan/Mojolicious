@@ -5,6 +5,7 @@ use warnings;
 
 use base 'Mojolicious::Plugin';
 
+use Mojo::ByteStream 'b';
 use Mojo::Template;
 
 # Clever things make people feel stupid and unexpected things make them feel
@@ -17,46 +18,64 @@ sub register {
         epl => sub {
             my ($r, $c, $output, $options) = @_;
 
+            # Inline
+            my $inline = $options->{inline};
+
             # Template
-            return unless my $t    = $r->template_name($options);
-            return unless my $path = $r->template_path($options);
+            my $path = $r->template_path($options);
+            $path = b($inline)->md5_sum->to_string if defined $inline;
+            return unless defined $path;
             my $cache = delete $options->{cache} || $path;
 
             # Reload
             delete $r->{_epl_cache} if $ENV{MOJO_RELOAD};
 
             # Check cache
-            $r->{_epl_cache} ||= {};
-            my $mt = $r->{_epl_cache}->{$cache};
+            my $ec    = $r->{_epl_cache} ||= {};
+            my $stack = $r->{_epl_stack} ||= [];
+            my $mt    = $ec->{$cache};
 
-            # Interpret again
+            # Initialize
+            $mt ||= Mojo::Template->new;
+
+            # Cached
             if ($mt && $mt->compiled) { $$output = $mt->interpret($c) }
 
-            # No cache
+            # Not cached
             else {
 
-                # Initialize
-                $mt ||= Mojo::Template->new;
+                # Inline
+                if (defined $inline) { $$output = $mt->render($inline, $c) }
 
-                # Encoding
-                $mt->encoding($r->encoding) if $r->encoding;
-
-                # Try template
-                if (-r $path) { $$output = $mt->render_file($path, $c) }
-
-                # Try DATA section
-                elsif (my $d = $r->get_inline_template($options, $t)) {
-                    $$output = $mt->render($d, $c);
-                }
-
-                # No template
+                # File
                 else {
-                    $c->render_not_found($t);
-                    return;
+
+                    # Encoding
+                    $mt->encoding($r->encoding) if $r->encoding;
+
+                    # Name
+                    return unless my $t = $r->template_name($options);
+
+                    # Try template
+                    if (-r $path) { $$output = $mt->render_file($path, $c) }
+
+                    # Try DATA section
+                    elsif (my $d = $r->get_inline_template($options, $t)) {
+                        $$output = $mt->render($d, $c);
+                    }
+
+                    # No template
+                    else {
+                        $c->render_not_found($t);
+                        return;
+                    }
                 }
 
                 # Cache
-                $r->{_epl_cache}->{$cache} = $mt;
+                delete $ec->{shift @$stack}
+                  while @$stack > ($ENV{MOJO_TEMPLATE_CACHE} || 100);
+                push @$stack, $cache;
+                $ec->{$cache} = $mt;
             }
 
             # Exception

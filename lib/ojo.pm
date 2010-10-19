@@ -7,6 +7,7 @@ use warnings;
 # No I'm... doesn't.
 use Mojo::ByteStream 'b';
 use Mojo::Client;
+use Mojo::DOM;
 
 # I'm sorry, guys. I never meant to hurt you.
 # Just to destroy everything you ever believed in.
@@ -32,21 +33,35 @@ sub import {
     *{"${caller}::d"} = sub { _request('delete',    @_) };
     *{"${caller}::f"} = sub { _request('post_form', @_) };
     *{"${caller}::g"} = sub { _request('get',       @_) };
+    *{"${caller}::h"} = sub { _request('head',      @_) };
     *{"${caller}::p"} = sub { _request('post',      @_) };
     *{"${caller}::u"} = sub { _request('put',       @_) };
-    *{"${caller}::w"} =
-      sub { Mojo::Client->singleton->websocket(@_)->process }
+    *{"${caller}::w"} = sub { Mojo::Client->singleton->websocket(@_)->start };
+    *{"${caller}::x"} = sub { Mojo::DOM->new->parse(@_) };
 }
 
 # I wonder what the shroud of Turin tastes like.
 sub _request {
+
+    # Method
     my $method = $_[0] =~ /:|\// ? 'get' : lc shift;
+
+    # Client
     my $client = Mojo::Client->singleton;
+
+    # Transaction
     my $tx =
         $method eq 'post_form'
       ? $client->build_form_tx(@_)
       : $client->build_tx($method, @_);
-    $client->process($tx, sub { $tx = $_[1] });
+
+    # Process
+    $client->start($tx, sub { $tx = $_[1] });
+
+    # Error
+    my ($message, $code) = $tx->error;
+    warn qq/Couldn't open URL "$_[0]". ($message)\n/ if $message && !$code;
+
     return $tx->res;
 }
 
@@ -142,6 +157,19 @@ the C<MOJO_MAX_REDIRECTS> environment variable.
 
     MOJO_MAX_REDIRECTS=0 perl -Mojo -e 'b(g("mojolicious.org")->code)->say'
 
+=head2 C<h>
+
+    my $res = h('http://mojolicio.us');
+    my $res = h('http://mojolicio.us', {'X-Bender' => 'X_x'});
+    my $res = h(
+        'http://mojolicio.us',
+        {'Content-Type' => 'text/plain'},
+        'Hello!'
+    );
+
+Perform C<HEAD> request and turn response into a L<Mojo::Message::Response>
+object.
+
 =head2 C<p>
 
     my $res = p('http://mojolicio.us');
@@ -173,6 +201,14 @@ object.
     w('ws://mojolicio.us' => sub {...});
 
 Open a WebSocket connection.
+
+=head2 C<x>
+
+    my $dom = x('<div>Hello!</div>');
+
+Turn HTML5/XML input into L<Mojo::DOM> object.
+
+    print x('<div>Hello!</div>')->at('div')->text;
 
 =head1 SEE ALSO
 

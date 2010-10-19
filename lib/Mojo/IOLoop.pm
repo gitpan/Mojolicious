@@ -11,7 +11,8 @@ use File::Spec;
 use IO::File;
 use IO::Poll qw/POLLERR POLLHUP POLLIN POLLOUT/;
 use IO::Socket;
-use Mojo::ByteStream;
+use Mojo::ByteStream 'b';
+use Scalar::Util 'weaken';
 use Socket qw/IPPROTO_TCP TCP_NODELAY/;
 use Time::HiRes 'time';
 
@@ -26,10 +27,10 @@ use constant EPOLL_POLLHUP => EPOLL ? IO::Epoll::POLLHUP() : 0;
 use constant EPOLL_POLLIN  => EPOLL ? IO::Epoll::POLLIN()  : 0;
 use constant EPOLL_POLLOUT => EPOLL ? IO::Epoll::POLLOUT() : 0;
 
-# IPv6 support requires IO::Socket::INET6
+# IPv6 support requires IO::Socket::IP
 use constant IPV6 => $ENV{MOJO_NO_IPV6}
   ? 0
-  : eval 'use IO::Socket::INET6 (); 1';
+  : eval 'use IO::Socket::IP 0.04 (); 1';
 
 # KQueue support requires IO::KQueue
 use constant KQUEUE => ($ENV{MOJO_POLL} || $ENV{MOJO_EPOLL})
@@ -47,6 +48,9 @@ use constant TLS => $ENV{MOJO_NO_TLS} ? 0
   :        eval 'use IO::Socket::SSL 1.33 "inet4"; 1';
 use constant TLS_READ  => TLS ? IO::Socket::SSL::SSL_WANT_READ()  : 0;
 use constant TLS_WRITE => TLS ? IO::Socket::SSL::SSL_WANT_WRITE() : 0;
+
+# Windows
+use constant WINDOWS => $^O eq 'MSWin32' ? 1 : 0;
 
 # Default TLS cert (20.03.2010)
 # (openssl req -new -x509 -keyout cakey.pem -out cacert.pem -nodes -days 7300)
@@ -94,18 +98,27 @@ AnqxHi90n/p912ynLg2SjBq+03GaECeGzC/QqKK2gtA=
 -----END RSA PRIVATE KEY-----
 EOF
 
+__PACKAGE__->attr([qw/accept_timeout connect_timeout/] => 5);
+__PACKAGE__->attr(max_connections                      => 1000);
+__PACKAGE__->attr([qw/on_idle on_tick/]);
 __PACKAGE__->attr(
-    [qw/lock_cb unlock_cb/] => sub {
+    [qw/on_lock on_unlock/] => sub {
         sub {1}
     }
 );
-__PACKAGE__->attr([qw/idle_cb tick_cb/]);
-__PACKAGE__->attr([qw/accept_timeout connect_timeout/] => 5);
-__PACKAGE__->attr(max_connections                      => 1000);
-__PACKAGE__->attr(timeout                              => '0.25');
+__PACKAGE__->attr(timeout => '0.25');
 
 # Singleton
 our $LOOP;
+
+# DEPRECATED in Comet!
+*error_cb  = \&on_error;
+*hup_cb    = \&on_hup;
+*idle_cb   = \&on_idle;
+*lock_cb   = \&on_lock;
+*read_cb   = \&on_read;
+*tick_cb   = \&on_tick;
+*unlock_cb = \&on_unlock;
 
 sub DESTROY {
     my $self = shift;
@@ -142,7 +155,6 @@ sub connect {
 
     # Options
     my %options = (
-        Blocking => 0,
         PeerAddr => $args->{address},
         PeerPort => $args->{port} || ($args->{tls} ? 443 : 80),
         Proto    => 'tcp',
@@ -151,7 +163,7 @@ sub connect {
     );
 
     # New connection
-    my $class = IPV6 ? 'IO::Socket::INET6' : 'IO::Socket::INET';
+    my $class = IPV6 ? 'IO::Socket::IP' : 'IO::Socket::INET';
     return unless my $socket = $args->{socket} || $class->new(%options);
     my $id = "$socket";
 
@@ -161,8 +173,10 @@ sub connect {
 
     # Add connection
     my $c = $self->{_cs}->{$id} = {
-        buffer     => Mojo::ByteStream->new,
-        connect_cb => $args->{connect_cb} || $args->{cb},
+        buffer     => b(),
+        on_connect => $args->{on_connect}
+          || $args->{connect_cb}
+          || $args->{cb},
         connecting => 1,
         socket     => $socket
     };
@@ -179,9 +193,10 @@ sub connect {
           sub { shift->_error($id, 'Connect timeout.') });
 
     # Register callbacks
-    for my $name (qw/error_cb hup_cb read_cb/) {
-        my $cb = $args->{$name};
-        $self->$name($id => $cb) if $cb;
+    for my $name (qw/error hup read/) {
+        my $cb = $args->{"on_$name"} || $args->{"${name}_cb"};
+        my $event = "on_$name";
+        $self->$event($id => $cb) if $cb;
     }
 
     # Add socket to poll
@@ -215,8 +230,6 @@ sub drop {
     return $self->_drop_immediately($id);
 }
 
-sub error_cb { shift->_add_event('error', @_) }
-
 sub generate_port {
     my $self = shift;
 
@@ -238,8 +251,6 @@ sub generate_port {
     return;
 }
 
-sub hup_cb { shift->_add_event('hup', @_) }
-
 sub is_running { shift->{_running} }
 
 # Fat Tony is a cancer on this fair city!
@@ -256,21 +267,36 @@ sub listen {
 
     # Options
     my %options = (
-        Blocking => 0,
-        Listen   => $args->{queue_size} || SOMAXCONN,
-        Type     => SOCK_STREAM,
+        Listen => $args->{queue_size} || SOMAXCONN,
+        Proto  => 'tcp',
+        Type   => SOCK_STREAM,
         %{$args->{args} || {}}
     );
 
+    # File
+    my $file = $args->{file};
+
+    # Port
+    my $port = $args->{port} || 3000;
+
+    # File descriptor reuse
+    my $reuse = defined $file ? $file : $port;
+    $ENV{MOJO_REUSE} ||= '';
+    my $fd;
+    if ($ENV{MOJO_REUSE} =~ /(?:^|\,)$reuse\:(\d+)/) { $fd = $1 }
+
     # Listen on UNIX domain socket
     my $socket;
-    if (my $file = $args->{file}) {
+    if (defined $file) {
 
         # Path
         $options{Local} = $file;
 
         # Create socket
-        $socket = IO::Socket::UNIX->new(%options)
+        $socket =
+          defined $fd
+          ? IO::Socket::UNIX->new
+          : IO::Socket::UNIX->new(%options)
           or croak "Can't create listen socket: $!";
     }
 
@@ -279,25 +305,34 @@ sub listen {
 
         # Socket options
         $options{LocalAddr} = $args->{address} || (IPV6 ? '::' : '0.0.0.0');
-        $options{LocalPort} = $args->{port}    || 3000;
+        $options{LocalPort} = $port;
         $options{Proto}     = 'tcp';
         $options{ReuseAddr} = 1;
 
         # Create socket
-        my $class = IPV6 ? 'IO::Socket::INET6' : 'IO::Socket::INET';
-        $socket = $class->new(%options)
+        my $class = IPV6 ? 'IO::Socket::IP' : 'IO::Socket::INET';
+        $socket = defined $fd ? $class->new : $class->new(%options)
           or croak "Can't create listen socket: $!";
     }
+
+    # File descriptor
+    if (defined $fd) { $socket->fdopen($fd, 'r') }
+    else {
+        $fd = fileno $socket;
+        $reuse = ",$reuse" if length $ENV{MOJO_REUSE};
+        $ENV{MOJO_REUSE} .= "$reuse:$fd";
+    }
     my $id = "$socket";
+    $self->{_fds}->{$fd} = $id;
 
     # Add listen socket
     my $c = $self->{_listen}->{$id} = {
-        accept_cb => $args->{accept_cb} || $args->{cb},
-        error_cb => $args->{error_cb},
         file => $args->{file} ? 1 : 0,
-        hup_cb  => $args->{hup_cb},
-        read_cb => $args->{read_cb},
-        socket  => $socket
+        on_accept => $args->{on_accept} || $args->{accept_cb} || $args->{cb},
+        on_error  => $args->{on_error}  || $args->{error_cb},
+        on_hup    => $args->{on_hup}    || $args->{hup_cb},
+        on_read   => $args->{on_read}   || $args->{read_cb},
+        socket    => $socket
     };
 
     # TLS options
@@ -307,10 +342,6 @@ sub listen {
         SSL_key_file       => $args->{tls_key} || $self->_prepare_key
       }
       if $args->{tls};
-
-    # File descriptor
-    my $fd = fileno $socket;
-    $self->{_fds}->{$fd} = $id;
 
     return $id;
 }
@@ -330,6 +361,10 @@ sub local_info {
     # Info
     return {address => $socket->sockhost, port => $socket->sockport};
 }
+
+sub on_error { shift->_add_event('error', @_) }
+sub on_hup   { shift->_add_event('hup',   @_) }
+sub on_read  { shift->_add_event('read',  @_) }
 
 sub one_tick {
     my ($self, $timeout) = @_;
@@ -429,18 +464,16 @@ sub one_tick {
     my $timers = $self->_timer;
 
     # Tick callback
-    if (my $cb = $self->tick_cb) {
+    if (my $cb = $self->on_tick) {
         $self->_run_callback('tick', $cb);
     }
 
     # Idle callback
-    if (my $cb = $self->idle_cb) {
+    if (my $cb = $self->on_idle) {
         $self->_run_callback('idle', $cb)
           unless @read || @write || @error || @hup || $timers;
     }
 }
-
-sub read_cb { shift->_add_event('read', @_) }
 
 sub remote_info {
     my ($self, $id) = @_;
@@ -486,13 +519,11 @@ sub start_tls {
     my $args = ref $_[0] ? $_[0] : {@_};
 
     # Options
-    my %options =
-      (SSL_startHandshake => 0, Timeout => $self->connect_timeout);
-    if ($args->{tls_ca_file}) {
-        $options{SSL_ca_file}         = $args->{tls_ca_file};
-        $options{SSL_verify_mode}     = 0x01;
-        $options{SSL_verify_callback} = $args->{tls_verify_cb};
-    }
+    my %options = (
+        SSL_startHandshake => 0,
+        Timeout            => $self->connect_timeout,
+        %{$args->{tls_args} || {}}
+    );
 
     # Connection
     $self->drop($id) and return unless my $c = $self->{_cs}->{$id};
@@ -530,6 +561,25 @@ sub start_tls {
 
 sub stop { delete shift->{_running} }
 
+sub test {
+    my ($self, $id) = @_;
+
+    # Connection
+    return unless my $c = $self->{_cs}->{$id};
+
+    # Socket
+    return unless my $socket = $c->{socket};
+
+    # Test
+    my $test = $self->{_test} ||= IO::Poll->new;
+    $test->mask($socket, POLLIN);
+    $test->poll(0);
+    my $result = $test->handles(POLLIN | POLLERR | POLLHUP);
+    $test->remove($socket);
+
+    return !$result;
+}
+
 sub timer {
     my ($self, $after, $cb) = @_;
 
@@ -550,14 +600,18 @@ sub write {
     my $c = $self->{_cs}->{$id};
 
     # Buffer
-    $c->{buffer} = Mojo::ByteStream->new unless exists $c->{buffer};
+    $c->{buffer} = b() unless exists $c->{buffer};
     $c->{buffer}->add_chunk($chunk);
 
-    # Callback
-    $c->{drain} = 0 if $cb;
+    # UNIX only
+    unless (WINDOWS) {
 
-    # Fast write
-    $self->_write($id);
+        # Callback
+        $c->{drain} = 0 if $cb;
+
+        # Fast write
+        $self->_write($id);
+    }
 
     # Callback
     $c->{drain} = $cb if $cb;
@@ -573,20 +627,26 @@ sub _accept {
     my $socket = $listen->accept or return;
 
     # Unlock
-    $self->unlock_cb->($self);
+    $self->on_unlock->($self);
 
     # Listen
     my $l = $self->{_listen}->{$listen};
 
+    # Weaken
+    weaken $self;
+
     # TLS handshake
     my $tls = $l->{tls};
-    $socket = IO::Socket::SSL->start_SSL($socket, %$tls) if $tls;
+    if ($tls) {
+        $tls->{SSL_error_trap} = sub { $self->_drop_immediately(shift) };
+        $socket = IO::Socket::SSL->start_SSL($socket, %$tls);
+    }
 
     # Add connection
     my $id = "$socket";
     my $c = $self->{_cs}->{$id} = {
         accepting => 1,
-        buffer    => Mojo::ByteStream->new,
+        buffer    => b(),
         socket    => $socket
     };
     $c->{tls_accept} = 1 if $tls;
@@ -604,13 +664,13 @@ sub _accept {
     $self->{_fds}->{$fd} = $id;
 
     # Register callbacks
-    for my $name (qw/error_cb hup_cb read_cb/) {
+    for my $name (qw/on_error on_hup on_read/) {
         my $cb = $l->{$name};
         $self->$name($id => $cb) if $cb;
     }
 
     # Accept callback
-    my $cb = $l->{accept_cb};
+    my $cb = $l->{on_accept};
     $self->_run_event('accept', $cb, $id) if $cb;
 
     # Remove listen sockets
@@ -705,8 +765,11 @@ sub _drop_immediately {
 sub _error {
     my ($self, $id, $error) = @_;
 
+    # Connection
+    return unless my $c = $self->{_cs}->{$id};
+
     # Get error callback
-    my $event = $self->{_cs}->{$id}->{error};
+    my $event = $c->{error};
 
     # Cleanup
     $self->_drop_immediately($id);
@@ -839,7 +902,7 @@ sub _prepare_connect {
     $self->_drop_immediately(delete $c->{connect_timer});
 
     # Connect callback
-    my $cb = $c->{connect_cb};
+    my $cb = $c->{on_connect};
     $self->_run_event('connect', $cb, $id) if $cb;
 }
 
@@ -862,7 +925,7 @@ sub _prepare_connections {
         if ($c->{finish}) {
 
             # Buffer empty
-            unless ($c->{buffer} && !$c->{buffer}->size) {
+            unless (defined $c->{buffer} && $c->{buffer}->size) {
                 $self->_drop_immediately($id);
                 next;
             }
@@ -918,7 +981,7 @@ sub _prepare_listen {
     return unless $i < $self->max_connections;
 
     # Lock
-    return unless $self->lock_cb->($self, !$i);
+    return unless $self->on_lock->($self, !$i);
 
     # Add listen sockets
     for my $lid (keys %$listen) {
@@ -1077,7 +1140,6 @@ sub _tls_accept {
     # Connected
     if ($c->{socket}->accept_SSL) {
         delete $c->{tls_accept};
-        $self->_writing($id);
         return;
     }
 
@@ -1103,7 +1165,6 @@ sub _tls_connect {
     # Connected
     if ($c->{socket}->connect_SSL) {
         delete $c->{tls_connect};
-        $self->_writing($id);
         return;
     }
 
@@ -1230,7 +1291,7 @@ Mojo::IOLoop - Minimalistic Reactor For TCP Clients And Servers
     # Listen on port 3000
     $loop->listen(
         port => 3000,
-        read_cb => sub {
+        on_read => sub {
             my ($self, $id, $chunk) = @_;
 
             # Process input
@@ -1246,13 +1307,13 @@ Mojo::IOLoop - Minimalistic Reactor For TCP Clients And Servers
         address => 'localhost',
         port => 3000,
         tls => 1,
-        connect_cb => sub {
+        on_connect => sub {
             my ($self, $id) = @_;
 
             # Write request
             $self->write($id, "GET / HTTP/1.1\r\n\r\n");
         },
-        read_cb => sub {
+        on_read => sub {
             my ($self, $id, $chunk) = @_;
 
             # Process input
@@ -1276,7 +1337,7 @@ L<Mojo::IOLoop> is a very minimalistic reactor that has been reduced to the
 absolute minimal feature set required to build solid and scalable TCP clients
 and servers.
 
-Optional modules L<IO::KQueue>, L<IO::Epoll>, L<IO::Socket::INET6> and
+Optional modules L<IO::KQueue>, L<IO::Epoll>, L<IO::Socket::IP> and
 L<IO::Socket::SSL> are supported transparently and used if installed.
 
 A TLS certificate and key are also built right in to make writing test
@@ -1302,31 +1363,6 @@ dropped, defaults to C<5>.
 Maximum time in seconds a conenction can take to be connected before being
 dropped, defaults to C<5>.
 
-=head2 C<idle_cb>
-
-    my $cb = $loop->idle_cb;
-    $loop  = $loop->idle_cb(sub {...});
-
-Callback to be invoked on every reactor tick if no events occurred.
-Note that this attribute is EXPERIMENTAL and might change without warning!
-
-=head2 C<lock_cb>
-
-    my $cb = $loop->lock_cb;
-    $loop  = $loop->lock_cb(sub {...});
-
-A locking callback that decides if this loop is allowed to accept new
-incoming connections, used to sync multiple server processes.
-The callback should return true or false.
-Note that exceptions in this callback are not captured.
-
-    $loop->lock_cb(sub {
-        my ($loop, $blocking) = @_;
-
-        # Got the lock, listen for new connections
-        return 1;
-    });
-
 =head2 C<max_connections>
 
     my $max = $loop->max_connections;
@@ -1338,19 +1374,52 @@ Setting the value to C<0> will make this loop stop accepting new connections
 and allow it to shutdown gracefully without interrupting existing
 connections.
 
-=head2 C<tick_cb>
+=head2 C<on_idle>
 
-    my $cb = $loop->tick_cb;
-    $loop  = $loop->tick_cb(sub {...});
+    my $cb = $loop->on_idle;
+    $loop  = $loop->on_idle(sub {...});
+
+Callback to be invoked on every reactor tick if no events occurred.
+Note that this attribute is EXPERIMENTAL and might change without warning!
+
+=head2 C<on_lock>
+
+    my $cb = $loop->on_lock;
+    $loop  = $loop->on_lock(sub {...});
+
+A locking callback that decides if this loop is allowed to accept new
+incoming connections, used to sync multiple server processes.
+The callback should return true or false.
+Note that exceptions in this callback are not captured.
+
+    $loop->on_lock(sub {
+        my ($loop, $blocking) = @_;
+
+        # Got the lock, listen for new connections
+        return 1;
+    });
+
+=head2 C<on_tick>
+
+    my $cb = $loop->on_tick;
+    $loop  = $loop->on_tick(sub {...});
 
 Callback to be invoked on every reactor tick, this for example allows you to
 run multiple reactors next to each other.
 
     my $loop2 = Mojo::IOLoop->new(timeout => 0);
-    Mojo::IOLoop->singleton->tick_cb(sub { $loop2->one_tick });
+    Mojo::IOLoop->singleton->on_tick(sub { $loop2->one_tick });
 
 Note that the loop timeout can be changed dynamically at any time to adjust
 responsiveness.
+
+=head2 C<on_unlock>
+
+    my $cb = $loop->on_unlock;
+    $loop  = $loop->on_unlock(sub {...});
+
+A callback to free the accept lock, used to sync multiple server processes.
+Note that exceptions in this callback are not captured.
 
 =head2 C<timeout>
 
@@ -1360,14 +1429,6 @@ responsiveness.
 Maximum time in seconds our loop waits for new events to happen, defaults to
 C<0.25>.
 Note that a value of C<0> would make the loop non blocking.
-
-=head2 C<unlock_cb>
-
-    my $cb = $loop->unlock_cb;
-    $loop  = $loop->unlock_cb(sub {...});
-
-A callback to free the accept lock, used to sync multiple server processes.
-Note that exceptions in this callback are not captured.
 
 =head1 METHODS
 
@@ -1396,7 +1457,7 @@ possible.
 
 Open a TCP connection to a remote host, IPv6 will be used automatically if
 available.
-Note that IPv6 support depends on L<IO::Socket::INET6> and TLS support on
+Note that IPv6 support depends on L<IO::Socket::IP> and TLS support on
 L<IO::Socket::SSL>.
 
 These options are currently available.
@@ -1407,25 +1468,25 @@ These options are currently available.
 
 Address or host name of the peer to connect to.
 
-=item C<connect_cb>
+=item C<on_connect>
 
 Callback to be invoked once the connection is established.
 
-=item C<error_cb>
+=item C<on_error>
 
 Callback to be invoked if an error event happens on the connection.
 
-=item C<hup_cb>
+=item C<on_hup>
 
 Callback to be invoked if the connection gets closed.
+
+=item C<on_read>
+
+Callback to be invoked if new data arrives on the connection.
 
 =item C<port>
 
 Port to connect to.
-
-=item C<read_cb>
-
-Callback to be invoked if new data arrives on the connection.
 
 =item C<socket>
 
@@ -1434,14 +1495,6 @@ Use an already prepared socket handle.
 =item C<tls>
 
 Enable TLS.
-
-=item C<tls_ca_file>
-
-CA file to use for TLS.
-
-=item C<tls_verify_cb>
-
-Callback to invoke for TLS verification.
 
 =back
 
@@ -1461,23 +1514,11 @@ Drop a connection, listen socket or timer.
 Connections will be dropped gracefully by allowing them to finish writing all
 data in it's write buffer.
 
-=head2 C<error_cb>
-
-    $loop = $loop->error_cb($id => sub {...});
-
-Callback to be invoked if an error event happens on the connection.
-
 =head2 C<generate_port>
 
     my $port = $loop->generate_port;
 
 Find a free TCP port, this is a utility function primarily used for tests.
-
-=head2 C<hup_cb>
-
-    $loop = $loop->hup_cb($id => sub {...});
-
-Callback to be invoked if the connection gets closed.
 
 =head2 C<is_running>
 
@@ -1500,7 +1541,7 @@ Check if loop is running.
     );
 
 Create a new listen socket, IPv6 will be used automatically if available.
-Note that IPv6 support depends on L<IO::Socket::INET6> and TLS support on
+Note that IPv6 support depends on L<IO::Socket::IP> and TLS support on
 L<IO::Socket::SSL>.
 
 These options are currently available.
@@ -1511,21 +1552,25 @@ These options are currently available.
 
 Local address to listen on, defaults to all.
 
-=item C<accept_cb>
-
-Callback to invoke for each accepted connection.
-
-=item C<error_cb>
-
-Callback to be invoked if an error event happens on the connection.
-
 =item C<file>
 
 A unix domain socket to listen on.
 
-=item C<hup_cb>
+=item C<on_accept>
+
+Callback to invoke for each accepted connection.
+
+=item C<on_error>
+
+Callback to be invoked if an error event happens on the connection.
+
+=item C<on_hup>
 
 Callback to be invoked if the connection gets closed.
+
+=item C<on_read>
+
+Callback to be invoked if new data arrives on the connection.
 
 =item C<port>
 
@@ -1534,10 +1579,6 @@ Port to listen on.
 =item C<queue_size>
 
 Maximum queue size, defaults to C<SOMAXCONN>.
-
-=item C<read_cb>
-
-Callback to be invoked if new data arrives on the connection.
 
 =item C<tls>
 
@@ -1575,6 +1616,30 @@ The local port.
 
 =back
 
+=head2 C<on_error>
+
+    $loop = $loop->on_error($id => sub {...});
+
+Callback to be invoked if an error event happens on the connection.
+
+=head2 C<on_hup>
+
+    $loop = $loop->on_hup($id => sub {...});
+
+Callback to be invoked if the connection gets closed.
+
+=head2 C<on_read>
+
+    $loop = $loop->on_read($id => sub {...});
+
+Callback to be invoked if new data arrives on the connection.
+
+    $loop->on_read($id => sub {
+        my ($loop, $id, $chunk) = @_;
+
+        # Process chunk
+    });
+
 =head2 C<one_tick>
 
     $loop->one_tick;
@@ -1582,18 +1647,6 @@ The local port.
     $loop->one_tick(0);
 
 Run reactor for exactly one tick.
-
-=head2 C<read_cb>
-
-    $loop = $loop->read_cb($id => sub {...});
-
-Callback to be invoked if new data arrives on the connection.
-
-    $loop->read_cb($id => sub {
-        my ($loop, $id, $chunk) = @_;
-
-        # Process chunk
-    });
 
 =head2 C<remote_info>
 
@@ -1634,24 +1687,9 @@ if the loop is already running.
 =head2 C<start_tls>
 
     my $id = $loop->start_tls($id);
-    my $id = $loop->start_tls($id => {tls_ca_file => '/etc/tls/cacerts.pem'});
 
 Start new TLS connection inside old connection.
 Note that TLS support depends on L<IO::Socket::SSL>.
-
-These options are currently available.
-
-=over 4
-
-=item C<tls_ca_file>
-
-CA file to use for TLS.
-
-=item C<tls_verify_cb>
-
-Callback to invoke for TLS verification.
-
-=back
 
 =head2 C<stop>
 
@@ -1659,6 +1697,13 @@ Callback to invoke for TLS verification.
 
 Stop the loop immediately, this will not interrupt any existing connections
 and the loop can be restarted by running C<start> again.
+
+=head2 C<test>
+
+    my $success = $loop->test($id);
+
+Test for errors and garbage bytes on the connection.
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<timer>
 

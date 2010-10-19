@@ -15,8 +15,8 @@ use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 262144;
 
 __PACKAGE__->attr([qw/auto_escape compiled namespace/]);
 __PACKAGE__->attr([qw/append code prepend/] => '');
-__PACKAGE__->attr(capture_end               => '}');
-__PACKAGE__->attr(capture_start             => '{');
+__PACKAGE__->attr(capture_end               => 'end');
+__PACKAGE__->attr(capture_start             => 'begin');
 __PACKAGE__->attr(comment_mark              => '#');
 __PACKAGE__->attr(encoding                  => 'UTF-8');
 __PACKAGE__->attr(escape_mark               => '=');
@@ -30,15 +30,15 @@ __PACKAGE__->attr(trim_mark => '=');
 
 # Helpers
 my $HELPERS = <<'EOF';
+use Mojo::ByteStream 'b';
 no strict 'refs'; no warnings 'redefine';
 sub block;
 *block = sub { shift->(@_) };
 sub escape;
 *escape = sub {
-    my $v = shift;
-    ref $v && ref $v eq 'Mojo::ByteStream'
-      ? "$v"
-      : Mojo::ByteStream->new($v)->xml_escape->to_string;
+    ref $_[0] && ref $_[0] eq 'Mojo::ByteStream'
+      ? "$_[0]"
+      : b($_[0])->xml_escape->to_string;
 };
 use strict; use warnings;
 EOF
@@ -124,7 +124,7 @@ sub build {
     my $namespace = $self->namespace || ref $self;
     $lines[0] ||= '';
     $lines[0] =
-      "package $namespace; sub { my \$_M = ''; $HELPERS; $prepend; do {"
+      "package $namespace; $HELPERS sub { my \$_M = ''; $prepend; do {"
       . $lines[0];
     $lines[-1] .= qq/$append; \$_M; } };/;
 
@@ -190,52 +190,93 @@ sub parse {
     my $capture_start = quotemeta $self->capture_start;
     my $capture_end   = quotemeta $self->capture_end;
 
+    # DEPRECATED in Comet!
+    # Use "begin" and "end" instead of "{" and "}"
     my $mixed_re = qr/
         (
-        $tag_start$capture_start$expr$escp   # Escaped expression (start)
+        $tag_start$expr$escp\s*$capture_end   # Escaped expression (end)
         |
-        $tag_start$expr$escp                 # Escaped expression
+        $tag_start$expr$escp                  # Escaped expression
         |
-        $tag_start$capture_start$expr        # Expression (start)
+        $tag_start$expr\s*$capture_end        # Expression (end)
         |
-        $tag_start$expr                      # Expression
+        $tag_start$expr                       # Expression
         |
-        $tag_start$capture_end$cmnt          # Comment (end)
+        $tag_start$cmnt\s*$capture_end        # Comment (end)
         |
-        $tag_start$capture_start$cmnt        # Comment (start)
+        $tag_start$cmnt\}                     # DEPRECATED Comment (end)
         |
-        $tag_start$cmnt                      # Comment
+        $tag_start$cmnt                       # Comment
         |
-        $tag_start$capture_end               # Code (end)
+        $tag_start\s*$capture_end             # Code (end)
         |
-        $tag_start$capture_start             # Code (start)
+        $tag_start\}                          # DEPRECATED Code (end)
         |
-        $tag_start                           # Code
+        $tag_start                            # Code
         |
-        $trim$capture_start$tag_end          # Trim end (start)
+        $capture_start\s*$trim$tag_end        # Trim end (start)
         |
-        $trim$tag_end                        # Trim end
+        \{$trim$tag_end                       # DEPRECATED Trim end (start)
         |
-        $capture_start$tag_end               # End (start)
+        $trim$tag_end                         # Trim end
         |
-        $tag_end                             # End
+        $capture_start\s*$tag_end             # End (start)
+        |
+        \{$tag_end                            # DEPRECATED End (start)
+        |
+        $tag_end                              # End
         )
     /x;
 
-    # Capture regex
-    my $token_capture_re =
-      qr/^($tag_start|$tag_end)($capture_end|$capture_start)/;
+    # Capture end regex
+    my $capture_end_re = qr/
+        ^(
+        $tag_start        # Start
+        )
+        (?:
+        $expr             # Expression
+        )?
+        (?:
+        $escp             # Escaped expression
+        )?
+        (?:
+        \s*$capture_end   # (end)
+        |
+        \}                # DEPRECATED (end)
+        )
+    /x;
 
     # Tag end regex
     my $end_re = qr/
         ^(
-        $trim$capture_start$tag_end   # Trim end (start)
+            (?:
+            $capture_start\s*$trim$tag_end   # Trim end (start)
+            |
+            \{$trim$tag_end                  # DEPRECATED Trim end (start)
+            )
         )|(
-        $capture_start$tag_end        # End (start)
+            (?:
+            $capture_start\s*$tag_end        # End (start)
+            |
+            \{$tag_end                       # DEPRECATED End (start)
+            )
         )|(
-        $trim$tag_end                 # Trim end
+        $trim$tag_end                        # Trim end
         )|
-        $tag_end                      # End
+        $tag_end                             # End
+        $
+    /x;
+
+    # Perl line regex
+    my $line_re = qr/
+        ^
+        (\s*)                  # Leading whitespace
+        $line_start            # Line start
+        ($expr)?               # Expression
+        ($escp)?               # Escaped expression
+        (\s*$capture_end)?     # End
+        ([^\#\>]{1}.*?)?       # Code
+        ($capture_start\s*)?   # Start
         $
     /x;
 
@@ -245,40 +286,35 @@ sub parse {
     my @capture_token;
     my $trimming = 0;
     for my $line (split /\n/, $tmpl) {
-        my @capture;
 
-        # Perl line with capture end or start
-        if ($line =~ /^$line_start($capture_end|$capture_start)/) {
-            my $capture = $1;
-            $line =~ s/^($line_start)$capture/$1/;
-            @capture =
-              ("\\$capture" eq $capture_end ? 'cpen' : 'cpst', undef);
-        }
+        # Perl line
+        if ($line =~ /$line_re/) {
 
-        # Perl line with return value that needs to be escaped
-        if ($line =~ /^$line_start$expr$escp(.+)?$/) {
-            push @{$self->tree}, [@capture, 'escp', $1];
-            $multiline_expression = 0;
-            next;
-        }
+            # Token
+            my @token = ();
 
-        # Perl line with return value
-        if ($line =~ /^$line_start$expr(.+)?$/) {
-            push @{$self->tree}, [@capture, 'expr', $1];
+            # Capture end
+            push @token, 'cpen', undef if $4;
+
+            # Capture start
+            push @token, 'cpst', undef if $6;
+
+            # Expression
+            if ($2) {
+                unshift @token, 'text', $1;
+                push @token, $3 ? 'escp' : 'expr', $5, 'text', "\n";
+            }
+
+            # Code
+            else { push @token, 'code', $5 }
+
+            push @{$self->tree}, \@token;
             $multiline_expression = 0;
             next;
         }
 
         # Comment line, dummy token needed for line count
-        if ($line =~ /^$line_start$cmnt(.+)?$/) {
-            push @{$self->tree}, [@capture];
-            $multiline_expression = 0;
-            next;
-        }
-
-        # Perl line without return value
-        if ($line =~ /^$line_start([^\>]{1}.*)?$/) {
-            push @{$self->tree}, [@capture, 'code', $1];
+        if ($line =~ /^\s*$line_start$cmnt(.+)?$/) {
             $multiline_expression = 0;
             next;
         }
@@ -309,14 +345,9 @@ sub parse {
             # Done trimming
             $trimming = 0 if $trimming && $state ne 'text';
 
-            # Perl token with capture end or start
-            if ($token =~ /$token_capture_re/) {
-                my $tag     = quotemeta $1;
-                my $capture = quotemeta $2;
-                $token =~ s/^($tag)$capture/$1/;
-                @capture_token =
-                  ($capture eq $capture_end ? 'cpen' : 'cpst', undef);
-            }
+            # Capture end
+            @capture_token = ('cpen', undef)
+              if $token =~ s/$capture_end_re/$1/;
 
             # End
             if ($state ne 'text' && $token =~ /$end_re/) {
@@ -569,23 +600,29 @@ example.
     %== Perl expression line, replaced with result
 
 L<Mojo::ByteStream> objects are always excluded from automatic escaping.
+
+    <%= b('<div>excluded!</div>') %>
+
 Whitespace characters around tags can be trimmed with a special tag ending.
 
     <%= All whitespace characters around this expression will be trimmed =%>
 
-You can capture whole template blocks for reuse later.
+You can capture whole template blocks for reuse later with the C<begin> and
+C<end> keywords.
 
-    <% my $block = {%>
+    <% my $block = begin %>
         <% my $name = shift; =%>
         Hello <%= $name %>.
-    <%}%>
-    <%= $block->('Sebastian') %>
-    <%= $block->('Sara') %>
+    <% end %>
+    <%= $block->('Baerbel') %>
+    <%= $block->('Wolfgang') %>
 
-    %{ my $block =
-    % my $name = shift;
-    Hello <%= $name %>.
-    %}
+Perl lines can also be indented freely.
+
+    % my $block = begin
+        % my $name = shift;
+        Hello <%= $name %>.
+    % end
     %= $block->('Baerbel')
     %= $block->('Wolfgang')
 
@@ -673,24 +710,24 @@ Append Perl code to compiled template.
 =head2 C<capture_end>
 
     my $capture_end = $mt->capture_end;
-    $mt             = $mt->capture_end('}');
+    $mt             = $mt->capture_end('end');
 
-Character indicating the end of a capture block, defaults to C<}>.
+Keyword indicating the end of a capture block, defaults to C<end>.
 
-    %{ $block =
+    <% my $block = begin %>
         Some data!
-    %}
+    <% end %>
 
 =head2 C<capture_start>
 
     my $capture_start = $mt->capture_start;
-    $mt               = $mt->capture_start('{');
+    $mt               = $mt->capture_start('begin');
 
-Character indicating the start of a capture block, defaults to C<{>.
+Keyword indicating the start of a capture block, defaults to C<begin>.
 
-    <% my $block = {%>
+    <% my $block = begin %>
         Some data!
-    <%}%>
+    <% end %>
 
 =head2 C<code>
 

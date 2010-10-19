@@ -90,7 +90,7 @@ sub get_body_chunk {
     my ($self, $offset) = @_;
 
     # Body generator
-    return $self->generate_body_chunk($offset) if $self->body_cb;
+    return $self->generate_body_chunk($offset) if $self->on_read;
 
     # Multipart
     my $boundary        = $self->build_boundary;
@@ -134,15 +134,14 @@ sub get_body_chunk {
 sub parse {
     my $self = shift;
 
-    # Parse headers and filter body
+    # Parse headers and chunked body
     $self->SUPER::parse(@_);
 
     # Custom body parser
-    return $self if $self->body_cb;
+    return $self if $self->on_read;
 
     # Upgrade state
-    $self->{_state} = 'multipart_preamble'
-      if ($self->{_state} || '') eq 'body';
+    $self->{_multi_state} ||= 'multipart_preamble';
 
     # Parse multipart content
     $self->_parse_multipart;
@@ -168,17 +167,17 @@ sub _parse_multipart {
         last if $self->is_done;
 
         # Preamble
-        if (($self->{_state} || '') eq 'multipart_preamble') {
+        if (($self->{_multi_state} || '') eq 'multipart_preamble') {
             last unless $self->_parse_multipart_preamble($boundary);
         }
 
         # Boundary
-        elsif (($self->{_state} || '') eq 'multipart_boundary') {
+        elsif (($self->{_multi_state} || '') eq 'multipart_boundary') {
             last unless $self->_parse_multipart_boundary($boundary);
         }
 
         # Body
-        elsif (($self->{_state} || '') eq 'multipart_body') {
+        elsif (($self->{_multi_state} || '') eq 'multipart_body') {
             last unless $self->_parse_multipart_body($boundary);
         }
     }
@@ -203,7 +202,7 @@ sub _parse_multipart_body {
     # Store chunk
     my $chunk = $buffer->remove($pos);
     $self->parts->[-1] = $self->parts->[-1]->parse($chunk);
-    $self->{_state} = 'multipart_boundary';
+    $self->{_multi_state} = 'multipart_boundary';
     return 1;
 }
 
@@ -217,7 +216,7 @@ sub _parse_multipart_boundary {
 
         # New part
         push @{$self->parts}, Mojo::Content::Single->new(relaxed => 1);
-        $self->{_state} = 'multipart_body';
+        $self->{_multi_state} = 'multipart_body';
         return 1;
     }
 
@@ -227,7 +226,7 @@ sub _parse_multipart_boundary {
         $buffer->remove(length $end);
 
         # Done
-        $self->{_state} = 'done';
+        $self->{_state} = $self->{_multi_state} = 'done';
     }
 
     return;
@@ -243,7 +242,7 @@ sub _parse_multipart_preamble {
         $buffer->remove($pos, "\x0d\x0a");
 
         # Parse boundary
-        $self->{_state} = 'multipart_boundary';
+        $self->{_multi_state} = 'multipart_boundary';
         return 1;
     }
 

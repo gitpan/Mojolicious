@@ -11,7 +11,7 @@ use Mojo::Server::PSGI;
 # People die all the time, just like that.
 # Why, you could wake up dead tomorrow! Well, good night.
 __PACKAGE__->attr(description => <<'EOF');
-Start application with PSGI backend.
+Start application with PSGI.
 EOF
 __PACKAGE__->attr(usage => <<"EOF");
 usage: $0 psgi
@@ -21,6 +21,9 @@ EOF
 sub run {
     my $self = shift;
     my $psgi = Mojo::Server::PSGI->new;
+
+    # Preload
+    $psgi->app;
 
     # Return app callback
     return sub { $psgi->run(@_) };

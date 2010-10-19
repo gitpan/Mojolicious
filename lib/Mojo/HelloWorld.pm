@@ -5,7 +5,6 @@ use warnings;
 
 use base 'Mojo';
 
-use Mojo::Filter::Chunked;
 use Mojo::JSON;
 
 # How is education supposed to make me feel smarter? Besides,
@@ -33,6 +32,7 @@ sub handler {
     $res->code(200);
     $res->headers->content_type('text/plain');
     $res->body('Your Mojo is working!');
+    $tx->resume;
 }
 
 sub _chunked_params {
@@ -49,23 +49,21 @@ sub _chunked_params {
     }
 
     # Callback
-    my $counter = 0;
-    my $chunked = Mojo::Filter::Chunked->new;
-    $tx->res->body(
-        sub {
-            my $self = shift;
-            my $chunk = $chunks->[$counter] || '';
-            $counter++;
-            return $chunked->build($chunk);
-        }
-    );
+    my $cb;
+    $cb = sub {
+        my $self = shift;
+        my $chunk = shift @$chunks || '';
+        $self->write_chunk($chunk, $chunk ? $cb : undef);
+    };
+    $cb->($tx->res);
+    $tx->resume;
 }
 
 sub _diag {
     my ($self, $tx) = @_;
 
     # Finished transaction
-    $tx->finished(sub { $ENV{MOJO_HELLO} = 'world' });
+    $tx->on_finish(sub { $ENV{MOJO_HELLO} = 'world' });
 
     # Path
     my $path = $tx->req->url->path;
@@ -83,6 +81,7 @@ sub _diag {
     return $self->_chunked_params($tx) if $path =~ /^\/chunked_params/;
     return $self->_dump_env($tx)       if $path =~ /^\/dump_env/;
     return $self->_dump_params($tx)    if $path =~ /^\/dump_params/;
+    return $self->_upload($tx)         if $path =~ /^\/upload/;
     return $self->_proxy($tx)          if $path =~ /^\/proxy/;
 
     # List
@@ -95,10 +94,12 @@ sub _diag {
         <a href="/diag/dump_env">Dump Environment Variables</a><br />
         <a href="/diag/dump_params">Dump Request Parameters</a><br />
         <a href="/diag/proxy">Proxy</a><br />
+        <a href="/diag/upload">Upload</a><br />
         <a href="/diag/websocket">WebSocket</a>
     </body>
 </html>
 EOF
+    $tx->resume;
 }
 
 sub _dump_env {
@@ -106,6 +107,7 @@ sub _dump_env {
     my $res = $tx->res;
     $res->headers->content_type('application/json');
     $res->body(Mojo::JSON->new->encode(\%ENV));
+    $tx->resume;
 }
 
 sub _dump_params {
@@ -113,6 +115,7 @@ sub _dump_params {
     my $res = $tx->res;
     $res->headers->content_type('application/json');
     $res->body(Mojo::JSON->new->encode($tx->req->params->to_hash));
+    $tx->resume;
 }
 
 sub _hello {
@@ -123,6 +126,7 @@ sub _hello {
     $res->code(200);
     $res->headers->content_type('text/plain');
     $res->body('Your Mojo is working!');
+    $tx->resume;
 }
 
 sub _proxy {
@@ -140,8 +144,9 @@ sub _proxy {
                 $tx->res->headers->content_type(
                     $tx2->res->headers->content_type);
                 $tx->res->body($tx2->res->content->asset->slurp);
+                $tx->resume;
             }
-        )->process;
+        )->start;
 
         return;
     }
@@ -149,23 +154,18 @@ sub _proxy {
     # Async proxy
     if (my $url = $tx->req->param('async_url')) {
 
-        # Pause transaction
-        $tx->pause;
-
         # Fetch
         $self->client->async->get(
             $url => sub {
                 my ($self, $tx2) = @_;
 
-                # Resume transaction
-                $tx->resume;
-
                 # Pass through content
                 $tx->res->headers->content_type(
                     $tx2->res->headers->content_type);
                 $tx->res->body($tx2->res->content->asset->slurp);
+                $tx->resume;
             }
-        )->process;
+        )->start;
 
         return;
     }
@@ -192,6 +192,48 @@ sub _proxy {
     </body>
 </html>
 EOF
+    $tx->resume;
+}
+
+sub _upload {
+    my ($self, $tx) = @_;
+
+    # Request
+    my $req = $tx->req;
+
+    # Response
+    my $res = $tx->res;
+    $res->code(200);
+
+    # File
+    if (my $file = $req->upload('file')) {
+        my $headers = $res->headers;
+        $headers->content_type($file->headers->content_type
+              || 'application/octet-stream');
+        $headers->header('X-Upload-Limit-Exceeded' => 1)
+          if $req->is_limit_exceeded;
+        $res->body($file->slurp);
+    }
+
+    # Form
+    else {
+        my $url = $req->url->to_abs;
+        $url->path('/diag/upload');
+        $res->headers->content_type('text/html');
+        $res->body(<<"EOF");
+<!doctype html><html>
+    <head><title>Mojo Diagnostics</title></head>
+    <body>
+        File:
+        <form action="$url" method="POST" enctype="multipart/form-data">
+            <input type="file" name="file" />
+            <input type="submit" value="Upload" />
+        </form>
+    </body>
+</html>
+EOF
+    }
+    $tx->resume;
 }
 
 sub _websocket {
@@ -200,13 +242,15 @@ sub _websocket {
     # WebSocket request
     if ($tx->is_websocket) {
         $tx->send_message('Congratulations, your Mojo is working!');
-        return $tx->receive_message(
+        $tx->on_message(
             sub {
                 my ($tx, $message) = @_;
                 return unless $message eq 'test 123';
                 $tx->send_message('With WebSocket support!');
+                $tx->resume;
             }
         );
+        return $tx->resume;
     }
 
     # WebSocket example
@@ -241,6 +285,7 @@ sub _websocket {
     </body>
 </html>
 EOF
+    $tx->resume;
 }
 
 1;

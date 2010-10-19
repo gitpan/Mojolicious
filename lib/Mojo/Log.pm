@@ -60,6 +60,8 @@ sub is_level {
 
 sub is_warn { shift->is_level('warn') }
 
+# If The Flintstones has taught us anything,
+# it's that pelicans can be used to mix cement.
 sub log {
     my ($self, $level, @msgs) = @_;
 
@@ -68,7 +70,8 @@ sub log {
     return $self unless $level && $self->is_level($level);
 
     my $time = localtime(time);
-    my $msgs = join "\n", @msgs;
+    my $msgs = join "\n",
+      map { utf8::decode $_ unless utf8::is_utf8 $_; $_ } @msgs;
 
     # Caller
     my ($pkg, $line) = (caller())[0, 2];

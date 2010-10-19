@@ -25,12 +25,13 @@ use constant PUNYCODE_INITIAL_N    => 128;
 # Core module since Perl 5.9.3
 use constant SHA1 => eval 'use Digest::SHA (); 1';
 
-__PACKAGE__->attr(raw_size => 0);
-
 # Punycode delimiter
 my $DELIMITER = chr 0x2D;
 
-# XHTML 1.0 entities for html_unescape
+# Encode cache
+my %ENCODE;
+
+# XHTML 1.0 entities for html_unescape (without "apos")
 my %ENTITIES = (
     Aacute   => 193,
     aacute   => 225,
@@ -47,7 +48,7 @@ my %ENTITIES = (
     amp      => 38,
     and      => 8743,
     ang      => 8736,
-    apos     => 39,
+    '#39'    => 39,
     Aring    => 197,
     aring    => 229,
     asymp    => 8776,
@@ -290,6 +291,9 @@ my %ENTITIES = (
 # Reverse entities for html_escape
 my %REVERSE_ENTITIES = reverse %ENTITIES;
 
+# "apos"
+$ENTITIES{apos} = 39;
+
 # Unreserved character map for url_sanitize
 my %UNRESERVED;
 {
@@ -307,7 +311,11 @@ my %UNRESERVED;
 sub import {
     my $caller = caller;
     no strict 'refs';
-    *{"${caller}::b"} = sub { Mojo::ByteStream->new(@_) }
+    *{"${caller}::b"} = sub {
+        bless {
+            bytestream => @_ < 2 ? defined $_[0] ? "$_[0]" : '' : join('', @_)
+        }, 'Mojo::ByteStream';
+      }
       if @_ > 1;
 }
 
@@ -315,8 +323,8 @@ sub import {
 # Well, I think the veal died of loneliness.
 sub new {
     my $self = shift->SUPER::new();
-    $self->{bytestream} = @_ < 2 ? defined $_[0] ? $_[0] : '' : join('', @_);
-    $self->{raw_size} = length $self->{bytestream};
+    $self->{bytestream} =
+      @_ < 2 ? defined $_[0] ? "$_[0]" : '' : join('', @_);
     return $self;
 }
 
@@ -327,7 +335,7 @@ sub add_chunk {
     return $self unless defined $chunk;
 
     # Raw length
-    $self->{raw_size} = $self->{raw_size} + length $chunk;
+    $self->{_raw_size} += length $chunk;
 
     # Store
     $self->{bytestream} .= $chunk;
@@ -410,6 +418,7 @@ sub decamelize {
 # Number 1: "Cover for me."
 # Number 2: "Oh, good idea, Boss!"
 # Number 3: "It was like that when I got here."
+
 sub decode {
     my ($self, $encoding) = @_;
 
@@ -418,8 +427,18 @@ sub decode {
 
     # Try decoding
     eval {
-        $self->{bytestream} =
-          Encode::decode($encoding, $self->{bytestream}, 1);
+
+        # UTF-8
+        if ($encoding eq 'UTF-8') {
+            die unless utf8::decode $self->{bytestream};
+        }
+
+        # Everything else
+        else {
+            $self->{bytestream} =
+              ($ENCODE{$encoding} ||= Encode::find_encoding($encoding))
+              ->decode($self->{bytestream}, 1);
+        }
     };
 
     # Failed
@@ -444,7 +463,15 @@ sub encode {
     # Shortcut
     return $self unless $encoding;
 
-    $self->{bytestream} = Encode::encode($encoding, $self->{bytestream});
+    # UTF-8
+    if ($encoding eq 'UTF-8') { utf8::encode $self->{bytestream} }
+
+    # Everything else
+    else {
+        $self->{bytestream} =
+          ($ENCODE{$encoding} ||= Encode::find_encoding($encoding))
+          ->encode($self->{bytestream});
+    }
     return $self;
 }
 
@@ -691,6 +718,8 @@ sub quote {
     return $self;
 }
 
+sub raw_size { shift->{_raw_size} || 0 }
+
 sub remove {
     my ($self, $length, $chunk) = @_;
 
@@ -760,6 +789,7 @@ sub url_escape {
 
     # Escape
     utf8::encode $self->{bytestream} if utf8::is_utf8 $self->{bytestream};
+    return $self unless $self->{bytestream} =~ /[^$pattern]/;
     $self->{bytestream} =~ s/([^$pattern])/sprintf('%%%02X',ord($1))/ge;
 
     return $self;
@@ -777,6 +807,9 @@ sub url_sanitize {
 sub url_unescape {
     my $self = shift;
 
+    # Shortcut
+    return $self if index($self->{bytestream}, '%') == -1;
+
     # Unescape
     $self->{bytestream} =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/ge;
 
@@ -792,7 +825,7 @@ sub xml_escape {
         s/</&lt;/g;
         s/>/&gt;/g;
         s/"/&quot;/g;
-        s/'/&apos;/g;
+        s/'/&#39;/g;
     }
 
     return $self;
@@ -936,17 +969,6 @@ Mojo::ByteStream - ByteStream
 
 L<Mojo::ByteStream> provides portable text and bytestream manipulation
 functions.
-
-=head1 ATTRIBUTES
-
-L<Mojo::ByteStream> implements the following attributes.
-
-=head2 C<raw_size>
-
-    my $size = $stream->raw_size;
-    $stream  = $stream->raw_size(23);
-
-Raw bytestream size in bytes.
 
 =head1 METHODS
 
@@ -1101,6 +1123,12 @@ Quoted Printable encode bytestream.
     $stream = $stream->quote;
 
 Quote bytestream.
+
+=head2 C<raw_size>
+
+    my $size = $stream->raw_size;
+
+Raw size of chunks added to bytestream in bytes.
 
 =head2 C<remove>
 

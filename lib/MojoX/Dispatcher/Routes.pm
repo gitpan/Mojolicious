@@ -24,13 +24,20 @@ sub auto_render {
     # Transaction
     my $tx = $c->tx;
 
-    # Render
-    return !$c->render
-      unless $c->stash->{'mojo.rendered'}
-          || $tx->is_paused
-          || $tx->is_websocket;
+    # Rendering
+    my $success = eval {
 
-    # Nothing to render
+        # Render
+        $c->render unless $c->stash->{'mojo.rendered'} || $tx->is_websocket;
+
+        # Success
+        1;
+    };
+
+    # Renderer error
+    $c->render_exception($@) if !$success && $@;
+
+    # Rendered
     return;
 }
 
@@ -77,9 +84,6 @@ sub dispatch {
         my ($error, $code) = $c->req->error;
         $res->code($code) if $code;
     }
-
-    # Params
-    my $p = $c->stash->{'mojo.params'} ||= $c->tx->req->params->clone;
 
     # Walk the stack
     return 1 if $self->_walk_stack($c);
@@ -130,13 +134,15 @@ sub _dispatch_controller {
 
     # Class
     $app ||= $self->_generate_class($c);
-    return unless $app;
+    return 1 unless $app;
 
     # Method
     my $method = $self->_generate_method($c);
 
     # Debug
-    $c->app->log->debug('Dispatching controller.');
+    my $dispatch = ref $app || $app;
+    $dispatch .= "->$method" if $method;
+    $c->app->log->debug("Dispatching $dispatch.");
 
     # Load class
     unless (ref $app && $self->{_loaded}->{$app}) {
@@ -145,7 +151,10 @@ sub _dispatch_controller {
         if (my $e = Mojo::Loader->load($app)) {
 
             # Doesn't exist
-            return unless ref $e;
+            unless (ref $e) {
+                $c->app->log->debug("$app does not exist, maybe a typo?");
+                return;
+            }
 
             # Error
             $c->app->log->error($e);
@@ -169,8 +178,9 @@ sub _dispatch_controller {
             # Call action
             $continue = $app->$method if $app->can($method);
 
-            # Copy stash
-            $c->stash($app->stash);
+            # Merge stash
+            my $new = $app->stash;
+            @{$c->stash}{keys %$new} = values %$new;
         }
 
         # Handler
@@ -266,15 +276,23 @@ sub _generate_method {
 sub _walk_stack {
     my ($self, $c) = @_;
 
-    # Walk the stack
-    my $staging = $#{$c->match->stack};
-    for my $field (@{$c->match->stack}) {
+    # Stack
+    my $stack = $c->match->stack;
 
-        # Params
-        $c->stash->{'mojo.params'}->append(%{$field});
+    # Walk the stack
+    my $staging = @$stack;
+    for my $field (@$stack) {
+        $staging--;
+
+        # Stash
+        my $stash = $c->stash;
+
+        # Captures
+        my $captures = $stash->{'mojo.captures'} ||= {};
+        $stash->{'mojo.captures'} = {%$captures, %$field};
 
         # Merge in captures
-        $c->stash({%{$c->stash}, %{$field}});
+        @{$c->stash}{keys %$field} = values %$field;
 
         # Captures
         $c->match->captures($field);
@@ -292,7 +310,7 @@ sub _walk_stack {
         }
 
         # Break the chain
-        return unless $e;
+        return 1 if $staging && !$e;
     }
 
     # Done

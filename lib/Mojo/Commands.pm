@@ -24,11 +24,34 @@ __PACKAGE__->attr(namespaces => sub { ['Mojo::Command'] });
 
 # Aren't we forgetting the true meaning of Christmas?
 # You know, the birth of Santa.
+sub detect {
+    my ($self, $guess) = @_;
+
+    # Hypnotoad
+    return 'hypnotoad' if defined $ENV{HYPNOTOAD_APP};
+
+    # PSGI (Plack only for now)
+    return 'psgi' if defined $ENV{PLACK_ENV};
+
+    # CGI
+    return 'cgi'
+      if defined $ENV{PATH_INFO} || defined $ENV{GATEWAY_INTERFACE};
+
+    # No further detection if we have a guess
+    return $guess if $guess;
+
+    # FastCGI (detect absence of WINDIR for Windows and USER for UNIX)
+    return 'fastcgi' if !defined $ENV{WINDIR} && !defined $ENV{USER};
+
+    # Nothing
+    return;
+}
+
 sub run {
     my ($self, $name, @args) = @_;
 
     # Try to detect environment
-    $name = $self->_detect($name) unless $ENV{MOJO_NO_DETECT};
+    $name = $self->detect($name) unless $ENV{MOJO_NO_DETECT};
 
     # Run command
     if ($name && $name =~ /^\w+$/ && ($name ne 'help' || $args[0])) {
@@ -139,26 +162,6 @@ sub start {
     return ref $self ? $self->run(@args) : $self->new->run(@args);
 }
 
-sub _detect {
-    my ($self, $name) = @_;
-
-    # PSGI (Plack only for now)
-    return 'psgi' if defined $ENV{PLACK_ENV};
-
-    # CGI
-    return 'cgi'
-      if defined $ENV{PATH_INFO} || defined $ENV{GATEWAY_INTERFACE};
-
-    # No further detection if we have a name
-    return $name if $name;
-
-    # FastCGI
-    return 'fastcgi' unless defined $ENV{PATH};
-
-    # Nothing
-    return;
-}
-
 1;
 __END__
 
@@ -197,36 +200,6 @@ List available commands with short descriptions.
 
 List available options for the command with short descriptions.
 
-=item C<generate>
-
-    mojo generate
-    mojo generate help
-
-List available generator commands with short descriptions.
-
-    mojo generate help <generator>
-
-List available options for generator command with short descriptions.
-
-=item C<generate app>
-
-    mojo generate app <AppName>
-
-Generate application directory structure for a fully functional L<Mojo>
-application.
-
-=item C<generate makefile>
-
-    script/myapp generate makefile
-
-Generate C<Makefile.PL> file for application.
-
-=item C<generate psgi>
-
-    script/myapp generate psgi
-
-Generate C<myapp.psgi> file for application.
-
 =item C<cgi>
 
     mojo cgi
@@ -240,13 +213,6 @@ Start application with CGI backend.
     script/myapp daemon
 
 Start application with standalone HTTP 1.1 server backend.
-
-=item C<daemon_prefork>
-
-    mojo daemon_prefork
-    script/myapp daemon_prefork
-
-Start application with preforking standalone HTTP 1.1 server backend.
 
 =item C<fastcgi>
 
@@ -309,6 +275,13 @@ Namespaces to search for available commands, defaults to L<Mojo::Command>.
 
 L<Mojo::Commands> inherits all methods from L<Mojo::Command> and implements
 the following new ones.
+
+=head2 C<detect>
+
+    my $env = $commands->detect;
+    my $env = $commands->detect($guess);
+
+Try to detect environment.
 
 =head2 C<run>
 

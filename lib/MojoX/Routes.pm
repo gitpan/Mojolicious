@@ -32,7 +32,7 @@ sub new {
             my $m = lc $c->req->method;
             $m = 'get' if $m eq 'head';
             for my $method (@$methods) {
-                return $captures if $method eq $m;
+                return 1 if $method eq $m;
             }
 
             # Nothing
@@ -46,7 +46,7 @@ sub new {
             my ($r, $c, $captures) = @_;
 
             # WebSocket
-            return $captures if $c->tx->is_websocket;
+            return 1 if $c->tx->is_websocket;
 
             # Not a WebSocket
             return;
@@ -88,6 +88,13 @@ sub is_endpoint {
     return 1;
 }
 
+sub is_websocket {
+    my $self = shift;
+    return 1 if $self->{_websocket};
+    if (my $parent = $self->parent) { return $parent->is_websocket }
+    return;
+}
+
 sub name {
     my ($self, $name) = @_;
 
@@ -115,7 +122,7 @@ sub over {
 
     # Conditions
     my $conditions = ref $_[0] eq 'ARRAY' ? $_[0] : [@_];
-    $self->conditions($conditions);
+    push @{$self->conditions}, @$conditions;
 
     return $self;
 }
@@ -254,6 +261,7 @@ sub websocket {
 
     # Condition
     push @{$self->conditions}, websocket => 1;
+    $self->{_websocket} = 1;
 
     return $self;
 }
@@ -407,18 +415,25 @@ Add a new bridge to this route as a nested child.
 
 Returns true if this route qualifies as an endpoint.
 
+=head2 C<is_websocket>
+
+    my $is_websocket = $r->is_websocket;
+
+Returns true if this route leads to a WebSocket.
+
 =head2 C<name>
 
     my $name = $r->name;
     $r       = $r->name('foo');
     $r       = $r->name('*');
 
-The name of this route.
+The name of this route, the special value C<*> will generate a name based on
+the route pattern.
+Note that the name C<current> is reserved for refering to the current route.
 
 =head2 C<over>
 
     $r = $r->over(foo => qr/\w+/);
-    $r = $r->over({foo => qr/\w+/});
 
 Apply condition parameters to this route.
 

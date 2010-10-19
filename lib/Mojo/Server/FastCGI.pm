@@ -76,8 +76,6 @@ sub accept_connection {
     # Debug
     $self->app->log->debug('Accepted FastCGI connection.') if DEBUG;
 
-    # Blocking sucks
-    $c->blocking(0);
     return $c;
 }
 
@@ -116,7 +114,7 @@ sub read_request {
     $self->app->log->debug('Reading FastCGI request.') if DEBUG;
 
     # Transaction
-    my $tx = $self->build_tx_cb->($self);
+    my $tx = $self->on_build_tx->($self);
     $tx->connection($c);
     my $req = $tx->req;
 
@@ -230,13 +228,13 @@ sub run {
         $self->app->log->debug('Handling FastCGI request.') if DEBUG;
 
         # Handle
-        $self->handler_cb->($self, $tx);
+        $self->on_handler->($self, $tx);
 
         # Response
         $self->write_response($tx);
 
         # Finish transaction
-        $tx->finished->($tx);
+        $tx->on_finish->($tx);
     }
 }
 

@@ -12,7 +12,7 @@ use Test::More;
 # Make sure sockets are working
 plan skip_all => 'working sockets required for this test!'
   unless Mojo::IOLoop->new->generate_port;
-plan tests => 27;
+plan tests => 29;
 
 # Oh, dear. She’s stuck in an infinite loop and he’s an idiot.
 # Well, that’s love for you.
@@ -29,19 +29,26 @@ app->log->level('fatal');
 # Avoid exception template
 app->renderer->root(app->home->rel_dir('public'));
 
+# GET /link
+get '/link' => sub {
+    my $self = shift;
+    $self->render(text => $self->url_for('index')->to_abs);
+};
+
 # WebSocket /
 my $flag;
 websocket '/' => sub {
     my $self = shift;
-    $self->finished(sub { $flag += 4 });
-    $self->receive_message(
+    $self->on_finish(sub { $flag += 4 });
+    $self->on_message(
         sub {
             my ($self, $message) = @_;
-            $self->send_message("${message}test2");
+            my $url = $self->url_for->to_abs;
+            $self->send_message("${message}test2$url");
             $flag = 20;
         }
     );
-};
+} => 'index';
 
 # WebSocket /socket
 websocket '/socket' => sub {
@@ -54,7 +61,7 @@ websocket '/socket' => sub {
 websocket '/early_start' => sub {
     my $self = shift;
     $self->send_message('test1');
-    $self->receive_message(
+    $self->on_message(
         sub {
             my ($self, $message) = @_;
             $self->send_message("${message}test2");
@@ -67,8 +74,8 @@ websocket '/early_start' => sub {
 my ($handshake, $denied) = 0;
 websocket '/denied' => sub {
     my $self = shift;
-    $self->tx->handshake->finished(sub { $handshake += 2 });
-    $self->finished(sub                { $denied    += 1 });
+    $self->tx->handshake->on_finish(sub { $handshake += 2 });
+    $self->on_finish(sub                { $denied    += 1 });
     $self->render(text => 'denied', status => 403);
 };
 
@@ -79,7 +86,7 @@ websocket '/subreq' => sub {
     $self->client->async->websocket(
         '/echo' => sub {
             my $client = shift;
-            $client->receive_message(
+            $client->on_message(
                 sub {
                     my ($client, $message) = @_;
                     $self->send_message($message);
@@ -89,14 +96,14 @@ websocket '/subreq' => sub {
             );
             $client->send_message('test1');
         }
-    )->process;
+    )->start;
     $self->send_message('test0');
-    $self->finished(sub { $subreq += 3 });
+    $self->on_finish(sub { $subreq += 3 });
 };
 
 # WebSocket /echo
 websocket '/echo' => sub {
-    shift->receive_message(
+    shift->on_message(
         sub {
             my ($self, $message) = @_;
             $self->send_message($message);
@@ -108,22 +115,28 @@ websocket '/echo' => sub {
 websocket '/dead' => sub { die 'i see dead processes' };
 
 # WebSocket /foo
-websocket '/foo' => sub { shift->res->code('403')->message("i'm a teapot") };
+websocket '/foo' =>
+  sub { shift->rendered->res->code('403')->message("i'm a teapot") };
 
 # WebSocket /deadcallback
 websocket '/deadcallback' => sub {
     my $self = shift;
-    $self->receive_message(sub { die 'i see dead callbacks' });
+    $self->on_message(sub { die 'i see dead callbacks' });
 };
 
 my $client = Mojo::Client->singleton->app(app);
+
+# GET /link
+my $res = $client->get('/link')->success;
+is $res->code, 200, 'right status';
+like $res->body, qr/ws\:\/\/localhost\:\d+\//, 'right content';
 
 # WebSocket /
 my $result;
 $client->websocket(
     '/' => sub {
         my $self = shift;
-        $self->receive_message(
+        $self->on_message(
             sub {
                 my ($self, $message) = @_;
                 $result = $message;
@@ -132,20 +145,20 @@ $client->websocket(
         );
         $self->send_message('test1');
     }
-)->process;
-is($result, 'test1test2', 'right result');
+)->start;
+like $result, qr/test1test2ws\:\/\/localhost\:\d+\//, 'right result';
 
 # WebSocket / (ojo)
 $result = undef;
 w '/' => sub {
-    shift->receive_message(
+    shift->on_message(
         sub {
             shift->finish;
             $result = shift;
         }
     )->send_message('test1');
 };
-is($result, 'test1test2', 'right result');
+like $result, qr/test1test2ws\:\/\/localhost\:\d+\//, 'right result';
 
 # WebSocket /socket (using an already prepared socket)
 my $peer  = $client->test_server;
@@ -159,10 +172,10 @@ my $socket = IO::Socket::INET->new(
 );
 $tx->connection($socket);
 my $port;
-$client->process(
+$client->start(
     $tx => sub {
         my $self = shift;
-        $self->receive_message(
+        $self->on_message(
             sub {
                 my ($self, $message) = @_;
                 $result = $message;
@@ -171,9 +184,9 @@ $client->process(
         );
         $port = $self->ioloop->local_info($self->tx->connection)->{port};
     }
-)->process;
-is($result, 'lalala', 'right result');
-is($port,   $local,   'right local port');
+);
+is $result, 'lalala', 'right result';
+is $port, $local, 'right local port';
 
 # WebSocket /early_start (server directly sends a message)
 my $flag2;
@@ -181,8 +194,8 @@ $result = undef;
 $client->websocket(
     '/early_start' => sub {
         my $self = shift;
-        $self->finished(sub { $flag2 += 5 });
-        $self->receive_message(
+        $self->on_finish(sub { $flag2 += 5 });
+        $self->on_message(
             sub {
                 my ($self, $message) = @_;
                 $result = $message;
@@ -191,16 +204,16 @@ $client->websocket(
             }
         );
     }
-)->process;
-is($result, 'test3test2', 'right result');
-is($flag2,  23,           'finished callback');
+)->start;
+is $result, 'test3test2', 'right result';
+is $flag2,  23,           'finished callback';
 
 # WebSocket /denied (connection denied)
 my $code = undef;
-$client->websocket('/denied' => sub { $code = shift->res->code })->process;
-is($code,      403, 'right status');
-is($handshake, 2,   'finished handshake');
-is($denied,    1,   'finished websocket');
+$client->websocket('/denied' => sub { $code = shift->res->code })->start;
+is $code,      403, 'right status';
+is $handshake, 2,   'finished handshake';
+is $denied,    1,   'finished websocket';
 
 # WebSocket /subreq
 my $finished = 0;
@@ -210,20 +223,20 @@ $client->websocket(
         my $self = shift;
         $code   = $self->res->code;
         $result = '';
-        $self->receive_message(
+        $self->on_message(
             sub {
                 my ($self, $message) = @_;
                 $result .= $message;
                 $self->finish if $message eq 'test1';
             }
         );
-        $self->finished(sub { $finished += 4 });
+        $self->on_finish(sub { $finished += 4 });
     }
-)->process;
-is($code,     101,          'right status');
-is($result,   'test0test1', 'right result');
-is($finished, 4,            'finished client websocket');
-is($subreq,   3,            'finished server websocket');
+)->start;
+is $code,     101,          'right status';
+is $result,   'test0test1', 'right result';
+is $finished, 4,            'finished client websocket';
+is $subreq,   3,            'finished server websocket';
 
 # WebSocket /subreq (async)
 my $running = 2;
@@ -234,40 +247,40 @@ $client->async->websocket(
         my $self = shift;
         $code   = $self->res->code;
         $result = '';
-        $self->receive_message(
+        $self->on_message(
             sub {
                 my ($self, $message) = @_;
                 $result .= $message;
                 $self->finish and $running-- if $message eq 'test1';
-                $self->ioloop->idle_cb(sub { shift->stop }) unless $running;
+                $self->ioloop->on_idle(sub { shift->stop }) unless $running;
             }
         );
-        $self->finished(sub { $finished += 1 });
+        $self->on_finish(sub { $finished += 1 });
     }
-)->process;
+)->start;
 $client->async->websocket(
     '/subreq' => sub {
         my $self = shift;
         $code2   = $self->res->code;
         $result2 = '';
-        $self->receive_message(
+        $self->on_message(
             sub {
                 my ($self, $message) = @_;
                 $result2 .= $message;
                 $self->finish and $running-- if $message eq 'test1';
-                $self->ioloop->idle_cb(sub { shift->stop }) unless $running;
+                $self->ioloop->on_idle(sub { shift->stop }) unless $running;
             }
         );
-        $self->finished(sub { $finished += 2 });
+        $self->on_finish(sub { $finished += 2 });
     }
-)->process;
+)->start;
 $client->ioloop->start;
-is($code,     101,          'right status');
-is($result,   'test0test1', 'right result');
-is($code2,    101,          'right status');
-is($result2,  'test0test1', 'right result');
-is($finished, 7,            'finished client websocket');
-is($subreq,   9,            'finished server websocket');
+is $code,     101,          'right status';
+is $result,   'test0test1', 'right result';
+is $code2,    101,          'right status';
+is $result2,  'test0test1', 'right result';
+is $finished, 7,            'finished client websocket';
+is $subreq,   9,            'finished server websocket';
 
 # WebSocket /dead (dies)
 $code = undef;
@@ -280,11 +293,11 @@ $client->websocket(
         $code      = $self->res->code;
         $message   = $self->res->message;
     }
-)->process;
-is($done,      1,                       'transaction is done');
-is($websocket, 0,                       'no websocket');
-is($code,      500,                     'right status');
-is($message,   'Internal Server Error', 'right message');
+)->start;
+is $done,      1,                       'transaction is done';
+is $websocket, 0,                       'no websocket';
+is $code,      500,                     'right status';
+is $message,   'Internal Server Error', 'right message';
 
 # WebSocket /foo (forbidden)
 ($websocket, $code, $message) = undef;
@@ -295,10 +308,10 @@ $client->websocket(
         $code      = $self->res->code;
         $message   = $self->res->message;
     }
-)->process;
-is($websocket, 0,              'no websocket');
-is($code,      403,            'right status');
-is($message,   "i'm a teapot", 'right message');
+)->start;
+is $websocket, 0,              'no websocket';
+is $code,      403,            'right status';
+is $message,   "i'm a teapot", 'right message';
 
 # WebSocket /deadcallback (dies in callback)
 $client->websocket(
@@ -306,7 +319,7 @@ $client->websocket(
         my $self = shift;
         $self->send_message('test1');
     }
-)->process;
+)->start;
 
 # Server side "finished" callback
-is($flag, 24, 'finished callback');
+is $flag, 24, 'finished callback';

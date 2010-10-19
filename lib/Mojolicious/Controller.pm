@@ -11,57 +11,61 @@ use Mojo::URL;
 
 require Carp;
 
-# Space: It seems to go on and on forever...
-# but then you get to the end and a gorilla starts throwing barrels at you.
+# DEPRECATED in Comet!
+*finished        = \&on_finish;
+*receive_message = \&on_message;
+
+our $AUTOLOAD;
+
+sub AUTOLOAD {
+    my $self = shift;
+
+    # Method
+    my ($package, $method) = $AUTOLOAD =~ /^([\w\:]+)\:\:(\w+)$/;
+
+    # Helper
+    Carp::croak(qq/Can't locate object method "$method" via "$package"/)
+      unless my $helper = $self->app->renderer->helper->{$method};
+
+    # Run
+    return $self->$helper(@_);
+}
+
+sub DESTROY { }
+
 sub client { shift->app->client }
 
 sub finish {
     my $self = shift;
 
-    # Transaction
-    my $tx = $self->tx;
+    # WebSocket check
+    Carp::croak('No WebSocket connection to finish')
+      unless $self->tx->is_websocket;
 
     # Finish WebSocket
-    return $tx->finish if $tx->is_websocket;
-
-    # Render
-    $self->app->routes->auto_render($self);
-
-    # Finish
-    $self->app->finish($self);
-
-    # Resume
-    $self->resume if $tx->is_paused;
+    $self->tx->finish;
 }
 
-sub finished {
-    my ($self, $cb) = @_;
-
-    # Transaction finished
-    $self->tx->finished(sub { shift and $self->$cb(@_) });
-}
-
+# DEPRECATED in Comet!
 sub helper {
     my $self = shift;
 
     # Name
     return unless my $name = shift;
 
-    # Helper
-    Carp::croak(qq/Helper "$name" not found/)
-      unless my $helper = $self->app->renderer->helper->{$name};
-
     # Run
-    return $self->$helper(@_);
+    return $self->$name(@_);
 }
 
-sub pause { shift->tx->pause }
+sub on_finish {
+    my ($self, $cb) = @_;
 
-sub receive_message {
+    # Transaction finished
+    $self->tx->on_finish(sub { shift and $self->$cb(@_) });
+}
+
+sub on_message {
     my $self = shift;
-
-    # Deactivate auto rendering
-    $self->stash->{'mojo.rendered'} = 1;
 
     # WebSocket check
     Carp::croak('No WebSocket connection to receive messages from')
@@ -71,16 +75,16 @@ sub receive_message {
     my $cb = shift;
 
     # Receive
-    $self->tx->receive_message(sub { shift and $self->$cb(@_) });
+    $self->tx->on_message(sub { shift and $self->$cb(@_) });
+
+    # Rendered
+    $self->rendered;
 
     return $self;
 }
 
 sub redirect_to {
     my $self = shift;
-
-    # Rendered
-    $self->stash->{'mojo.rendered'} = 1;
 
     # Response
     my $res = $self->res;
@@ -93,6 +97,9 @@ sub redirect_to {
     $headers->location($self->url_for(@_)->to_abs);
     $headers->content_length(0);
 
+    # Rendered
+    $self->rendered;
+
     return $self;
 }
 
@@ -104,7 +111,7 @@ sub render {
     # Template as single argument
     my $stash = $self->stash;
     my $template;
-    $template = shift if (@_ % 2 && !ref $_[0]) || (!@_ % 2 && ref $_[1]);
+    $template = shift if @_ % 2 && !ref $_[0];
 
     # Arguments
     my $args = ref $_[0] ? $_[0] : {@_};
@@ -114,18 +121,18 @@ sub render {
     unless ($stash->{template} || $args->{template}) {
 
         # Default template
-        my $controller = $stash->{controller};
-        my $action     = $stash->{action};
+        my $controller = $args->{controller} || $stash->{controller};
+        my $action     = $args->{action}     || $stash->{action};
 
         # Normal default template
         if ($controller && $action) {
-            $self->stash(
-                template => join('/', split(/-/, $controller), $action));
+            $self->stash->{template} =
+              join('/', split(/-/, $controller), $action);
         }
 
         # Try the route name if we don't have controller and action
         elsif ($self->match && (my $name = $self->match->endpoint->name)) {
-            $self->stash(template => $name);
+            $self->stash->{template} = $name;
         }
     }
 
@@ -151,6 +158,9 @@ sub render {
     # Type
     my $headers = $res->headers;
     $headers->content_type($type) unless $headers->content_type;
+
+    # Rendered
+    $self->rendered;
 
     # Success
     return 1;
@@ -182,6 +192,7 @@ sub render_exception {
     my $options = {
         template         => 'exception',
         format           => 'html',
+        handler          => undef,
         status           => 500,
         exception        => $e,
         'mojo.exception' => 1
@@ -189,8 +200,8 @@ sub render_exception {
     $self->app->static->serve_500($self)
       if $self->stash->{'mojo.exception'} || !$self->render($options);
 
-    # Resume for exceptions
-    $self->resume if $self->tx->is_paused;
+    # Rendered
+    $self->rendered;
 }
 
 sub render_inner {
@@ -229,7 +240,8 @@ sub render_not_found {
     my ($self, $resource) = @_;
 
     # Debug
-    $self->app->log->debug(qq/Resource "$resource" not found./) if $resource;
+    $self->app->log->debug(qq/Resource "$resource" not found./)
+      if $resource;
 
     # Render not found template
     my $options = {
@@ -240,6 +252,9 @@ sub render_not_found {
     $options->{status} = 404 unless $self->stash->{status};
     $self->app->static->serve_404($self)
       if $self->stash->{not_found} || !$self->render($options);
+
+    # Rendered
+    $self->rendered;
 }
 
 sub render_partial {
@@ -262,13 +277,18 @@ sub render_partial {
 }
 
 sub render_static {
-    my $self = shift;
+    my ($self, $file) = @_;
 
-    # Rendered
-    $self->stash->{'mojo.rendered'} = 1;
+    # Application
+    my $app = $self->app;
 
     # Static
-    $self->app->static->serve($self, @_);
+    $app->static->serve($self, $file)
+      and $app->log->debug(
+        qq/Static file "$file" not found, public directory missing?/);
+
+    # Rendered
+    $self->rendered;
 }
 
 sub render_text {
@@ -284,13 +304,41 @@ sub render_text {
     return $self->render($args);
 }
 
-sub resume { shift->tx->resume }
+sub rendered {
+    my $self = shift;
+
+    # Resume
+    $self->tx->resume;
+
+    # Rendered
+    $self->stash->{'mojo.rendered'} = 1;
+
+    # Stash
+    my $stash = $self->stash;
+
+    # Already finished
+    return $self if $stash->{'mojo.finished'};
+
+    # Transaction
+    my $tx = $self->tx;
+
+    # Application
+    my $app = $self->app;
+
+    # Hook
+    $app->plugins->run_hook_reverse(after_dispatch => $self);
+
+    # Session
+    $app->session->store($self);
+
+    # Finished
+    $stash->{'mojo.finished'} = 1;
+
+    return $self;
+}
 
 sub send_message {
     my $self = shift;
-
-    # Deactivate auto rendering
-    $self->stash->{'mojo.rendered'} = 1;
 
     # WebSocket check
     Carp::croak('No WebSocket connection to send message to')
@@ -298,6 +346,9 @@ sub send_message {
 
     # Send
     $self->tx->send_message(@_);
+
+    # Rendered
+    $self->rendered;
 
     return $self;
 }
@@ -307,7 +358,7 @@ sub url_for {
     my $target = shift || '';
 
     # Make sure we have a match for named routes
-    $self->match(MojoX::Routes::Match->new->root($self->app->routes))
+    $self->match(MojoX::Routes::Match->new($self)->root($self->app->routes))
       unless $self->match;
 
     # Path
@@ -319,20 +370,60 @@ sub url_for {
     # URL
     elsif ($target =~ /^\w+\:\/\//) { return Mojo::URL->new($target) }
 
-    # Use match or root
-    my $url = $self->match->url_for($target, @_);
+    # Route
+    return $self->match->url_for($target, @_);
+}
 
-    # Base
-    unless ($url->is_abs) {
-        $url->base($self->tx->req->url->base->clone);
-        $url->base->userinfo(undef);
+sub write {
+    my ($self, $chunk, $cb) = @_;
+
+    # Callback only
+    if (ref $chunk && ref $chunk eq 'CODE') {
+        $cb    = $chunk;
+        $chunk = undef;
     }
 
-    # Fix paths
-    unshift @{$url->path->parts}, @{$url->base->path->parts};
-    $url->base->path->parts([]);
+    # Write
+    $self->res->write(
+        $chunk,
+        sub {
 
-    return $url;
+            # Cleanup
+            shift;
+
+            # Callback
+            $self->$cb(@_) if $cb;
+        }
+    );
+
+    # Rendered
+    $self->rendered;
+}
+
+sub write_chunk {
+    my ($self, $chunk, $cb) = @_;
+
+    # Callback only
+    if (ref $chunk && ref $chunk eq 'CODE') {
+        $cb    = $chunk;
+        $chunk = undef;
+    }
+
+    # Write
+    $self->res->write_chunk(
+        $chunk,
+        sub {
+
+            # Cleanup
+            shift;
+
+            # Callback
+            $self->$cb(@_) if $cb;
+        }
+    );
+
+    # Rendered
+    $self->rendered;
 }
 
 1;
@@ -377,63 +468,40 @@ A L<Mojo::Client> prepared for the current environment.
     $c->client->get('http://mojolicious.org' => sub {
         my $client = shift;
         $c->render_data($client->res->body);
-    })->process;
+    })->start;
 
-For async processing you can use C<pause> and C<finish>.
+For async processing you can use C<finish>.
 
-    $c->pause;
     $c->client->async->get('http://mojolicious.org' => sub {
         my $client = shift;
         $c->render_data($client->res->body);
         $c->finish;
-    })->process;
+    })->start;
 
 =head2 C<finish>
 
     $c->finish;
 
-Similar to C<resume> but will also trigger automatic rendering and the
-C<after_dispatch> plugin hook, which would normally get disabled once a
-request gets paused.
-For WebSockets it will gracefully end the connection.
+Gracefully end WebSocket connection.
 
-=head2 C<finished>
+=head2 C<on_finish>
 
-    $c->finished(sub {...});
+    $c->on_finish(sub {...});
 
 Callback signaling that the transaction has been finished.
 
-    $c->finished(sub {
+    $c->on_finish(sub {
         my $self = shift;
     });
 
-=head2 C<helper>
+=head2 C<on_message>
 
-    $c->helper('foo');
-    $c->helper(foo => 23);
-
-Directly call a L<Mojolicious> helper, see
-L<Mojolicious::Plugin::DefaultHelpers> for a list of helpers that are always
-available.
-
-=head2 C<pause>
-
-    $c->pause;
-
-Pause transaction associated with this request, used for async web
-applications.
-Note that automatic rendering and some plugins that do state changing
-operations inside the C<after_dispatch> hook won't work if you pause a
-transaction.
-
-=head2 C<receive_message>
-
-    $c = $c->receive_message(sub {...});
+    $c = $c->on_message(sub {...});
 
 Receive messages via WebSocket, only works if there is currently a WebSocket
 connection in progress.
 
-    $c->receive_message(sub {
+    $c->on_message(sub {
         my ($self, $message) = @_;
     });
 
@@ -458,7 +526,6 @@ Prepare a redirect response.
     $c->render(handler => 'something');
     $c->render('foo/bar');
     $c->render('foo/bar', format => 'html');
-    $c->render('foo/bar', {format => 'html'});
 
 This is a wrapper around L<MojoX::Renderer> exposing pretty much all
 functionality provided by it.
@@ -520,8 +587,10 @@ Same as C<render> but returns the rendered result.
 =head2 C<render_static>
 
     $c->render_static('images/logo.png');
+    $c->render_static('../lib/MyApp.pm');
 
-Render a static asset using L<MojoX::Dispatcher::Static>.
+Render a static file using L<MojoX::Dispatcher::Static> relative to the
+C<public> directory of your application.
 
 =head2 C<render_text>
 
@@ -531,12 +600,13 @@ Render a static asset using L<MojoX::Dispatcher::Static>.
 Render the given content as plain text, note that text will be encoded.
 See C<render_data> for an alternative without encoding.
 
-=head2 C<resume>
+=head2 C<rendered>
 
-    $c->resume;
+    $c->rendered;
 
-Resume transaction associated with this request, used for async web
-applications.
+Disable automatic rendering for response and run C<after_dispatch> plugin
+hook.
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<send_message>
 
@@ -552,6 +622,42 @@ connection in progress.
     my $url = $c->url_for('named', controller => 'bar', action => 'baz');
 
 Generate a L<Mojo::URL> for the current or a named route.
+
+=head2 C<write>
+
+    $c->write;
+    $c->write('Hello!');
+    $c->write(sub {...});
+    $c->write('Hello!', sub {...});
+
+Write dynamic content matching the corresponding C<Content-Length> header
+chunk wise, the optional drain callback will be invoked once all data has
+been written to the kernel send buffer or equivalent.
+
+    $c->res->headers->content_length(6);
+    $c->write('Hel');
+    $c->write('lo!');
+
+Note that this method is EXPERIMENTAL and might change without warning!
+
+=head2 C<write_chunk>
+
+    $c->write_chunk;
+    $c->write_chunk('Hello!');
+    $c->write_chunk(sub {...});
+    $c->write_chunk('Hello!', sub {...});
+
+Write dynamic content chunk wise with the C<chunked> C<Transfer-Encoding>
+which doesn't require a C<Content-Length> header, the optional drain callback
+will be invoked once all data has been written to the kernel send buffer or
+equivalent.
+An empty chunk marks the end of the stream.
+
+    $c->write_chunk('Hel');
+    $c->write_chunk('lo!');
+    $c->write_chunk('');
+
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head1 SEE ALSO
 

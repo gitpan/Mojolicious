@@ -20,13 +20,13 @@ my $buffer = {};
 # Minimal ioloop example demonstrating how to cheat at HTTP benchmarks :)
 $loop->listen(
     port      => 3000,
-    accept_cb => sub {
+    on_accept => sub {
         my ($loop, $id) = @_;
 
         # Initialize buffer
         $buffer->{$id} = '';
     },
-    read_cb => sub {
+    on_read => sub {
         my ($loop, $id, $chunk) = @_;
 
         # Append chunk to buffer
@@ -41,11 +41,10 @@ $loop->listen(
             # Write a minimal HTTP response
             # (not spec compliant but benchmarks won't care)
             $loop->write($id => "HTTP/1.1 200 OK\x0d\x0a"
-                  . "Connection: keep-alive\x0d\x0aContent-Length: 11\x0d\x0a"
-                  . "\x0d\x0aHello Mojo!");
+                  . "Connection: keep-alive\x0d\x0a\x0d\x0a");
         }
     },
-    error_cb => sub {
+    on_error => sub {
         my ($self, $id) = @_;
 
         # Clean buffer

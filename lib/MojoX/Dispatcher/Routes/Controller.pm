@@ -5,25 +5,19 @@ use warnings;
 
 use base 'MojoX::Session::Cookie::Controller';
 
-require Carp;
-require Scalar::Util;
-
 __PACKAGE__->attr('match');
 
 # Just make a simple cake. And this time, if someone's going to jump out of
 # it make sure to put them in *after* you cook it.
 sub param {
-    my $self = shift;
+    my ($self, $name) = @_;
 
-    # Parameters
-    my $params = $self->stash->{'mojo.params'} || $self->req->params;
-    Carp::croak(qq/Stash value "params" is not a "Mojo::Parameters" object./)
-      unless ref $params
-          && Scalar::Util::blessed($params)
-          && $params->isa('Mojo::Parameters');
+    # Captures
+    my $p = $self->stash->{'mojo.captures'} || {};
+    return $p->{$name} if exists $p->{$name};
 
-    # Values
-    return wantarray ? ($params->param(@_)) : scalar $params->param(@_);
+    # Params
+    return $self->req->param($name);
 }
 
 1;

@@ -7,6 +7,7 @@ use base 'Mojo::Command';
 
 use Mojo::ByteStream 'b';
 use Mojo::Client;
+use Mojo::IOLoop;
 use Mojo::Transaction::HTTP;
 
 use Getopt::Long 'GetOptions';
@@ -36,7 +37,7 @@ sub run {
     $url = b($url)->decode('UTF-8')->to_string;
 
     # Client
-    my $client = Mojo::Client->new;
+    my $client = Mojo::Client->new(ioloop => Mojo::IOLoop->singleton);
 
     # Silence
     $client->log->level('fatal');
@@ -58,7 +59,7 @@ sub run {
     );
 
     # Request
-    $client->process($tx);
+    $client->start($tx);
 
     # Error
     my ($message, $code) = $tx->error;

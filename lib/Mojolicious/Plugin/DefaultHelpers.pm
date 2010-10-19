@@ -13,13 +13,13 @@ sub register {
     my ($self, $app) = @_;
 
     # Add "app" helper
-    $app->renderer->add_helper(app => sub { shift->app });
+    $app->helper(app => sub { shift->app });
 
     # Add "content" helper
-    $app->renderer->add_helper(content => sub { shift->render_inner(@_) });
+    $app->helper(content => sub { shift->render_inner(@_) });
 
     # Add "dumper" helper
-    $app->renderer->add_helper(
+    $app->helper(
         dumper => sub {
             shift;
             Data::Dumper->new([@_])->Maxdepth(2)->Indent(1)->Terse(1)->Dump;
@@ -27,30 +27,85 @@ sub register {
     );
 
     # Add "extends" helper
-    $app->renderer->add_helper(extends => sub { shift->stash(extends => @_) }
+    $app->helper(
+        extends => sub {
+            my $self  = shift;
+            my $stash = $self->stash;
+            $stash->{extends} = shift if @_;
+            $self->stash(@_) if @_;
+            return $stash->{extends};
+        }
     );
 
     # Add "flash" helper
-    $app->renderer->add_helper(flash => sub { shift->flash(@_) });
+    $app->helper(flash => sub { shift->flash(@_) });
 
     # Add "include" helper
-    $app->renderer->add_helper(include => sub { shift->render_partial(@_) });
+    $app->helper(include => sub { shift->render_partial(@_) });
 
     # Add "layout" helper
-    $app->renderer->add_helper(layout => sub { shift->stash(layout => @_) });
+    $app->helper(
+        layout => sub {
+            my $self  = shift;
+            my $stash = $self->stash;
+            $stash->{layout} = shift if @_;
+            $self->stash(@_) if @_;
+            return $stash->{layout};
+        }
+    );
+
+    # Add "memorize" helper
+    my $memorize = {};
+    $app->helper(
+        memorize => sub {
+            shift;
+
+            # Callback
+            my $cb = pop;
+            return '' unless ref $cb && ref $cb eq 'CODE';
+
+            # Name
+            my $name = shift;
+
+            # Arguments
+            my $args;
+            if (ref $name && ref $name eq 'HASH') {
+                $args = $name;
+                $name = undef;
+            }
+            else { $args = shift || {} }
+
+            # Default name
+            $name ||= join '', map { $_ || '' } caller(1);
+
+            # Expire
+            my $expires = $args->{expires} || 0;
+            delete $memorize->{$name}
+              if exists $memorize->{$name}
+                  && $expires > 0
+                  && $memorize->{$name}->{expires} < time;
+
+            # Memorized
+            return $memorize->{$name}->{content} if exists $memorize->{$name};
+
+            # Memorize
+            $memorize->{$name}->{expires} = $expires;
+            $memorize->{$name}->{content} = $cb->();
+        }
+    );
 
     # Add "param" helper
-    $app->renderer->add_helper(param =>
+    $app->helper(param =>
           sub { wantarray ? (shift->param(@_)) : scalar shift->param(@_); });
 
     # Add "session" helper
-    $app->renderer->add_helper(session => sub { shift->session(@_) });
+    $app->helper(session => sub { shift->session(@_) });
 
     # Add "stash" helper
-    $app->renderer->add_helper(stash => sub { shift->stash(@_) });
+    $app->helper(stash => sub { shift->stash(@_) });
 
     # Add "url_for" helper
-    $app->renderer->add_helper(url_for => sub { shift->url_for(@_) });
+    $app->helper(url_for => sub { shift->url_for(@_) });
 }
 
 1;
@@ -79,41 +134,83 @@ L<Mojolicious>.
 
 =item content
 
+    <%= content %>
+
 Insert content into a layout template.
 
 =item dumper
+
+    <%= dumper $foo %>
 
 Dump a Perl data structure using L<Data::Dumper>.
 
 =item extends
 
+    <% extends 'foo'; %>
+
 Extend a template.
 
 =item flash
+
+    <%= flash 'foo' %>
 
 Access flash values.
 
 =item include
 
+    <%= include 'menubar' %>
+    <%= include 'menubar', format => 'txt' %>
+
 Include a partial template.
 
 =item layout
 
+    <% layout 'green'; %>
+
 Render this template with a layout.
 
+=item memorize
+
+    <%= memorize begin %>
+        <%= time %>
+    <% end %>
+    <%= memorize {expires => time + 1} => begin %>
+        <%= time %>
+    <% end %>
+    <%= memorize foo => begin %>
+        <%= time %>
+    <% end %>
+    <%= memorize foo => {expires => time + 1} => begin %>
+        <%= time %>
+    <% end %>
+
+Memorize block result in memory and prevent future execution.
+Note that this helper is EXPERIMENTAL and might change without warning!
+
 =item param
+
+    <%= param 'foo' %>
 
 Access request parameters and routes captures.
 
 =item session
 
+    <%= session 'foo' %>
+
 Access session values.
 
 =item stash
 
+    <%= stash 'foo' %>
+    <% stash foo => 'bar'; %>
+
 Access stash values.
 
 =item url_for
+
+    <%= url_for %>
+    <%= url_for 'index' %>
+    <%= url_for 'index', foo => 'bar' %>
 
 Generate URLs.
 

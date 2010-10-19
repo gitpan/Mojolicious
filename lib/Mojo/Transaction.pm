@@ -10,11 +10,15 @@ use Carp 'croak';
 __PACKAGE__->attr([qw/connection kept_alive local_address local_port/]);
 __PACKAGE__->attr([qw/previous remote_port/]);
 __PACKAGE__->attr(
-    [qw/finished resume_cb/] => sub {
+    [qw/on_finish on_resume/] => sub {
         sub {1}
     }
 );
 __PACKAGE__->attr(keep_alive => 0);
+
+# DEPRECATED in Comet!
+*finished  = \&on_finish;
+*resume_cb = \&on_resume;
 
 # Please don't eat me! I have a wife and kids. Eat them!
 sub client_read  { croak 'Method "client_read" not implemented by subclass' }
@@ -34,11 +38,6 @@ sub is_done {
     return;
 }
 
-sub is_paused {
-    return 1 if (shift->{_state} || '') eq 'paused';
-    return;
-}
-
 sub is_websocket {0}
 
 sub is_writing {
@@ -49,21 +48,6 @@ sub is_writing {
           || $state eq 'write_headers'
           || $state eq 'write_body';
     return;
-}
-
-sub pause {
-    my $self = shift;
-
-    # Already paused
-    return $self if $self->{_real_state};
-
-    # Save state
-    $self->{_real_state} = $self->{_state};
-
-    # Pause
-    $self->{_state} = 'paused';
-
-    return $self;
 }
 
 sub remote_address {
@@ -107,14 +91,16 @@ sub res { croak 'Method "res" not implemented by subclass' }
 sub resume {
     my $self = shift;
 
-    # Not paused
-    return unless $self->{_real_state};
+    # Delayed
+    if (($self->{_state} || '') eq 'paused') {
+        $self->{_state} = 'write_body';
+    }
 
-    # Resume
-    $self->{_state} = delete $self->{_real_state};
+    # Writing
+    elsif (!$self->is_writing) { $self->{_state} = 'write' }
 
     # Callback
-    $self->resume_cb->($self);
+    $self->on_resume->($self);
 
     return $self;
 }
@@ -123,7 +109,7 @@ sub server_close {
     my $self = shift;
 
     # Transaction finished
-    $self->finished->($self);
+    $self->on_finish->($self);
 
     return $self;
 }
@@ -163,17 +149,6 @@ L<Mojo::Transaction> implements the following attributes.
 
 Connection identifier or socket.
 
-=head2 C<finished>
-
-    my $cb = $tx->finished;
-    $tx    = $tx->finished(sub {...});
-
-Callback signaling that the transaction has been finished.
-
-    $tx->finsihed(sub {
-        my $self = shift;
-    });
-
 =head2 C<keep_alive>
 
     my $keep_alive = $tx->keep_alive;
@@ -202,6 +177,24 @@ Local interface address.
 
 Local interface port.
 
+=head2 C<on_finish>
+
+    my $cb = $tx->on_finish;
+    $tx    = $tx->on_finish(sub {...});
+
+Callback signaling that the transaction has been finished.
+
+    $tx->on_finish(sub {
+        my $self = shift;
+    });
+
+=head2 C<on_resume>
+
+    my $cb = $tx->on_resume;
+    $tx    = $tx->on_resume(sub {...});
+
+Callback to be invoked whenever the transaction is resumed.
+
 =head2 C<previous>
 
     my $previous = $tx->previous;
@@ -222,13 +215,6 @@ Remote interface address.
     $tx             = $tx->remote_port($port);
 
 Remote interface port.
-
-=head2 C<resume_cb>
-
-    my $cb = $tx->resume_cb;
-    $tx    = $tx->resume_cb(sub {...});
-
-Callback to be invoked whenever the transaction is resumed.
 
 =head1 METHODS
 
@@ -260,12 +246,6 @@ Parser errors and codes.
 
 Check if transaction is done.
 
-=head2 C<is_paused>
-
-    my $paused = $tx->is_paused;
-
-Check if transaction is paused.
-
 =head2 C<is_websocket>
 
     my $is_websocket = $tx->is_websocket;
@@ -278,23 +258,17 @@ Check if transaction is a WebSocket.
 
 Check if transaction is writing.
 
-=head2 C<pause>
-
-    $tx = $tx->pause;
-
-Pause transaction, it can still read but writing is disabled while paused.
-
 =head2 C<req>
 
     my $req = $tx->req;
 
-Transaction request.
+Transaction request, usually a L<Mojo::Message::Request> object.
 
 =head2 C<res>
 
     my $res = $tx->res;
 
-Transaction response.
+Transaction response, usually a L<Mojo::Message::Response> object.
 
 =head2 C<resume>
 

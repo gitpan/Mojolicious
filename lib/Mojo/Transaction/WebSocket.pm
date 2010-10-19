@@ -10,12 +10,15 @@ use base 'Mojo::Transaction';
 use Mojo::ByteStream 'b';
 use Mojo::Transaction::HTTP;
 
+__PACKAGE__->attr(handshake => sub { Mojo::Transaction::HTTP->new });
 __PACKAGE__->attr(
-    receive_message => sub {
+    on_message => sub {
         sub { }
     }
 );
-__PACKAGE__->attr(handshake => sub { Mojo::Transaction::HTTP->new });
+
+# DEPRECATED in Comet!
+*receive_message = \&on_message;
 
 sub client_challenge {
     my $self = shift;
@@ -83,6 +86,15 @@ sub remote_port    { shift->handshake->remote_port }
 sub req            { shift->handshake->req(@_) }
 sub res            { shift->handshake->res(@_) }
 
+sub resume {
+    my $self = shift;
+
+    # Resume
+    $self->handshake->resume;
+
+    return $self;
+}
+
 sub send_message {
     my ($self, $message) = @_;
 
@@ -137,7 +149,7 @@ sub server_read {
     my ($self, $chunk) = @_;
 
     # Add chunk
-    my $buffer = $self->{_read} ||= Mojo::ByteStream->new;
+    my $buffer = $self->{_read} ||= b();
     $buffer->add_chunk($chunk);
 
     # Full frames
@@ -154,13 +166,11 @@ sub server_read {
         $message =~ s/[\xff]$//;
 
         # Callback
-        $self->receive_message->(
-            $self, b($message)->decode('UTF-8')->to_string
-        );
+        $self->on_message->($self, b($message)->decode('UTF-8')->to_string);
     }
 
     # Resume
-    $self->resume_cb->($self);
+    $self->on_resume->($self);
 
     return $self;
 }
@@ -169,7 +179,7 @@ sub server_write {
     my $self = shift;
 
     # Not writing anymore
-    my $write = $self->{_write} ||= Mojo::ByteStream->new;
+    my $write = $self->{_write} ||= b();
     unless ($write->size) {
         $self->{_state} = $self->{_finished} ? 'done' : 'read';
     }
@@ -219,14 +229,14 @@ sub _send_bytes {
     my ($self, $bytes) = @_;
 
     # Add to buffer
-    my $write = $self->{_write} ||= Mojo::ByteStream->new;
+    my $write = $self->{_write} ||= b();
     $write->add_chunk($bytes);
 
     # Writing
     $self->{_state} = 'write';
 
     # Resume
-    $self->resume_cb->($self);
+    $self->on_resume->($self);
 }
 
 1;
@@ -257,14 +267,14 @@ L<Mojo::Transaction> and implements the following new ones.
 
 The original handshake transaction.
 
-=head2 C<receive_message>
+=head2 C<on_message>
 
-    my $cb = $ws->receive_message;
-    $ws    = $ws->receive_message(sub {...});
+    my $cb = $ws->on_message;
+    $ws    = $ws->on_message(sub {...});
 
 The callback that receives decoded messages one by one.
 
-    $ws->receive_message(sub {
+    $ws->on_message(sub {
         my ($self, $message) = @_;
     });
 
@@ -358,6 +368,12 @@ The original handshake request.
     my $req = $ws->res;
 
 The original handshake response.
+
+=head2 C<resume>
+
+    $ws = $ws->resume;
+
+Resume transaction.
 
 =head2 C<send_message>
 

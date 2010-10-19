@@ -26,40 +26,43 @@ sub add_hook {
 }
 
 sub load_plugin {
-    my $self = shift;
+    my ($self, $name) = @_;
 
-    # Application
-    my $app = shift;
-    return unless $app;
+    # Module
+    if ($name =~ /^[A-Z]+/) { return $name->new if $self->_load($name) }
 
-    # Class
-    my $name = shift;
-    return unless $name;
-    my $class = b($name)->camelize->to_string;
+    # Search plugin by name
+    else {
 
-    # Arguments
-    my $args = ref $_[0] ? $_[0] : {@_};
+        # Class
+        my $class = b($name)->camelize->to_string;
 
-    # Try all namspaces
-    for my $namespace (@{$self->namespaces}) {
+        # Try all namspaces
+        for my $namespace (@{$self->namespaces}) {
 
-        # Module
-        my $module = "${namespace}::$class";
+            # Module
+            my $module = "${namespace}::$class";
 
-        # Load
-        my $e = Mojo::Loader->load($module);
-        if (ref $e) { die $e }
-        next if $e;
-
-        # Module is a plugin
-        next unless $module->can('new') && $module->can('register');
-
-        # Register
-        return $module->new->register($app, $args);
+            # Load and register
+            return $module->new if $self->_load($module);
+        }
     }
 
     # Not found
     die qq/Plugin "$name" missing, maybe you need to install it?\n/;
+}
+
+# Let's see how crazy I am now, Nixon. The correct answer is very.
+sub register_plugin {
+    my $self = shift;
+    my $name = shift;
+    my $app  = shift;
+
+    # Arguments
+    my $args = ref $_[0] ? $_[0] : {@_};
+
+    # Register
+    return $self->load_plugin($name)->register($app, $args);
 }
 
 sub run_hook {
@@ -76,6 +79,7 @@ sub run_hook {
     return $self;
 }
 
+# Everybody's a jerk. You, me, this jerk.
 sub run_hook_reverse {
     my $self = shift;
 
@@ -88,6 +92,19 @@ sub run_hook_reverse {
     for my $hook (reverse @{$self->hooks->{$name}}) { $self->$hook(@_) }
 
     return $self;
+}
+
+sub _load {
+    my ($self, $module) = @_;
+
+    # Load
+    my $e = Mojo::Loader->load($module);
+    if (ref $e) { die $e }
+    return if $e;
+
+    # Module is a plugin
+    return unless $module->can('new') && $module->can('register');
+    return 1;
 }
 
 1;
@@ -138,10 +155,20 @@ implements the following new ones.
     $plugins = $plugins->add_hook(event => sub {...});
 
 Hook into an event.
-The following events are available.
-(Note that C<after_*> hooks run in reverse order)
+The following events are available and run in the listed order.
 
 =over 4
+
+=item after_build_tx
+
+Runs right after the transaction is built and before the HTTP request gets
+parsed.
+One usage case would be upload progress bars.
+(Passed the transaction instance)
+
+    $plugins->add_hook(before_request => sub {
+        my ($self, $tx) = @_;
+    });
 
 =item before_dispatch
 
@@ -152,34 +179,25 @@ Runs before the dispatchers determines what action to run.
         my ($self, $c) = @_;
     });
 
-=item after_dispatch
-
-Runs after the dispatchers determines what action to run.
-(Passed the default controller instance)
-
-    $plugins->add_hook(after_dispatch => sub {
-        my ($self, $c) = @_;
-    });
-
 =item after_static_dispatch
 
 Runs after the static dispatcher determines if a static file should be
 served. (Passed the default controller instance)
+Note that the callbacks of this hook run in reverse order.
 
     $plugins->add_hook(after_static_dispatch => sub {
         my ($self, $c) = @_;
-    })
+    });
 
-=item after_build_tx
+=item after_dispatch
 
-Runs right after the transaction is built and before the HTTP message gets
-parsed.
-One usage case would be upload progress bars.
-(Passed the transaction instance)
+Runs after the dispatchers determines what action to run.
+(Passed the default controller instance)
+Note that the callbacks of this hook run in reverse order.
 
-    $plugins->add_hook(after_build_tx => sub {
-        my ($self, $tx) = @_;
-    })
+    $plugins->add_hook(after_dispatch => sub {
+        my ($self, $c) = @_;
+    });
 
 =back
 
@@ -188,12 +206,25 @@ in your application.
 
 =head2 C<load_plugin>
 
-    $plugins = $plugins->load_plugin($app, 'something');
-    $plugins = $plugins->load_plugin($app, 'something', foo => 23);
-    $plugins = $plugins->load_plugin($app, 'something', {foo => 23});
+    my $plugin = $plugins->load_plugin('something');
+    my $plugin = $plugins->load_plugin('Foo::Bar');
 
-Load a plugin from the configured namespaces and run C<register>.
+Load a plugin from the configured namespaces or by full module name.
+Note that this method is EXPERIMENTAL and might change without warning!
+
+=head2 C<register_plugin>
+
+    $plugins->register_plugin('something', $app);
+    $plugins->register_plugin('something', $app, foo => 23);
+    $plugins->register_plugin('something', $app, {foo => 23});
+    $plugins->register_plugin('Foo::Bar', $app);
+    $plugins->register_plugin('Foo::Bar', $app, foo => 23);
+    $plugins->register_plugin('Foo::Bar', $app, {foo => 23});
+
+Load a plugin from the configured namespaces or by full module name and run
+C<register>.
 Optional arguments are passed to register.
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<run_hook>
 

@@ -10,22 +10,22 @@ use Test::More;
 
 use File::Spec;
 use File::Temp;
+use IO::Socket::INET;
 use Mojo::Client;
+use Mojo::IOLoop;
 use Mojo::Template;
-use Test::Mojo::Server;
 
 # Mac OS X only test
 plan skip_all => 'Mac OS X required for this test!' unless $^O eq 'darwin';
 plan skip_all => 'set TEST_APACHE to enable this test (developer only!)'
   unless $ENV{TEST_APACHE};
-plan tests => 7;
+plan tests => 8;
 
 # Robots don't have any emotions, and sometimes that makes me very sad.
-use_ok('Mojo::Server::FastCGI');
+use_ok 'Mojo::Server::FastCGI';
 
 # Setup
-my $server = Test::Mojo::Server->new;
-my $port   = $server->generate_port_ok;
+my $port   = Mojo::IOLoop->generate_port;
 my $dir    = File::Temp::tempdir(CLEANUP => 1);
 my $config = File::Spec->catfile($dir, 'fcgi.config');
 my $mt     = Mojo::Template->new;
@@ -48,7 +48,7 @@ Mojo::Server::FastCGI->new->run;
 1;
 EOF
 chmod 0777, $fcgi;
-ok(-x $fcgi, 'script is executable');
+ok -x $fcgi, 'script is executable';
 
 # Apache setup
 $mt->render_to_file(<<'EOF', $config, $dir, $port, $fcgi);
@@ -75,18 +75,61 @@ Alias / <%= $fcgi %>/
 EOF
 
 # Start
-$server->command(['/usr/sbin/httpd', '-X', '-f', $config]);
-$server->start_server_ok;
+my $pid = open my $server, '-|', '/usr/sbin/httpd', '-X', '-f', $config;
+sleep 1
+  while !IO::Socket::INET->new(
+    Proto    => 'tcp',
+    PeerAddr => 'localhost',
+    PeerPort => $port
+  );
 
 # Request
 my $client = Mojo::Client->new;
+my ($code, $body);
 $client->get(
     "http://127.0.0.1:$port/" => sub {
         my $self = shift;
-        is($self->res->code, 200, 'right status');
-        like($self->res->body, qr/Mojo/, 'right content');
+        $code = $self->res->code;
+        $body = $self->res->body;
     }
-)->process;
+)->start;
+is $code,   200,      'right status';
+like $body, qr/Mojo/, 'right content';
+
+# Form with chunked response
+my $params = {};
+for my $i (1 .. 10) { $params->{"test$i"} = $i }
+my $result = '';
+for my $key (sort keys %$params) { $result .= $params->{$key} }
+($code, $body) = undef;
+$client->post_form(
+    "http://127.0.0.1:$port/diag/chunked_params" => $params => sub {
+        my $self = shift;
+        $code = $self->res->code;
+        $body = $self->res->body;
+    }
+)->start;
+is $code, 200, 'right status';
+is $body, $result, 'right content';
+
+# Upload
+($code, $body) = undef;
+$client->post_form(
+    "http://127.0.0.1:$port/diag/upload" => {file => {content => $result}} =>
+      sub {
+        my $self = shift;
+        $code = $self->res->code;
+        $body = $self->res->body;
+    }
+)->start;
+is $code, 200, 'right status';
+is $body, $result, 'right content';
 
 # Stop
-$server->stop_server_ok;
+kill 'INT', $pid;
+sleep 1
+  while IO::Socket::INET->new(
+    Proto    => 'tcp',
+    PeerAddr => 'localhost',
+    PeerPort => $port
+  );

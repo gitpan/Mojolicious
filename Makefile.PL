@@ -30,7 +30,8 @@ WriteMakefile(
                     license  => 'http://dev.perl.org/licenses/',
                     MailingList =>
                       'http://groups.google.com/group/mojolicious',
-                    repository => 'http://github.com/kraih/mojo'
+                    repository => 'http://github.com/kraih/mojo',
+                    bugtracker => 'http://github.com/kraih/mojo/issues'
                 },
                 no_index => {directory => [qw/t/]}
             },
@@ -41,7 +42,7 @@ WriteMakefile(
         )
     ),
 
-    EXE_FILES => ['script/mojo', 'script/mojolicious'],
+    EXE_FILES => ['script/mojo'],
     PREREQ_PM => {
         'Carp'                  => 0,
         'Cwd'                   => 0,
@@ -74,5 +75,5 @@ WriteMakefile(
         'Test::More'            => 0,
         'Time::HiRes'           => 0
     },
-    test => {TESTS => 't/*.t t/*/*.t t/*/*/*.t t/*/*/*/*.t'}
+    test => {TESTS => 't/*.t t/*/*.t'}
 );

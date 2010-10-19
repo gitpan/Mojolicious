@@ -51,12 +51,10 @@ sub register {
     );
 
     # Add "languages" helper
-    $app->renderer->add_helper(
-        languages => sub { shift->stash->{i18n}->languages(@_) });
+    $app->helper(languages => sub { shift->stash->{i18n}->languages(@_) });
 
     # Add "l" helper
-    $app->renderer->add_helper(l => sub { shift->stash->{i18n}->localize(@_) }
-    );
+    $app->helper(l => sub { shift->stash->{i18n}->localize(@_) });
 }
 
 # Container

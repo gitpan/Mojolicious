@@ -28,7 +28,8 @@ sub register {
             my ($r, $c, $output, $options) = @_;
 
             # Generate name
-            return unless my $path = $r->template_path($options);
+            my $path = $r->template_path($options) || $options->{inline};
+            return unless defined $path;
             my $list = join ', ', sort keys %{$c->stash};
             my $cache = $options->{cache} =
               b("$path($list)")->md5_sum->to_string;
@@ -41,13 +42,12 @@ sub register {
             local $ENV{MOJO_RELOAD} = 0 if $ENV{MOJO_RELOAD};
 
             # Cache
-            $r->{_epl_cache} ||= {};
-            unless ($r->{_epl_cache}->{$cache}) {
+            my $ec = $r->{_epl_cache} ||= {};
+            unless ($ec->{$cache}) {
 
                 # Initialize
                 $template->{namespace} ||= "Mojo::Template::$cache";
-                my $mt = $r->{_epl_cache}->{$cache} =
-                  Mojo::Template->new($template);
+                my $mt = $ec->{$cache} = Mojo::Template->new($template);
 
                 # Self
                 my $prepend = 'my $self = shift;';

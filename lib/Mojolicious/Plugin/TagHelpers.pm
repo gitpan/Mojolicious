@@ -5,81 +5,165 @@ use warnings;
 
 use base 'Mojolicious::Plugin';
 
-use Mojo::ByteStream;
+use Mojo::ByteStream 'b';
 
 # Is today's hectic lifestyle making you tense and impatient?
 # Shut up and get to the point!
 sub register {
     my ($self, $app) = @_;
 
-    # Add "form_for" helper
-    $app->renderer->add_helper(
-        form_for => sub {
+    # Add "checkbox" helper
+    $app->helper(
+        check_box => sub {
+            $self->_input(
+                shift, shift,
+                value => shift,
+                @_, type => 'checkbox'
+            );
+        }
+    );
+
+    # Add "file_field" helper
+    $app->helper(
+        file_field => sub {
             my $c    = shift;
             my $name = shift;
+            $self->_tag('input', name => $name, type => 'file', @_);
+        }
+    );
+
+    # Add "form_for" helper
+    $app->helper(
+        form_for => sub {
+            my $c   = shift;
+            my @url = (shift);
 
             # Captures
-            my $captures = ref $_[0] eq 'HASH' ? shift : {};
+            push @url, shift if ref $_[0] eq 'HASH';
 
-            $self->_tag('form', action => $c->url_for($name, $captures), @_);
+            $self->_tag('form', action => $c->url_for(@url), @_);
+        }
+    );
+
+    # Add "hidden_field" helper
+    $app->helper(
+        hidden_field => sub {
+            shift;
+            $self->_tag(
+                'input',
+                name  => shift,
+                value => shift,
+                type  => 'hidden',
+                @_
+            );
         }
     );
 
     # Add "img" helper
-    $app->renderer->add_helper(
-        img => sub { shift; $self->_tag('img', src => shift, @_) });
+    $app->helper(img => sub { shift; $self->_tag('img', src => shift, @_) });
 
     # Add "input" helper
-    $app->renderer->add_helper(
-        input => sub {
-            my $c    = shift;
-            my $name = shift;
-
-            # Value
-            if (defined(my $p = $c->param($name))) {
-
-                # Attributes
-                my %attrs = @_;
-
-                # Checkbox
-                if (($attrs{type} || '') eq 'checkbox') {
-                    $attrs{checked} = 'checked';
-                }
-
-                # Other
-                else { $attrs{value} = $p }
-
-                return $self->_tag('input', name => $name, %attrs);
-            }
-
-            # Empty tag
-            $self->_tag('input', name => $name, @_);
-        }
-    );
+    $app->helper(input => sub { $self->_input(@_) });
 
     # Add "label" helper
-    $app->renderer->add_helper(
+    $app->helper(
         label => sub { shift; $self->_tag('label', for => shift, @_) });
 
     # Add "link_to" helper
-    $app->renderer->add_helper(
+    $app->helper(
         link_to => sub {
-            my $c    = shift;
-            my $name = shift;
+            my $c       = shift;
+            my $content = shift;
+            my @url     = ($content);
+
+            # Content
+            unless (defined $_[-1] && ref $_[-1] eq 'CODE') {
+                @url = (shift);
+                push @_, sub {$content}
+            }
 
             # Captures
-            my $captures = ref $_[0] eq 'HASH' ? shift : {};
+            push @url, shift if ref $_[0] eq 'HASH';
 
-            # Default content
-            push @_, sub { ucfirst $name }
-              unless defined $_[-1] && ref $_[-1] eq 'CODE';
+            $self->_tag('a', href => $c->url_for(@url), @_);
+        }
+    );
 
-            $self->_tag('a', href => $c->url_for($name, $captures), @_);
+    # Add "password_field" helper
+    $app->helper(
+        password_field => sub {
+            my $c    = shift;
+            my $name = shift;
+            $self->_tag('input', name => $name, type => 'password', @_);
+        }
+    );
+
+    # Add "radio_button" helper
+    $app->helper(
+        radio_button => sub {
+            $self->_input(shift, shift, value => shift, @_, type => 'radio');
+        }
+    );
+
+    # Add "select_field" helper
+    $app->helper(
+        select_field => sub {
+            my $c       = shift;
+            my $name    = shift;
+            my $options = shift;
+            my %attrs   = @_;
+
+            # Values
+            my %v = map { $_, 1 } $c->param($name);
+
+            # Callback
+            my $cb = sub {
+
+                # Pair
+                my $pair = shift;
+                $pair = [$pair, $pair] unless ref $pair eq 'ARRAY';
+
+                # Attributes
+                my %attrs = (value => $pair->[1]);
+                $attrs{selected} = 'selected' if exists $v{$pair->[1]};
+
+                # Option tag
+                $self->_tag('option', %attrs, sub { $pair->[0] });
+            };
+
+            return $self->_tag(
+                'select',
+                name => $name,
+                %attrs,
+                sub {
+
+                    # Parts
+                    my $parts = '';
+                    for my $o (@$options) {
+
+                        # OptGroup
+                        if (ref $o eq 'ARRAY' && ref $o->[1] eq 'ARRAY') {
+                            $parts .= $self->_tag(
+                                'optgroup',
+                                label => $o->[0],
+                                sub {
+                                    join '', map { $cb->($_) } @{$o->[1]};
+                                }
+                            );
+                        }
+
+                        # Option
+                        else { $parts .= $cb->($o) }
+                    }
+
+                    return $parts;
+                }
+            );
         }
     );
 
     # Add "script" helper
-    $app->renderer->add_helper(
+    $app->helper(
         script => sub {
             my $c = shift;
 
@@ -98,8 +182,72 @@ sub register {
         }
     );
 
+    # Add "submit_button" helper
+    $app->helper(
+        submit_button => sub {
+            my $c     = shift;
+            my $value = shift;
+            $value = 'Ok' unless defined $value;
+            $self->_tag('input', value => $value, type => 'submit', @_);
+        }
+    );
+
     # Add "tag" helper
-    $app->renderer->add_helper(tag => sub { shift; $self->_tag(@_) });
+    $app->helper(tag => sub { shift; $self->_tag(@_) });
+
+    # Add "text_area" helper
+    $app->helper(
+        text_area => sub {
+            my $c    = shift;
+            my $name = shift;
+
+            # Value
+            my $cb = ref $_[-1] && ref $_[-1] eq 'CODE' ? pop : sub {''};
+            if (defined(my $value = $c->param($name))) {
+                $cb = sub {$value}
+            }
+
+            $self->_tag('textarea', name => $name, @_, $cb);
+        }
+    );
+
+    # Add "text_field" helper
+    $app->helper(text_field => sub { $self->_input(@_) });
+}
+
+sub _input {
+    my $self  = shift;
+    my $c     = shift;
+    my $name  = shift;
+    my %attrs = @_;
+
+    # Value
+    my $p = $c->param($name);
+    $p = b($p)->xml_escape if defined $p;
+
+    my $t = $attrs{type} || '';
+    if (defined $p && $t ne 'submit') {
+
+        # Checkbox
+        if ($t eq 'checkbox') {
+            $attrs{checked} = 'checked';
+        }
+
+        # Radiobutton
+        elsif ($t eq 'radio') {
+            my $value = $attrs{value};
+            $value = '' unless defined $value;
+            $attrs{checked} = 'checked' if $value eq $p;
+        }
+
+        # Other
+        else { $attrs{value} = $p }
+
+        return $self->_tag('input', name => $name, %attrs);
+    }
+
+    # Empty tag
+    $self->_tag('input', name => $name, %attrs);
 }
 
 sub _tag {
@@ -131,7 +279,7 @@ sub _tag {
     else { $tag .= ' />' }
 
     # Prevent escaping
-    return Mojo::ByteStream->new($tag);
+    return b($tag);
 }
 
 1;
@@ -159,22 +307,76 @@ Note that this module is EXPERIMENTAL and might change without warning!
 
 =over 4
 
+=item check_box
+
+    <%= check_box employed => 1 %>
+    <%= check_box employed => 1, id => 'foo' %>
+
+Generate checkbox input element.
+Note that this helper is EXPERIMENTAL and might change without warning!
+
+    <input name="employed" type="checkbox" value="1" />
+    <input id="foo" name="employed" type="checkbox" value="1" />
+
+=item file_field
+
+    <%= file_field 'avatar' %>
+    <%= file_field 'avatar', id => 'foo' %>
+
+Generate file input element.
+Note that this helper is EXPERIMENTAL and might change without warning!
+
+    <input name="avatar" type="file" />
+    <input id="foo" name="avatar" type="file" />
+
 =item form_for
 
-    <%= form_for login => (method => 'post') => {%>
-        <%= input 'first_name' %>
-    <%}%>
-    <%= form_for login => {foo => 'bar'} => (method => 'post') => {%>
-        <%= input 'first_name' %>
-    <%}%>
-    <%= form_for '/login' => (method => 'post') => {%>
-        <%= input 'first_name' %>
-    <%}%>
-    <%= form_for 'http://mojolicious.org/login' => (method => 'post') => {%>
-        <%= input 'first_name' %>
-    <%}%>
+    <%= form_for login => (method => 'post') => begin %>
+        <%= text_field 'first_name' %>
+        <%= submit_button %>
+    <% end %>
+    <%= form_for login => {foo => 'bar'} => (method => 'post') => begin %>
+        <%= text_field 'first_name' %>
+        <%= submit_button %>
+    <% end %>
+    <%= form_for '/login' => (method => 'post') => begin %>
+        <%= text_field 'first_name' %>
+        <%= submit_button %>
+    <% end %>
+    <%= form_for 'http://kraih.com/login' => (method => 'post') => begin %>
+        <%= text_field 'first_name' %>
+        <%= submit_button %>
+    <% end %>
 
 Generate form for route, path or URL.
+
+    <form action="/path/to/login" method="post">
+        <input name="first_name" type="text" />
+        <input value="Ok" type="submit" />
+    </form>
+    <form action="/path/to/login/bar" method="post">
+        <input name="first_name" type="text" />
+        <input value="Ok" type="submit" />
+    </form>
+    <form action="/login" method="post">
+        <input name="first_name" type="text" />
+        <input value="Ok" type="submit" />
+    </form>
+    <form action="http://kraih.com/login" method="post">
+        <input name="first_name" type="text" />
+        <input value="Ok" type="submit" />
+    </form>
+
+=item hidden_field
+
+    <%= hidden_field foo => 'bar' %>
+    <%= hidden_field foo => 'bar', id => 'bar' %>
+
+Generate hidden input element.
+Note that this helper is EXPERIMENTAL and might change without warning!
+
+    <input name="foo" type="hidden" value="bar" />
+    <input id="bar" name="foo" type="hidden" value="bar" />
 
 =item img
 
@@ -183,44 +385,165 @@ Generate form for route, path or URL.
 
 Generate image tag.
 
+    <img src="/foo.jpg" />
+    <img alt="Image" src="/foo.jpg" />
+
 =item input
 
     <%= input 'first_name' %>
     <%= input 'first_name', value => 'Default name' %>
+    <%= input 'employed', type => 'checkbox' %>
+    <%= input 'country', type => 'radio', value => 'germany' %>
 
 Generate form input element.
 
+    <input name="first_name" type="text" />
+    <input name="first_name" type="text" value="Default name" />
+    <input name="employed" type="checkbox" />
+    <input name="country" type="radio" value="germany" />
+
 =item label
 
-    <%= label first_name => {%>First name<%}%>
+    <%= label first_name => begin %>First name<% end %>
 
 Generate form label.
 
+    <label for="first_name">First name</label>
+
 =item link_to
 
-    <%= link_to index => {%>Home<%}%>
-    <%= link_to index => {foo => 'bar'} => (class => 'links') => {%>Home<%}%>
-    <%= link_to '/path/to/file' => {%>File<%}%>
-    <%= link_to 'http://mojolicious.org' => {%>Mojolicious<%}%>
+    <%= link_to Home => 'index' %>
+    <%= link_to index => begin %>Home<% end %>
+    <%= link_to index => {foo => 'bar'} => (class => 'links') => begin %>
+        Home
+    <% end %>
+    <%= link_to '/path/to/file' => begin %>File<% end %>
+    <%= link_to 'http://mojolicious.org' => begin %>Mojolicious<% end %>
+    <%= link_to url_for->query(foo => $foo) => begin %>Retry<% end %>
 
-Generate link to route, path or URL.
+Generate link to route, path or URL, by default the capitalized link target
+will be used as content.
+
+    <a href="/path/to/index">Home</a>
+    <a href="/path/to/index">Home</a>
+    <a class="links" href="/path/to/index/bar">Home</a>
+    <a href="/path/to/file">File</a>
+    <a href="http://mojolicious.org">Mojolicious</a>
+    <a href="/current/path?foo=something">Retry</a>
+
+=item password_field
+
+    <%= password_field 'pass' %>
+    <%= password_field 'pass', id => 'foo' %>
+
+Generate password input element.
+Note that this helper is EXPERIMENTAL and might change without warning!
+
+    <input name="pass" type="password" />
+    <input id="foo" name="pass" type="password" />
+
+=item radio_button
+
+    <%= radio_button country => 'germany' %>
+    <%= radio_button country => 'germany', id => 'foo' %>
+
+Generate radio input element.
+Note that this helper is EXPERIMENTAL and might change without warning!
+
+    <input name="country" type="radio" value="germany" />
+    <input id="foo" name="country" type="radio" value="germany" />
+
+=item select_field
+
+    <%= select_field language => [qw/de en/] %>
+    <%= select_field language => [qw/de en/], id => 'lang' %>
+    <%= select_field country => [[Germany => 'de'], 'en'] %>
+    <%= select_field country => [[Europe => [Germany => 'de']]] %>
+
+Generate select, option and optgroup elements.
+Note that this helper is EXPERIMENTAL and might change without warning!
+
+    <select name="language">
+        <option name="de">de</option>
+        <option name="en">en</option>
+    </select>
+    <select id="lang" name="language">
+        <option name="de">de</option>
+        <option name="en">en</option>
+    </select>
+    <select name="country">
+        <option name="de">Germany</option>
+        <option name="en">en</option>
+    </select>
+    <select id="lang" name="language">
+        <optgroup label="Europe">
+            <option name="de">Germany</option>
+            <option name="en">en</option>
+        </optgroup>
+    </select>
 
 =item script
 
     <%= script '/script.js' %>
-    <%= script {%>
+    <%= script begin %>
         var a = 'b';
-    <%}%>
+    <% end %>
 
 Generate script tag.
+
+    <script src="/script.js" type="text/javascript" />
+    <script type="text/javascript">
+        var a = 'b';
+    </script>
+
+=item submit_button
+
+    <%= submit_button %>
+    <%= submit_button 'Ok!', id => 'foo' %>
+
+Generate submit input element.
+Note that this helper is EXPERIMENTAL and might change without warning!
+
+    <input type="submit" value="Ok" />
+    <input id="foo" type="submit" value="Ok!" />
 
 =item tag
 
     <%= tag 'div' %>
     <%= tag 'div', id => 'foo' %>
-    <%= tag div => {%>Content<%}%>
+    <%= tag div => begin %>Content<% end %>
 
 HTML5 tag generator.
+
+    <div />
+    <div id="foo" />
+    <div>Content</div>
+
+=item text_field
+
+    <%= text_field 'first_name' %>
+    <%= text_field 'first_name', value => 'Default name' %>
+
+Generate text input element.
+Note that this helper is EXPERIMENTAL and might change without warning!
+
+    <input name="first_name" type="text" />
+    <input name="first_name" type="text" value="Default name" />
+
+=item text_area
+
+    <%= text_area 'foo' %>
+    <%= text_area foo => begin %>
+        Default!
+    <% end %>
+
+Generate textarea element.
+Note that this helper is EXPERIMENTAL and might change without warning!
+
+    <textarea name="foo"></textarea>
+    <textarea name="foo">
+        Default!
+    </textarea>
 
 =back
 

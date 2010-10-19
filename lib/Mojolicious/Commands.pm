@@ -5,11 +5,30 @@ use warnings;
 
 use base 'Mojo::Commands';
 
+# One day a man has everything, the next day he blows up a $400 billion
+# space station, and the next day he has nothing. It makes you think.
+use Getopt::Long qw/GetOptions :config pass_through/;
+
+__PACKAGE__->attr(hint => <<"EOF");
+
+These options are available for all commands:
+    --home <path>   Path to your applications home directory, defaults to
+                    the value of MOJO_HOME or auto detection.
+    --mode <name>   Run mode of your application, defaults to the value of
+                    MOJO_MODE or development.
+
+See '$0 help COMMAND' for more information on a specific command.
+EOF
 __PACKAGE__->attr(
     namespaces => sub { [qw/Mojolicious::Command Mojo::Command/] });
 
-# One day a man has everything, the next day he blows up a $400 billion
-# space station, and the next day he has nothing. It makes you think.
+# Command line options for MOJO_HOME and MOJO_MODE
+BEGIN {
+    GetOptions(
+        'home=s' => sub { $ENV{MOJO_HOME} = $_[1] },
+        'mode=s' => sub { $ENV{MOJO_MODE} = $_[1] }
+    ) unless Mojo::Commands->detect;
+}
 
 1;
 __END__
@@ -40,27 +59,33 @@ L<Mojo::Commands>.
 
 =item C<generate>
 
-    mojolicious generate
-    mojolicious generate help
+    mojo generate
+    mojo generate help
 
 List available generator commands with short descriptions.
 
-    mojolicious generate help <generator>
+    mojo generate help <generator>
 
 List available options for generator command with short descriptions.
 
 =item C<generate app>
 
-    mojolicious generate app <AppName>
+    mojo generate app <AppName>
 
 Generate application directory structure for a fully functional
 L<Mojolicious> application.
 
 =item C<generate lite_app>
 
-    mojolicious generate lite_app
+    mojo generate lite_app
 
 Generate a fully functional L<Mojolicious::Lite> application.
+
+=item C<generate makefile>
+
+    mojo generate makefile
+
+Generate C<Makefile.PL> file for application.
 
 =item C<inflate>
 
@@ -81,6 +106,13 @@ List application routes.
 
 L<Mojolicious::Commands> inherits all attributes from L<Mojo::Commands> and
 implements the following new ones.
+
+=head2 C<hint>
+
+    my $hint  = $commands->hint;
+    $commands = $commands->hint('Foo!');
+
+Short hint shown after listing available commands.
 
 =head2 C<namespaces>
 

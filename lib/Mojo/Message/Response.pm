@@ -16,8 +16,8 @@ my $START_LINE_RE = qr/
     HTTP\/(\d)\.(\d)   # Version
     \s+                # Whitespace
     (\d\d\d)           # Code
-    \s+                # Whitespace
-    ([\w\'\s]+)        # Message (with "I'm a teapot" support)
+    \s*                # Whitespace
+    ([\w\'\s]+)?       # Message (with "I'm a teapot" support)
     $                  # End
 /x;
 
@@ -128,24 +128,6 @@ sub is_status_class {
     return;
 }
 
-sub parse {
-    my ($self, $chunk) = @_;
-
-    # Buffer
-    $self->buffer->add_chunk($chunk) if defined $chunk;
-
-    return $self->_parse(0);
-}
-
-sub parse_until_body {
-    my ($self, $chunk) = @_;
-
-    # Buffer
-    $self->buffer->add_chunk($chunk);
-
-    return $self->_parse(1);
-}
-
 sub _build_start_line {
     my $self = shift;
 
@@ -209,8 +191,11 @@ sub _parse_start_line {
             $self->code($3);
             $self->message($4);
             $self->{_state} = 'content';
+            $self->at_least_version('1.1')
+              ? $self->content->auto_relax(1)
+              : $self->content->relaxed(1);
         }
-        else { $self->error('Bad response start line.', 400) }
+        else { $self->error('Bad response start line.') }
     }
 }
 
@@ -288,18 +273,6 @@ Make sure message has all required headers for the current HTTP version.
     my $is_2xx = $res->is_status_class(200);
 
 Check response status class.
-
-=head2 C<parse>
-
-    $res = $res->parse('HTTP/1.1 200 OK');
-
-Parse HTTP response chunk.
-
-=head2 C<parse_until_body>
-
-    $res = $res->parse_until_body('HTTP/1.1 200 OK');
-
-Parse HTTP response chunk until the body is reached.
 
 =head1 SEE ALSO
 

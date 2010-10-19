@@ -29,7 +29,12 @@ use Mojolicious::Lite;
 app->log->level('fatal');
 
 # GET /
-get '/' => sub { shift->render_text('Hello World!') };
+get '/' => sub {
+    my $self = shift;
+    my $rel  = $self->req->url;
+    my $abs  = $rel->to_abs;
+    $self->render_text("Hello World! $rel $abs");
+};
 
 # GET /proxy
 get '/proxy' => sub {
@@ -41,7 +46,7 @@ get '/proxy' => sub {
 websocket '/test' => sub {
     my $self = shift;
     my $flag = 0;
-    $self->receive_message(
+    $self->on_message(
         sub {
             my ($self, $message) = @_;
             $self->send_message("${message}test2");
@@ -62,11 +67,14 @@ $server->prepare_ioloop;
 my $c = {};
 my $connected;
 my ($read, $sent, $fail) = 0;
-my $nf = "HTTP/1.1 404 NOT FOUND\x0d\x0aConnection: close\x0d\x0a\x0d\x0a";
+my $nf =
+    "HTTP/1.1 404 NOT FOUND\x0d\x0a"
+  . "Content-Length: 0\x0d\x0a"
+  . "Connection: close\x0d\x0a\x0d\x0a";
 my $ok = "HTTP/1.1 200 OK\x0d\x0aConnection: keep-alive\x0d\x0a\x0d\x0a";
 $loop->listen(
     port    => $proxy,
-    read_cb => sub {
+    on_read => sub {
         my ($loop, $client, $chunk) = @_;
         if (my $server = $c->{$client}->{connection}) {
             return $loop->write($server, $chunk);
@@ -81,16 +89,16 @@ $loop->listen(
                 my $server = $loop->connect(
                     address    => $1,
                     port       => $fail ? $port : $2,
-                    connect_cb => sub {
+                    on_connect => sub {
                         my ($loop, $server) = @_;
                         $c->{$client}->{connection} = $server;
                         $loop->write($client, $fail ? $nf : $ok);
                     },
-                    error_cb => sub {
+                    on_error => sub {
                         shift->drop($client);
                         delete $c->{$client};
                     },
-                    read_cb => sub {
+                    on_read => sub {
                         my ($loop, $server, $chunk) = @_;
                         $read += length $chunk;
                         $sent += length $chunk;
@@ -101,7 +109,7 @@ $loop->listen(
             else { $loop->drop($client) }
         }
     },
-    error_cb => sub {
+    on_error => sub {
         my ($self, $client) = @_;
         shift->drop($c->{$client}->{connection})
           if $c->{$client}->{connection};
@@ -110,15 +118,15 @@ $loop->listen(
 );
 
 # GET / (normal request)
-is($client->get("https://localhost:$port/")->success->body,
-    'Hello World!', 'right content');
+is $client->get("https://localhost:$port/")->success->body,
+  "Hello World! / https://localhost:$port/", 'right content';
 
 # WebSocket /test (normal websocket)
 my $result;
 $client->websocket(
     "wss://localhost:$port/test" => sub {
         my $self = shift;
-        $self->receive_message(
+        $self->on_message(
             sub {
                 my ($self, $message) = @_;
                 $result = $message;
@@ -127,22 +135,20 @@ $client->websocket(
         );
         $self->send_message('test1');
     }
-)->process;
-is($result, 'test1test2', 'right result');
+)->start;
+is $result, 'test1test2', 'right result';
 
 # GET /proxy (proxy request)
 $client->https_proxy("http://localhost:$proxy");
-is( $client->get("https://localhost:$port/proxy")->success->body,
-    "https://localhost:$port/proxy",
-    'right content'
-);
+is $client->get("https://localhost:$port/proxy")->success->body,
+  "https://localhost:$port/proxy", 'right content';
 
 # GET /proxy (kept alive proxy request)
 $client->https_proxy("http://localhost:$proxy");
 my $tx = $client->build_tx(GET => "https://localhost:$port/proxy");
-$client->process($tx);
-is($tx->success->body, "https://localhost:$port/proxy", 'right content');
-is($tx->kept_alive, 1, 'kept alive');
+$client->start($tx);
+is $tx->success->body, "https://localhost:$port/proxy", 'right content';
+is $tx->kept_alive, 1, 'kept alive';
 
 # WebSocket /test (kept alive proxy websocket)
 $client->https_proxy("http://localhost:$proxy");
@@ -152,7 +158,7 @@ $client->websocket(
     "wss://localhost:$port/test" => sub {
         my $self = shift;
         $kept_alive = $self->tx->kept_alive;
-        $self->receive_message(
+        $self->on_message(
             sub {
                 my ($self, $message) = @_;
                 $result = $message;
@@ -161,12 +167,12 @@ $client->websocket(
         );
         $self->send_message('test1');
     }
-)->process;
-is($kept_alive, 1,                 'kept alive');
-is($connected,  "localhost:$port", 'connected');
-is($result,     'test1test2',      'right result');
-ok($read > 25, 'read enough');
-ok($sent > 25, 'sent enough');
+)->start;
+is $kept_alive, 1,                 'kept alive';
+is $connected,  "localhost:$port", 'connected';
+is $result,     'test1test2',      'right result';
+ok $read > 25, 'read enough';
+ok $sent > 25, 'sent enough';
 
 # WebSocket /test (proxy websocket)
 $client->https_proxy("http://localhost:$proxy");
@@ -174,7 +180,7 @@ $client->https_proxy("http://localhost:$proxy");
 $client->websocket(
     "wss://localhost:$port/test" => sub {
         my $self = shift;
-        $self->receive_message(
+        $self->on_message(
             sub {
                 my ($self, $message) = @_;
                 $result = $message;
@@ -183,11 +189,11 @@ $client->websocket(
         );
         $self->send_message('test1');
     }
-)->process;
-is($connected, "localhost:$port", 'connected');
-is($result,    'test1test2',      'right result');
-ok($read > 25, 'read enough');
-ok($sent > 25, 'sent enough');
+)->start;
+is $connected, "localhost:$port", 'connected';
+is $result,    'test1test2',      'right result';
+ok $read > 25, 'read enough';
+ok $sent > 25, 'sent enough';
 
 # WebSocket /test (proxy websocket with bad target)
 $client->https_proxy("http://localhost:$proxy");
@@ -199,6 +205,6 @@ $client->websocket(
         $success = $tx->success;
         $error   = $tx->error;
     }
-)->process;
-is($success, undef, 'no success');
-is($error, 'Proxy connection failed.', 'right message');
+)->start;
+is $success, undef, 'no success';
+is $error, 'Proxy connection failed.', 'right message';

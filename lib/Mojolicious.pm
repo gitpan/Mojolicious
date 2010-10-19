@@ -5,6 +5,7 @@ use warnings;
 
 use base 'Mojo';
 
+use Carp 'croak';
 use Mojolicious::Commands;
 use Mojolicious::Plugins;
 use MojoX::Dispatcher::Routes;
@@ -33,8 +34,36 @@ __PACKAGE__->attr(session => sub { MojoX::Session::Cookie->new });
 __PACKAGE__->attr(static  => sub { MojoX::Dispatcher::Static->new });
 __PACKAGE__->attr(types   => sub { MojoX::Types->new });
 
-our $CODENAME = 'Comet';
-our $VERSION  = '0.999929';
+our $CODENAME = 'Hot Beverage';
+our $VERSION  = '0.999930';
+
+our $AUTOLOAD;
+
+sub AUTOLOAD {
+    my $self = shift;
+
+    # Method
+    my ($package, $method) = $AUTOLOAD =~ /^([\w\:]+)\:\:(\w+)$/;
+
+    # Helper
+    croak qq/Can't locate object method "$method" via "$package"/
+      unless my $helper = $self->renderer->helper->{$method};
+
+    # Load controller class
+    my $class = $self->controller_class;
+    if (my $e = Mojo::Loader->load($class)) {
+        $self->log->error(
+            ref $e
+            ? qq/Can't load controller class "$class": $e/
+            : qq/Controller class "$class" doesn't exist./
+        );
+    }
+
+    # Run
+    return $class->new(app => $self)->$helper(@_);
+}
+
+sub DESTROY { }
 
 # I personalized each of your meals.
 # For example, Amy: you're cute, so I baked you a pony.
@@ -42,7 +71,7 @@ sub new {
     my $self = shift->SUPER::new(@_);
 
     # Transaction builder
-    $self->build_tx_cb(
+    $self->on_build_tx(
         sub {
             my $self = shift;
 
@@ -50,7 +79,7 @@ sub new {
             my $tx = Mojo::Transaction::HTTP->new;
 
             # Hook
-            $self->plugins->run_hook_reverse(after_build_tx => $tx);
+            $self->plugins->run_hook(after_build_tx => $tx);
 
             return $tx;
         }
@@ -64,6 +93,7 @@ sub new {
 
     # Renderer
     my $renderer = $self->renderer;
+    $renderer->default_handler('ep');
 
     # Static
     my $static = $self->static;
@@ -80,11 +110,12 @@ sub new {
     $static->root($home->rel_dir('public'));
 
     # Hide own controller methods
-    $r->hide(qw/client cookie finish finished flash handler helper param/);
-    $r->hide(qw/pause receive_message redirect_to render render_data/);
-    $r->hide(qw/render_exception render_inner render_json render_not_found/);
-    $r->hide(qw/render_partial render_static render_text resume/);
-    $r->hide(qw/send_message session signed_cookie url_for/);
+    $r->hide(qw/AUTOLOAD DESTROY client cookie finish finished flash/);
+    $r->hide(qw/handler helper on_message param redirect_to render/);
+    $r->hide(qw/render_data render_exception render_inner render_json/);
+    $r->hide(qw/render_not_found render_partial render_static render_text/);
+    $r->hide(qw/rendered send_message session signed_cookie url_for/);
+    $r->hide(qw/write write_chunk/);
 
     # Mode
     my $mode = $self->mode;
@@ -168,28 +199,6 @@ sub dispatch {
         # Nothing found
         $c->render_not_found unless $c->res->code;
     }
-
-    # Finish
-    $self->finish($c);
-}
-
-sub finish {
-    my ($self, $c) = @_;
-
-    # Already finished
-    return if $c->stash->{finished};
-
-    # Paused
-    return if $c->tx->is_paused;
-
-    # Hook
-    $self->plugins->run_hook_reverse(after_dispatch => $c);
-
-    # Session
-    $self->session->store($c);
-
-    # Finished
-    $c->stash->{finished} = 1;
 }
 
 # Bite my shiny metal ass!
@@ -221,12 +230,20 @@ sub handler {
     eval {
         $self->process($class->new(app => $self, stash => $stash, tx => $tx));
     };
-    $self->log->error("Processing request failed: $@") if $@;
+
+    # Fatal exception
+    if ($@) {
+        $self->log->fatal("Processing request failed: $@");
+        $tx->res->code(500);
+        $tx->resume;
+    }
 }
+
+sub helper { shift->renderer->add_helper(@_) }
 
 sub plugin {
     my $self = shift;
-    $self->plugins->load_plugin($self, @_);
+    $self->plugins->register_plugin(shift, $self, @_);
 }
 
 # This will run for each request
@@ -302,6 +319,8 @@ art technology.
 
 =over 4
 
+=item *
+
 An amazing MVC web framework supporting a simplified single file mode through
 L<Mojolicious::Lite>.
 
@@ -313,18 +332,30 @@ I18N, first class unicode support and much more for you to discover.
 
 =back
 
+=item *
+
 Very clean, portable and Object Oriented pure Perl API without any hidden
 magic and no requirements besides Perl 5.8.7.
 
-Full stack HTTP 1.1 and WebSocket client/server implementation with IPv6,
-TLS, Bonjour, IDNA, chunking and multipart support.
+=item *
 
-Builtin async IO and prefork web server supporting epoll, kqueue, hot
-deployment and UNIX domain socket sharing, perfect for embedding.
+Full stack HTTP 1.1 and WebSocket client/server implementation with IPv6,
+TLS, Bonjour, IDNA, Comet (long polling), chunking and multipart support.
+
+=item *
+
+Builtin async IO web server supporting epoll, kqueue, UNIX domain sockets and
+hot deployment, perfect for embedding.
+
+=item *
 
 Automatic CGI, FastCGI and L<PSGI> detection.
 
+=item *
+
 JSON and XML/HTML5 parser with CSS3 selector support.
+
+=item *
 
 Fresh code based upon years of experience developing L<Catalyst>.
 
@@ -342,7 +373,7 @@ Web development for humans, making hard things possible and everything fun.
 
     websocket '/echo' => sub {
         my $self = shift;
-        $self->receive_message(
+        $self->on_message(
             sub {
                 my ($self, $message) = @_;
                 $self->send_message("echo: $message");
@@ -368,12 +399,16 @@ Web development for humans, making hard things possible and everything fun.
 
     @@ clock.html.ep
     % my ($second, $minute, $hour) = (localtime(time))[0, 1, 2];
-    The time is <%= $hour %>:<%= $minute %>:<%= $second %>.
+    <%= link_to clock => begin %>
+        The time is <%= $hour %>:<%= $minute %>:<%= $second %>.
+    <% end %>
 
 For more user friendly documentation see L<Mojolicious::Guides> and
 L<Mojolicious::Lite>.
 
 =head2 Have Some Cake
+
+Loosely coupled building blocks, use what you like and just ignore the rest.
 
     .---------------------------------------------------------------.
     |                             Fun!                              |
@@ -401,16 +436,16 @@ following new ones.
 
 =head2 C<controller_class>
 
-    my $class = $mojo->controller_class;
-    $mojo     = $mojo->controller_class('Mojolicious::Controller');
+    my $class = $app->controller_class;
+    $app      = $app->controller_class('Mojolicious::Controller');
 
 Class to be used for the default controller, defaults to
 L<Mojolicious::Controller>.
 
 =head2 C<mode>
 
-    my $mode = $mojo->mode;
-    $mojo    = $mojo->mode('production');
+    my $mode = $app->mode;
+    $app     = $app->mode('production');
 
 The operating mode for your application.
 It defaults to the value of the environment variable C<MOJO_MODE> or
@@ -431,8 +466,8 @@ to your application named C<$mode_mode>.
 
 =head2 C<plugins>
 
-    my $plugins = $mojo->plugins;
-    $mojo       = $mojo->plugins(Mojolicious::Plugins->new);
+    my $plugins = $app->plugins;
+    $app        = $app->plugins(Mojolicious::Plugins->new);
 
 The plugin loader, by default a L<Mojolicious::Plugins> object.
 You can usually leave this alone, see L<Mojolicious::Plugin> if you want to
@@ -440,8 +475,8 @@ write a plugin.
 
 =head2 C<renderer>
 
-    my $renderer = $mojo->renderer;
-    $mojo        = $mojo->renderer(MojoX::Renderer->new);
+    my $renderer = $app->renderer;
+    $app         = $app->renderer(MojoX::Renderer->new);
 
 Used in your application to render content, by default a L<MojoX::Renderer>
 object.
@@ -450,8 +485,8 @@ L<Mojolicious::Plugin::EplRenderer> contain more specific information.
 
 =head2 C<routes>
 
-    my $routes = $mojo->routes;
-    $mojo      = $mojo->routes(MojoX::Dispatcher::Routes->new);
+    my $routes = $app->routes;
+    $app       = $app->routes(MojoX::Dispatcher::Routes->new);
 
 The routes dispatcher, by default a L<MojoX::Dispatcher::Routes> object.
 You use this in your startup method to define the url endpoints for your
@@ -466,8 +501,8 @@ application.
 
 =head2 C<secret>
 
-    my $secret = $mojo->secret;
-    $mojo      = $mojo->secret('passw0rd');
+    my $secret = $app->secret;
+    $app       = $app->secret('passw0rd');
 
 A secret passphrase used for signed cookies and the like, defaults to the
 application name which is not very secure, so you should change it!!!
@@ -476,22 +511,22 @@ the log file reminding you to change your passphrase.
 
 =head2 C<static>
 
-    my $static = $mojo->static;
-    $mojo      = $mojo->static(MojoX::Dispatcher::Static->new);
+    my $static = $app->static;
+    $app       = $app->static(MojoX::Dispatcher::Static->new);
 
 For serving static assets from your C<public> directory, by default a
 L<MojoX::Dispatcher::Static> object.
 
 =head2 C<types>
 
-    my $types = $mojo->types;
-    $mojo     = $mojo->types(MojoX::Types->new);
+    my $types = $app->types;
+    $app      = $app->types(MojoX::Types->new);
 
 Responsible for tracking the types of content you want to serve in your
 application, by default a L<MojoX::Types> object.
 You can easily register new types.
 
-    $mojo->types->type(vti => 'help/vampire');
+    $app->types->type(vti => 'help/vampire');
 
 =head1 METHODS
 
@@ -500,7 +535,7 @@ new ones.
 
 =head2 C<new>
 
-    my $mojo = Mojolicious->new;
+    my $app = Mojolicious->new;
 
 Construct a new L<Mojolicious> application.
 Will automatically detect your home directory and set up logging based on
@@ -509,51 +544,66 @@ Also sets up the renderer, static dispatcher and a default set of plugins.
 
 =head2 C<defaults>
 
-    my $defaults = $mojo->default;
-    my $foo      = $mojo->defaults('foo');
-    $mojo        = $mojo->defaults({foo => 'bar'});
-    $mojo        = $mojo->defaults(foo => 'bar');
+    my $defaults = $app->defaults;
+    my $foo      = $app->defaults('foo');
+    $app         = $app->defaults({foo => 'bar'});
+    $app         = $app->defaults(foo => 'bar');
 
 Default values for the stash.
 Note that this method is EXPERIMENTAL and might change without warning!
 
-    $mojo->defaults->{foo} = 'bar';
-    my $foo = $mojo->defaults->{foo};
-    delete $mojo->defaults->{foo};
+    $app->defaults->{foo} = 'bar';
+    my $foo = $app->defaults->{foo};
+    delete $app->defaults->{foo};
 
 =head2 C<dispatch>
 
-    $mojo->dispatch($c);
+    $app->dispatch($c);
 
 The heart of every Mojolicious application, calls the static and routes
-dispatchers for every request.
-
-=head2 C<finish>
-
-    $mojo->finish($c);
-
-Clean up after processing a request, usually called automatically.
+dispatchers for every request and passes them a L<Mojolicious::Controller>
+object.
 
 =head2 C<handler>
 
-    $tx = $mojo->handler($tx);
+    $tx = $app->handler($tx);
 
 Sets up the default controller and calls process for every request.
 
+=head2 C<helper>
+
+    $app->helper(foo => sub { ... });
+
+Add a new helper.
+Note that this method is EXPERIMENTAL and might change without warning!
+
+    # Helper
+    $app->helper(add => sub { $_[1] + $_[2] });
+
+    # Controller/Application
+    my $result = $self->add(2, 3);
+
+    # Template
+    <%= add 2, 3 %>
+
 =head2 C<plugin>
 
-    $mojo->plugin('something');
-    $mojo->plugin('something', foo => 23);
-    $mojo->plugin('something', {foo => 23});
+    $app->plugin('something');
+    $app->plugin('something', foo => 23);
+    $app->plugin('something', {foo => 23});
+    $app->plugin('Foo::Bar');
+    $app->plugin('Foo::Bar', foo => 23);
+    $app->plugin('Foo::Bar', {foo => 23});
 
 Load a plugin.
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<process>
 
-    $mojo->process($c);
+    $app->process($c);
 
 This method can be overloaded to do logic on a per request basis, by default
-just calls dispatch.
+just calls dispatch and passes it a L<Mojolicious::Controller> object.
 Generally you will use a plugin or controller instead of this, consider it
 the sledgehammer in your toolbox.
 
@@ -572,7 +622,7 @@ application.
 
 =head2 C<startup>
 
-    $mojo->startup;
+    $app->startup;
 
 This is your main hook into the application, it will be called at application
 startup.
@@ -600,6 +650,17 @@ startup.
 =head2 Repository
 
     http://github.com/kraih/mojo
+
+=head1 CODE NAMES
+
+Every major release of L<Mojolicious> has a code name, these are the ones
+that have been used in the past.
+
+0.999930, C<Hot Beverage> (u2615)
+
+0.999927, C<Comet> (u2604)
+
+0.999920, C<Snowman> (u2603)
 
 =head1 AUTHOR
 
@@ -653,6 +714,8 @@ Danijel Tasov
 
 David Davis
 
+Dmitriy Shalashov
+
 Dmitry Konstantinov
 
 Eugene Toropov
@@ -666,6 +729,8 @@ Graham Barr
 Hideki Yamamura
 
 James Duncan
+
+Jan Jona Javorsek
 
 Jaroslav Muhin
 
@@ -697,9 +762,13 @@ Maxim Vuets
 
 Mirko Westermeier
 
+Mons Anderson
+
 Oleg Zhelo
 
 Pascal Gaudette
+
+Paul Tomlin
 
 Pedro Melo
 
@@ -721,6 +790,8 @@ Sascha Kiefer
 
 Sergey Zasenko
 
+Simon Bertrang
+
 Shu Cho
 
 Stanis Trendelenburg
@@ -730,6 +801,8 @@ Tatsuhiko Miyagawa
 The Perl Foundation
 
 Tomas Znamenacek
+
+Ulrich Habel
 
 Ulrich Kautz
 

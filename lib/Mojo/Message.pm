@@ -16,13 +16,21 @@ use Mojo::Upload;
 
 use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 262144;
 
-__PACKAGE__->attr(buffer  => sub { Mojo::ByteStream->new });
+__PACKAGE__->attr(buffer  => sub { b() });
 __PACKAGE__->attr(content => sub { Mojo::Content::Single->new });
-__PACKAGE__->attr(default_charset => 'UTF-8');
-__PACKAGE__->attr(dom_class       => 'Mojo::DOM');
-__PACKAGE__->attr([qw/finish_cb progress_cb/]);
+__PACKAGE__->attr(default_charset                   => 'UTF-8');
+__PACKAGE__->attr(dom_class                         => 'Mojo::DOM');
 __PACKAGE__->attr(json_class                        => 'Mojo::JSON');
 __PACKAGE__->attr([qw/major_version minor_version/] => 1);
+__PACKAGE__->attr(max_line_size => sub { $ENV{MOJO_MAX_LINE_SIZE} || 10240 });
+__PACKAGE__->attr(
+    max_message_size => sub { $ENV{MOJO_MAX_MESSAGE_SIZE} || 5242880 });
+__PACKAGE__->attr([qw/on_finish on_progress/]);
+
+# DEPRECATED in Comet!
+*finish_cb   = \&on_finish;
+*progress_cb = \&on_progress;
+*read_cb     = \&on_read;
 
 # I'll keep it short and sweet. Family. Religion. Friendship.
 # These are the three demons you must slay if you wish to succeed in
@@ -50,8 +58,8 @@ sub body {
 
     # Get
     unless (@_) {
-        return $self->body_cb
-          ? $self->body_cb
+        return $self->on_read
+          ? $self->on_read
           : return $self->content->asset->slurp;
     }
 
@@ -59,22 +67,20 @@ sub body {
     my $content = shift;
 
     # Cleanup
-    $self->body_cb(undef);
+    $self->on_read(undef);
     $self->content->asset(Mojo::Asset::Memory->new);
 
     # Shortcut
     return $self unless defined $content;
 
     # Callback
-    if (ref $content eq 'CODE') { $self->body_cb($content) }
+    if (ref $content eq 'CODE') { $self->on_read($content) }
 
     # Set text content
     elsif (length $content) { $self->content->asset->add_chunk($content) }
 
     return $self;
 }
-
-sub body_cb { shift->content->body_cb(@_) }
 
 sub body_params {
     my $self = shift;
@@ -147,7 +153,7 @@ sub build_body {
 
     # Finished
     $self->{_state} = 'done';
-    if (my $cb = $self->finish_cb) { $self->$cb }
+    if (my $cb = $self->on_finish) { $self->$cb }
 
     return $body;
 }
@@ -242,7 +248,12 @@ sub dom {
       and $charset = $1;
 
     # Parse
-    return $class->new(charset => $charset)->parse($self->body);
+    my $dom = $class->new(charset => $charset)->parse($self->body);
+
+    # Find right away
+    return $dom->find(@_) if @_;
+
+    return $dom;
 }
 
 sub error {
@@ -261,14 +272,16 @@ sub error {
     return $self;
 }
 
+sub finish { shift->content->finish(@_) }
+
 sub fix_headers {
     my $self = shift;
 
     # Content-Length header is required in HTTP 1.0 (and above)
     if ($self->at_least_version('1.0') && !$self->is_chunked) {
-        my $size = $self->body_size;
-        $self->headers->content_length($size)
-          if $size && !$self->headers->content_length;
+        my $headers = $self->headers;
+        $headers->content_length($self->body_size)
+          unless $headers->content_length;
     }
 
     return $self;
@@ -278,15 +291,15 @@ sub get_body_chunk {
     my $self = shift;
 
     # Progress
-    if (my $cb = $self->progress_cb) { $self->$cb('body', @_) }
+    if (my $cb = $self->on_progress) { $self->$cb('body', @_) }
 
     # Chunk
     my $chunk = $self->content->get_body_chunk(@_);
-    return $chunk if length $chunk || !defined $chunk;
+    return $chunk if !defined $chunk || length $chunk;
 
     # Finish
     $self->{_state} = 'done';
-    if (my $cb = $self->finish_cb) { $self->$cb }
+    if (my $cb = $self->on_finish) { $self->$cb }
 
     return $chunk;
 }
@@ -295,7 +308,7 @@ sub get_header_chunk {
     my $self = shift;
 
     # Progress
-    if (my $cb = $self->progress_cb) { $self->$cb('headers', @_) }
+    if (my $cb = $self->on_progress) { $self->$cb('headers', @_) }
 
     # HTTP 0.9 has no headers
     return '' if $self->version eq '0.9';
@@ -310,7 +323,7 @@ sub get_start_line_chunk {
     my ($self, $offset) = @_;
 
     # Progress
-    if (my $cb = $self->progress_cb) { $self->$cb('start_line', @_) }
+    if (my $cb = $self->on_progress) { $self->$cb('start_line', @_) }
 
     my $copy = $self->_build_start_line;
     return substr($copy, $offset, CHUNK_SIZE);
@@ -345,6 +358,13 @@ sub is_chunked { shift->content->is_chunked }
 sub is_done {
     return 1 if (shift->{_state} || '') eq 'done';
     return;
+}
+
+sub is_limit_exceeded {
+    my $self = shift;
+    return unless my $code = ($self->error)[1];
+    return unless $code eq '413';
+    return 1;
 }
 
 sub is_multipart { shift->content->is_multipart }
@@ -392,6 +412,8 @@ sub parse_until_body {
 
     return $self->_parse(1);
 }
+
+sub on_read { shift->content->on_read(@_) }
 
 sub start_line_size { length shift->build_start_line }
 
@@ -480,6 +502,9 @@ sub version {
     return $self;
 }
 
+sub write       { shift->content->write(@_) }
+sub write_chunk { shift->content->write_chunk(@_) }
+
 sub _build_start_line {
     croak 'Method "_build_start_line" not implemented by subclass';
 }
@@ -488,21 +513,18 @@ sub _parse {
     my $self = shift;
     my $until_body = @_ ? shift : 0;
 
-    # Progress
-    if (my $cb = $self->progress_cb) { $self->$cb }
-
     # Start line and headers
     my $buffer = $self->buffer;
     if (!$self->{_state} || $self->{_state} eq 'headers') {
 
         # Check line size
         $self->error('Maximum line size exceeded.', 413)
-          if $buffer->size > ($ENV{MOJO_MAX_LINE_SIZE} || 10240);
+          if $buffer->size > $self->max_line_size;
     }
 
     # Check message size
     $self->error('Maximum message size exceeded.', 413)
-      if $buffer->raw_size > ($ENV{MOJO_MAX_MESSAGE_SIZE} || 5242880);
+      if $buffer->raw_size > $self->max_message_size;
 
     # Content
     my $state = $self->{_state} || '';
@@ -510,7 +532,7 @@ sub _parse {
         my $content = $self->content;
 
         # Parse
-        $content->filter_buffer($buffer);
+        $content->chunked_buffer($buffer);
 
         # Until body
         if ($until_body) { $self->content($content->parse_until_body) }
@@ -530,8 +552,11 @@ sub _parse {
     # Done
     $self->{_state} = 'done' if $self->content->is_done;
 
+    # Progress
+    if (my $cb = $self->on_progress) { $self->$cb }
+
     # Finished
-    if ((my $cb = $self->finish_cb) && $self->is_done) { $self->$cb }
+    if ((my $cb = $self->on_finish) && $self->is_done) { $self->$cb }
 
     return $self;
 }
@@ -627,22 +652,6 @@ in RFC 2616 and RFC 2388.
 
 L<Mojo::Message> implements the following attributes.
 
-=head2 C<body_cb>
-
-    my $cb = $message->body_cb;
-
-    $counter = 1;
-    $message = $message->body_cb(sub {
-        my $self  = shift;
-        my $chunk = '';
-        $chunk    = "hello world!" if $counter == 1;
-        $chunk    = "hello world2!\n\n" if $counter == 2;
-        $counter++;
-        return $chunk;
-    });
-
-Content generator callback.
-
 =head2 C<buffer>
 
     my $buffer = $message->buffer;
@@ -652,7 +661,7 @@ Input buffer for parsing.
 
 =head2 C<content>
 
-    my $content = $message->content;
+    my $message = $message->content;
     $message    = $message->content(Mojo::Content::Single->new);
 
 Content container, defaults to a L<Mojo::Content::Single> object.
@@ -672,15 +681,6 @@ Default charset used for form data parsing.
 Class to be used for DOM manipulation, defaults to L<Mojo::DOM>.
 Note that this attribute is EXPERIMENTAL and might change without warning!
 
-=head2 C<finish_cb>
-
-    my $cb   = $message->finish_cb;
-    $message = $message->finish_cb(sub {
-        my $self = shift;
-    });
-
-Callback called after message building or parsing is finished.
-
 =head2 C<json_class>
 
     my $class = $message->json_class;
@@ -697,6 +697,22 @@ Note that this attribute is EXPERIMENTAL and might change without warning!
 
 Major version, defaults to C<1>.
 
+=head2 C<max_line_size>
+
+    my $size = $message->max_line_size;
+    $message = $message->max_line_size(1024);
+
+Maximum line size in bytes, defaults to C<10240>.
+Note that this attribute is EXPERIMENTAL and might change without warning!
+
+=head2 C<max_message_size>
+
+    my $size = $message->max_message_size;
+    $message = $message->max_message_size(1024);
+
+Maximum message size in bytes, defaults to C<5242880>.
+Note that this attribute is EXPERIMENTAL and might change without warning!
+
 =head2 C<minor_version>
 
     my $minor_version = $message->minor_version;
@@ -704,15 +720,38 @@ Major version, defaults to C<1>.
 
 Minor version, defaults to C<1>.
 
-=head2 C<progress_cb>
+=head2 C<on_finish>
 
-    my $cb   = $message->progress_cb;
-    $message = $message->progress_cb(sub {
+    my $cb   = $message->on_finish;
+    $message = $message->on_finish(sub {
+        my $self = shift;
+    });
+
+Callback called after message building or parsing is finished.
+
+=head2 C<on_progress>
+
+    my $cb   = $message->on_progress;
+    $message = $message->on_progress(sub {
         my $self = shift;
         print '+';
     });
 
 Progress callback.
+
+=head2 C<on_read>
+
+    my $cb   = $message->on_read;
+    $message = $message->on_read(sub {...});
+
+Content parser callback.
+
+    $message = $message->on_read(sub {
+        my ($self, $chunk) = @_;
+        print $chunk;
+    });
+
+Note that this attribute is EXPERIMENTAL and might change without warning!
 
 =head1 METHODS
 
@@ -729,16 +768,7 @@ Check if message is at least a specific version.
 
     my $string = $message->body;
     $message   = $message->body('Hello!');
-
-    $counter = 1;
-    $message = $message->body(sub {
-        my $self  = shift;
-        my $chunk = '';
-        $chunk    = "hello world!" if $counter == 1;
-        $chunk    = "hello world2!\n\n" if $counter == 2;
-        $counter++;
-        return $chunk;
-    });
+    $message   = $message->body(sub {...});
 
 Helper for simplified content access.
 
@@ -789,9 +819,11 @@ Access message cookies.
 
 =head2 C<dom>
 
-    my $dom = $message->dom;
+    my $dom        = $message->dom;
+    my $collection = $message->dom('a[href]');
 
-Parses content into a L<Mojo::DOM> object.
+Parses content into a L<Mojo::DOM> object and takes an optional selector to
+perform a find on it right away.
 Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<error>
@@ -802,6 +834,13 @@ Note that this method is EXPERIMENTAL and might change without warning!
     $message             = $message->error('Parser error.', 500);
 
 Parser errors and codes.
+
+=head2 C<finish>
+
+    $message->finish;
+
+Finish dynamic content generation.
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<fix_headers>
 
@@ -857,6 +896,13 @@ Check if message content is chunked.
     my $done = $message->is_done;
 
 Check if parser is done.
+
+=head2 C<is_limit_exceeded>
+
+    my $limit = $message->is_limit_exceeded;
+
+Check if message has exceeded C<max_line_size> or C<max_message_size>.
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<is_multipart>
 
@@ -923,6 +969,24 @@ All file uploads.
     $message    = $message->version('1.1');
 
 HTTP version of message.
+
+=head2 C<write>
+
+    $message->write('Hello!');
+    $message->write('Hello!', sub {...});
+
+Write dynamic content, the optional drain callback will be invoked once all
+data has been written.
+Note that this method is EXPERIMENTAL and might change without warning!
+
+=head2 C<write_chunk>
+
+    $message->write_chunk('Hello!');
+    $message->write_chunk('Hello!', sub {...});
+
+Write chunked content, the optional drain callback will be invoked once all
+data has been written.
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head1 SEE ALSO
 

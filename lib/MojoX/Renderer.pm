@@ -82,8 +82,7 @@ sub render {
     # Arguments
     $args ||= {};
 
-    # We got called
-    $stash->{'mojo.rendered'} = 1;
+    # Content
     my $content = $stash->{'mojo.content'} ||= {};
 
     # Partial
@@ -101,6 +100,9 @@ sub render {
     # Template
     my $template = delete $stash->{template};
 
+    # Template class
+    my $class = $stash->{template_class};
+
     # Format
     my $format = $stash->{format} || $self->default_format;
 
@@ -116,12 +118,17 @@ sub render {
     # Text
     my $text = delete $stash->{text};
 
+    # Inline
+    my $inline = delete $stash->{inline};
+    $handler = $self->default_handler if defined $inline && !defined $handler;
+
     my $options = {
         template       => $template,
         format         => $format,
         handler        => $handler,
         encoding       => $self->encoding,
-        template_class => $stash->{template_class}
+        inline         => $inline,
+        template_class => $class
     };
     my $output;
 
@@ -173,12 +180,19 @@ sub render {
     # Extends
     while ((my $extends = $self->_extends($c)) && !$json && !$data) {
 
+        # Stash
+        my $stash = $c->stash;
+
+        # Template class
+        $class = $stash->{template_class};
+        $options->{template_class} = $class;
+
         # Handler
-        $handler = $c->stash->{handler};
+        $handler = $stash->{handler};
         $options->{handler} = $handler;
 
         # Format
-        $format = $c->stash->{format} || $self->default_format;
+        $format = $stash->{format} || $self->default_format;
         $options->{format} = $format;
 
         # Template
@@ -248,6 +262,7 @@ sub _detect_handler {
 
     # Detect
     return unless my $file = $self->template_name($options);
+    $file = quotemeta $file;
     for my $template (@$templates, @$inline) {
         if ($template =~ /^$file\.(\w+)$/) { return $1 }
     }

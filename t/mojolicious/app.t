@@ -26,7 +26,7 @@ use Mojolicious;
 
 # Congratulations Fry, you've snagged the perfect girlfriend.
 # Amy's rich, she's probably got other characteristics...
-use_ok('MojoliciousTest');
+use_ok 'MojoliciousTest';
 
 my $t = Test::Mojo->new(app => 'MojoliciousTest');
 
@@ -35,13 +35,6 @@ $t->get_ok('/syntax_error/foo')->status_is(500)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_like(qr/Missing right curly/);
-
-# Foo::exceptionduringpausedtransaction
-# (syntax error in controller during paused transaction)
-$t->get_ok('/foo/exceptionduringpausedtransaction')->status_is(500)
-  ->header_is(Server         => 'Mojolicious (Perl)')
-  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_like(qr/Exception/);
 
 # Foo::syntaxerror (syntax error in template)
 $t->get_ok('/foo/syntaxerror')->status_is(500)
@@ -78,7 +71,7 @@ $t->get_ok('/foo/test', {'X-Test' => 'Hi there!'})->status_is(200)
 $t->get_ok('/foo', {'X-Test' => 'Hi there!'})->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_like(qr/<body>\s+23Hello Mojo from the template \/foo! He/);
+  ->content_like(qr/<body>\s+23\nHello Mojo from the template \/foo! He/);
 
 # Foo::Bar::index
 $t->get_ok('/foo-bar', {'X-Test' => 'Hi there!'})->status_is(200)
@@ -177,11 +170,11 @@ $t->get_ok('/hello.txt', {'If-Modified-Since' => $mtime})->status_is(304)
 
 # Check develpment mode log level
 my $app = Mojolicious->new;
-is($app->log->level, 'debug', 'right log level');
+is $app->log->level, 'debug', 'right log level';
 
 # Make sure we can override attributes with constructor arguments
 $app = MojoliciousTest->new({mode => 'test'});
-is($app->mode, 'test', 'right mode');
+is $app->mode, 'test', 'right mode';
 
 # Persistent error
 $app = MojoliciousTest->new;
@@ -189,28 +182,22 @@ my $tx = Mojo::Transaction::HTTP->new;
 $tx->req->method('GET');
 $tx->req->url->parse('/foo');
 $app->handler($tx);
-is($tx->res->code, 200, 'right status');
-like(
-    $tx->res->body,
-    qr/Hello Mojo from the template \/foo! Hello World!/,
-    'right content'
-);
+is $tx->res->code, 200, 'right status';
+like $tx->res->body, qr/Hello Mojo from the template \/foo! Hello World!/,
+  'right content';
 $tx = Mojo::Transaction::HTTP->new;
 $tx->req->method('GET');
 $tx->req->url->parse('/foo/willdie');
 $app->handler($tx);
-is($tx->res->code, 500, 'right status');
-like($tx->res->body, qr/Foo\.pm/, 'right content');
+is $tx->res->code,   500,         'right status';
+like $tx->res->body, qr/Foo\.pm/, 'right content';
 $tx = Mojo::Transaction::HTTP->new;
 $tx->req->method('GET');
 $tx->req->url->parse('/foo');
 $app->handler($tx);
-is($tx->res->code, 200, 'right status');
-like(
-    $tx->res->body,
-    qr/Hello Mojo from the template \/foo! Hello World!/,
-    'right content'
-);
+is $tx->res->code, 200, 'right status';
+like $tx->res->body, qr/Hello Mojo from the template \/foo! Hello World!/,
+  'right content';
 
 $t = Test::Mojo->new(app => 'SingleFileTestApp');
 
@@ -218,6 +205,12 @@ $t = Test::Mojo->new(app => 'SingleFileTestApp');
 $t->get_ok('/foo')->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_like(qr/Same old in green Seems to work!/);
+
+# SingleFileTestApp (helper)
+$t->get_ok('/helper')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is('Welcome aboard!');
 
 # SingleFileTestApp::Foo::data_template
 $t->get_ok('/foo/data_template')->status_is(200)

@@ -19,6 +19,11 @@ sub startup {
     # Only log errors to STDERR
     $self->log->level('fatal');
 
+    # Plugin
+    unshift @{$self->plugins->namespaces},
+      $self->routes->namespace . '::Plugin';
+    $self->plugin('test_plugin');
+
     # Templateless renderer
     $self->renderer->add_handler(
         test => sub {

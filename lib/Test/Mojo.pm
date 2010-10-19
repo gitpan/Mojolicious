@@ -112,7 +112,7 @@ sub header_is {
 
     # Test
     local $Test::Builder::Level = $Test::Builder::Level + 1;
-    Test::More::is($tx->res->headers->header($name),
+    Test::More::is(scalar $tx->res->headers->header($name),
         $value, "$name: " . ($value ? $value : ''));
 
     return $self;
@@ -129,7 +129,7 @@ sub header_like {
 
     # Test
     local $Test::Builder::Level = $Test::Builder::Level + 1;
-    Test::More::like($tx->res->headers->header($name), $regex, $desc);
+    Test::More::like(scalar $tx->res->headers->header($name), $regex, $desc);
 
     return $self;
 }
@@ -168,7 +168,7 @@ sub post_form_ok {
     $client->max_redirects($self->max_redirects);
 
     # Request
-    $client->post_form(@_, sub { $self->tx($_[-1]) })->process;
+    $client->post_form(@_, sub { $self->tx($_[-1]) })->start;
 
     # Test
     local $Test::Builder::Level = $Test::Builder::Level + 1;
@@ -227,6 +227,9 @@ sub text_is {
     return $self;
 }
 
+# Hello, my name is Barney Gumble, and I'm an alcoholic.
+# Mr Gumble, this is a girl scouts meeting.
+# Is it, or is it you girls can't admit that you have a problem?
 sub text_like {
     my ($self, $selector, $regex, $desc) = @_;
 
@@ -279,7 +282,7 @@ sub _request_ok {
 
     # Request
     $client->$method($url, %$headers, $body, sub { $self->tx($_[-1]) })
-      ->process;
+      ->start;
 
     # Test
     local $Test::Builder::Level = $Test::Builder::Level + 2;
@@ -398,7 +401,8 @@ Perform a C<DELETE> request.
     $t = $t->element_exists('div.foo[x=y]');
     $t = $t->element_exists('html head title', 'has a title');
 
-Checks for existence of the CSS3 selectors XML/HTML element.
+Checks for existence of the CSS3 selectors XML/HTML element with
+L<Mojo::DOM>.
 Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<get_ok>
@@ -494,7 +498,8 @@ Check response status for exact match.
     $t = $t->text_is('div.foo[x=y]' => 'Hello!');
     $t = $t->text_is('html head title' => 'Hello!', 'right title');
 
-Checks text content of the CSS3 selectors XML/HTML element for exact match.
+Checks text content of the CSS3 selectors XML/HTML element for exact match
+with L<Mojo::DOM>.
 Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<text_like>
@@ -502,7 +507,8 @@ Note that this method is EXPERIMENTAL and might change without warning!
     $t = $t->text_like('div.foo[x=y]' => qr/Hello/);
     $t = $t->text_like('html head title' => qr/Hello/, 'right title');
 
-Checks text content of the CSS3 selectors XML/HTML element for similar match.
+Checks text content of the CSS3 selectors XML/HTML element for similar match
+with L<Mojo::DOM>.
 Note that this method is EXPERIMENTAL and might change without warning!
 
 =head1 SEE ALSO

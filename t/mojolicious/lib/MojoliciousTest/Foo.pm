@@ -19,14 +19,10 @@ sub config {
     $self->render_text($self->stash('config')->{test});
 }
 
-sub exceptionduringpausedtransaction { shift->pause and die 'Exception' }
-
 sub index {
-    shift->stash(
-        layout  => 'default',
-        handler => 'xpl',
-        msg     => 'Hello World!'
-    );
+    my $self = shift;
+    $self->layout('default');
+    $self->stash(handler => 'xpl', msg => 'Hello World!');
 }
 
 sub session_domain {
@@ -52,7 +48,10 @@ sub stage1 {
     return;
 }
 
-sub stage2 { shift->render_text('Welcome aboard!') }
+sub stage2 {
+    my $self = shift;
+    $self->render_text($self->test_plugin);
+}
 
 sub syntaxerror { shift->render('syntaxerror', format => 'html') }
 

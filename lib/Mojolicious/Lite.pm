@@ -38,20 +38,15 @@ sub import {
         my $conditions = [];
 
         # Route information
-        my $condition;
-        while (my $arg = shift @args) {
-
-            # Condition can be everything
-            if ($condition) {
-                push @$conditions, $condition => $arg;
-                $condition = undef;
-            }
+        while (defined(my $arg = shift @args)) {
 
             # First scalar is the pattern
-            elsif (!ref $arg && !$pattern) { $pattern = $arg }
+            if (!ref $arg && !$pattern) { $pattern = $arg }
 
             # Scalar
-            elsif (!ref $arg && @args) { $condition = $arg }
+            elsif (!ref $arg && @args) {
+                push @$conditions, $arg, shift @args;
+            }
 
             # Last scalar is the route name
             elsif (!ref $arg) { $name = $arg }
@@ -164,7 +159,7 @@ application.
 
 There is also a helper command to generate a small example application.
 
-    % mojolicious generate lite_app
+    % mojo generate lite_app
 
 All the normal L<Mojolicious> command options are available from the command
 line.
@@ -176,9 +171,6 @@ will just work without commands.
 
     % ./myapp.pl daemon --listen http://*:8080
     Server available at http://127.0.0.1:8080.
-
-    % ./myapp.pl daemon_prefork
-    Server available at http://127.0.0.1:3000.
 
     % ./myapp.pl cgi
     ...CGI output...
@@ -230,12 +222,8 @@ simply equal to the route without non-word characters.
     __DATA__
 
     @@ index.html.ep
-    <%= link_to foo => {%>
-        Foo
-    <%}%>.
-    <%= link_to bar => {%>
-        Bar
-    <%}%>.
+    <%= link_to Foo => 'foo' %>.
+    <%= link_to Bar => 'bar' %>.
 
     @@ foo.html.ep
     <a href="<%= url_for 'index' %>">Home</a>.
@@ -267,10 +255,10 @@ Template blocks can be reused like functions in Perl scripts.
     __DATA__
 
     @@ block.html.ep
-    <% my $link = {%>
+    <% my $link = begin %>
         <% my ($url, $name) = @_; %>
-        Try <%= link_to $url => {%><%= $name %><%}%>!
-    <%}%>
+        Try <%= link_to $url => begin %><%= $name %><% end %>!
+    <% end %>
     <!doctype html><html>
         <head><title>Sebastians Frameworks!</title></head>
         <body>
@@ -292,18 +280,26 @@ other.
 
     @@ first.html.ep
     <!doctype html><html>
-        <head><%= content header => {%><title>Hi!</title><%}%></head>
-        <body><%= content body => {%>First page!<%}%></body>
+        <head>
+            <%= content header => begin %>
+                <title>Hi!</title>
+            <% end %>
+        </head>
+        <body>
+            <%= content body => begin %>
+                First page!
+            <% end %>
+        </body>
     </html>
 
     @@ second.html.ep
     % extends 'first';
-    <% content header => {%>
+    <% content header => begin %>
         <title>Howdy!</title>
-    <%}%>
-    <% content body => {%>
+    <% end %>
+    <% content body => begin %>
         Second page!
-    <%}%>
+    <% end %>
 
 Route placeholders allow capturing parts of a request path until a C</> or
 C<.> separator occurs, results will be stored by name in the C<stash> and
@@ -442,19 +438,19 @@ multiple features at once.
     @@ index.html.ep
     % layout 'funky';
     Who is groovy?
-    <%= form_for test => (method => 'post') => {%>
-        <%= input 'groovy', type => 'text' %>
-        <input type="submit" value="Woosh!" />
-    <%}%>
+    <%= form_for test => (method => 'post') => begin %>
+        <%= text_field 'groovy' %>
+        <%= submit_button 'Woosh!' %>
+    <% end %>
 
     @@ welcome.html.ep
     <%= $groovy %> is groovy!
     <%= include 'menu' %>
 
     @@ menu.html.ep
-    <%= link_to index => {%>
+    <%= link_to index => begin %>
         Try again
-    <%}%>
+    <% end %>
 
     @@ layouts/funky.html.ep
     <!doctype html><html>
@@ -495,6 +491,21 @@ true value.
     @@ index.html.ep
     Hi Bender!
 
+Prefixing multiple routes is another good use for C<under>.
+
+    use Mojolicious::Lite;
+
+    # /foo
+    under '/foo';
+
+    # GET /foo/bar
+    get '/bar' => sub { shift->render(text => 'bar!') };
+
+    # GET /foo/baz
+    get '/baz' => sub { shift->render(text => 'baz!') };
+
+    app->start;
+
 Conditions such as C<agent> allow even more powerful route constructs.
 
     # /foo
@@ -531,8 +542,9 @@ Formats can be automatically detected by looking at file extensions.
 
 Signed cookie based sessions just work out of the box as soon as you start
 using them.
-The C<flash> can be used to store values that will only be available for one
-request, this is very useful in combination with C<redirect_to>.
+The C<flash> can be used to store values that will only be available for the
+next request (unlike C<stash>, which is only available for the current
+request), this is very useful in combination with C<redirect_to>.
 
     use Mojolicious::Lite;
 
@@ -569,16 +581,16 @@ request, this is very useful in combination with C<redirect_to>.
 
     @@ login.html.ep
     % layout 'default';
-    <%= form_for login => {%>
+    <%= form_for login => begin %>
         <% if (param 'name') { %>
             <b>Wrong name or password, please try again.</b><br />
         <% } %>
         Name:<br />
-        <%= input name => (type => 'text') %><br />
+        <%= text_field 'name' %><br />
         Password:<br />
-        <%= input pass => (type => 'text') %><br />
-        <input type="submit" value="Login" />
-    <%}%>
+        <%= password_field 'pass' %><br />
+        <%= submit_button 'Login' %>
+    <% end %>
 
     @@ index.html.ep
     % layout 'default';
@@ -586,9 +598,9 @@ request, this is very useful in combination with C<redirect_to>.
         <b><%= $message %></b><br />
     <% } %>
     Welcome <%= session 'name' %>!<br />
-    <%= link_to logout => {%>
+    <%= link_to logout => begin %>
         Logout
-    <%}%>
+    <% end %>
 
 Note that you should use a custom C<secret> to make signed cookies really secure.
 
@@ -608,7 +620,7 @@ WebSocket applications have never been this easy before.
 
     websocket '/echo' => sub {
         my $self = shift;
-        $self->receive_message(sub {
+        $self->on_message(sub {
             my ($self, $message) = @_;
             $self->send_message("echo: $message");
         });
@@ -638,7 +650,9 @@ Static files will be automatically served from the C<DATA> section
     % mv something.js public/something.js
 
 Testing your application is as easy as creating a C<t> directory and filling
-it with normal Perl unit tests like C<t/funky.t>.
+it with normal Perl unit tests.
+Some plugins depend on the actual script name, so a test file for the
+application C<myapp.pl> should be named C<t/myapp.t>.
 
     use Test::More tests => 3;
     use Test::Mojo;
@@ -662,7 +676,7 @@ directly in your test files.
 To disable debug messages later in a production setup you can change the
 L<Mojolicious> mode, default will be C<development>.
 
-    % MOJO_MODE=production ./myapp.pl
+    % ./myapp.pl --mode production
 
 Log messages will be automatically written to a C<log/$mode.log> file if a
 C<log> directory exists.
@@ -701,9 +715,67 @@ L<Mojolicious::Lite> and L<Mojolicious> applications.
 Both share about 99% of the same code, so almost everything you learned in
 this tutorial applies there too. :)
 
-    % mojolicious generate app
+    % mojo generate app
 
 Have fun!
+
+=head1 FUNCTIONS
+
+L<Mojolicious::Lite> implements the following functions.
+
+=head2 C<any>
+
+    my $route = any '/:foo' => sub {...};
+    my $route = any [qw/get post/] => '/:foo' => sub {...};
+
+Generate route matching any of the listed HTTP request methods or all.
+See also the tutorial above for more argument variations.
+
+=head2 C<app>
+
+    my $app = app;
+
+The L<Mojolicious::Lite> application.
+
+=head2 C<get>
+
+    my $route = get '/:foo' => sub {...};
+
+Generate route matching only C<GET> requests.
+See also the tutorial above for more argument variations.
+
+=head2 C<plugin>
+
+    plugin 'something';
+    plugin 'something', foo => 23;
+    plugin 'something', {foo => 23};
+    plugin 'Foo::Bar';
+    plugin 'Foo::Bar', foo => 23;
+    plugin 'Foo::Bar', {foo => 23};
+
+Load a plugin.
+
+=head2 C<post>
+
+    my $route = post '/:foo' => sub {...};
+
+Generate route matching only C<POST> requests.
+See also the tutorial above for more argument variations.
+
+=head2 C<under>
+
+    my $route = under sub {...};
+    my $route = under '/:foo';
+
+Generate bridge to which all following routes are automatically appended.
+See also the tutorial above for more argument variations.
+
+=head2 C<websocket>
+
+    my $route = websocket '/:foo' => sub {...};
+
+Generate route matching only C<WebSocket> handshakes.
+See also the tutorial above for more argument variations.
 
 =head1 ATTRIBUTES
 

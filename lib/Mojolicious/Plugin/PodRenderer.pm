@@ -5,7 +5,7 @@ use warnings;
 
 use base 'Mojolicious::Plugin';
 
-use Mojo::ByteStream;
+use Mojo::ByteStream 'b';
 
 # Core module since Perl 5.9.3, so it might not always be present
 BEGIN {
@@ -36,8 +36,7 @@ sub register {
     );
 
     # Add "pod_to_html" helper
-    $app->renderer->add_helper(pod_to_html =>
-          sub { shift; Mojo::ByteStream->new($self->_pod_to_html(@_)) });
+    $app->helper(pod_to_html => sub { shift; b($self->_pod_to_html(@_)) });
 }
 
 sub _pod_to_html {
@@ -63,8 +62,8 @@ sub _pod_to_html {
     return $@ if $@;
 
     # Filter
-    $output =~ s/<a name='___top' class='dummyTopAnchor'\s*><\/a>\n//g;
-    $output =~ s/<a class='u'.*name=".*"\s*>(.*)<\/a>/$1/sg;
+    $output =~ s/<a name='___top' class='dummyTopAnchor'\s*?><\/a>\n//g;
+    $output =~ s/<a class='u'.*?name=".*?"\s*>(.*?)<\/a>/$1/sg;
 
     return $output;
 }
@@ -119,7 +118,7 @@ L<Mojolicous::Plugin::PodRenderer> is a renderer for true Perl hackers, rawr!
 =item pod_to_html
 
     <%= pod_to_html '=head2 lalala' %>
-    <%= pod_to_html {%>=head2 lalala<%}%>
+    <%= pod_to_html begin %>=head2 lalala<% end %>
 
 Render POD to HTML.
 

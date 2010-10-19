@@ -18,7 +18,7 @@ our $UNRESERVED = 'A-Za-z0-9\-\.\_\~';
 our $SUBDELIM   = '!\$\&\'\(\)\*\+\,\;\=';
 our $PCHAR      = "$UNRESERVED$SUBDELIM\%\:\@";
 
-# The specs for this are blurry, it's mostly a colelction of w3c suggestions
+# The specs for this are blurry, it's mostly a collection of w3c suggestions
 our $PARAM = "$UNRESERVED\!\$\'\(\)\*\,\:\@\/\?";
 
 sub new {
@@ -162,6 +162,7 @@ sub path {
             else {
                 my $new = Mojo::Path->new($path);
                 $path = $self->{path} || Mojo::Path->new;
+                pop @{$path->parts} unless $path->trailing_slash;
                 push @{$path->parts}, @{$new->parts};
                 $path->leading_slash(1);
                 $path->trailing_slash($new->trailing_slash);
@@ -183,12 +184,18 @@ sub query {
     # Set
     if (@_) {
 
-        # Multiple values
+        # Replace with array
         if (@_ > 1 || (ref $_[0] && ref $_[0] eq 'ARRAY')) {
             $self->{query} = Mojo::Parameters->new(ref $_[0] ? @{$_[0]} : @_);
         }
 
-        # Single value
+        # Append hash
+        elsif (ref $_[0] && ref $_[0] eq 'HASH') {
+            my $q = $self->{query} ||= Mojo::Parameters->new;
+            $q->append(%{$_[0]});
+        }
+
+        # Replace with string or object
         else {
             $self->{query} =
               !ref $_[0] ? Mojo::Parameters->new->append($_[0]) : $_[0];
@@ -430,8 +437,9 @@ defaults to a L<Mojo::Path> object.
 =head2 C<query>
 
     my $query = $url->query;
-    $url      = $url->query(name => 'value');
-    $url      = $url->query([name => 'value']);
+    $url      = $url->query(replace => 'with');
+    $url      = $url->query([replace => 'with']);
+    $url      = $url->query({append => 'to'});
     $url      = $url->query(Mojo::Parameters->new);
 
 Query part of this URL, defaults to a L<Mojo::Parameters> object.

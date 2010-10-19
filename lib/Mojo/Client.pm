@@ -25,15 +25,20 @@ use Scalar::Util 'weaken';
 use constant DEBUG => $ENV{MOJO_CLIENT_DEBUG} || 0;
 
 # You can't let a single bad experience scare you away from drugs.
-__PACKAGE__->attr(
-    [qw/app http_proxy https_proxy tls_ca_file tls_verify_cb tx/]);
+__PACKAGE__->attr([qw/app http_proxy https_proxy tx/]);
 __PACKAGE__->attr(cookie_jar => sub { Mojo::CookieJar->new });
 __PACKAGE__->attr(ioloop     => sub { Mojo::IOLoop->new });
-__PACKAGE__->attr(keep_alive_timeout         => 15);
-__PACKAGE__->attr(log                        => sub { Mojo::Log->new });
-__PACKAGE__->attr(max_keep_alive_connections => 5);
+__PACKAGE__->attr(keep_alive_timeout => 15);
+__PACKAGE__->attr(log                => sub { Mojo::Log->new });
+__PACKAGE__->attr(max_connections    => 5);
 __PACKAGE__->attr(max_redirects     => sub { $ENV{MOJO_MAX_REDIRECTS} || 0 });
 __PACKAGE__->attr(websocket_timeout => 300);
+
+# DEPRECATED in Comet!
+*finished                   = \&on_finish;
+*max_keep_alive_connections = \&max_connections;
+*process                    = \&start;
+*receive_message            = \&on_message;
 
 # Singleton
 our $CLIENT;
@@ -305,10 +310,8 @@ sub clone {
     $clone->log($self->log);
     $clone->cookie_jar($self->cookie_jar);
     $clone->keep_alive_timeout($self->keep_alive_timeout);
-    $clone->max_keep_alive_connections($self->max_keep_alive_connections);
+    $clone->max_connections($self->max_connections);
     $clone->max_redirects($self->max_redirects);
-    $clone->tls_ca_file($self->tls_ca_file);
-    $clone->tls_verify_cb($self->tls_verify_cb);
     $clone->websocket_timeout($self->websocket_timeout);
 
     return $clone;
@@ -318,7 +321,7 @@ sub clone {
 # and you didn't do it.
 sub delete {
     my $self = shift;
-    return $self->_tx_queue_or_process($self->build_tx('DELETE', @_));
+    return $self->_tx_queue_or_start($self->build_tx('DELETE', @_));
 }
 
 sub detect_proxy {
@@ -341,7 +344,18 @@ sub finish {
     $tx->finish;
 }
 
-sub finished {
+# "What are you lookin' at?" - the innocent words of a drunken child.
+sub get {
+    my $self = shift;
+    return $self->_tx_queue_or_start($self->build_tx('GET', @_));
+}
+
+sub head {
+    my $self = shift;
+    return $self->_tx_queue_or_start($self->build_tx('HEAD', @_));
+}
+
+sub on_finish {
     my $self = shift;
 
     # Transaction
@@ -358,84 +372,10 @@ sub finished {
     weaken $tx;
 
     # Connection finished
-    $tx->finished(sub { shift; local $self->{tx} = $tx; $self->$cb(@_) });
+    $tx->on_finish(sub { shift; local $self->{tx} = $tx; $self->$cb(@_) });
 }
 
-# "What are you lookin' at?" - the innocent words of a drunken child.
-sub get {
-    my $self = shift;
-    return $self->_tx_queue_or_process($self->build_tx('GET', @_));
-}
-
-sub head {
-    my $self = shift;
-    return $self->_tx_queue_or_process($self->build_tx('HEAD', @_));
-}
-
-sub post {
-    my $self = shift;
-    return $self->_tx_queue_or_process($self->build_tx('POST', @_));
-}
-
-sub post_form {
-    my $self = shift;
-    return $self->_tx_queue_or_process($self->build_form_tx(@_));
-}
-
-# Olive oil? Asparagus? If your mother wasn't so fancy,
-# we could just shop at the gas station like normal people.
-sub process {
-    my $self = shift;
-
-    # Queue
-    $self->queue(@_) if @_;
-    my $queue = delete $self->{_queue} || [];
-
-    # Process sync subrequests in new client
-    if (!$self->{_is_async} && $self->{_processing}) {
-        my $clone = $self->clone;
-        $clone->queue(@$_) for @$queue;
-        return $clone->process;
-    }
-
-    # Add async transactions from queue
-    else { $self->_tx_start(@$_) for @$queue }
-
-    # Process sync requests
-    if (!$self->{_is_async} && $self->{_processing}) {
-
-        # Start loop
-        my $loop = $self->ioloop;
-        $loop->start;
-
-        # Cleanup
-        $loop->one_tick(0);
-    }
-
-    return $self;
-}
-
-sub put {
-    my $self = shift;
-    $self->_tx_queue_or_process($self->build_tx('PUT', @_));
-}
-
-# And I gave that man directions, even though I didn't know the way,
-# because that's the kind of guy I am this week.
-sub queue {
-    my $self = shift;
-
-    # Callback
-    my $cb = pop @_ if ref $_[-1] && ref $_[-1] eq 'CODE';
-
-    # Queue transactions
-    my $queue = $self->{_queue} ||= [];
-    push @$queue, [$_, $cb] for @_;
-
-    return $self;
-}
-
-sub receive_message {
+sub on_message {
     my $self = shift;
 
     # Transaction
@@ -452,8 +392,37 @@ sub receive_message {
     weaken $tx;
 
     # Receive
-    $tx->receive_message(
-        sub { shift; local $self->{tx} = $tx; $self->$cb(@_) });
+    $tx->on_message(sub { shift; local $self->{tx} = $tx; $self->$cb(@_) });
+
+    return $self;
+}
+
+sub post {
+    my $self = shift;
+    return $self->_tx_queue_or_start($self->build_tx('POST', @_));
+}
+
+sub post_form {
+    my $self = shift;
+    return $self->_tx_queue_or_start($self->build_form_tx(@_));
+}
+
+sub put {
+    my $self = shift;
+    $self->_tx_queue_or_start($self->build_tx('PUT', @_));
+}
+
+# And I gave that man directions, even though I didn't know the way,
+# because that's the kind of guy I am this week.
+sub queue {
+    my $self = shift;
+
+    # Callback
+    my $cb = pop @_ if ref $_[-1] && ref $_[-1] eq 'CODE';
+
+    # Queue transactions
+    my $queue = $self->{_queue} ||= [];
+    push @$queue, [$_, $cb] for @_;
 
     return $self;
 }
@@ -476,6 +445,39 @@ sub send_message {
 
     # Send
     $tx->send_message(@_);
+
+    return $self;
+}
+
+# Olive oil? Asparagus? If your mother wasn't so fancy,
+# we could just shop at the gas station like normal people.
+sub start {
+    my $self = shift;
+
+    # Queue
+    $self->queue(@_) if @_;
+    my $queue = delete $self->{_queue} || [];
+
+    # Process sync subrequests in new client
+    if (!$self->{_is_async} && $self->{_processing}) {
+        my $clone = $self->clone;
+        $clone->queue(@$_) for @$queue;
+        return $clone->start;
+    }
+
+    # Add async transactions from queue
+    else { $self->_tx_start(@$_) for @$queue }
+
+    # Process sync requests
+    if (!$self->{_is_async} && $self->{_processing}) {
+
+        # Start loop
+        my $loop = $self->ioloop;
+        $loop->start;
+
+        # Cleanup
+        $loop->one_tick(0);
+    }
 
     return $self;
 }
@@ -526,7 +528,7 @@ sub _cache {
     if ($id) {
 
         # Limit keep alive connections
-        my $max = $self->max_keep_alive_connections;
+        my $max = $self->max_connections;
         while (@$cache > $max) {
             my $cached = shift @$cache;
             $self->_drop($cached->[1]);
@@ -538,17 +540,29 @@ sub _cache {
         return $self;
     }
 
+    # Loop
+    my $loop = $self->ioloop;
+
     # Dequeue
     my $result;
     my @cache;
     for my $cached (@$cache) {
 
         # Search for name or id
-        $result = $cached->[1] and next
-          if $cached->[1] eq $name || $cached->[0] eq $name;
+        if (!$result && ($cached->[1] eq $name || $cached->[0] eq $name)) {
+
+            # Result
+            my $id = $cached->[1];
+
+            # Test connection
+            if ($loop->test($id)) { $result = $id }
+
+            # Drop corrupted connection
+            else { $loop->drop($id) }
+        }
 
         # Cache again
-        push @cache, $cached;
+        else { push @cache, $cached }
     }
     $self->{_cache} = \@cache;
 
@@ -608,12 +622,10 @@ sub _connect {
             port    => $port,
             socket  => $id,
             tls     => $scheme eq 'https' ? 1 : 0,
-            tls_ca_file => $self->tls_ca_file || $ENV{MOJO_CA_FILE},
-            tls_verify_cb => $self->tls_verify_cb,
-            connect_cb    => sub { $self->_connected($_[1]) },
-            error_cb      => sub { $self->_error(@_) },
-            hup_cb        => sub { $self->_hup(@_) },
-            read_cb       => sub { $self->_read(@_) }
+            on_connect => sub { $self->_connected($_[1]) },
+            on_error   => sub { $self->_error(@_) },
+            on_hup     => sub { $self->_hup(@_) },
+            on_read    => sub { $self->_read(@_) }
         );
 
         # Error
@@ -671,11 +683,7 @@ sub _connect_proxy {
                 return unless my $oid = $tx->connection;
 
                 # Start TLS
-                my $nid = $self->ioloop->start_tls(
-                    $oid,
-                    tls_ca_file => $self->tls_ca_file || $ENV{MOJO_CA_FILE},
-                    tls_verify_cb => $self->tls_verify_cb
-                );
+                my $nid = $self->ioloop->start_tls($oid);
 
                 # Cleanup
                 $old->req->proxy(undef);
@@ -868,9 +876,17 @@ sub _redirect {
 
     # Location
     return unless my $location = $res->headers->location;
+    $location = Mojo::URL->new($location);
+
+    # Request
+    my $req = $old->req;
+
+    # Fix broken location without authority
+    $location->authority($req->url->authority)
+      unless $location->authority;
 
     # Method
-    my $method = $old->req->method;
+    my $method = $req->method;
     $method = 'GET' unless $method =~ /^GET|HEAD$/i;
 
     # Max redirects
@@ -880,13 +896,11 @@ sub _redirect {
 
     # New transaction
     my $new = Mojo::Transaction::HTTP->new;
-    my $req = $new->req;
-    $req->method($method);
-    $req->url->parse($location);
+    $new->req->method($method)->url($location);
     $new->previous($old);
 
     # Start redirected request
-    my $nid = $self->_tx_start($new, $c->{cb});
+    return 1 unless my $nid = $self->_tx_start($new, $c->{cb});
 
     # Create new connection
     $self->{_cs}->{$nid}->{redirects} = $r + 1;
@@ -940,11 +954,11 @@ sub _tx_info {
     return ($scheme, $host, $port);
 }
 
-sub _tx_queue_or_process {
+sub _tx_queue_or_start {
     my ($self, $tx, $cb) = @_;
 
-    # Quick process
-    $self->process($tx, sub { $tx = $_[1] }) and return $tx
+    # Quick start
+    $self->start($tx, sub { $tx = $_[1] }) and return $tx
       if !$cb && !$self->{_is_async};
 
     # Queue transaction with callback
@@ -1006,7 +1020,7 @@ sub _tx_start {
     weaken $self;
 
     # Resume callback
-    $tx->resume_cb(sub { $self->_write($id) });
+    $tx->on_resume(sub { $self->_write($id) });
 
     # Counter
     $self->{_processing} ||= 0;
@@ -1056,7 +1070,7 @@ sub _upgrade {
     weaken $self;
 
     # Resume callback
-    $new->resume_cb(sub { $self->_write($id) });
+    $new->on_resume(sub { $self->_write($id) });
 
     return $new;
 }
@@ -1122,7 +1136,8 @@ Mojo::Client - Async IO HTTP 1.1 And WebSocket Client
 
     # Scrape the latest headlines from a news site
     my $news = 'http://digg.com';
-    $client->get($news)->res->dom->find("h3 > a.offsite")->each(sub {
+    $client->max_redirects(3);
+    $client->get($news)->res->dom('h3 > a.story-title')->each(sub {
         print shift->text . "\n";
     });
 
@@ -1140,13 +1155,13 @@ Mojo::Client - Async IO HTTP 1.1 And WebSocket Client
     my $callback = sub { print shift->res->body };
     $client->get('http://mojolicious.org' => $callback);
     $client->get('http://search.cpan.org' => $callback);
-    $client->process;
+    $client->start;
 
     # Websocket request
     $client->websocket(
         'ws://websockets.org:8787' => sub {
             my $client = shift;
-            $client->receive_message(
+            $client->on_message(
                 sub {
                     my ($client, $message) = @_;
                     print "$message\n";
@@ -1155,14 +1170,14 @@ Mojo::Client - Async IO HTTP 1.1 And WebSocket Client
             );
             $client->send_message('hi there!');
         }
-    )->process;
+    )->start;
 
 =head1 DESCRIPTION
 
 L<Mojo::Client> is a full featured async io HTTP 1.1 and WebSocket client
 with C<IPv6>, C<TLS>, C<epoll> and C<kqueue> support.
 
-Optional modules L<IO::KQueue>, L<IO::Epoll>, L<IO::Socket::INET6> and
+Optional modules L<IO::KQueue>, L<IO::Epoll>, L<IO::Socket::IP> and
 L<IO::Socket::SSL> are supported transparently and used if installed.
 
 =head1 ATTRIBUTES
@@ -1222,10 +1237,10 @@ Timeout in seconds for keep alive between requests, defaults to C<15>.
 A L<Mojo::Log> object used for logging, by default the application log will
 be used.
 
-=head2 C<max_keep_alive_connections>
+=head2 C<max_connections>
 
-    my $max_keep_alive_connections = $client->max_keep_alive_connections;
-    $client                        = $client->max_keep_alive_connections(5);
+    my $max_connections = $client->max_connections;
+    $client             = $client->max_connections(5);
 
 Maximum number of keep alive connections that the client will retain before
 it starts closing the oldest cached ones, defaults to C<5>.
@@ -1238,29 +1253,12 @@ it starts closing the oldest cached ones, defaults to C<5>.
 Maximum number of redirects the client will follow before it fails, defaults
 to C<0>.
 
-=head2 C<tls_ca_file>
-
-    my $tls_ca_file = $client->tls_ca_file;
-    $client         = $client->tls_ca_file('/etc/tls/cacerts.pem');
-
-TLS certificate authority file to use, defaults to the C<MOJO_CA_FILE>
-environment variable.
-Note that L<IO::Socket::SSL> must be installed for HTTPS support.
-
-=head2 C<tls_verify_cb>
-
-    my $tls_verify_cb = $client->tls_verify_cb;
-    $client           = $client->tls_verify_cb(sub {...});
-
-Callback to verify your TLS connection, by default the client will accept
-most certificates.
-Note that L<IO::Socket::SSL> must be installed for HTTPS support.
-
 =head2 C<tx>
 
     $client->tx;
 
-The last finished transaction, only available from callbacks.
+The last finished transaction, only available from callbacks, usually a
+L<Mojo::Transaction::HTTP> or L<Mojo::Transaction::WebSocket> object.
 
 =head2 C<websocket_timeout>
 
@@ -1323,11 +1321,11 @@ you can quickly run out of file descriptors with too many active clients.
         {myzip => {file => $asset, filename => 'foo.zip'}}
     );
 
-Versatile transaction builder for forms.
+Versatile L<Mojo::Transaction::HTTP> builder for forms.
 
     my $tx = $client->build_form_tx('http://kraih.com/foo' => {test => 123});
     $tx->res->body(sub { print $_[1] });
-    $client->process($tx);
+    $client->start($tx);
 
 =head2 C<build_tx>
 
@@ -1340,23 +1338,25 @@ Versatile transaction builder for forms.
         POST => 'http://kraih.com' => {Connection => 'close'} => 'Hi!'
     );
 
-Versatile general purpose transaction builder.
+Versatile general purpose L<Mojo::Transaction::HTTP> builder.
 
     # Streaming response
     my $tx = $client->build_tx(GET => 'http://mojolicious.org');
     $tx->res->body(sub { print $_[1] });
-    $client->process($tx);
+    $client->start($tx);
 
     # Custom socket
     my $tx = $client->build_tx(GET => 'http://mojolicious.org');
     $tx->connection($socket);
-    $client->process($tx);
+    $client->start($tx);
 
 =head2 C<build_websocket_tx>
 
     my $tx = $client->build_websocket_tx('ws://localhost:3000');
 
-WebSocket transaction builder.
+Versatile L<Mojo::Transaction::HTTP> builder for WebSocket handshakes.
+An upgrade to L<Mojo::Transaction::WebSocket> will happen automatically after
+a successful handshake is performed.
 
 =head2 C<clone>
 
@@ -1381,7 +1381,16 @@ you can quickly run out of file descriptors with too many active clients.
         'http://kraih.com' => {Connection => 'close'} => 'Hi!' => sub {...}
     );
 
-Send a HTTP C<DELETE> request.
+Prepare HTTP C<DELETE> request.
+
+    $client->delete('http://kraih.com' => sub {
+        print shift->res->body;
+    })->start;
+
+The request will be performed right away and the resulting
+L<Mojo::Transaction::HTTP> object returned if no callback is given.
+
+    print $client->delete('http://kraih.com')->res->body;
 
 =head2 C<detect_proxy>
 
@@ -1394,17 +1403,6 @@ Check environment variables for proxy information.
     $client->finish;
 
 Finish the WebSocket connection, only available from callbacks.
-
-=head2 C<finished>
-
-    $client->finished(sub {...});
-
-Callback signaling that peer finished the WebSocket connection, only
-available from callbacks.
-
-    $client->finished(sub {
-        my $client = shift;
-    });
 
 =head2 C<get>
 
@@ -1421,7 +1419,16 @@ available from callbacks.
         'http://kraih.com' => {Connection => 'close'} => 'Hi!' => sub {...}
     );
 
-Send a HTTP C<GET> request.
+Prepare HTTP C<GET> request.
+
+    $client->get('http://kraih.com' => sub {
+        print shift->res->body;
+    })->start;
+
+The request will be performed right away and the resulting
+L<Mojo::Transaction::HTTP> object returned if no callback is given.
+
+    print $client->get('http://kraih.com')->res->body;
 
 =head2 C<head>
 
@@ -1438,7 +1445,37 @@ Send a HTTP C<GET> request.
         'http://kraih.com' => {Connection => 'close'} => 'Hi!' => sub {...}
     );
 
-Send a HTTP C<HEAD> request.
+Prepare HTTP C<HEAD> request.
+
+    $client->head('http://kraih.com' => sub {
+        print shift->res->headers->content_length;
+    })->start;
+
+The request will be performed right away and the resulting
+L<Mojo::Transaction::HTTP> object returned if no callback is given.
+
+    print $client->head('http://kraih.com')->res->headers->content_length;
+
+=head2 C<on_finish>
+
+    $client->on_finish(sub {...});
+
+Callback signaling that peer finished the WebSocket connection, only
+available from callbacks.
+
+    $client->on_finish(sub {
+        my $client = shift;
+    });
+
+=head2 C<on_message>
+
+    $client = $client->on_message(sub {...});
+
+Receive messages via WebSocket, only available from callbacks.
+
+    $client->on_message(sub {
+        my ($client, $message) = @_;
+    });
 
 =head2 C<post>
 
@@ -1461,7 +1498,16 @@ Send a HTTP C<HEAD> request.
         'http://kraih.com' => {Connection => 'close'} => 'Hi!' => sub {...}
     );
 
-Send a HTTP C<POST> request.
+Prepare HTTP C<POST> request.
+
+    $client->post('http://kraih.com' => sub {
+        print shift->res->body;
+    })->start;
+
+The request will be performed right away and the resulting
+L<Mojo::Transaction::HTTP> object returned if no callback is given.
+
+    print $client->post('http://kraih.com')->res->body;
 
 =head2 C<post_form>
 
@@ -1530,17 +1576,16 @@ Send a HTTP C<POST> request.
         sub {...}
     );
 
-Send a HTTP C<POST> request with form data.
+Prepare HTTP C<POST> request with form data.
 
-=head2 C<process>
+    $client->post_form('http://kraih.com' => {q => 'test'} => sub {
+        print shift->res->body;
+    })->start;
 
-    $client = $client->process;
-    $client = $client->process(@transactions);
-    $client = $client->process(@transactions => sub {...});
+The request will be performed right away and the resulting
+L<Mojo::Transaction::HTTP> object returned if no callback is given.
 
-Process all queued transactions.
-Will be blocking unless you have a global shared ioloop and use the C<async>
-method.
+    print $client->post_form('http://kraih.com' => {q => 'test'})->res->body;
 
 =head2 C<put>
 
@@ -1557,7 +1602,16 @@ method.
         'http://kraih.com' => {Connection => 'close'} => 'Hi!' => sub {...}
     );
 
-Send a HTTP C<PUT> request.
+Prepare HTTP C<PUT> request.
+
+    $client->put('http://kraih.com' => sub {
+        print shift->res->body;
+    })->start;
+
+The request will be performed right away and the resulting
+L<Mojo::Transaction::HTTP> object returned if no callback is given.
+
+    print $client->put('http://kraih.com')->res->body;
 
 =head2 C<queue>
 
@@ -1566,29 +1620,19 @@ Send a HTTP C<PUT> request.
 
 Queue a list of transactions for processing.
 
-=head2 C<receive_message>
-
-    $client = $client->receive_message(sub {...});
-
-Receive messages via WebSocket, only available from callbacks.
-
-    $client->receive_message(sub {
-        my ($client, $message) = @_;
-    });
-
 =head2 C<req>
 
     my $req = $client->req;
 
 The request object of the last finished transaction, only available from
-callbacks.
+callbacks, usually a L<Mojo::Message::Request> object.
 
 =head2 C<res>
 
     my $res = $client->res;
 
 The response object of the last finished transaction, only available from
-callbacks.
+callbacks, usually a L<Mojo::Message::Response> object.
 
 =head2 C<singleton>
 
@@ -1602,6 +1646,16 @@ everywhere inside the process.
     $client = $client->send_message('Hi there!');
 
 Send a message via WebSocket, only available from callbacks.
+
+=head2 C<start>
+
+    $client = $client->start;
+    $client = $client->start(@transactions);
+    $client = $client->start(@transactions => sub {...});
+
+Start processing all queued transactions.
+Will be blocking unless you have a global shared ioloop and use the C<async>
+method.
 
 =head2 C<test_server>
 
