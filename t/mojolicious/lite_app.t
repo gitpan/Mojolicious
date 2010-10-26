@@ -8,13 +8,7 @@ use utf8;
 # Disable epoll, kqueue and IPv6
 BEGIN { $ENV{MOJO_POLL} = $ENV{MOJO_NO_IPV6} = 1 }
 
-use Mojo::IOLoop;
-use Test::More;
-
-# Make sure sockets are working
-plan skip_all => 'working sockets required for this test!'
-  unless Mojo::IOLoop->new->generate_port;
-plan tests => 669;
+use Test::More tests => 664;
 
 # Pollution
 123 =~ m/(\d+)/;
@@ -36,9 +30,6 @@ use Test::Mojo;
 
 # Mojolicious::Lite and ojo
 use ojo;
-
-# Silence
-app->log->level('error');
 
 # Test with lite templates
 app->renderer->default_handler('epl');
@@ -185,18 +176,6 @@ get '/inline/ep/partial' => sub {
 
 # GET /source
 get '/source' => sub { shift->render_static('../lite_app.t') };
-
-# POST /upload
-post '/upload' => sub {
-    my $self = shift;
-    $self->rendered;
-    my $body = $self->res->body || '';
-    $self->res->body("called, $body");
-    return if $self->req->is_limit_exceeded;
-    if (my $u = $self->req->upload('Вячеслав')) {
-        $self->res->body($self->res->body . $u->filename . $u->size);
-    }
-};
 
 # GET /foo_relaxed/*
 get '/foo_relaxed/(.test)' => sub {
@@ -391,7 +370,7 @@ get '/app' => {layout => 'app'} => '*';
 
 # GET /helper
 get '/helper' => sub { shift->render(handler => 'ep') } => 'helper';
-app->helper(agent => sub { scalar shift->req->headers->user_agent });
+app->helper(agent => sub { shift->req->headers->user_agent });
 
 # GET /eperror
 get '/eperror' => sub { shift->render(handler => 'ep') } => 'eperror';
@@ -737,8 +716,6 @@ $t->get_ok('/action_template')->status_is(200)
   ->content_is("controller and action!\n");
 
 # GET /dead
-my $level = app->log->level;
-app->log->level('fatal');
 $t->get_ok('/dead')->status_is(500)->header_is(Server => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_like(qr/works!/);
@@ -760,7 +737,6 @@ $t->get_ok('/dead_template')->status_is(500)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_like(qr/works too!/);
-app->log->level($level);
 
 # GET /regex/in/template
 $t->get_ok('/regex/in/template')->status_is(200)
@@ -832,7 +808,9 @@ $t->get_ok('/tags/lala?a=b&b=0&c=2&d=3&escaped=1%22+%222')->status_is(200)
 <a href="http://example.com/">Example</a>
 <a href="/template">Home</a>
 <a href="/tags/23" title="Foo">Foo</a>
-<form action="/template" method="post"><input name="foo" /></form>
+<form action="/template" method="post">
+    <input name="foo" />
+</form>
 <form action="/tags/24" method="post">
     <input name="foo" />
     <input name="foo" type="checkbox" value="1" />
@@ -851,21 +829,25 @@ $t->get_ok('/tags/lala?a=b&b=0&c=2&d=3&escaped=1%22+%222')->status_is(200)
     <input id="bar" type="submit" value="Ok too!" />
 </form>
 <form action="/">
-    <label for="foo">Name</label>
     <input name="foo" />
 </form>
 <input name="escaped" value="1&quot; &quot;2" />
 <input name="a" value="b" />
 <input name="a" value="b" />
-<script src="/script.js" type="text/javascript" />
-<script type="text/javascript">
+<script src="script.js" type="text/javascript" />
+<script type="text/javascript"><![CDATA[
     var a = 'b';
-</script>
-<script type="foo">
+]]></script>
+<script type="foo"><![CDATA[
     var a = 'b';
-</script>
-<img src="/foo.jpg" />
-<img alt="image" src="/foo.jpg" />
+]]></script>
+<link href="foo.css" media="screen" rel="stylesheet" type="text/css" />
+<style type="text/css"><![CDATA[
+    body {color: #000}
+]]></style>
+<style type="foo"><![CDATA[
+    body {color: #000}
+]]></style>
 EOF
 
 # GET /tags (alternative)
@@ -878,7 +860,9 @@ $t->get_ok('/tags/lala?c=b&d=3&e=4&f=5')->status_is(200)->content_is(<<EOF);
 <a href="http://example.com/">Example</a>
 <a href="/template">Home</a>
 <a href="/tags/23" title="Foo">Foo</a>
-<form action="/template" method="post"><input name="foo" /></form>
+<form action="/template" method="post">
+    <input name="foo" />
+</form>
 <form action="/tags/24" method="post">
     <input name="foo" />
     <input name="foo" type="checkbox" value="1" />
@@ -895,21 +879,25 @@ $t->get_ok('/tags/lala?c=b&d=3&e=4&f=5')->status_is(200)->content_is(<<EOF);
     <input id="bar" type="submit" value="Ok too!" />
 </form>
 <form action="/">
-    <label for="foo">Name</label>
     <input name="foo" />
 </form>
 <input name="escaped" />
 <input name="a" />
 <input name="a" value="c" />
-<script src="/script.js" type="text/javascript" />
-<script type="text/javascript">
+<script src="script.js" type="text/javascript" />
+<script type="text/javascript"><![CDATA[
     var a = 'b';
-</script>
-<script type="foo">
+]]></script>
+<script type="foo"><![CDATA[
     var a = 'b';
-</script>
-<img src="/foo.jpg" />
-<img alt="image" src="/foo.jpg" />
+]]></script>
+<link href="foo.css" media="screen" rel="stylesheet" type="text/css" />
+<style type="text/css"><![CDATA[
+    body {color: #000}
+]]></style>
+<style type="foo"><![CDATA[
+    body {color: #000}
+]]></style>
 EOF
 
 # GET /selection (empty)
@@ -994,64 +982,12 @@ $t->get_ok('/inline/ep/partial')->status_is(200)
 # GET /source
 $t->get_ok('/source')->status_is(200)->content_like(qr/get_ok\('\/source/);
 
-# POST /upload (huge upload without appropriate max message size)
-$backup = $ENV{MOJO_MAX_MESSAGE_SIZE} || '';
-$ENV{MOJO_MAX_MESSAGE_SIZE} = 2048;
-my $backup2 = app->log->level;
-app->log->level('fatal');
-my $tx   = Mojo::Transaction::HTTP->new;
-my $part = Mojo::Content::Single->new;
-my $name = b('Вячеслав')->url_escape;
-$part->headers->content_disposition(
-    qq/form-data; name="$name"; filename="$name.jpg"/);
-$part->headers->content_type('image/jpeg');
-$part->asset->add_chunk('1234' x 1024);
-my $content = Mojo::Content::MultiPart->new;
-$content->headers($tx->req->headers);
-$content->headers->content_type('multipart/form-data');
-$content->parts([$part]);
-$tx->req->method('POST');
-$tx->req->url->parse('/upload');
-$tx->req->content($content);
-$client->start($tx);
-is $tx->res->code, 413,        'right status';
-is $tx->res->body, 'called, ', 'right content';
-app->log->level($backup2);
-$ENV{MOJO_MAX_MESSAGE_SIZE} = $backup;
-
-# POST /upload (huge upload with appropriate max message size)
-$backup = $ENV{MOJO_MAX_MESSAGE_SIZE} || '';
-$ENV{MOJO_MAX_MESSAGE_SIZE} = 1073741824;
-$tx                         = Mojo::Transaction::HTTP->new;
-$part                       = Mojo::Content::Single->new;
-$name                       = b('Вячеслав')->url_escape;
-$part->headers->content_disposition(
-    qq/form-data; name="$name"; filename="$name.jpg"/);
-$part->headers->content_type('image/jpeg');
-$part->asset->add_chunk('1234' x 1024);
-$content = Mojo::Content::MultiPart->new;
-$content->headers($tx->req->headers);
-$content->headers->content_type('multipart/form-data');
-$content->parts([$part]);
-$tx->req->method('POST');
-$tx->req->url->parse('/upload');
-$tx->req->content($content);
-$client->start($tx);
-ok $tx->is_done, 'transaction is done';
-is $tx->res->code, 200, 'right status';
-is b($tx->res->body)->decode('UTF-8')->to_string,
-  'called, Вячеслав.jpg4096', 'right content';
-$ENV{MOJO_MAX_MESSAGE_SIZE} = $backup;
-
 # GET / (with body and max message size)
 $backup = $ENV{MOJO_MAX_MESSAGE_SIZE} || '';
 $ENV{MOJO_MAX_MESSAGE_SIZE} = 1024;
-$backup2 = app->log->level;
-app->log->level('fatal');
 $t->get_ok('/', '1234' x 1024)->status_is(413)
   ->content_is(
     "/root.html\n/root.html\n/root.html\n/root.html\n/root.html\n");
-app->log->level($backup2);
 $ENV{MOJO_MAX_MESSAGE_SIZE} = $backup;
 
 # GET /foo_relaxed/123
@@ -1296,9 +1232,7 @@ $t->post_form_ok(
       ->to_string);
 
 # POST /malformed_utf8
-$level = app->log->level;
-app->log->level('fatal');
-$tx = Mojo::Transaction::HTTP->new;
+my $tx = Mojo::Transaction::HTTP->new;
 $tx->req->method('POST');
 $tx->req->url->parse('/malformed_utf8');
 $tx->req->headers->content_type('application/x-www-form-urlencoded');
@@ -1317,7 +1251,6 @@ is $code,    200,                  'right status';
 is $server,  'Mojolicious (Perl)', 'right "Server" value';
 is $powered, 'Mojolicious (Perl)', 'right "X-Powered-By" value';
 is $body,    '%E1',                'right content';
-app->log->level($level);
 
 # GET /json
 $t->get_ok('/json')->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
@@ -1349,12 +1282,9 @@ $t->get_ok('/helper', {'User-Agent' => 'Explorer'})->status_is(200)
   ->content_is("23\n<br/>\n&lt;...\n/template\n(Explorer)");
 
 # GET /eperror
-$level = app->log->level;
-app->log->level('fatal');
 $t->get_ok('/eperror')->status_is(500)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_like(qr/\$c/);
-app->log->level($level);
 
 # GET /subrequest
 $t->get_ok('/subrequest')->status_is(200)
@@ -1656,7 +1586,9 @@ controller and action!
 <%= link_to 'http://example.com/' => begin %>Example<% end %>
 <%= link_to Home => 'index' %>
 <%= link_to Foo => 'tags', {test => 23}, title => 'Foo' %>
-<%= form_for 'index', method => 'post' => begin %><%= input 'foo' %><% end %>
+<%= form_for 'index', method => 'post' => begin %>
+    <%= input_tag 'foo' %>
+<% end %>
 %= form_for 'tags', {test => 24}, method => 'post' => begin
     %= text_field 'foo'
     %= check_box foo => 1
@@ -1675,21 +1607,25 @@ controller and action!
     %= submit_button 'Ok too!', id => 'bar'
 %= end
 <%= form_for '/' => begin %>
-    <%= label 'foo' => begin %>Name<% end %>
-    <%= input 'foo' %>
+    <%= input_tag 'foo' %>
 <% end %>
-<%= input 'escaped' %>
-<%= input 'a' %>
-<%= input 'a', value => 'c' %>
-<%= script '/script.js' %>
-<%= script begin %>
+<%= input_tag 'escaped' %>
+<%= input_tag 'a' %>
+<%= input_tag 'a', value => 'c' %>
+<%= javascript 'script.js' %>
+<%= javascript begin %>
     var a = 'b';
 <% end %>
-<%= script type => 'foo' => begin %>
+<%= javascript type => 'foo' => begin %>
     var a = 'b';
 <% end %>
-<%= img '/foo.jpg' %>
-<%= img '/foo.jpg', alt => 'image' %>
+<%= stylesheet 'foo.css' %>
+<%= stylesheet begin %>
+    body {color: #000}
+<% end %>
+<%= stylesheet type => 'foo' => begin %>
+    body {color: #000}
+<% end %>
 
 @@ selection.html.ep
 %= form_for selection => begin
