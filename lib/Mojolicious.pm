@@ -35,7 +35,7 @@ __PACKAGE__->attr(static  => sub { MojoX::Dispatcher::Static->new });
 __PACKAGE__->attr(types   => sub { MojoX::Types->new });
 
 our $CODENAME = 'Hot Beverage';
-our $VERSION  = '0.999933';
+our $VERSION  = '0.999934';
 
 our $AUTOLOAD;
 
@@ -421,9 +421,6 @@ L<Mojolicious::Lite>.
 Loosely coupled building blocks, use what you like and just ignore the rest.
 
     .---------------------------------------------------------------.
-    |                             Fun!                              |
-    '---------------------------------------------------------------'
-    .---------------------------------------------------------------.
     |                                                               |
     |                .----------------------------------------------'
     |                | .--------------------------------------------.
@@ -438,6 +435,12 @@ Loosely coupled building blocks, use what you like and just ignore the rest.
     .-------. .-----------. .--------. .------------. .-------------.
     |  CGI  | |  FastCGI  | |  PSGI  | |  HTTP 1.1  | |  WebSocket  |
     '-------' '-----------' '--------' '------------' '-------------'
+
+=head2 Installation
+
+All you need is a oneliner.
+
+    curl -L cpanmin.us | perl - http://latest.mojolicio.us
 
 =head1 ATTRIBUTES
 
@@ -730,13 +733,21 @@ that have been used in the past.
 
 Sebastian Riedel, C<sri@cpan.org>.
 
-=head1 CORE DEVELOPERS
+=head1 CORE DEVELOPERS EMERITUS
+
+Retired members of the core team, we thank you dearly for your service.
+
+=over 4
 
 Viacheslav Tykhanovskyi, C<vti@cpan.org>.
 
+=back
+
 =head1 CREDITS
 
-In alphabetical order:
+In alphabetical order.
+
+=over 4
 
 Adam Kennedy
 
@@ -879,6 +890,8 @@ Yaroslav Korshak
 Yuki Kimoto
 
 Zak B. Elep
+
+=back
 
 =head1 COPYRIGHT AND LICENSE
 
