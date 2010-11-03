@@ -4,9 +4,10 @@ use strict;
 use warnings;
 
 use base 'Mojo::Base';
+use overload 'bool' => sub {1}, fallback => 1;
 use overload '""' => sub { shift->to_xml }, fallback => 1;
 
-use Mojo::ByteStream 'b';
+use Mojo::Util qw/decode encode html_unescape xml_escape/;
 use Scalar::Util 'weaken';
 
 # How are the kids supposed to get home?
@@ -178,7 +179,7 @@ sub inner_xml {
 
     # Encode
     my $charset = $self->charset;
-    $result = b($result)->encode($charset)->to_string if $charset;
+    encode $charset, $result if $charset;
 
     return $result;
 }
@@ -347,7 +348,7 @@ sub to_xml {
 
     # Encode
     my $charset = $self->charset;
-    $result = b($result)->encode($charset)->to_string if $charset;
+    encode $charset, $result if $charset;
 
     return $result;
 }
@@ -890,8 +891,7 @@ sub _parse_xml {
 
     # Decode
     my $charset = $self->charset;
-    $xml = b($xml)->decode($charset)->to_string
-      if $charset && !utf8::is_utf8 $xml;
+    decode $charset, $xml if $charset && !utf8::is_utf8 $xml;
     return $tree unless $xml;
 
     # Tokenize
@@ -907,7 +907,7 @@ sub _parse_xml {
         if (length $text) {
 
             # Unescape
-            $text = b($text)->html_unescape->to_string if $text =~ /&/;
+            html_unescape $text if (index $text, '&') >= 0;
 
             $self->_text($text, \$current);
         }
@@ -950,8 +950,7 @@ sub _parse_xml {
                 next if $key eq '/';
 
                 # Unescape
-                $value = b($value)->html_unescape->to_string
-                  if $value && $value =~ /&/;
+                html_unescape $value if $value && (index $value, '&') >= 0;
 
                 # Merge
                 $attrs->{$key} = $value;
@@ -982,7 +981,11 @@ sub _render {
     my $e = $tree->[0];
 
     # Text (escaped)
-    return b($tree->[1])->xml_escape->to_string if $e eq 'text';
+    if ($e eq 'text') {
+        my $escaped = $tree->[1];
+        xml_escape $escaped;
+        return $escaped;
+    }
 
     # DOCTYPE
     return "<!DOCTYPE" . $tree->[1] . ">" if $e eq 'doctype';
@@ -1020,7 +1023,7 @@ sub _render {
             push @attrs, $key and next unless $value;
 
             # Escape
-            $value = b($value)->xml_escape->to_string;
+            xml_escape $value;
 
             # Key and value
             push @attrs, qq/$key="$value"/;

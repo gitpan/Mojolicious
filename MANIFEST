@@ -52,6 +52,7 @@ lib/Mojo/Transaction/HTTP.pm
 lib/Mojo/Transaction/WebSocket.pm
 lib/Mojo/Upload.pm
 lib/Mojo/URL.pm
+lib/Mojo/Util.pm
 lib/Mojolicious.pm
 lib/Mojolicious/Command/Generate.pm
 lib/Mojolicious/Command/Generate/App.pm

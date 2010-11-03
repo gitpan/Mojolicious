@@ -4,11 +4,12 @@ use strict;
 use warnings;
 
 use base 'Mojo::Base';
+use overload 'bool' => sub {1}, fallback => 1;
 use overload '""' => sub { shift->to_string }, fallback => 1;
 
-use Mojo::ByteStream 'b';
 use Mojo::Parameters;
 use Mojo::Path;
+use Mojo::Util qw/punycode_decode punycode_encode url_escape url_unescape/;
 
 __PACKAGE__->attr([qw/fragment host port scheme userinfo/]);
 __PACKAGE__->attr(base => sub { Mojo::URL->new });
@@ -58,23 +59,22 @@ sub authority {
         if ($authority =~ /^([^\@]+)\@(.+)$/) {
             $userinfo = $1;
             $host     = $2;
+            url_unescape $userinfo;
+            $self->userinfo($userinfo);
         }
 
         # Port
         my $port = undef;
         if ($host =~ /^(.+)\:(\d+)$/) {
             $host = $1;
-            $port = $2;
+            $self->port($2);
         }
 
-        $self->userinfo(
-            $userinfo ? b($userinfo)->url_unescape->to_string : undef);
-        $host
-          ? $self->ihost(b($host)->url_unescape->to_string)
-          : $self->host(undef);
-        $self->port($port);
-
-        return $self;
+        # Host
+        url_unescape $host;
+        return $host =~ /[^\x00-\x7f]/
+          ? $self->ihost($host)
+          : $self->host($host);
     }
 
     # *( unreserved / pct-encoded / sub-delims ), extended with "[" and "]"
@@ -83,7 +83,8 @@ sub authority {
     my $port = $self->port;
 
     # *( unreserved / pct-encoded / sub-delims / ":" )
-    my $userinfo = b($self->userinfo)->url_escape("$UNRESERVED$SUBDELIM\:");
+    my $userinfo = $self->userinfo;
+    url_escape $userinfo, "$UNRESERVED$SUBDELIM\:" if $userinfo;
 
     # Format
     $authority .= "$userinfo\@" if $userinfo;
@@ -120,7 +121,8 @@ sub ihost {
         my @decoded;
         for my $part (split /\./, $_[1]) {
             if ($part =~ /^xn--(.+)$/) {
-                $part = b($1)->punycode_decode->to_string;
+                $part = $1;
+                punycode_decode $part;
             }
             push @decoded, $part;
         }
@@ -129,11 +131,17 @@ sub ihost {
         return $self;
     }
 
+    # Host
+    return unless $host = $self->host;
+    return $host unless $host =~ /[^\x00-\x7f]/;
+
     # Encode parts
     my @encoded;
-    for my $part (split /\./, $self->host || '') {
-        $part = 'xn--' . b($part)->punycode_encode->to_string
-          if $part =~ /[^\x00-\x7f]/;
+    for my $part (split /\./, $host || '') {
+        if ($part =~ /[^\x00-\x7f]/) {
+            punycode_encode $part;
+            $part = "xn--$part";
+        }
         push @encoded, $part;
     }
 
@@ -309,16 +317,26 @@ sub to_string {
     my $path      = $self->path;
     my $query     = $self->query;
 
-    # *( pchar / "/" / "?" )
-    my $fragment = b($self->fragment)->url_escape("$PCHAR\/\?");
-
     # Format
     my $url = '';
 
-    $url .= lc "$scheme://" if $scheme && $authority;
-    $url .= "$authority$path";
+    # Scheme and authority
+    if ($scheme && $authority) {
+        $url .= lc "$scheme://";
+        $url .= "$authority";
+    }
+
+    # Path and query
+    $url .= $path;
     $url .= "?$query" if @{$query->params};
-    $url .= "#$fragment" if $fragment->size;
+
+    # Fragment
+    if (my $fragment = $self->fragment) {
+
+        # *( pchar / "/" / "?" )
+        url_escape $fragment, "$PCHAR\/\?";
+        $url .= "#$fragment";
+    }
 
     return $url;
 }

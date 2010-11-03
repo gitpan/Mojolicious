@@ -133,7 +133,7 @@ is $url->userinfo, undef,                                     'no userinfo';
 is $url->host,     'acme.s3.amazonaws.com',                   'right host';
 is $url->port,     undef,                                     'no port';
 is $url->path,     '/mojo%2Fg++-4.2_4.2.3-2ubuntu7_i386.deb', 'right path';
-ok !$url->query, 'no query';
+ok !$url->query->to_string, 'no query';
 is_deeply $url->query->to_hash, {}, 'right structure';
 is $url->fragment, undef, 'no fragment';
 is "$url",
@@ -167,7 +167,7 @@ $clone = $url->clone;
 is "$url", '/test/index.html', 'right format';
 is $clone->is_abs, undef, 'not absolute';
 is $clone->scheme, undef, 'no scheme';
-is $clone->host,   undef, 'no host';
+is $clone->host,   '',    'no host';
 is $clone->base->scheme, 'http',      'right base scheme';
 is $clone->base->host,   '127.0.0.1', 'right base host';
 is $clone->path, '/test/index.html', 'right path';

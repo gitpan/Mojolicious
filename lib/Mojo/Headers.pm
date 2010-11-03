@@ -4,11 +4,8 @@ use strict;
 use warnings;
 
 use base 'Mojo::Base';
-use overload '""' => sub { shift->to_string }, fallback => 1;
 
-use Mojo::ByteStream 'b';
-
-__PACKAGE__->attr(buffer => sub { b() });
+use Mojo::Util 'get_line';
 
 # Headers
 my @GENERAL_HEADERS = qw/
@@ -107,25 +104,6 @@ sub add {
     return $self;
 }
 
-sub build {
-    my $self = shift;
-
-    # Prepare headers
-    my @headers;
-    for my $name (@{$self->names}) {
-
-        # Multiline value
-        for my $values ($self->header($name)) {
-            my $value = join "\x0d\x0a ", @$values;
-            push @headers, "$name: $value";
-        }
-    }
-
-    # Format headers
-    my $headers = join "\x0d\x0a", @headers;
-    return length $headers ? $headers : undef;
-}
-
 sub connection          { scalar shift->header(Connection            => @_) }
 sub content_disposition { scalar shift->header('Content-Disposition' => @_) }
 sub content_length      { scalar shift->header('Content-Length'      => @_) }
@@ -200,7 +178,10 @@ sub is_done {
 }
 
 sub last_modified { scalar shift->header('Last-Modified' => @_) }
-sub location      { scalar shift->header(Location        => @_) }
+
+sub leftovers { shift->{_buffer} }
+
+sub location { scalar shift->header(Location => @_) }
 
 sub names {
     my $self = shift;
@@ -220,13 +201,13 @@ sub parse {
     my ($self, $chunk) = @_;
 
     # Buffer
-    $self->buffer->add_chunk($chunk);
+    $self->{_buffer} = '' unless defined $self->{_buffer};
+    $self->{_buffer} .= $chunk if defined $chunk;
 
     # Parse headers
-    my $buffer = $self->buffer;
-    my $headers = $self->{_buffer} || [];
+    my $headers = $self->{_cache} || [];
     $self->{_state} = 'headers';
-    while (defined(my $line = $buffer->get_line)) {
+    while (defined(my $line = get_line $self->{_buffer})) {
 
         # New header
         if ($line =~ /^(\S+)\s*:\s*(.*)/) { push @$headers, $1, $2 }
@@ -243,14 +224,14 @@ sub parse {
             }
 
             # Done
-            $self->{_state}  = 'done';
-            $self->{_buffer} = [];
-            return $buffer;
+            $self->{_state} = 'done';
+            $self->{_cache} = [];
+            return $self;
         }
     }
-    $self->{_buffer} = $headers;
+    $self->{_cache} = $headers;
 
-    return;
+    return $self;
 }
 
 sub proxy_authenticate  { scalar shift->header('Proxy-Authenticate'  => @_) }
@@ -295,7 +276,24 @@ sub to_hash {
     return $hash;
 }
 
-sub to_string { shift->build(@_) }
+sub to_string {
+    my $self = shift;
+
+    # Prepare headers
+    my @headers;
+    for my $name (@{$self->names}) {
+
+        # Multiline value
+        for my $values ($self->header($name)) {
+            my $value = join "\x0d\x0a ", @$values;
+            push @headers, "$name: $value";
+        }
+    }
+
+    # Format headers
+    my $headers = join "\x0d\x0a", @headers;
+    return length $headers ? $headers : undef;
+}
 
 sub trailer            { scalar shift->header(Trailer              => @_) }
 sub transfer_encoding  { scalar shift->header('Transfer-Encoding'  => @_) }
@@ -331,23 +329,10 @@ Mojo::Headers - Headers
     my $headers = Mojo::Headers->new;
     $headers->content_type('text/plain');
     $headers->parse("Content-Type: text/html\n\n");
-    print "$headers";
 
 =head1 DESCRIPTION
 
 L<Mojo::Headers> is a container and parser for HTTP headers.
-
-=head1 ATTRIBUTES
-
-L<Mojo::Headers> implements the following attributes.
-
-=head2 C<buffer>
-
-    my $buffer = $headers->buffer;
-    $headers   = $headers->buffer(Mojo::ByteStream->new);
-
-The Buffer to use for header parsing, by default a L<Mojo::ByteStream>
-object.
 
 =head1 METHODS
 
@@ -380,16 +365,6 @@ Add one or more header lines.
     $headers          = $headers->authorization('Basic Zm9vOmJhcg==');
 
 Shortcut for the C<Authorization> header.
-
-=head2 C<to_string>
-
-=head2 C<build>
-
-    my $string = $headers->build;
-    my $string = $headers->to_string;
-    my $string = "$headers";
-
-Format headers suitable for HTTP 1.1 messages.
 
 =head2 C<connection>
 
@@ -497,6 +472,12 @@ Check if header parser is done.
 
 Shortcut for the C<Last-Modified> header.
 
+=head2 C<leftovers>
+
+    my $leftovers = $headers->leftovers;
+
+Leftovers.
+
 =head2 C<location>
 
     my $location = $headers->location;
@@ -519,7 +500,7 @@ Shortcut for the C<Origin> header.
 
 =head2 C<parse>
 
-    my $success = $headers->parse("Content-Type: text/foo\n\n");
+    $headers = $headers->parse("Content-Type: text/foo\n\n");
 
 Parse formatted headers.
 
@@ -628,6 +609,12 @@ Shortcut for the C<Status> header.
 
 Format headers as a hash.
 Nested arrayrefs to represent multi line values are optional.
+
+=head2 C<to_string>
+
+    my $string = $headers->to_string;
+
+Format headers suitable for HTTP 1.1 messages.
 
 =head2 C<trailer>
 
