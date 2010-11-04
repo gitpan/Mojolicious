@@ -35,7 +35,7 @@ __PACKAGE__->attr(static  => sub { MojoX::Dispatcher::Static->new });
 __PACKAGE__->attr(types   => sub { MojoX::Types->new });
 
 our $CODENAME = 'Hot Beverage';
-our $VERSION  = '0.999935';
+our $VERSION  = '0.999936';
 
 our $AUTOLOAD;
 
@@ -321,7 +321,7 @@ Mojolicious - The Web In A Box!
     # Say hello
     sub welcome {
         my $self = shift;
-        $self->render_text('Hi there!');
+        $self->render(text => 'Hi there!');
     }
 
     # Say goodbye from a template (foo/bye.html.ep)
