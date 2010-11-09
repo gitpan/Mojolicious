@@ -773,12 +773,11 @@ A L<Mojo::Client> prepared for the current environment.
         $c->render_data($client->res->body);
     })->start;
 
-For async processing you can use C<finish>.
+Some environments such as L<Mojo::Server::Daemon> even allow async requests.
 
     $c->client->async->get('http://mojolicious.org' => sub {
         my $client = shift;
         $c->render_data($client->res->body);
-        $c->finish;
     })->start;
 
 =head2 C<cookie>
@@ -1035,13 +1034,19 @@ Write dynamic content chunk wise with the C<chunked> C<Transfer-Encoding>
 which doesn't require a C<Content-Length> header, the optional drain callback
 will be invoked once all data has been written to the kernel send buffer or
 equivalent.
-An empty chunk marks the end of the stream.
+Note that this method is EXPERIMENTAL and might change without warning!
 
     $c->write_chunk('Hel');
     $c->write_chunk('lo!');
     $c->write_chunk('');
 
-Note that this method is EXPERIMENTAL and might change without warning!
+An empty chunk marks the end of the stream.
+
+    3
+    Hel
+    3
+    lo!
+    0
 
 =head1 SEE ALSO
 
