@@ -5,7 +5,7 @@ package Test::Foo;
 use strict;
 use warnings;
 
-use base 'MojoX::Dispatcher::Routes::Controller';
+use base 'Mojolicious::Controller';
 
 sub bar  {1}
 sub home {1}
@@ -15,7 +15,7 @@ package Test::Controller;
 use strict;
 use warnings;
 
-use base 'MojoX::Dispatcher::Routes::Controller';
+use base 'Mojolicious::Controller';
 
 __PACKAGE__->attr('render_called');
 
@@ -37,14 +37,14 @@ use warnings;
 
 use utf8;
 
-use Test::More tests => 41;
+use Test::More tests => 67;
 
 use Mojo;
 use Mojo::Transaction::HTTP;
-use MojoX::Dispatcher::Routes;
-use MojoX::Dispatcher::Routes::Controller;
+use Mojolicious::Controller;
+use Mojolicious::Routes;
 
-my $c = MojoX::Dispatcher::Routes::Controller->new;
+my $c = Mojolicious::Controller->new;
 
 # Set
 $c->stash(foo => 'bar');
@@ -88,7 +88,7 @@ is_deeply $stash, {a => 1, b => 2}, 'set via hashref';
 $c = Test::Controller->new(app => Mojo->new);
 $c->app->log->path(undef);
 $c->app->log->level('fatal');
-my $d = MojoX::Dispatcher::Routes->new;
+my $d = Mojolicious::Routes->new;
 ok $d, 'initialized';
 
 $d->namespace('Test');
@@ -121,6 +121,37 @@ is ref $c->stash->{'mojo.captures'}, 'HASH', 'right captures';
 is $c->param('controller'), 'foo',   'right value';
 is $c->param('action'),     'bar',   'right value';
 is $c->param('capture'),    'hello', 'right value';
+is_deeply [$c->param], [qw/action capture controller/], 'right names';
+$c->param(capture => 'bye');
+is $c->param('controller'), 'foo', 'right value';
+is $c->param('action'),     'bar', 'right value';
+is $c->param('capture'),    'bye', 'right value';
+is_deeply [$c->param], [qw/action capture controller/], 'right names';
+$c->param(capture => undef);
+is $c->param('controller'), 'foo', 'right value';
+is $c->param('action'),     'bar', 'right value';
+is $c->param('capture'),    undef, 'no value';
+is_deeply [$c->param], [qw/action capture controller/], 'right names';
+$c->req->param(foo => 'bar');
+is $c->param('controller'), 'foo', 'right value';
+is $c->param('action'),     'bar', 'right value';
+is $c->param('capture'),    undef, 'no value';
+is $c->param('foo'),        'bar', 'right value';
+is_deeply [$c->param], [qw/action capture controller foo/], 'right names';
+$c->req->param(bar => 'baz');
+is $c->param('controller'), 'foo', 'right value';
+is $c->param('action'),     'bar', 'right value';
+is $c->param('capture'),    undef, 'no value';
+is $c->param('foo'),        'bar', 'right value';
+is $c->param('bar'),        'baz', 'right value';
+is_deeply [$c->param], [qw/action bar capture controller foo/], 'right names';
+$c->req->param(action => 'baz');
+is $c->param('controller'), 'foo', 'right value';
+is $c->param('action'),     'bar', 'right value';
+is $c->param('capture'),    undef, 'no value';
+is $c->param('foo'),        'bar', 'right value';
+is $c->param('bar'),        'baz', 'right value';
+is_deeply [$c->param], [qw/action bar capture controller foo/], 'right names';
 ok $c->render_called, 'rendered';
 
 # Escaping

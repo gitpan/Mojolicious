@@ -913,7 +913,8 @@ sub _connect {
     # Socket
     my $class = IPV6 ? 'IO::Socket::IP' : 'IO::Socket::INET';
     return $self->_error($id, "Couldn't connect.")
-      unless my $socket = $args->{socket} || $class->new(%options);
+      unless my $socket = $args->{socket}
+          || $class->new(%options);
     $c->{socket} = $socket;
     $self->{_reverse}->{$socket} = $id;
 
@@ -1506,7 +1507,7 @@ __END__
 
 =head1 NAME
 
-Mojo::IOLoop - Minimalistic Reactor For Non-Blocking TCP Clients And Servers
+Mojo::IOLoop - Minimalistic Reactor For Async TCP Clients And Servers
 
 =head1 SYNOPSIS
 
@@ -1561,8 +1562,8 @@ Mojo::IOLoop - Minimalistic Reactor For Non-Blocking TCP Clients And Servers
 =head1 DESCRIPTION
 
 L<Mojo::IOLoop> is a very minimalistic reactor that has been reduced to the
-absolute minimal feature set required to build solid and scalable
-non-blocking TCP clients and servers.
+absolute minimal feature set required to build solid and scalable async TCP
+clients and servers.
 
 Optional modules L<IO::KQueue>, L<IO::Epoll>, L<IO::Socket::IP> and
 L<IO::Socket::SSL> are supported transparently and used if installed.

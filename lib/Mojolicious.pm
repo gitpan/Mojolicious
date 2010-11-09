@@ -8,17 +8,17 @@ use base 'Mojo';
 use Carp 'croak';
 use Mojolicious::Commands;
 use Mojolicious::Plugins;
-use MojoX::Dispatcher::Routes;
-use MojoX::Dispatcher::Static;
-use MojoX::Renderer;
-use MojoX::Session::Cookie;
-use MojoX::Types;
+use Mojolicious::Renderer;
+use Mojolicious::Routes;
+use Mojolicious::Session;
+use Mojolicious::Static;
+use Mojolicious::Types;
 
 __PACKAGE__->attr(controller_class => 'Mojolicious::Controller');
 __PACKAGE__->attr(mode => sub { ($ENV{MOJO_MODE} || 'development') });
 __PACKAGE__->attr(plugins  => sub { Mojolicious::Plugins->new });
-__PACKAGE__->attr(renderer => sub { MojoX::Renderer->new });
-__PACKAGE__->attr(routes   => sub { MojoX::Dispatcher::Routes->new });
+__PACKAGE__->attr(renderer => sub { Mojolicious::Renderer->new });
+__PACKAGE__->attr(routes   => sub { Mojolicious::Routes->new });
 __PACKAGE__->attr(
     secret => sub {
         my $self = shift;
@@ -30,12 +30,12 @@ __PACKAGE__->attr(
         return ref $self;
     }
 );
-__PACKAGE__->attr(session => sub { MojoX::Session::Cookie->new });
-__PACKAGE__->attr(static  => sub { MojoX::Dispatcher::Static->new });
-__PACKAGE__->attr(types   => sub { MojoX::Types->new });
+__PACKAGE__->attr(session => sub { Mojolicious::Session->new });
+__PACKAGE__->attr(static  => sub { Mojolicious::Static->new });
+__PACKAGE__->attr(types   => sub { Mojolicious::Types->new });
 
 our $CODENAME = 'Hot Beverage';
-our $VERSION  = '0.999936';
+our $VERSION  = '0.999937';
 
 our $AUTOLOAD;
 
@@ -98,10 +98,6 @@ sub new {
 
     # Static
     my $static = $self->static;
-
-    # Types
-    $renderer->types($self->types);
-    $static->types($self->types);
 
     # Home
     my $home = $self->home;
@@ -426,9 +422,6 @@ Web development for humans, making hard things possible and everything fun.
         The time is <%= $hour %>:<%= $minute %>:<%= $second %>.
     <% end %>
 
-For more user friendly documentation see L<Mojolicious::Guides> and
-L<Mojolicious::Lite>.
-
 =head2 Have Some Cake
 
 Loosely coupled building blocks, use what you like and just ignore the rest.
@@ -449,11 +442,61 @@ Loosely coupled building blocks, use what you like and just ignore the rest.
     |  CGI  | |  FastCGI  | |  PSGI  | |  HTTP 1.1  | |  WebSocket  |
     '-------' '-----------' '--------' '------------' '-------------'
 
-=head2 Installation
+=head2 Highlights
 
-All you need is a oneliner.
+These are some of the most important building blocks of L<Mojolicious>.
 
-    curl -L cpanmin.us | perl - http://latest.mojolicio.us
+=over 4
+
+=item L<Mojolicious::Lite>
+
+Micro Web Framework built on top of L<Mojolicious> for prototypes and small
+applications.
+
+=item L<Mojo::Client>
+
+Full featured async io HTTP 1.1 and WebSocket client.
+
+=item L<Mojo::DOM>
+
+Very fun and minimalistic XML/HTML5 DOM parser with CSS3 selector support.
+
+=item L<Mojo::JSON>
+
+Minimalistic JSON implementation that just works.
+
+=item L<Mojo::Server::Daemon>
+
+Full featured async io HTTP 1.1 and WebSocket server.
+
+=item L<Mojo::Server::CGI>, L<Mojo::Server::FastCGI>, L<Mojo::Server::PSGI>
+
+Transparent CGI, FastCGI and PSGI support out of the box.
+
+=item L<Mojo::Template>
+
+Very perlish and minimalistic template system.
+
+=item L<Mojo::ByteStream>
+
+Countless portable and very convenient bytestream manipulation methods.
+
+=item L<Mojolicious::Commands>
+
+Pluggable command line system and the backbone of the C<mojo> script.
+
+=item L<Test::Mojo>
+
+Test driven development toolkit for web applications.
+
+=item L<ojo>
+
+Fun oneliners using everything above.
+
+=back
+
+For more documentation see L<Mojolicious::Guides> and the tutorial in
+L<Mojolicious::Lite>!
 
 =head1 ATTRIBUTES
 
@@ -502,19 +545,19 @@ write a plugin.
 =head2 C<renderer>
 
     my $renderer = $app->renderer;
-    $app         = $app->renderer(MojoX::Renderer->new);
+    $app         = $app->renderer(Mojolicious::Renderer->new);
 
-Used in your application to render content, by default a L<MojoX::Renderer>
-object.
+Used in your application to render content, by default a
+L<Mojolicious::Renderer> object.
 The two main renderer plugins L<Mojolicious::Plugin::EpRenderer> and
 L<Mojolicious::Plugin::EplRenderer> contain more specific information.
 
 =head2 C<routes>
 
     my $routes = $app->routes;
-    $app       = $app->routes(MojoX::Dispatcher::Routes->new);
+    $app       = $app->routes(Mojolicious::Routes->new);
 
-The routes dispatcher, by default a L<MojoX::Dispatcher::Routes> object.
+The routes dispatcher, by default a L<Mojolicious::Routes> object.
 You use this in your startup method to define the url endpoints for your
 application.
 
@@ -535,21 +578,29 @@ application name which is not very secure, so you should change it!!!
 As long as you are using the unsecure default there will be debug messages in
 the log file reminding you to change your passphrase.
 
+=head2 C<session>
+
+    my $session = $app->session;
+    $app        = $app->session(Mojolicious::Session->new);
+
+Simple singed cookie based sessions, by default a L<Mojolicious::Session>
+object.
+
 =head2 C<static>
 
     my $static = $app->static;
-    $app       = $app->static(MojoX::Dispatcher::Static->new);
+    $app       = $app->static(Mojolicious::Static->new);
 
 For serving static assets from your C<public> directory, by default a
-L<MojoX::Dispatcher::Static> object.
+L<Mojolicious::Static> object.
 
 =head2 C<types>
 
     my $types = $app->types;
-    $app      = $app->types(MojoX::Types->new);
+    $app      = $app->types(Mojolicious::Types->new);
 
 Responsible for tracking the types of content you want to serve in your
-application, by default a L<MojoX::Types> object.
+application, by default a L<Mojolicious::Types> object.
 You can easily register new types.
 
     $app->types->type(vti => 'help/vampire');
