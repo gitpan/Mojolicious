@@ -19,8 +19,12 @@ use Time::HiRes 'time';
 # Debug
 use constant DEBUG => $ENV{MOJO_IOLOOP_DEBUG} || 0;
 
+# Perl 5.12 required for "inet_pton"
+use constant PTON => eval 'use 5.12.0; 1';
+use constant PTON_AF_INET6 => PTON ? Socket::AF_INET6() : 0;
+
 # Epoll support requires IO::Epoll
-use constant EPOLL => ($ENV{MOJO_POLL} || $ENV{MOJO_KQUEUE})
+use constant EPOLL => $ENV{MOJO_POLL}
   ? 0
   : eval 'use IO::Epoll 0.02 (); 1';
 use constant EPOLL_POLLERR => EPOLL ? IO::Epoll::POLLERR() : 0;
@@ -28,13 +32,8 @@ use constant EPOLL_POLLHUP => EPOLL ? IO::Epoll::POLLHUP() : 0;
 use constant EPOLL_POLLIN  => EPOLL ? IO::Epoll::POLLIN()  : 0;
 use constant EPOLL_POLLOUT => EPOLL ? IO::Epoll::POLLOUT() : 0;
 
-# IPv6 support requires IO::Socket::IP
-use constant IPV6 => $ENV{MOJO_NO_IPV6}
-  ? 0
-  : eval 'use IO::Socket::IP 0.04 (); 1';
-
 # KQueue support requires IO::KQueue
-use constant KQUEUE => ($ENV{MOJO_POLL} || $ENV{MOJO_EPOLL})
+use constant KQUEUE => $ENV{MOJO_POLL}
   ? 0
   : eval 'use IO::KQueue 0.34 (); 1';
 use constant KQUEUE_ADD    => KQUEUE ? IO::KQueue::EV_ADD()       : 0;
@@ -44,9 +43,9 @@ use constant KQUEUE_READ   => KQUEUE ? IO::KQueue::EVFILT_READ()  : 0;
 use constant KQUEUE_WRITE  => KQUEUE ? IO::KQueue::EVFILT_WRITE() : 0;
 
 # TLS support requires IO::Socket::SSL
-use constant TLS => $ENV{MOJO_NO_TLS} ? 0
-  : IPV6 ? eval 'use IO::Socket::SSL 1.33 (); 1'
-  :        eval 'use IO::Socket::SSL 1.33 "inet4"; 1';
+use constant TLS => $ENV{MOJO_NO_TLS}
+  ? 0
+  : eval 'use IO::Socket::SSL 1.33 (); 1';
 use constant TLS_READ  => TLS ? IO::Socket::SSL::SSL_WANT_READ()  : 0;
 use constant TLS_WRITE => TLS ? IO::Socket::SSL::SSL_WANT_WRITE() : 0;
 
@@ -122,6 +121,8 @@ if (-r '/etc/resolv.conf') {
 my $DNS_TYPES = {
     A    => 0x0001,
     AAAA => 0x001c,
+    MX   => 0x000f,
+    PTR  => 0x000c,
     TXT  => 0x0010
 };
 
@@ -193,7 +194,8 @@ sub connect {
         on_connect => $args->{on_connect}
           || $args->{connect_cb}
           || $args->{cb},
-        connecting => 1
+        connecting => 1,
+        tls        => $args->{tls}
     };
     (my $id) = "$c" =~ /0x([\da-f]+)/;
     $self->{_cs}->{$id} = $c;
@@ -329,14 +331,16 @@ sub listen {
     else {
 
         # Socket options
-        $options{LocalAddr} = $args->{address} || (IPV6 ? '::' : '0.0.0.0');
+        $options{LocalAddr} = $args->{address} || '0.0.0.0';
         $options{LocalPort} = $port;
         $options{Proto}     = 'tcp';
         $options{ReuseAddr} = 1;
 
         # Create socket
-        my $class = IPV6 ? 'IO::Socket::IP' : 'IO::Socket::INET';
-        $socket = defined $fd ? $class->new : $class->new(%options)
+        $socket =
+          defined $fd
+          ? IO::Socket::INET->new
+          : IO::Socket::INET->new(%options)
           or croak "Can't create listen socket: $!";
     }
 
@@ -552,8 +556,10 @@ sub resolve {
     my ($self, $name, $type, $cb) = @_;
 
     # Regex
-    my $ipv4 = $Mojo::URL::IPV4_RE;
-    my $ipv6 = $Mojo::URL::IPV6_RE;
+    my $ipv4;
+    $ipv4 = 1 if $name =~ $Mojo::URL::IPV4_RE;
+    my $ipv6;
+    $ipv6 = 1 if PTON && $name =~ $Mojo::URL::IPV6_RE;
 
     # Type
     my $t = $DNS_TYPES->{$type};
@@ -562,7 +568,7 @@ sub resolve {
     my $server = $self->dns_server;
 
     # No lookup required or record type not supported
-    unless ($server && $t && $name !~ $ipv4 && $name !~ $ipv6) {
+    if (!$server || !$t || ($t ne $DNS_TYPES->{PTR} && ($ipv4 || $ipv6))) {
         $self->timer(0 => sub { $self->$cb([]) });
         return $self;
     }
@@ -587,8 +593,24 @@ sub resolve {
             # Header (one question with recursion)
             my $req = pack 'nnnnnn', $tx, 0x0100, 1, 0, 0, 0;
 
+            # Parts
+            my @parts = split /\./, $name;
+
+            # Reverse
+            if ($t eq $DNS_TYPES->{PTR}) {
+
+                # IPv4
+                if ($ipv4) { @parts = reverse 'arpa', 'in-addr', @parts }
+
+                # IPv6
+                elsif ($ipv6) {
+                    @parts = reverse 'arpa', 'ip6', split //, unpack 'H32',
+                      Socket::inet_pton(PTON_AF_INET6, $name);
+                }
+            }
+
             # Query (Internet)
-            for my $part (split /\./, $name) {
+            for my $part (@parts) {
                 $req .= pack 'C/a', $part if defined $part;
             }
             $req .= pack 'Cnn', 0, $t, 0x0001;
@@ -624,7 +646,8 @@ sub resolve {
             # Questions
             for (1 .. $packet[2]) {
                 my $n;
-                do { ($n, $content) = unpack 'C/aa*', $content } while ($n);
+                do { ($n, $content) = unpack 'C/aa*', $content }
+                  while ($n ne '');
                 $content = (unpack 'nna*', $content)[2];
             }
 
@@ -643,6 +666,20 @@ sub resolve {
                 elsif ($t eq $DNS_TYPES->{AAAA}) {
                     $answer = sprintf '%x:%x:%x:%x:%x:%x:%x:%x',
                       unpack('n*', $a);
+                }
+
+                # MX
+                elsif ($t eq $DNS_TYPES->{MX}) {
+                    $answer =
+                      _parse_name($chunk,
+                        length($chunk) - length($content) - length($a) + 2);
+                }
+
+                # PTR
+                elsif ($t eq $DNS_TYPES->{PTR}) {
+                    $answer =
+                      _parse_name($chunk,
+                        length($chunk) - length($content) - length($a));
                 }
 
                 # TXT
@@ -669,9 +706,6 @@ sub resolve {
 
             # Debug
             warn "RESOLVE TIMEOUT ($server)\n" if DEBUG;
-
-            # Disable
-            $self->dns_server(undef);
 
             # Abort
             $self->drop($id);
@@ -861,8 +895,8 @@ sub _accept {
     }
 
     # Accept callback
-    my $cb = $l->{on_accept};
-    $self->_run_event('accept', $cb, $id) if $cb;
+    my $cb = $c->{on_accept} = $l->{on_accept};
+    $self->_run_event('accept', $cb, $id) if $cb && !$l->{tls};
 
     # Remove listen sockets
     $listen = $self->{_listen} || {};
@@ -903,6 +937,7 @@ sub _connect {
 
     # Options
     my %options = (
+        Blocking => 0,
         PeerAddr => $args->{address},
         PeerPort => $args->{port} || ($args->{tls} ? 443 : 80),
         Proto    => $args->{proto},
@@ -911,10 +946,9 @@ sub _connect {
     );
 
     # Socket
-    my $class = IPV6 ? 'IO::Socket::IP' : 'IO::Socket::INET';
     return $self->_error($id, "Couldn't connect.")
       unless my $socket = $args->{socket}
-          || $class->new(%options);
+          || IO::Socket::INET->new(%options);
     $c->{socket} = $socket;
     $self->{_reverse}->{$socket} = $id;
 
@@ -1081,6 +1115,35 @@ sub _not_writing {
     $c->{writing} = 0;
 }
 
+# Domain name helper for "resolve"
+sub _parse_name {
+    my ($packet, $offset) = @_;
+
+    # Elements
+    my @elements;
+    for (1 .. 128) {
+
+        # Element length
+        my $length = ord substr $packet, $offset++, 1;
+
+        # Offset
+        if ($length >= 0xc0) {
+            $offset = (unpack 'n', substr $packet, ++$offset - 2, 2) & 0x3fff;
+        }
+
+        # Element
+        elsif ($length) {
+            push @elements, substr $packet, $offset, $length;
+            $offset += $length;
+        }
+
+        # Zero length element (the end)
+        else { return join '.', @elements }
+    }
+
+    return;
+}
+
 sub _prepare_accept {
     my ($self, $id) = @_;
 
@@ -1139,7 +1202,7 @@ sub _prepare_connect {
 
     # Connect callback
     my $cb = $c->{on_connect};
-    $self->_run_event('connect', $cb, $id) if $cb;
+    $self->_run_event('connect', $cb, $id) if $cb && !$c->{tls};
 }
 
 sub _prepare_connections {
@@ -1371,9 +1434,16 @@ sub _tls_accept {
     # Connection
     my $c = $self->{_cs}->{$id};
 
-    # Connected
+    # Accepted
     if ($c->{socket}->accept_SSL) {
+
+        # Cleanup
         delete $c->{tls_accept};
+
+        # Accept callback
+        my $cb = $c->{on_accept};
+        $self->_run_event('accept', $cb, $id) if $cb;
+
         return;
     }
 
@@ -1398,7 +1468,14 @@ sub _tls_connect {
 
     # Connected
     if ($c->{socket}->connect_SSL) {
+
+        # Cleanup
         delete $c->{tls_connect};
+
+        # Connect callback
+        my $cb = $c->{on_connect};
+        $self->_run_event('connect', $cb, $id) if $cb;
+
         return;
     }
 
@@ -1565,8 +1642,8 @@ L<Mojo::IOLoop> is a very minimalistic reactor that has been reduced to the
 absolute minimal feature set required to build solid and scalable async TCP
 clients and servers.
 
-Optional modules L<IO::KQueue>, L<IO::Epoll>, L<IO::Socket::IP> and
-L<IO::Socket::SSL> are supported transparently and used if installed.
+Optional modules L<IO::KQueue>, L<IO::Epoll> and L<IO::Socket::SSL> are
+supported transparently and used if installed.
 
 A TLS certificate and key are also built right in to make writing test
 servers as easy as possible.
@@ -1700,10 +1777,8 @@ possible.
         tls     => 1
     });
 
-Open a TCP connection to a remote host, IPv6 will be used automatically if
-available.
-Note that IPv6 support depends on L<IO::Socket::IP> and TLS support on
-L<IO::Socket::SSL>.
+Open a TCP connection to a remote host.
+Note that TLS support depends on L<IO::Socket::SSL>.
 
 These options are currently available.
 
@@ -1789,9 +1864,8 @@ Check if loop is running.
         tls_key  => '/foo/server.key'
     );
 
-Create a new listen socket, IPv6 will be used automatically if available.
-Note that IPv6 support depends on L<IO::Socket::IP> and TLS support on
-L<IO::Socket::SSL>.
+Create a new listen socket.
+Note that TLS support depends on L<IO::Socket::SSL>.
 
 These options are currently available.
 
@@ -1935,7 +2009,7 @@ The remote port.
 
     $loop = $loop->resolve('mojolicio.us', 'A', sub {...});
 
-Resolve domain into C<A>, C<AAAA> or C<TXT> records.
+Resolve domain into C<A>, C<AAAA>, C<MX>, C<PTR> or C<TXT> records.
 Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<singleton>

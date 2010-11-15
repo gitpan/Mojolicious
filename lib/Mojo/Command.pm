@@ -12,12 +12,26 @@ require IO::File;
 
 use Carp 'croak';
 use Mojo::Template;
-use Mojo::Util qw/b64_decode decamelize/;
+use Mojo::Loader;
+use Mojo::Util qw/b64_decode camelize decamelize/;
 
+__PACKAGE__->attr(hint => <<"EOF");
+
+See '$0 help COMMAND' for more information on a specific command.
+EOF
 __PACKAGE__->attr(description => 'No description.');
-__PACKAGE__->attr(quiet       => 0);
-__PACKAGE__->attr(renderer    => sub { Mojo::Template->new });
-__PACKAGE__->attr(usage       => "usage: $0\n");
+__PACKAGE__->attr(message     => <<"EOF");
+usage: $0 COMMAND [OPTIONS]
+
+Tip: CGI, FastCGI and PSGI environments can be automatically detected very
+     often and work without commands.
+
+These commands are currently available:
+EOF
+__PACKAGE__->attr(namespaces => sub { ['Mojo::Command'] });
+__PACKAGE__->attr(quiet      => 0);
+__PACKAGE__->attr(renderer   => sub { Mojo::Template->new });
+__PACKAGE__->attr(usage      => "usage: $0\n");
 
 sub chmod_file {
     my ($self, $path, $mod) = @_;
@@ -82,6 +96,29 @@ sub create_rel_dir {
 
     # Create
     $self->create_dir($path);
+}
+
+sub detect {
+    my ($self, $guess) = @_;
+
+    # Hypnotoad
+    return 'hypnotoad' if defined $ENV{HYPNOTOAD_APP};
+
+    # PSGI (Plack only for now)
+    return 'psgi' if defined $ENV{PLACK_ENV};
+
+    # CGI
+    return 'cgi'
+      if defined $ENV{PATH_INFO} || defined $ENV{GATEWAY_INTERFACE};
+
+    # No further detection if we have a guess
+    return $guess if $guess;
+
+    # FastCGI (detect absence of WINDIR for Windows and USER for UNIX)
+    return 'fastcgi' if !defined $ENV{WINDIR} && !defined $ENV{USER};
+
+    # Nothing
+    return;
 }
 
 sub get_all_data {
@@ -201,7 +238,125 @@ sub render_to_rel_file {
 }
 
 # My cat's breath smells like cat food.
-sub run { croak 'Method "run" not implemented by subclass' }
+sub run {
+    my ($self, $name, @args) = @_;
+
+    # Try to detect environment
+    $name = $self->detect($name) unless $ENV{MOJO_NO_DETECT};
+
+    # Run command
+    if ($name && $name =~ /^\w+$/ && ($name ne 'help' || $args[0])) {
+
+        # Help
+        my $help = $name eq 'help' ? 1 : 0;
+        $name = shift @args if $help;
+
+        # Try all namespaces
+        my $module;
+        for my $namespace (@{$self->namespaces}) {
+
+            # Generate module
+            my $camelized = $name;
+            camelize $camelized;
+            my $try = "$namespace\::$camelized";
+
+            # Load
+            if (my $e = Mojo::Loader->load($try)) {
+
+                # Module missing
+                next unless ref $e;
+
+                # Real error
+                die $e;
+            }
+
+            # Module is a command
+            next unless $try->can('new') && $try->can('run');
+
+            # Found
+            $module = $try;
+            last;
+        }
+
+        # Command missing
+        die qq/Command "$name" missing, maybe you need to install it?\n/
+          unless $module;
+
+        # Run
+        my $command = $module->new;
+        return $help ? $command->help : $command->run(@args);
+    }
+
+    # Test
+    return $self if $ENV{HARNESS_ACTIVE};
+
+    # Try all namespaces
+    my $commands = [];
+    my $seen     = {};
+    for my $namespace (@{$self->namespaces}) {
+
+        # Search
+        if (my $modules = Mojo::Loader->search($namespace)) {
+            for my $module (@$modules) {
+
+                # Load
+                if (my $e = Mojo::Loader->load($module)) { die $e }
+
+                # Seen
+                my $command = $module;
+                $command =~ s/^$namespace\:://;
+                push @$commands, [$command => $module]
+                  unless $seen->{$command};
+                $seen->{$command} = 1;
+            }
+        }
+    }
+
+    # Print overview
+    print $self->message;
+
+    # Make list
+    my $list   = [];
+    my $length = 0;
+    foreach my $command (@$commands) {
+
+        # Generate name
+        my $name = $command->[0];
+        decamelize $name;
+
+        # Add to list
+        my $l = length $name;
+        $length = $l if $l > $length;
+        push @$list, [$name, $command->[1]->new->description];
+    }
+
+    # Print list
+    foreach my $command (@$list) {
+        my $name        = $command->[0];
+        my $description = $command->[1];
+        my $padding     = ' ' x ($length - length $name);
+        print "  $name$padding   $description";
+    }
+
+    # Hint
+    print $self->hint;
+
+    return $self;
+}
+
+sub start {
+    my $self = shift;
+
+    # Don't run commands if we are reloading
+    return $self if $ENV{MOJO_COMMANDS_DONE};
+    $ENV{MOJO_COMMANDS_DONE} ||= 1;
+
+    # Arguments
+    my @args = @_ ? @_ : @ARGV;
+
+    # Run
+    return ref $self ? $self->run(@args) : $self->new->run(@args);
+}
 
 sub write_file {
     my ($self, $path, $data) = @_;
@@ -292,6 +447,27 @@ L<Mojo::Command> implements the following attributes.
 
 Short description of command, used for the command list.
 
+=head2 C<hint>
+
+    my $hint  = $commands->hint;
+    $commands = $commands->hint('Foo!');
+
+Short hint shown after listing available commands.
+
+=head2 C<message>
+
+    my $message = $commands->message;
+    $commands   = $commands->message('Hello World!');
+
+Short usage message shown before listing available commands.
+
+=head2 C<namespaces>
+
+    my $namespaces = $commands->namespaces;
+    $commands      = $commands->namespaces(['Mojolicious::Commands']);
+
+Namespaces to search for available commands, defaults to L<Mojo::Command>.
+
 =head2 C<quiet>
 
     my $quiet = $command->quiet;
@@ -351,6 +527,13 @@ Portably create a directory.
 
 Portably create a relative directory.
 
+=head2 C<detect>
+
+    my $env = $commands->detect;
+    my $env = $commands->detect($guess);
+
+Try to detect environment.
+
 =head2 C<get_all_data>
 
     my $all = $command->get_all_data;
@@ -404,9 +587,17 @@ relative file.
 
 =head2 C<run>
 
-    $command = $command->run(@ARGV);
+    $commands->run;
+    $commands->run(@ARGV);
 
-Run command.
+Load and run commands.
+
+=head2 C<start>
+
+    Mojo::Command->start;
+    Mojo::Command->start(@ARGV);
+
+Start the command line interface.
 
 =head2 C<write_file>
 

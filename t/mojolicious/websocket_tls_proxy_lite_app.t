@@ -3,13 +3,14 @@
 use strict;
 use warnings;
 
-# Disable epoll, kqueue and IPv6
-BEGIN { $ENV{MOJO_POLL} = $ENV{MOJO_NO_IPV6} = 1 }
+# Disable epoll and kqueue
+BEGIN { $ENV{MOJO_POLL} = 1 }
 
 use Test::More;
 use Mojo::IOLoop;
 plan skip_all => 'IO::Socket::SSL 1.33 required for this test!'
   unless Mojo::IOLoop::TLS;
+plan skip_all => 'Windows is too fragile for this test!' if $^O eq 'MSWin32';
 plan tests => 16;
 
 # I was a hero to broken robots 'cause I was one of them, but how can I sing

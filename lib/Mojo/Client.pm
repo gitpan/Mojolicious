@@ -814,6 +814,10 @@ sub _handle {
         # Idle connection
         return unless $old;
 
+        # Interrupted
+        $old->res->error('Interrupted, maybe a timeout?')
+          unless $old->is_done;
+
         # Extract cookies
         if (my $jar = $self->cookie_jar) { $jar->extract($old) }
 
@@ -1121,8 +1125,8 @@ Mojo::Client - Async IO HTTP 1.1 And WebSocket Client
     my $client = Mojo::Client->new;
 
     # Grab the latest Mojolicious release :)
-    my $latest = 'http://mojolicious.org/Mojolicious-latest.tar.gz';
-    print $client->get($latest)->res->body;
+    my $latest = 'http://latest.mojolicio.us';
+    print $client->max_redirects(3)->get($latest)->res->body;
 
     # Quick JSON request
     my $trends = 'http://search.twitter.com/trends.json';
@@ -1172,10 +1176,10 @@ Mojo::Client - Async IO HTTP 1.1 And WebSocket Client
 =head1 DESCRIPTION
 
 L<Mojo::Client> is a full featured async io HTTP 1.1 and WebSocket client
-with C<IPv6>, C<TLS>, C<epoll> and C<kqueue> support.
+with C<TLS>, C<epoll> and C<kqueue> support.
 
-Optional modules L<IO::KQueue>, L<IO::Epoll>, L<IO::Socket::IP> and
-L<IO::Socket::SSL> are supported transparently and used if installed.
+Optional modules L<IO::KQueue>, L<IO::Epoll> and L<IO::Socket::SSL> are
+supported transparently and used if installed.
 
 =head1 ATTRIBUTES
 

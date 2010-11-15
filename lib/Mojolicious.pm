@@ -35,9 +35,7 @@ __PACKAGE__->attr(static  => sub { Mojolicious::Static->new });
 __PACKAGE__->attr(types   => sub { Mojolicious::Types->new });
 
 our $CODENAME = 'Hot Beverage';
-our $VERSION  = '0.999938';
-
-our $AUTOLOAD;
+our $VERSION  = '0.999939';
 
 # These old doomsday devices are dangerously unstable.
 # I'll rest easier not knowing where they are.
@@ -45,7 +43,7 @@ sub AUTOLOAD {
     my $self = shift;
 
     # Method
-    my ($package, $method) = $AUTOLOAD =~ /^([\w\:]+)\:\:(\w+)$/;
+    my ($package, $method) = our $AUTOLOAD =~ /^([\w\:]+)\:\:(\w+)$/;
 
     # Helper
     croak qq/Can't locate object method "$method" via "$package"/
@@ -358,8 +356,8 @@ magic and no requirements besides Perl 5.8.7.
 
 =item *
 
-Full stack HTTP 1.1 and WebSocket client/server implementation with IPv6,
-TLS, Bonjour, IDNA, Comet (long polling), chunking and multipart support.
+Full stack HTTP 1.1 and WebSocket client/server implementation with TLS,
+Bonjour, IDNA, Comet (long polling), chunking and multipart support.
 
 =item *
 

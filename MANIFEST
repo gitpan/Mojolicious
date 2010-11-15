@@ -117,6 +117,8 @@ t/mojo/fastcgi.t
 t/mojo/headers.t
 t/mojo/home.t
 t/mojo/ioloop.t
+t/mojo/ioloop_online.t
+t/mojo/ioloop_tls.t
 t/mojo/json.t
 t/mojo/lib/LoaderException.pm
 t/mojo/lib/LoaderException2.pm

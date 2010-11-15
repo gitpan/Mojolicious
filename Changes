@@ -1,5 +1,22 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+0.999939 2010-11-15 00:00:00
+        - Removed IPv6 support until Perl itself gets better support for it.
+        - Added MX and PTR record type support to the Mojo::IOLoop resolver.
+          (und3f)
+        - Fixed a Mojolicious::Static rendering bug.
+        - Fixed a bug that forced connect in Mojo::IOLoop to block.
+        - Fixed a bug that prevented on_finish to be triggered for
+          interrupted connections.
+        - Fixed a TLS accept bug in Mojo::IOLoop.
+        - Fixed a small bug in Mojo::Parameters. (spleenjack)
+        - Fixed javascript and stylesheet helper. (sshaw)
+        - Fixed IPv4 address detection bug in Mojo::URL.
+        - Fixed a Mojo::Client bug where interrupted transactions were still
+          successful.
+        - Fixed a small reloader bug.
+        - Fixed typos.
+
 0.999938 2010-11-09 00:00:00
         - Moved all commands into the Mojolicious namespace.
         - Fixed typo.
