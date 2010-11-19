@@ -11,10 +11,11 @@ plan skip_all => 'Perl 5.12 required for this test!'
   unless eval 'use 5.12.0; 1';
 plan skip_all => 'set TEST_ONLINE to enable this test (developer only!)'
   unless $ENV{TEST_ONLINE};
-plan tests => 7;
+plan tests => 9;
 
 use_ok 'Mojo::IOLoop';
 
+use List::Util 'first';
 use Mojo::URL;
 
 # Your guilty consciences may make you vote Democratic, but secretly you all
@@ -23,41 +24,66 @@ use Mojo::URL;
 my $loop = Mojo::IOLoop->new;
 
 # Resolve TXT record
-my $record;
+my $result;
 $loop->resolve(
     'google.com',
     'TXT',
     sub {
         my ($self, $records) = @_;
-        $record = $records->[0];
+        $result = (first { $_->[0] eq 'TXT' } @$records)->[1];
         $self->stop;
     }
 )->start;
-like $record, qr/spf/, 'right record';
+like $result, qr/spf/, 'right record';
+
+# Resolve NS records
+my $found = 0;
+$loop->resolve(
+    'gmail.com',
+    'NS',
+    sub {
+        my ($self, $records) = @_;
+        $found++ if first { $_->[1] =~ /ns\d*.google\.com/ } @$records;
+        $self->stop;
+    }
+)->start;
+ok $found, 'found NS records';
 
 # Resolve AAAA record
-$record = undef;
+$result = undef;
 $loop->resolve(
     'ipv6.google.com',
     'AAAA',
     sub {
         my ($self, $records) = @_;
-        $record = $records->[0];
+        $result = (first { $_->[0] eq 'AAAA' } @$records)->[1];
         $self->stop;
     }
 )->start;
-like $record, $Mojo::URL::IPV6_RE, 'valid IPv6 record';
+like $result, $Mojo::URL::IPV6_RE, 'valid IPv6 record';
+
+# Resolve CNAME record
+$result = undef;
+$loop->resolve(
+    'ipv6.google.com',
+    'CNAME',
+    sub {
+        my ($self, $records) = @_;
+        $result = (first { $_->[0] eq 'CNAME' } @$records)->[1];
+        $self->stop;
+    }
+)->start;
+is $result, 'ipv6.l.google.com', 'right CNAME record';
 
 # Resolve MX records
-my $found = 0;
+$found = 0;
 $loop->resolve(
     'gmail.com',
     'MX',
     sub {
         my ($self, $records) = @_;
-        for my $record (@$records) {
-            $found++ if $record =~ /gmail-smtp-in\.l\.google\.com/;
-        }
+        $found++
+          if first { $_->[1] =~ /gmail-smtp-in\.l\.google\.com/ } @$records;
         $self->stop;
     }
 )->start;
@@ -66,21 +92,21 @@ ok $found, 'found MX records';
 # Resolve A record and perform PTR roundtrip
 my ($a1, $ptr, $a2);
 $loop->resolve(
-    'google.com',
+    'perl.org',
     'A',
     sub {
         my ($self, $records) = @_;
-        $a1 = $records->[0];
+        $a1 = (first { $_->[0] eq 'A' } @$records)->[1];
         $self->resolve(
             $a1, 'PTR',
             sub {
                 my ($self, $records) = @_;
-                $ptr = $records->[0];
+                $ptr = $records->[0]->[1];
                 $self->resolve(
                     $ptr, 'A',
                     sub {
                         my ($self, $records) = @_;
-                        $a2 = $records->[0];
+                        $a2 = (first { $_->[0] eq 'A' } @$records)->[1];
                         $self->stop;
                     }
                 );
@@ -98,9 +124,7 @@ $loop->resolve(
     'PTR',
     sub {
         my ($self, $records) = @_;
-        for my $record (@$records) {
-            $found++ if $record eq 'freebsd.isc.org';
-        }
+        $found++ if first { $_->[1] eq 'freebsd.isc.org' } @$records;
         $self->stop;
     }
 )->start;

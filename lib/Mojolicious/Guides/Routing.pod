@@ -408,6 +408,37 @@ ones.
     $foo->route('/baz')->to(action => 'baz');
     $foo->route('/cde');
 
+=head2 Mojolicious::Lite routes
+
+L<Mojolicious::Lite> routes are in fact just a small convenience layer around
+everything described above and also part of the normal router.
+
+    # GET /foo -> {controller => 'foo', action => 'abc'}
+    $r->get('/foo')->to(controller => 'foo', action => 'abc');
+
+This makes the process of growing your L<Mojolicious::Lite> prototypes into
+full L<Mojolicious> applications very straightforward.
+
+    # POST /bar
+    $r->post('/bar' => sub {
+        my $self = shift;
+        $self->render(text => 'Just like a Mojolicious::Lite action!');
+    });
+
+Even the more abstract concepts are available.
+
+    # GET  /yada
+    # POST /yada
+    my $yada = $r->under('/yada');
+    $yada->get(sub {
+        my $self = shift;
+        $self->render(text => 'Hello!');
+    });
+    $yada->post(sub {
+        my $self = shift;
+        $self->render(text => 'Go away!');
+    });
+
 =head1 ADVANCED
 
 Less commonly used and more powerful features.
@@ -646,7 +677,7 @@ Now just load the plugin and you're done.
 You can restrict access to WebSocket handshakes using the C<websocket> method.
 
     # /ws (WebSocket handshake)
-    $r->route('/echo')->websocket->to(controller => 'foo', action => 'echo');
+    $r->websocket('/echo')->to(controller => 'foo', action => 'echo');
 
     # Controller
     package MyApp::Foo;

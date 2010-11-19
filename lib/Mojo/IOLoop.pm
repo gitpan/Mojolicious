@@ -11,6 +11,7 @@ use File::Spec;
 use IO::File;
 use IO::Poll qw/POLLERR POLLHUP POLLIN POLLOUT/;
 use IO::Socket;
+use List::Util 'first';
 use Mojo::URL;
 use Scalar::Util 'weaken';
 use Socket qw/IPPROTO_TCP TCP_NODELAY/;
@@ -119,11 +120,13 @@ if (-r '/etc/resolv.conf') {
 
 # DNS record types
 my $DNS_TYPES = {
-    A    => 0x0001,
-    AAAA => 0x001c,
-    MX   => 0x000f,
-    PTR  => 0x000c,
-    TXT  => 0x0010
+    A     => 0x0001,
+    AAAA  => 0x001c,
+    CNAME => 0x0005,
+    MX    => 0x000f,
+    NS    => 0x0002,
+    PTR   => 0x000c,
+    TXT   => 0x0010
 };
 
 # "localhost"
@@ -138,7 +141,7 @@ __PACKAGE__->attr(
         sub {1}
     }
 );
-__PACKAGE__->attr(timeout => '0.25');
+__PACKAGE__->attr(timeout => '0.025');
 
 # Singleton
 our $LOOP;
@@ -401,7 +404,8 @@ sub lookup {
             my ($self, $results) = @_;
 
             # Success
-            return $self->$cb($results->[0]) if $results->[0];
+            my $result = first { $_->[0] eq 'A' } @$results;
+            return $self->$cb($result->[1]) if $result;
 
             # IPv6
             $self->resolve(
@@ -410,7 +414,8 @@ sub lookup {
                     my ($self, $results) = @_;
 
                     # Success
-                    return $self->$cb($results->[0]) if $results->[0];
+                    my $result = first { $_->[0] eq 'AAA' } @$results;
+                    return $self->$cb($result->[1]) if $result;
 
                     # Pass through
                     $self->$cb();
@@ -637,6 +642,9 @@ sub resolve {
             # Packet
             my @packet = unpack 'nnnnnna*', $chunk;
 
+            # Debug
+            warn "ANSWERS $packet[3] ($server)\n" if DEBUG;
+
             # Wrong response
             return $self->$cb([]) unless $packet[0] eq $tx;
 
@@ -654,44 +662,20 @@ sub resolve {
             # Answers
             my @answers;
             for (1 .. $packet[3]) {
-                my ($t, $a, $answer);
-                ($t, $a, $content) = (unpack 'nnnNn/aa*', $content)[1, 4, 5];
 
-                # A
-                if ($t eq $DNS_TYPES->{A}) {
-                    $answer = join('.', unpack 'C4', $a);
-                }
+                # Parse
+                (my ($t, $a), $content) =
+                  (unpack 'nnnNn/aa*', $content)[1, 4, 5];
+                my @answer = _parse_answer($t, $a, $chunk, $content);
 
-                # AAAA
-                elsif ($t eq $DNS_TYPES->{AAAA}) {
-                    $answer = sprintf '%x:%x:%x:%x:%x:%x:%x:%x',
-                      unpack('n*', $a);
-                }
+                # No answer
+                next unless @answer;
 
-                # MX
-                elsif ($t eq $DNS_TYPES->{MX}) {
-                    $answer =
-                      _parse_name($chunk,
-                        length($chunk) - length($content) - length($a) + 2);
-                }
-
-                # PTR
-                elsif ($t eq $DNS_TYPES->{PTR}) {
-                    $answer =
-                      _parse_name($chunk,
-                        length($chunk) - length($content) - length($a));
-                }
-
-                # TXT
-                elsif ($t eq $DNS_TYPES->{TXT}) {
-                    $answer = unpack '(C/a*)*', $a;
-                }
-
-                next unless defined $answer;
-                push @answers, $answer;
+                # Answer
+                push @answers, \@answer;
 
                 # Debug
-                warn "ANSWER $answer\n" if DEBUG;
+                warn "ANSWER $answer[0] $answer[1]\n" if DEBUG;
             }
 
             # Done
@@ -859,10 +843,7 @@ sub _accept {
     weaken $self;
 
     # Connection
-    my $c = {
-        accepting => 1,
-        buffer    => '',
-    };
+    my $c = {buffer => ''};
     (my $id) = "$c" =~ /0x([\da-f]+)/;
     $self->{_cs}->{$id} = $c;
 
@@ -873,10 +854,8 @@ sub _accept {
     $c->{socket}     = $socket;
     $r->{$socket}    = $id;
 
-    # Timeout
-    $c->{accept_timer} =
-      $self->timer($self->accept_timeout, =>
-          sub { shift->_error($id, 'Accept timeout.') });
+    # Non-blocking
+    $socket->blocking(0);
 
     # Disable Nagle's algorithm
     setsockopt($socket, IPPROTO_TCP, TCP_NODELAY, 1) unless $l->{file};
@@ -890,6 +869,12 @@ sub _accept {
         my $cb = $l->{$name};
         $self->$name($id => $cb) if $cb;
     }
+
+    # Add socket to poll
+    $self->_not_writing($id);
+
+    # Debug
+    warn "ACCEPTED $id\n" if DEBUG;
 
     # Accept callback
     my $cb = $c->{on_accept} = $l->{on_accept};
@@ -965,7 +950,7 @@ sub _connect {
           sub { shift->_error($id, 'Connect timeout.') });
 
     # Add socket to poll
-    $self->_not_writing($id);
+    $self->_writing($id);
 
     # Start TLS
     if ($args->{tls}) { $self->start_tls($id => $args) }
@@ -1003,6 +988,9 @@ sub _drop_immediately {
 
     # Drop socket
     if (my $socket = $c->{socket}) {
+
+        # Debug
+        warn "DISCONNECTED $id\n" if DEBUG;
 
         # Remove file descriptor
         return unless my $fd = fileno $socket;
@@ -1112,6 +1100,47 @@ sub _not_writing {
     $c->{writing} = 0;
 }
 
+# Answer helper for "resolve"
+sub _parse_answer {
+    my ($t, $a, $packet, $rest) = @_;
+
+    # A
+    if ($t eq $DNS_TYPES->{A}) { return A => join('.', unpack 'C4', $a) }
+
+    # AAAA
+    elsif ($t eq $DNS_TYPES->{AAAA}) {
+        return AAAA => sprintf('%x:%x:%x:%x:%x:%x:%x:%x', unpack('n*', $a));
+    }
+
+    # TXT
+    elsif ($t eq $DNS_TYPES->{TXT}) { return TXT => unpack('(C/a*)*', $a) }
+
+    # Offset
+    my $offset = length($packet) - length($rest) - length($a);
+
+    # CNAME
+    my $type;
+    if ($t eq $DNS_TYPES->{CNAME}) { $type = 'CNAME' }
+
+    # MX
+    elsif ($t eq $DNS_TYPES->{MX}) {
+        $type = 'MX';
+        $offset += 2;
+    }
+
+    # NS
+    elsif ($t eq $DNS_TYPES->{NS}) { $type = 'NS' }
+
+    # PTR
+    elsif ($t eq $DNS_TYPES->{PTR}) { $type = 'PTR' }
+
+    # Domain name
+    return $type => _parse_name($packet, $offset) if $type;
+
+    # Not supported
+    return;
+}
+
 # Domain name helper for "resolve"
 sub _parse_name {
     my ($packet, $offset) = @_;
@@ -1141,28 +1170,6 @@ sub _parse_name {
     return;
 }
 
-sub _prepare_accept {
-    my ($self, $id) = @_;
-
-    # Connection
-    my $c = $self->{_cs}->{$id};
-
-    # Connected
-    return unless $c->{socket}->connected;
-
-    # Accepted
-    delete $c->{accepting};
-
-    # Remove timeout
-    $self->_drop_immediately(delete $c->{accept_timer});
-
-    # Non-blocking
-    $c->{socket}->blocking(0);
-
-    # Add socket to poll
-    $self->_not_writing($id);
-}
-
 sub _prepare_cert {
     my $self = shift;
 
@@ -1181,27 +1188,6 @@ sub _prepare_cert {
     return $self->{_cert} = $cert;
 }
 
-sub _prepare_connect {
-    my ($self, $id) = @_;
-
-    # Connection
-    my $c = $self->{_cs}->{$id};
-
-    # Not yet connected
-    return unless my $socket = $c->{socket};
-    if ($socket->can('connected')) { return unless $socket->connected }
-
-    # Connected
-    delete $c->{connecting};
-
-    # Remove timeout
-    $self->_drop_immediately(delete $c->{connect_timer});
-
-    # Connect callback
-    my $cb = $c->{on_connect};
-    $self->_run_event('connect', $cb, $id) if $cb && !$c->{tls};
-}
-
 sub _prepare_connections {
     my $self = shift;
 
@@ -1211,20 +1197,12 @@ sub _prepare_connections {
     # Prepare
     while (my ($id, $c) = each %$cs) {
 
-        # Accepting
-        $self->_prepare_accept($id) if $c->{accepting};
-
-        # Connecting
-        $self->_prepare_connect($id) if $c->{connecting};
-
         # Connection needs to be finished
-        if ($c->{finish}) {
+        if ($c->{finish} && !length $c->{buffer}) {
 
             # Buffer empty
-            unless (length $c->{buffer}) {
-                $self->_drop_immediately($id);
-                next;
-            }
+            $self->_drop_immediately($id);
+            next;
         }
 
         # Read only
@@ -1444,17 +1422,8 @@ sub _tls_accept {
         return;
     }
 
-    # Error
-    my $error = $IO::Socket::SSL::SSL_ERROR;
-
-    # Reading
-    if ($error == TLS_READ) { $self->_not_writing($id) }
-
-    # Writing
-    elsif ($error == TLS_WRITE) { $self->_writing($id) }
-
-    # Real error
-    else { $self->_error($id, $error) }
+    # Handle error
+    $self->_tls_error($id);
 }
 
 sub _tls_connect {
@@ -1475,6 +1444,13 @@ sub _tls_connect {
 
         return;
     }
+
+    # Handle error
+    $self->_tls_error($id);
+}
+
+sub _tls_error {
+    my ($self, $id) = @_;
 
     # Error
     my $error = $IO::Socket::SSL::SSL_ERROR;
@@ -1501,12 +1477,24 @@ sub _write {
     # TLS connect
     return $self->_tls_connect($id) if $c->{tls_connect};
 
-    # Connect has just completed
-    return if $c->{connecting};
-
     # Socket
     return unless my $socket = $c->{socket};
     return unless $socket->connected;
+
+    # Connecting
+    if ($c->{connecting}) {
+
+        # Cleanup
+        delete $c->{connecting};
+        $self->_drop_immediately(delete $c->{connect_timer});
+
+        # Debug
+        warn "CONNECTED $id\n" if DEBUG;
+
+        # Connect callback
+        my $cb = $c->{on_connect};
+        $self->_run_event('connect', $cb, $id) if $cb && !$c->{tls};
+    }
 
     # Callback
     if ($c->{drain} && (my $event = delete $c->{drain})) {
@@ -1746,7 +1734,7 @@ Note that exceptions in this callback are not captured.
     $loop       = $loop->timeout(5);
 
 Maximum time in seconds our loop waits for new events to happen, defaults to
-C<0.25>.
+C<0.025>.
 Note that a value of C<0> would make the loop non-blocking.
 
 =head1 METHODS
@@ -2006,7 +1994,8 @@ The remote port.
 
     $loop = $loop->resolve('mojolicio.us', 'A', sub {...});
 
-Resolve domain into C<A>, C<AAAA>, C<MX>, C<PTR> or C<TXT> records.
+Resolve domain into C<A>, C<AAAA>, C<CNAME>, C<MX>, C<NS>, C<PTR> or C<TXT>
+records.
 Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<singleton>
