@@ -116,6 +116,8 @@ sub auto_render {
 
 sub bridge { shift->route(@_)->inline(1) }
 
+sub del { shift->_generate_route('delete', @_) }
+
 sub detour {
     my $self = shift;
 
@@ -230,6 +232,8 @@ sub parse {
 }
 
 sub post { shift->_generate_route('post', @_) }
+
+sub put { shift->_generate_route('put', @_) }
 
 sub render {
     my ($self, $path, $values) = @_;
@@ -616,18 +620,22 @@ sub _walk_stack {
         my $stash = $c->stash;
 
         # Captures
+        $c->match->captures({%$field});
+
+        # Cleanup
+        my $cb = delete $field->{cb};
+        delete $field->{app};
+
+        # Captures
         my $captures = $stash->{'mojo.captures'} ||= {};
         $stash->{'mojo.captures'} = {%$captures, %$field};
 
         # Merge in captures
         @{$c->stash}{keys %$field} = values %$field;
 
-        # Captures
-        $c->match->captures($field);
-
         # Dispatch
         my $e =
-            $field->{cb}
+            $cb
           ? $self->_dispatch_callback($c, $staging)
           : $self->_dispatch_controller($c, $staging);
 
@@ -832,6 +840,14 @@ Automatic rendering.
 
 Add a new bridge to this route as a nested child.
 
+=head2 C<del>
+
+    my $del = $route->del('/:foo' => sub {...});
+
+Generate route matching only C<DELETE> requests.
+See also the L<Mojolicious::Lite> tutorial for more argument variations.
+Note that this method is EXPERIMENTAL and might change without warning!
+
 =head2 C<detour>
 
     $r = $r->detour(action => 'foo');
@@ -909,6 +925,14 @@ Parse a pattern.
     my $post = $route->post('/:foo' => sub {...});
 
 Generate route matching only C<POST> requests.
+See also the L<Mojolicious::Lite> tutorial for more argument variations.
+Note that this method is EXPERIMENTAL and might change without warning!
+
+=head2 C<put>
+
+    my $put = $route->put('/:foo' => sub {...});
+
+Generate route matching only C<PUT> requests.
 See also the L<Mojolicious::Lite> tutorial for more argument variations.
 Note that this method is EXPERIMENTAL and might change without warning!
 

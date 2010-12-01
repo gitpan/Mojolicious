@@ -59,6 +59,13 @@ sub load {
 }
 
 sub reload {
+
+    # Force script reloading
+    delete $INC{$0};
+    $STATS->{$0} = $^T - 1;
+    $INC{$0} = $0;
+
+    # Reload
     while (my ($key, $file) = each %INC) {
 
         # Modified time
@@ -74,6 +81,8 @@ sub reload {
             # Debug
             warn "$key -> $file modified, reloading!\n" if DEBUG;
 
+            $STATS->{$file} = $mtime;
+
             # Unload
             _unload($key);
 
@@ -82,8 +91,6 @@ sub reload {
 
             # Catch
             return Mojo::Exception->new($@) if $@;
-
-            $STATS->{$file} = $mtime;
         }
     }
 

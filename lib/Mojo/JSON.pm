@@ -5,6 +5,7 @@ use warnings;
 
 use base 'Mojo::Base';
 
+use B;
 use Mojo::Util;
 
 __PACKAGE__->attr('error');
@@ -182,26 +183,6 @@ sub _decode_array {
     return $self->_exception($ref, 'Missing right square bracket');
 }
 
-sub _decode_names {
-    my ($self, $ref) = @_;
-
-    # Name found
-    if ($$ref =~ s/$NAMES_RE//o) { return $1 }
-
-    # No number
-    return;
-}
-
-sub _decode_number {
-    my ($self, $ref) = @_;
-
-    # Number found
-    if ($$ref =~ s/$NUMBER_RE//o) { return $1 }
-
-    # No number
-    return;
-}
-
 sub _decode_object {
     my ($self, $ref) = @_;
 
@@ -244,23 +225,6 @@ sub _decode_object {
     return $self->_exception($ref, 'Missing right curly bracket');
 }
 
-sub _decode_string {
-    my ($self, $ref) = @_;
-
-    # String
-    if ($$ref =~ s/$STRING_RE//o) {
-        my $string = $1;
-
-        # Unescape
-        $string =~ s/$UNESCAPE_RE/_unescape($1, $2, $3, $4)/gex;
-
-        return $string;
-    }
-
-    # No string
-    return;
-}
-
 sub _decode_structure {
     my ($self, $ref) = @_;
 
@@ -285,28 +249,29 @@ sub _decode_values {
     my ($self, $ref) = @_;
 
     # Number
-    if (defined(my $number = $self->_decode_number($ref))) {
-        return [$number];
-    }
+    if ($$ref =~ s/$NUMBER_RE//o) { return [0 + $1] }
 
     # String
-    elsif (defined(my $string = $self->_decode_string($ref))) {
+    elsif ($$ref =~ s/$STRING_RE//o) {
+        my $string = $1;
+
+        # Unescape
+        $string =~ s/$UNESCAPE_RE/_unescape($1, $2, $3, $4)/gex;
+
         return [$string];
     }
 
     # Name
-    elsif (my $name = $self->_decode_names($ref)) {
+    elsif ($$ref =~ s/$NAMES_RE//o) {
 
         # "false"
-        if ($name eq 'false') { $name = $FALSE }
+        if ($1 eq 'false') { return [$FALSE] }
 
         # "null"
-        elsif ($name eq 'null') { $name = undef }
+        elsif ($1 eq 'null') { return [undef] }
 
         # "true"
-        elsif ($name eq 'true') { $name = $TRUE }
-
-        return [$name];
+        elsif ($1 eq 'true') { return [$TRUE] }
     }
 
     # Object or array
@@ -376,7 +341,9 @@ sub _encode_values {
     return 'true' if ref $value eq 'Mojo::JSON::_Bool' && $value;
 
     # Number
-    return $value if $value =~ m/$NUMBER_RE$/o;
+    my $flags = B::svref_2object(\$value)->FLAGS;
+    return $value
+      if $flags & (B::SVp_IOK | B::SVp_NOK) && !($flags & B::SVp_POK);
 
     # String
     return $self->_encode_string($value);

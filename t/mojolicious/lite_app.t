@@ -148,11 +148,11 @@ get ':number' => [number => qr/0/] => sub {
 # GET /tags
 get 'tags/:test' => 'tags';
 
-# GET /selection
-get 'selection' => '*';
+# PUT /selection
+put 'selection' => '*';
 
-# GET /inline/epl
-get '/inline/epl' => sub { shift->render(inline => '<%= 1 + 1%>') };
+# DELETE /inline/epl
+del '/inline/epl' => sub { shift->render(inline => '<%= 1 + 1%>') };
 
 # GET /inline/ep
 get '/inline/ep' =>
@@ -467,14 +467,14 @@ get '/captures/:foo/:bar' => sub {
 app->routes->add_condition(
     default => sub {
         my ($r, $c, $captures, $num) = @_;
-        $captures->{test} = "$num works!";
+        $captures->{test} = $captures->{text} . "$num works!";
         return 1 if $c->stash->{default} == $num;
         return;
     }
 );
 
 # GET /default/condition
-get '/default/condition' => (default => 23) => sub {
+get '/default/:text' => (default => 23) => sub {
     my $self    = shift;
     my $default = $self->stash('default');
     my $test    = $self->stash('test');
@@ -908,8 +908,8 @@ $t->get_ok('/tags/lala?c=b&d=3&e=4&f=5')->status_is(200)->content_is(<<EOF);
 /*]]>*/</style>
 EOF
 
-# GET /selection (empty)
-$t->get_ok('/selection')->status_is(200)
+# PUT /selection (empty)
+$t->put_ok('/selection')->status_is(200)
   ->content_is("<form action=\"/selection\">\n    "
       . '<select name="a">'
       . '<option value="b">b</option>'
@@ -930,8 +930,8 @@ $t->get_ok('/selection')->status_is(200)
       . '</form>'
       . "\n");
 
-# GET /selection (values)
-$t->get_ok('/selection?a=e&foo=bar')->status_is(200)
+# PUT /selection (values)
+$t->put_ok('/selection?a=e&foo=bar')->status_is(200)
   ->content_is("<form action=\"/selection\">\n    "
       . '<select name="a">'
       . '<option value="b">b</option>'
@@ -952,8 +952,8 @@ $t->get_ok('/selection?a=e&foo=bar')->status_is(200)
       . '</form>'
       . "\n");
 
-# GET /selection (multiple values)
-$t->get_ok('/selection?foo=bar&a=e&foo=baz')->status_is(200)
+# PUT /selection (multiple values)
+$t->put_ok('/selection?foo=bar&a=e&foo=baz')->status_is(200)
   ->content_is("<form action=\"/selection\">\n    "
       . '<select name="a">'
       . '<option value="b">b</option>'
@@ -974,8 +974,8 @@ $t->get_ok('/selection?foo=bar&a=e&foo=baz')->status_is(200)
       . '</form>'
       . "\n");
 
-# GET /inline/epl
-$t->get_ok('/inline/epl')->status_is(200)->content_is("2\n");
+# DELETE /inline/epl
+$t->delete_ok('/inline/epl')->status_is(200)->content_is("2\n");
 
 # GET /inline/ep
 $t->get_ok('/inline/ep?foo=bar')->status_is(200)->content_is("barworks!\n");
@@ -1225,8 +1225,8 @@ $t->post_form_ok('/utf8', 'UTF-8' => {name => 'Вячеслав'})
   ->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By'   => 'Mojolicious (Perl)')
   ->header_is('Content-Length' => 40)->content_type_is('text/html')
-  ->content_is(b("Вячеслав Тихановский\n")->encode('UTF-8')
-      ->to_string);
+  ->content_is(
+    b("Вячеслав Тихановский\n")->encode->to_string);
 
 # POST /utf8 (multipart/form-data)
 $t->post_form_ok(
@@ -1469,7 +1469,7 @@ $t->get_ok('/hello3.txt', {'Range' => 'bytes=0-0'})->status_is(206)
 $t->get_ok('/default/condition')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_is('works 23 23 works!');
+  ->content_is('works 23 condition23 works!');
 
 # GET /redirect/condition/0
 $t->get_ok('/redirect/condition/0')->status_is(200)

@@ -247,8 +247,7 @@ sub _parse_env {
     $self->env($env);
 
     # Headers
-    for my $name (keys %{$env}) {
-        my $value = $env->{$name};
+    while (my ($name, $value) = each %$env) {
 
         # Header
         if ($name =~ s/^HTTP_//i) {

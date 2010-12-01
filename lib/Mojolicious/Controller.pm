@@ -22,6 +22,68 @@ __PACKAGE__->attr(tx => sub { Mojo::Transaction::HTTP->new });
 *finished        = \&on_finish;
 *receive_message = \&on_message;
 
+# Exception template
+our $EXCEPTION = <<'EOF';
+% my $e = delete $self->stash->{'exception'};
+<!doctype html><html>
+    <head>
+        <title>Exception</title>
+        <style type="text/css">
+            body {
+                font: 0.9em Verdana, "Bitstream Vera Sans", sans-serif;
+            }
+            .snippet {
+                font: 115% Monaco, "Courier New", monospace;
+            }
+        </style>
+    </head>
+    <body>
+        <% if ($self->app->mode eq 'development') { %>
+            <div class="snippet"><pre><%= $e->message %></pre></div>
+            <div>
+                <% for my $line (@{$e->lines_before}) { %>
+                    <div class="snippet">
+                        <%= $line->[0] %>: <%= $line->[1] %>
+                    </div>
+                <% } %>
+                <% if ($e->line->[0]) { %>
+                    <div class="snippet">
+                        <b><%= $e->line->[0] %>: <%= $e->line->[1] %></b>
+                    </div>
+                <% } %>
+                <% for my $line (@{$e->lines_after}) { %>
+                    <div class="snippet">
+                        <%= $line->[0] %>: <%= $line->[1] %>
+                    </div>
+                <% } %>
+            </div>
+            <div class="snippet"><pre><%= dumper $self->stash %></pre></div>
+        <% } else { %>
+            <div>Page temporarily unavailable, please come back later.</div>
+        <% } %>
+    </body>
+</html>
+EOF
+
+# Not found template
+our $NOT_FOUND = <<'EOF';
+<!doctype html><html>
+    <head>
+        <title>Not Found</title>
+        <style type="text/css">
+            body {
+                font: 0.9em Verdana, "Bitstream Vera Sans", sans-serif;
+            }
+        </style>
+    </head>
+    <body>
+        <div>
+            Page not found, want to go <%= link_to home => url_for->base %>?
+        </div>
+    </body>
+</html>
+EOF
+
 # Reserved stash values
 my $STASH_RE = qr/
     ^
@@ -291,8 +353,8 @@ sub render {
         }
 
         # Try the route name if we don't have controller and action
-        elsif ($self->match && (my $name = $self->match->endpoint->name)) {
-            $self->stash->{template} = $name;
+        elsif ($self->match && $self->match->endpoint) {
+            $self->stash->{template} = $self->match->endpoint->name;
         }
     }
 
@@ -313,7 +375,7 @@ sub render {
     $res->code(200) unless $res->code;
 
     # Output
-    $res->body($output) unless $res->body;
+    $res->body($output);
 
     # Type
     my $headers = $res->headers;
@@ -350,7 +412,10 @@ sub render_exception {
     # Error
     $self->app->log->error($e);
 
-    # Render exception template
+    # Recursion
+    return if $self->stash->{'mojo.exception'};
+
+    # Exception template
     my $options = {
         template         => 'exception',
         format           => 'html',
@@ -359,8 +424,18 @@ sub render_exception {
         exception        => $e,
         'mojo.exception' => 1
     };
-    $self->app->static->serve_500($self)
-      if $self->stash->{'mojo.exception'} || !$self->render($options);
+
+    # Inline template
+    unless ($self->render($options)) {
+        $self->render(
+            inline           => $EXCEPTION,
+            format           => 'html',
+            handler          => 'ep',
+            status           => 500,
+            exception        => $e,
+            'mojo.exception' => 1
+        );
+    }
 
     # Rendered
     $self->rendered;
@@ -407,15 +482,33 @@ sub render_not_found {
     $self->app->log->debug(qq/Resource "$resource" not found./)
       if $resource;
 
+    # Stash
+    my $stash = $self->stash;
+
+    # Exception
+    return if $stash->{'mojo.exception'};
+
+    # Recursion
+    return if $stash->{'mojo.not_found'};
+
     # Render not found template
     my $options = {
-        template  => 'not_found',
-        format    => 'html',
-        not_found => 1
+        template         => 'not_found',
+        format           => 'html',
+        status           => 404,
+        'mojo.not_found' => 1
     };
-    $options->{status} = 404 unless $self->stash->{status};
-    $self->app->static->serve_404($self)
-      if $self->stash->{not_found} || !$self->render($options);
+
+    # Inline template
+    unless ($self->render($options)) {
+        $self->render(
+            inline           => $NOT_FOUND,
+            format           => 'html',
+            handler          => 'ep',
+            status           => 404,
+            'mojo.not_found' => 1
+        );
+    }
 
     # Rendered
     $self->rendered;

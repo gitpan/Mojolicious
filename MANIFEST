@@ -37,6 +37,7 @@ lib/Mojo/Server.pm
 lib/Mojo/Server/CGI.pm
 lib/Mojo/Server/Daemon.pm
 lib/Mojo/Server/FastCGI.pm
+lib/Mojo/Server/Hypnotoad.pm
 lib/Mojo/Server/PSGI.pm
 lib/Mojo/Template.pm
 lib/Mojo/Transaction.pm
@@ -52,6 +53,7 @@ lib/Mojolicious/Command/Fastcgi.pm
 lib/Mojolicious/Command/Generate.pm
 lib/Mojolicious/Command/Generate/App.pm
 lib/Mojolicious/Command/Generate/Gitignore.pm
+lib/Mojolicious/Command/Generate/Hypnotoad.pm
 lib/Mojolicious/Command/Generate/LiteApp.pm
 lib/Mojolicious/Command/Generate/Makefile.pm
 lib/Mojolicious/Command/Get.pm
@@ -98,6 +100,7 @@ Makefile.PL
 MANIFEST			This list of files
 MANIFEST.SKIP
 README.pod
+script/hypnotoad
 script/mojo
 t/mojo/apache_cgi.t
 t/mojo/apache_fastcgi.t
@@ -116,6 +119,7 @@ t/mojo/dom.t
 t/mojo/fastcgi.t
 t/mojo/headers.t
 t/mojo/home.t
+t/mojo/hypnotoad.t
 t/mojo/ioloop.t
 t/mojo/ioloop_online.t
 t/mojo/ioloop_tls.t
@@ -139,6 +143,7 @@ t/mojolicious/charset_lite_app.t
 t/mojolicious/dispatch.t
 t/mojolicious/dispatcher_lite_app.t
 t/mojolicious/embedded_lite_app.t
+t/mojolicious/exception_lite_app.t
 t/mojolicious/external_lite_app.json
 t/mojolicious/external_lite_app.pl
 t/mojolicious/external_lite_app.t

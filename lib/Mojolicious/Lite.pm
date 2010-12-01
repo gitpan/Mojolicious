@@ -10,9 +10,6 @@ use base 'Mojolicious';
 use File::Spec;
 use FindBin;
 
-# Make reloading work
-BEGIN { $INC{$0} = $0 }
-
 # It's the future, my parents, my co-workers, my girlfriend,
 # I'll never see any of them ever again... YAHOOO!
 sub import {
@@ -47,11 +44,13 @@ sub import {
     # Export
     *{"${caller}::new"} = *{"${caller}::app"} = sub {$app};
     *{"${caller}::any"} = sub { $routes->any(@_) };
+    *{"${caller}::del"} = sub { $routes->del(@_) };
     *{"${caller}::get"} = sub { $routes->get(@_) };
     *{"${caller}::under"} = *{"${caller}::ladder"} =
       sub { $routes = $root->under(@_) };
     *{"${caller}::plugin"}    = sub { $app->plugin(@_) };
     *{"${caller}::post"}      = sub { $routes->post(@_) };
+    *{"${caller}::put"}       = sub { $routes->put(@_) };
     *{"${caller}::websocket"} = sub { $routes->websocket(@_) };
 
     # We are most likely the app in a lite environment
@@ -137,6 +136,8 @@ option, so you don't have to restart the server after every change.
 
 Routes are basically just fancy paths that can contain different kinds of
 placeholders.
+C<$self> is an instance of L<Mojolicious::Controller> containing both the
+HTTP request and response.
 
     # /foo
     get '/foo' => sub {
@@ -687,6 +688,13 @@ See also the tutorial above for more argument variations.
 
 The L<Mojolicious::Lite> application.
 
+=head2 C<del>
+
+    my $route = del '/:foo' => sub {...};
+
+Generate route matching only C<DELETE> requests.
+See also the tutorial above for more argument variations.
+
 =head2 C<get>
 
     my $route = get '/:foo' => sub {...};
@@ -710,6 +718,13 @@ Load a plugin.
     my $route = post '/:foo' => sub {...};
 
 Generate route matching only C<POST> requests.
+See also the tutorial above for more argument variations.
+
+=head2 C<put>
+
+    my $route = put '/:foo' => sub {...};
+
+Generate route matching only C<PUT> requests.
 See also the tutorial above for more argument variations.
 
 =head2 C<under>
