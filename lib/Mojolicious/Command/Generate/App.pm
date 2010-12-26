@@ -17,6 +17,12 @@ sub run {
     my ($self, $class) = @_;
     $class ||= 'MyMojoliciousApp';
 
+    # Prevent bad applications
+    die <<EOF unless $class =~ /^[A-Z](?:\w|\:\:)+$/;
+Your application name has to be a well formed (camel case) Perl module name
+like "MyApp".
+EOF
+
     my $name = $self->class_to_file($class);
 
     # Script
@@ -70,7 +76,7 @@ use lib join '/', File::Spec->splitdir(dirname(__FILE__)), '..', 'lib';
 eval 'use Mojolicious::Commands';
 die <<EOF if $@;
 It looks like you don't have the Mojolicious Framework installed.
-Please visit http://mojolicious.org for detailed installation instructions.
+Please visit http://mojolicio.us for detailed installation instructions.
 
 EOF
 
@@ -92,11 +98,14 @@ use base 'Mojolicious';
 sub startup {
     my $self = shift;
 
+    # Documentation browser under "/perldoc" (this plugin requires Perl 5.10)
+    $self->plugin('pod_renderer');
+
     # Routes
     my $r = $self->routes;
 
-    # Default route
-    $r->route('/:controller/:action/:id')->to('example#welcome', id => 1);
+    # Normal route to controller
+    $r->route('/welcome')->to('example#welcome', id => 1);
 }
 
 1;
@@ -124,7 +133,7 @@ sub welcome {
     <body>
         <h2>Welcome to the Mojolicious Web Framework!</h2>
         This is the static document "public/index.html",
-        <a href="/">click here</a> to get back to the start.
+        <a href="/welcome">click here</a> to get back to the start.
     </body>
 </html>
 @@ test
@@ -141,7 +150,7 @@ use_ok('<%= $class %>');
 
 # Test
 my $t = Test::Mojo->new(app => '<%= $class %>');
-$t->get_ok('/')->status_is(200)->content_type_is('text/html')
+$t->get_ok('/welcome')->status_is(200)->content_type_is('text/html')
   ->content_like(qr/Mojolicious Web Framework/i);
 @@ layout
 <!doctype html><html>
@@ -206,6 +215,6 @@ Run this command.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

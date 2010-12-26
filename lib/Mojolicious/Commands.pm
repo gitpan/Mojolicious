@@ -106,6 +106,18 @@ List available options for generator command with short descriptions.
 Generate application directory structure for a fully functional
 L<Mojolicious> application.
 
+=item C<generate gitignore>
+
+    mojo generate gitignore
+
+Generate C<.gitignore> file.
+
+=item C<generate hypnotoad>
+
+    mojo generate hypnotoad
+
+Generate C<hypnotoad.conf> file.
+
 =item C<generate lite_app>
 
     mojo generate lite_app
@@ -120,7 +132,7 @@ Generate C<Makefile.PL> file for application.
 
 =item C<get>
 
-   mojo get http://mojolicious.org
+   mojo get http://mojolicio.us
    script/myapp get /foo
 
 Perform GET request to remote host or local application.
@@ -181,6 +193,6 @@ L<Mojolicious::Commands> inherits all methods from L<Mojo::Command>.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

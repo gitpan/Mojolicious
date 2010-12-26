@@ -17,9 +17,6 @@ __PACKAGE__->attr(
     }
 );
 
-# DEPRECATED in Comet!
-*receive_message = \&on_message;
-
 sub client_challenge {
     my $self = shift;
 
@@ -406,6 +403,6 @@ Raw WebSocket data to write, only used by servers.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

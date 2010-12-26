@@ -639,7 +639,7 @@ sub _match_selector {
             next if $type eq '*';
 
             # Type (ignore namespace prefix)
-            next if $current->[1] =~ /\:?$type$/;
+            next if $current->[1] =~ /(?:^|\:)$type$/;
         }
 
         # Attribute
@@ -1470,6 +1470,6 @@ Element type.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

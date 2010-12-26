@@ -184,8 +184,7 @@ sub url_for {
         # Find
         else {
             $captures = {};
-            croak qq/Route "$name" used in url_for does not exist/
-              unless $endpoint = $self->_find_route($name);
+            return unless $endpoint = $self->_find_route($name);
         }
     }
 
@@ -321,6 +320,6 @@ Render matching route with parameters into a L<Mojo::URL> object.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

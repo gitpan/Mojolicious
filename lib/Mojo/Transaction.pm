@@ -16,10 +16,6 @@ __PACKAGE__->attr(
 );
 __PACKAGE__->attr(keep_alive => 0);
 
-# DEPRECATED in Comet!
-*finished  = \&on_finish;
-*resume_cb = \&on_resume;
-
 # Please don't eat me! I have a wife and kids. Eat them!
 sub client_read  { croak 'Method "client_read" not implemented by subclass' }
 sub client_write { croak 'Method "client_write" not implemented by subclass' }
@@ -322,6 +318,6 @@ object.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

@@ -25,6 +25,7 @@ sub run {
 1;
 __DATA__
 @@ hypnotoad
+# See "perldoc Mojo::Server::Hypnotoad" for a full list of options
 {
     listen  => ['http://*:8080'],
     workers => 4
@@ -78,6 +79,6 @@ Run this command.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

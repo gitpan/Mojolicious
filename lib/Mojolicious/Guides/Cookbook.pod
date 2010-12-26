@@ -236,9 +236,58 @@ manually in your application.
 
     1;
 
-=head1 FUN
+=head1 CLIENT
 
-Hacks that might not be very useful but are fun! :)
+When we say L<Mojolicious> is a web framework we actually mean it.
+
+=head2 Streaming
+
+Receiving a streaming response can be really tricky in most HTTP clients,
+L<Mojo::Client> makes it actually easy.
+
+    my $client = Mojo::Client->new;
+    my $tx = $client->build_tx(GET => 'http://mojolicio.us');
+    $tx->res->body(sub { print $_[1] });
+    $client->start($tx);
+
+The C<body> callback will be called for every chunk of data that is received,
+even C<chunked> encoding will be handled transparently if neccessary.
+
+=head1 JAVASCRIPT
+
+=head2 jQuery (Content Distribution Network)
+
+These days L<Mojolicious> ships with a bundled version of jQuery, which you
+can easily use as a fallback for applications that might be used offline from
+time to time.
+
+    <%= javascript
+        'http://ajax.googleapis.com/ajax/libs/jquery/1.4/jquery.min.js' %>
+    <%= javascript begin %>
+        if (typeof jQuery == 'undefined') {
+            var e = document.createElement('script');
+            e.src = '/js/jquery.js';
+            e.type = 'text/javascript';
+            document.getElementsByTagName("head")[0].appendChild(e);
+        }
+    <% end %>
+
+=head1 HACKS
+
+Fun hacks you might not use very often but that might come in handy some day.
+
+=head2 Rewriting
+
+Sometimes you might have to deploy your application in a broken blackbox
+environment where you can't just fix the server configuration.
+In such cases you can use a C<before_dispatch> hook to rewrite incoming
+requests.
+
+    app->hook(before_dispatch => sub {
+        my $self = shift;
+        $self->req->url->base->scheme('https')
+          if $self->req->headers->header('X-Forwarded-Protocol') eq 'https';
+    });
 
 =head2 Hello World
 

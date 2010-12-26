@@ -29,9 +29,6 @@ __PACKAGE__->attr(
     }
 );
 
-# DEPRECATED in Comet!
-*build_tx_cb = \&on_build_tx;
-
 # Oh, so they have internet on computers now!
 sub new {
     my $self = shift->SUPER::new(@_);
@@ -159,6 +156,6 @@ or L<Mojo::Transaction::WebSocket> object.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

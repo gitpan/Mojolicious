@@ -14,9 +14,6 @@ __PACKAGE__->attr([qw/auto_relax relaxed/] => 0);
 __PACKAGE__->attr(headers => sub { Mojo::Headers->new });
 __PACKAGE__->attr('on_read');
 
-# DEPRECATED in Comet!
-*read_cb = \&on_read;
-
 sub body_contains {
     croak 'Method "body_contains" not implemented by subclass';
 }
@@ -617,6 +614,6 @@ Note that this method is EXPERIMENTAL and might change without warning!
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

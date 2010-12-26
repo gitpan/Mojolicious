@@ -8,7 +8,7 @@ use utf8;
 # Disable epoll and kqueue
 BEGIN { $ENV{MOJO_POLL} = 1 }
 
-use Test::More tests => 664;
+use Test::More tests => 669;
 
 # Pollution
 123 =~ m/(\d+)/;
@@ -213,6 +213,9 @@ post '/with/body/and/headers/desc' => sub {
           || $self->req->body ne 'body';
     $self->render_text('bar');
 };
+
+# GET /content_for
+get '/content_for' => '*';
 
 # GET /template_inheritance
 get '/template_inheritance' => sub { shift->render('template_inheritance') };
@@ -795,7 +798,7 @@ $t->get_ok('/tags/lala?a=b&b=0&c=2&d=3&escaped=1%22+%222')->status_is(200)
 <foo />
 <foo bar="baz" />
 <foo one="two" three="four">Hello</foo>
-<a href="/path">Path</a>
+<a href="path">Path</a>
 <a href="http://example.com/" title="Foo">Foo</a>
 <a href="http://example.com/">Example</a>
 <a href="/template">Home</a>
@@ -820,7 +823,7 @@ $t->get_ok('/tags/lala?a=b&b=0&c=2&d=3&escaped=1%22+%222')->status_is(200)
     <input type="submit" value="Ok!" />
     <input id="bar" type="submit" value="Ok too!" />
 </form>
-<form action="/">
+<form action="">
     <input name="foo" />
 </form>
 <input name="escaped" value="1&quot; &quot;2" />
@@ -855,7 +858,7 @@ $t->get_ok('/tags/lala?c=b&d=3&e=4&f=5')->status_is(200)->content_is(<<EOF);
 <foo />
 <foo bar="baz" />
 <foo one="two" three="four">Hello</foo>
-<a href="/path">Path</a>
+<a href="path">Path</a>
 <a href="http://example.com/" title="Foo">Foo</a>
 <a href="http://example.com/">Example</a>
 <a href="/template">Home</a>
@@ -878,7 +881,7 @@ $t->get_ok('/tags/lala?c=b&d=3&e=4&f=5')->status_is(200)->content_is(<<EOF);
     <input type="submit" value="Ok!" />
     <input id="bar" type="submit" value="Ok too!" />
 </form>
-<form action="/">
+<form action="">
     <input name="foo" />
 </form>
 <input name="escaped" />
@@ -1033,6 +1036,12 @@ $t->post_ok('/with/body/and/desc', 'body', 'desc')->status_is(200)
 $t->post_ok('/with/body/and/headers/desc', {with => 'header'}, 'body', 'desc')
   ->status_is(200)->content_is('bar');
 
+# GET /content_for
+$t->get_ok('/content_for')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is("This\nseems\nto\nHello    world!\n\nwork!\n");
+
 # GET /template_inheritance
 $t->get_ok('/template_inheritance')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
@@ -1059,26 +1068,26 @@ $t->get_ok('/plugin_with_template')->status_is(200)
 $t->get_ok('/nested-includes')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_is("layouted Nested Hello\n[\n  1,\n  2\n]\nthere<br/>!\n\n\n\n");
+  ->content_is("layouted Nested Hello\n[\n  1,\n  2\n]\nthere<br>!\n\n\n\n");
 
 # GET /outerlayout
 $t->get_ok('/outerlayout')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_is("layouted Hello\n[\n  1,\n  2\n]\nthere<br/>!\n\n\n");
+  ->content_is("layouted Hello\n[\n  1,\n  2\n]\nthere<br>!\n\n\n");
 
 # GET /outerlayouttwo
 $t->get_ok('/outerlayouttwo')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_is("layouted Hello\n[\n  1,\n  2\n]\nthere<br/>!\n\n\n");
+  ->content_is("layouted Hello\n[\n  1,\n  2\n]\nthere<br>!\n\n\n");
 
 # GET /outerinnerlayout
 $t->get_ok('/outerinnerlayout')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_is(
-    "layouted Hello\nlayouted [\n  1,\n  2\n]\nthere<br/>!\n\n\n\n");
+    "layouted Hello\nlayouted [\n  1,\n  2\n]\nthere<br>!\n\n\n\n");
 
 # GET /withblocklayout
 $t->get_ok('/withblocklayout')->status_is(200)
@@ -1281,13 +1290,13 @@ $t->get_ok('/app')->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
 $t->get_ok('/helper')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_is("23\n<br/>\n&lt;...\n/template\n(Mojolicious (Perl))");
+  ->content_is("23\n<br>\n&lt;...\n/template\n(Mojolicious (Perl))");
 
 # GET /helper
 $t->get_ok('/helper', {'User-Agent' => 'Explorer'})->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_is("23\n<br/>\n&lt;...\n/template\n(Explorer)");
+  ->content_is("23\n<br>\n&lt;...\n/template\n(Explorer)");
 
 # GET /eperror
 $t->get_ok('/eperror')->status_is(500)
@@ -1677,6 +1686,17 @@ dGVzdCAxMjMKbGFsYWxh
 @@ with_header_condition.html.ep
 Test ok<%= base_tag %>
 
+@@ content_for.html.ep
+This
+<% content_for message => begin =%>Hello<% end %>
+seems
+% content_for message => begin
+    world!
+% end
+to
+<%= content_for 'message' %>
+work!
+
 @@ template_inheritance.html.ep
 % layout 'template_inheritance';
 <% content header => begin =%>
@@ -1736,7 +1756,7 @@ Hello
 
 @@ outermenu.html.ep
 % stash test => 'there';
-<%= dumper [1, 2] %><%= stash 'test' %><br/>!
+<%= dumper [1, 2] %><%= stash 'test' %><br>!
 
 @@ outerinnerlayout.html.ep
 Hello
@@ -1781,7 +1801,7 @@ app layout <%= content %><%= app->mode %>
 
 @@ helper.html.ep
 %= $default
-%== '<br/>'
+%== '<br>'
 %= '<...'
 %= url_for 'index'
 (<%= agent %>)\

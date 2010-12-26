@@ -269,9 +269,9 @@ We differentiate between C<default helpers> which are more general purpose
 like C<dumper> and C<tag helpers>, which are template specific and mostly
 used to generate C<HTML> tags.
 
-    <%= script '/script.js' %>
+    <%= javascript 'script.js' %>
 
-    <%= script begin %>
+    <%= javascript begin %>
         var a = 'b';
     <% end %>
 
@@ -383,29 +383,32 @@ A naive translation to equivalent Perl code could look like this.
 
 =head2 Content Blocks
 
-Blocks and the C<content> helper can also be used to pass whole sections of
-the template to the layout.
+Blocks and the C<content_for> helper can also be used to pass whole sections
+of the template to the layout.
 
    @@ foo/bar.html.ep
    % layout 'mylayout';
-   <% content header => begin %>
+   <% content_for header => begin %>
        <title>MyApp!</title>
    <% end %>
    Hello World!
+   <% content_for header => begin %>
+       <meta http-equiv="Pragma" content="no-cache">
+   <% end %>
 
    @@ layouts/mylayout.html.ep
    <!doctype html><html>
-       <head><%= content 'header' %></head>
+       <head><%= content_for 'header' %></head>
        <body><%= content %></body>
    </html>
 
 =head2 Template Inheritance
 
-Inheritance takes the layout concept above one step further, allowing you to
-use the C<content> helper to overload whole template sections of normal
-templates.
-The difference between the C<layout> and the C<extends> helper is that
-extended templates don't get prefixed with C<layout/>.
+Inheritance takes the layout concept above one step further.
+Unlike C<content_for> the C<content> helper does not allow appending to
+existing values, this makes it possible to overload whole template sections.
+The only difference between C<layout> and the C<extends> is that extended
+templates don't get prefixed with C<layout/>.
 
     @@ first.html.ep
     %# "<div>First header!First footer!</div>"
@@ -458,7 +461,7 @@ stylesheets.
 
     $self->write_chunk('<html><head><title>Example</title>');
     $self->write_chunk('<link href="example.css" rel="stylesheet"');
-    $self->write_chunk(' type="text/css" /></head>', sub {
+    $self->write_chunk(' type="text/css"></head>', sub {
         my $self = shift;
         $self->write_chunk('<body>Example</body></html>');
         $self->write_chunk('');
@@ -472,8 +475,8 @@ An empty chunk marks the end of the stream.
     <html><head><title>Example</title>
     29
     <link href="example.css" rel="stylesheet"
-    19
-     type="text/css" /></head>
+    17
+     type="text/css"></head>
     1C
     <body>Example</body></html>
     0
@@ -610,6 +613,9 @@ to do is add a new C<handler>.
     app->renderer->add_handler(
         mine => sub {
             my ($r, $c, $output, $options) = @_;
+
+            # One time use inline template
+            my $inline = $options->{inline};
 
             # Generate relative template path
             my $name = $r->template_name($options);

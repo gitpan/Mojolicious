@@ -135,6 +135,7 @@ our $LOCALHOST = '127.0.0.1';
 
 __PACKAGE__->attr([qw/accept_timeout connect_timeout dns_timeout/] => 3);
 __PACKAGE__->attr(dns_server => sub { $ENV{MOJO_DNS_SERVER} || $DNS_SERVER });
+__PACKAGE__->attr(max_accepts     => 0);
 __PACKAGE__->attr(max_connections => 1000);
 __PACKAGE__->attr(
     [qw/on_lock on_unlock/] => sub {
@@ -145,15 +146,6 @@ __PACKAGE__->attr(timeout => '0.025');
 
 # Singleton
 our $LOOP;
-
-# DEPRECATED in Comet!
-*error_cb  = \&on_error;
-*hup_cb    = \&on_hup;
-*idle_cb   = \&on_idle;
-*lock_cb   = \&on_lock;
-*read_cb   = \&on_read;
-*tick_cb   = \&on_tick;
-*unlock_cb = \&on_unlock;
 
 sub DESTROY {
     my $self = shift;
@@ -200,9 +192,7 @@ sub connect {
     # Connection
     my $c = {
         buffer     => '',
-        on_connect => $args->{on_connect}
-          || $args->{connect_cb}
-          || $args->{cb},
+        on_connect => $args->{on_connect},
         connecting => 1,
         tls        => $args->{tls}
     };
@@ -211,7 +201,7 @@ sub connect {
 
     # Register callbacks
     for my $name (qw/error hup read/) {
-        my $cb = $args->{"on_$name"} || $args->{"${name}_cb"};
+        my $cb    = $args->{"on_$name"};
         my $event = "on_$name";
         $self->$event($id => $cb) if $cb;
     }
@@ -313,10 +303,10 @@ sub listen {
     # Connection
     my $c = {
         file => $args->{file} ? 1 : 0,
-        on_accept => $args->{on_accept} || $args->{accept_cb} || $args->{cb},
-        on_error  => $args->{on_error}  || $args->{error_cb},
-        on_hup    => $args->{on_hup}    || $args->{hup_cb},
-        on_read   => $args->{on_read}   || $args->{read_cb},
+        on_accept => $args->{on_accept},
+        on_error  => $args->{on_error},
+        on_hup    => $args->{on_hup},
+        on_read   => $args->{on_read},
     };
     (my $id) = "$c" =~ /0x([\da-f]+)/;
     $self->{_listen}->{$id} = $c;
@@ -379,6 +369,9 @@ sub listen {
         SSL_key_file       => $args->{tls_key} || $self->_prepare_key
       }
       if $args->{tls};
+
+    # Accept limit
+    $self->{_accepts} = $self->max_accepts if $self->max_accepts;
 
     return $id;
 }
@@ -738,9 +731,13 @@ sub start_tls {
     # Arguments
     my $args = ref $_[0] ? $_[0] : {@_};
 
+    # Weaken
+    weaken $self;
+
     # Options
     my %options = (
         SSL_startHandshake => 0,
+        SSL_error_trap     => sub { $self->_error($id, $_[1]) },
         Timeout            => $self->connect_timeout,
         %{$args->{tls_args} || {}}
     );
@@ -850,11 +847,15 @@ sub _accept {
     $self->{_cs}->{$id} = $c;
 
     # TLS handshake
-    my $tls = $l->{tls};
-    $socket = IO::Socket::SSL->start_SSL($socket, %$tls) if $tls;
-    $c->{tls_accept} = 1 if $tls;
-    $c->{handle}     = $socket;
-    $r->{$socket}    = $id;
+    if (my $tls = $l->{tls}) {
+        $tls->{SSL_error_trap} = sub { $self->_error($id, $_[1]) };
+        $socket = IO::Socket::SSL->start_SSL($socket, %$tls);
+        $c->{tls_accept} = 1;
+    }
+
+    # Socket
+    $c->{handle} = $socket;
+    $r->{$socket} = $id;
 
     # Non-blocking
     $socket->blocking(0);
@@ -874,6 +875,11 @@ sub _accept {
 
     # Add socket to poll
     $self->_not_writing($id);
+
+    # Accept limit
+    if (defined $self->{_accepts}) {
+        $self->max_connections(0) if --$self->{_accepts} == 0;
+    }
 
     # Debug
     warn "ACCEPTED $id\n" if DEBUG;
@@ -1505,9 +1511,6 @@ sub _tls_error {
 
     # Writing
     elsif ($error == TLS_WRITE) { $self->_writing($id) }
-
-    # Real error
-    else { $self->_error($id, $error) }
 }
 
 sub _write {
@@ -1715,13 +1718,25 @@ Note that this attribute is EXPERIMENTAL and might change without warning!
 Maximum time in seconds a C<DNS> lookup can take, defaults to C<3>.
 Note that this attribute is EXPERIMENTAL and might change without warning!
 
+=head2 C<max_accepts>
+
+    my $max = $loop->max_accepts;
+    $loop   = $loop->max_accepts(1000);
+
+The maximum number of connections this loop is allowed to accept before
+shutting down gracefully without interrupting existing connections, defaults
+to C<0>.
+Setting the value to C<0> will allow this loop to accept new connections
+infinitely.
+Note that this attribute is EXPERIMENTAL and might change without warning!
+
 =head2 C<max_connections>
 
     my $max = $loop->max_connections;
     $loop   = $loop->max_connections(1000);
 
-The maximum number of connections this loop is allowed to handle before
-stopping to accept new incoming connections, defaults to C<1000>.
+The maximum number of parallel connections this loop is allowed to handle
+before stopping to accept new incoming connections, defaults to C<1000>.
 Setting the value to C<0> will make this loop stop accepting new connections
 and allow it to shutdown gracefully without interrupting existing
 connections.
@@ -2088,6 +2103,6 @@ all data has been written.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

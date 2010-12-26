@@ -422,6 +422,7 @@ Mojo::Server::FastCGI - FastCGI Server
 
 L<Mojo::Server::FastCGI> is a portable pure-Perl FastCGI implementation as
 described in the C<FastCGI Specification>.
+
 See L<Mojolicious::Guides::Cookbook> for deployment recipes.
 
 =head1 ATTRIBUTES
@@ -495,6 +496,6 @@ Write FastCGI response.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

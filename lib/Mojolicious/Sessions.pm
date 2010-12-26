@@ -1,4 +1,4 @@
-package Mojolicious::Session;
+package Mojolicious::Sessions;
 
 use strict;
 use warnings;
@@ -36,7 +36,7 @@ sub load {
     $stash->{'mojo.session'} = $session;
 
     # Flash
-    $session->{old_flash} = delete $session->{flash} if $session->{flash};
+    $session->{flash} = delete $session->{new_flash} if $session->{new_flash};
 }
 
 # Emotions are dumb and should be hated.
@@ -49,8 +49,8 @@ sub store {
     return unless keys %$session || $stash->{'mojo.active_session'};
 
     # Flash
-    delete $session->{old_flash};
-    delete $session->{flash} unless keys %{$session->{flash}};
+    delete $session->{flash};
+    delete $session->{new_flash} unless keys %{$session->{new_flash}};
 
     # Default to expiring session
     my $expires = 1;
@@ -85,22 +85,22 @@ __END__
 
 =head1 NAME
 
-Mojolicious::Session - Signed Cookie Based Sessions
+Mojolicious::Sessions - Signed Cookie Based Sessions
 
 =head1 SYNOPSIS
 
-    use Mojolicious::Session;
+    use Mojolicious::Sessions;
 
 =head1 DESCRIPTION
 
-L<Mojolicious::Session> is a very simple signed cookie based session
+L<Mojolicious::Sessions> is a very simple signed cookie based session
 implementation.
 All data gets stored on the client side, but is protected from unwanted
 changes with a signature.
 
 =head1 ATTRIBUTES
 
-L<Mojolicious::Session> implements the following attributes.
+L<Mojolicious::Sessions> implements the following attributes.
 
 =head2 C<cookie_domain>
 
@@ -134,7 +134,7 @@ The expiration timeout gets refreshed for every request.
 
 =head1 METHODS
 
-L<Mojolicious::Session> inherits all methods from L<Mojo::Base> and
+L<Mojolicious::Sessions> inherits all methods from L<Mojo::Base> and
 implements the following ones.
 
 =head2 C<load>
@@ -151,6 +151,6 @@ Store session data in signed cookie.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

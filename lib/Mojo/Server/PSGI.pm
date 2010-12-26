@@ -44,8 +44,9 @@ sub run {
     my $headers = $res->content->headers;
     my @headers;
     for my $name (@{$headers->names}) {
-        my $value = $headers->header($name);
-        push @headers, $name => $value;
+        for my $values ($headers->header($name)) {
+            push @headers, $name => $_ for @$values;
+        }
     }
 
     # Response body
@@ -113,6 +114,7 @@ Mojo::Server::PSGI - PSGI Server
 
 L<Mojo::Server::PSGI> allows L<Mojo> applications to run on all PSGI
 compatible servers.
+
 See L<Mojolicious::Guides::Cookbook> for deployment recipes.
 
 =head1 METHODS
@@ -128,6 +130,6 @@ Start PSGI.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

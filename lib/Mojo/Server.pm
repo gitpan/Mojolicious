@@ -70,10 +70,6 @@ __PACKAGE__->attr(
 );
 __PACKAGE__->attr(reload => sub { $ENV{MOJO_RELOAD} || 0 });
 
-# DEPRECATED in Comet!
-*build_tx_cb = \&on_build_tx;
-*handler_cb  = \&on_handler;
-
 # Are you saying you're never going to eat any animal again? What about bacon?
 # No.
 # Ham?
@@ -175,6 +171,6 @@ Start server.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

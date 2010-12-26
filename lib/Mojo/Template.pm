@@ -13,7 +13,7 @@ use Mojo::Exception;
 
 use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 262144;
 
-__PACKAGE__->attr([qw/auto_escape compiled namespace/]);
+__PACKAGE__->attr([qw/auto_escape compiled/]);
 __PACKAGE__->attr([qw/append code prepend/] => '');
 __PACKAGE__->attr(capture_end               => 'end');
 __PACKAGE__->attr(capture_start             => 'begin');
@@ -22,6 +22,7 @@ __PACKAGE__->attr(encoding                  => 'UTF-8');
 __PACKAGE__->attr(escape_mark               => '=');
 __PACKAGE__->attr(expression_mark           => '=');
 __PACKAGE__->attr(line_start                => '%');
+__PACKAGE__->attr(namespace                 => 'Mojo::Template::Context');
 __PACKAGE__->attr(tag_start                 => '<%');
 __PACKAGE__->attr(tag_end                   => '%>');
 __PACKAGE__->attr(template                  => '');
@@ -33,8 +34,8 @@ my $HELPERS = <<'EOF';
 use Mojo::ByteStream 'b';
 use Mojo::Util;
 no strict 'refs'; no warnings 'redefine';
-sub block;
-*block = sub { shift->(@_) };
+sub capture;
+*capture = sub { shift->(@_) };
 sub escape;
 *escape = sub {
     return "$_[0]" if ref $_[0] && ref $_[0] eq 'Mojo::ByteStream';
@@ -56,6 +57,7 @@ sub build {
     # Compile
     my @lines;
     my $cpst;
+    my $multi = 0;
     for my $line (@{$self->tree}) {
 
         # New line
@@ -86,27 +88,35 @@ sub build {
                 $value = quotemeta($value);
                 $value .= '\n' if $newline;
 
-                $lines[-1] .= "\$_M .= \"" . $value . "\";";
+                $lines[-1] .= "\$_M .= \"" . $value . "\";" if length $value;
             }
 
-            # Code
-            if ($type eq 'code') { $lines[-1] .= "$value" }
+            # Code or multiline expression
+            if ($type eq 'code' || $multi) { $lines[-1] .= "$value" }
 
             # Expression
             if ($type eq 'expr' || $type eq 'escp') {
 
-                # Escaped
-                my $a = $self->auto_escape;
-                if (($type eq 'escp' && !$a) || ($type eq 'expr' && $a)) {
-                    $lines[-1] .= "\$_M .= escape";
-                    $lines[-1] .= " +$value" if length $value;
+                # Start
+                unless ($multi) {
+
+                    # Escaped
+                    my $a = $self->auto_escape;
+                    if (($type eq 'escp' && !$a) || ($type eq 'expr' && $a)) {
+                        $lines[-1] .= "\$_M .= escape";
+                        $lines[-1] .= " +$value" if length $value;
+                    }
+
+                    # Raw
+                    else { $lines[-1] .= "\$_M .= $value" }
                 }
 
-                # Raw
-                else { $lines[-1] .= "\$_M .= $value" }
+                # Multiline
+                $multi = ($line->[$j + 2] || '') eq 'text'
+                  && ($line->[$j + 3] || '') eq '' ? 0 : 1;
 
                 # Append semicolon
-                $lines[-1] .= ';' unless $cpst;
+                $lines[-1] .= ';' if !$multi && !$cpst;
             }
 
             # Capture started
@@ -127,7 +137,7 @@ sub build {
     # Wrap
     my $prepend   = $self->prepend;
     my $append    = $self->append;
-    my $namespace = $self->namespace || ref $self;
+    my $namespace = $self->namespace;
     $lines[0] ||= '';
     $lines[0] =
       "package $namespace; $HELPERS sub { my \$_M = ''; $prepend; do {"
@@ -142,14 +152,14 @@ sub compile {
     my $self = shift;
 
     # Shortcut
-    my $code = $self->code;
-    return unless $code;
+    return unless my $code = $self->code;
 
     # Compile
     my $compiled = eval $code;
 
-    # Exception
-    return Mojo::Exception->new($@, $self->template)->verbose(1) if $@;
+    # Use local stacktrace for compile exceptions
+    return Mojo::Exception->new($@, $self->template, $code)->trace->verbose(1)
+      if $@;
 
     $self->compiled($compiled);
     return;
@@ -169,6 +179,10 @@ sub interpret {
 
     # Shortcut
     return unless $compiled;
+
+    # Stacktrace
+    local $SIG{__DIE__} =
+      sub { Mojo::Exception->throw(shift, $self->template, $self->code) };
 
     # Interpret
     my $output = eval { $compiled->(@_) };
@@ -196,8 +210,7 @@ sub parse {
     my $capture_start = quotemeta $self->capture_start;
     my $capture_end   = quotemeta $self->capture_end;
 
-    # DEPRECATED in Comet!
-    # Use "begin" and "end" instead of "{" and "}"
+    # Mixed
     my $mixed_re = qr/
         (
         $tag_start$expr$escp\s*$capture_end   # Escaped expression (end)
@@ -210,25 +223,17 @@ sub parse {
         |
         $tag_start$cmnt\s*$capture_end        # Comment (end)
         |
-        $tag_start$cmnt\}                     # DEPRECATED Comment (end)
-        |
         $tag_start$cmnt                       # Comment
         |
         $tag_start\s*$capture_end             # Code (end)
-        |
-        $tag_start\}                          # DEPRECATED Code (end)
         |
         $tag_start                            # Code
         |
         $capture_start\s*$trim$tag_end        # Trim end (start)
         |
-        \{$trim$tag_end                       # DEPRECATED Trim end (start)
-        |
         $trim$tag_end                         # Trim end
         |
         $capture_start\s*$tag_end             # End (start)
-        |
-        \{$tag_end                            # DEPRECATED End (start)
         |
         $tag_end                              # End
         )
@@ -245,31 +250,19 @@ sub parse {
         (?:
         $escp             # Escaped expression
         )?
-        (?:
         \s*$capture_end   # (end)
-        |
-        \}                # DEPRECATED (end)
-        )
     /x;
 
     # Tag end regex
     my $end_re = qr/
         ^(
-            (?:
-            $capture_start\s*$trim$tag_end   # Trim end (start)
-            |
-            \{$trim$tag_end                  # DEPRECATED Trim end (start)
-            )
+        $capture_start\s*$trim$tag_end   # Trim end (start)
         )|(
-            (?:
-            $capture_start\s*$tag_end        # End (start)
-            |
-            \{$tag_end                       # DEPRECATED End (start)
-            )
+        $capture_start\s*$tag_end        # End (start)
         )|(
-        $trim$tag_end                        # Trim end
+        $trim$tag_end                    # Trim end
         )|
-        $tag_end                             # End
+        $tag_end                         # End
         $
     /x;
 
@@ -287,8 +280,7 @@ sub parse {
     /x;
 
     # Tokenize
-    my $state                = 'text';
-    my $multiline_expression = 0;
+    my $state = 'text';
     my @capture_token;
     my $trimming = 0;
     for my $line (split /\n/, $tmpl) {
@@ -308,20 +300,24 @@ sub parse {
             # Expression
             if ($2) {
                 unshift @token, 'text', $1;
-                push @token, $3 ? 'escp' : 'expr', $5, 'text', "\n";
+                push @token, $3 ? 'escp' : 'expr', $5;
+
+                # Hint at end
+                push @token, 'text', '';
+
+                # Line ending
+                push @token, 'text', "\n";
             }
 
             # Code
             else { push @token, 'code', $5 }
 
             push @{$self->tree}, \@token;
-            $multiline_expression = 0;
             next;
         }
 
         # Comment line, dummy token needed for line count
         if ($line =~ /^\s*$line_start$cmnt(.+)?$/) {
-            $multiline_expression = 0;
             next;
         }
 
@@ -375,9 +371,11 @@ sub parse {
                     }
                 }
 
+                # Hint at end
+                push @token, 'text', '';
+
                 # Back to business as usual
-                $state                = 'text';
-                $multiline_expression = 0;
+                $state = 'text';
             }
 
             # Code
@@ -413,11 +411,6 @@ sub parse {
 
                 # Comments are ignored
                 next if $state eq 'cmnt';
-
-                # Multiline expressions are a bit complicated,
-                # only the first line can be compiled as 'expr'
-                $state = 'code' if $multiline_expression;
-                $multiline_expression = 1 if $state eq 'expr';
 
                 # Store value
                 push @token, @capture_token, $state, $token;
@@ -790,7 +783,7 @@ Character indicating the start of a code line, defaults to C<%>.
     my $namespace = $mt->namespace;
     $mt           = $mt->namespace('main');
 
-Namespace used to compile templates.
+Namespace used to compile templates, defaults to C<Mojo::Template::Context>.
 
 =head2 C<prepend>
 
@@ -910,6 +903,6 @@ Render template to a specific file.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

@@ -34,12 +34,6 @@ __PACKAGE__->attr(max_connections    => 5);
 __PACKAGE__->attr(max_redirects     => sub { $ENV{MOJO_MAX_REDIRECTS} || 0 });
 __PACKAGE__->attr(websocket_timeout => 300);
 
-# DEPRECATED in Comet!
-*finished                   = \&on_finish;
-*max_keep_alive_connections = \&max_connections;
-*process                    = \&start;
-*receive_message            = \&on_message;
-
 # Singleton
 our $CLIENT;
 
@@ -1135,7 +1129,7 @@ Mojo::Client - Async IO HTTP 1.1 And WebSocket Client
     print $client->get($trends)->res->json->{trends}->[0]->{name};
 
     # Extract data from HTML and XML resources
-    print $client->get('mojolicious.org')->res->dom->at('title')->text;
+    print $client->get('mojolicio.us')->res->dom->at('title')->text;
 
     # Scrape the latest headlines from a news site
     my $news = 'http://digg.com';
@@ -1156,7 +1150,7 @@ Mojo::Client - Async IO HTTP 1.1 And WebSocket Client
 
     # Parallel requests
     my $callback = sub { print shift->res->body };
-    $client->get('http://mojolicious.org' => $callback);
+    $client->get('http://mojolicio.us' => $callback);
     $client->get('http://search.cpan.org' => $callback);
     $client->start;
 
@@ -1332,8 +1326,8 @@ Versatile L<Mojo::Transaction::HTTP> builder for forms.
 
 =head2 C<build_tx>
 
-    my $tx = $client->build_tx(GET => 'mojolicious.org');
-    my $tx = $client->build_tx(POST => 'http://mojolicious.org');
+    my $tx = $client->build_tx(GET => 'mojolicio.us');
+    my $tx = $client->build_tx(POST => 'http://mojolicio.us');
     my $tx = $client->build_tx(
         GET => 'http://kraih.com' => {Connection => 'close'}
     );
@@ -1344,12 +1338,12 @@ Versatile L<Mojo::Transaction::HTTP> builder for forms.
 Versatile general purpose L<Mojo::Transaction::HTTP> builder.
 
     # Streaming response
-    my $tx = $client->build_tx(GET => 'http://mojolicious.org');
+    my $tx = $client->build_tx(GET => 'http://mojolicio.us');
     $tx->res->body(sub { print $_[1] });
     $client->start($tx);
 
     # Custom socket
-    my $tx = $client->build_tx(GET => 'http://mojolicious.org');
+    my $tx = $client->build_tx(GET => 'http://mojolicio.us');
     $tx->connection($socket);
     $client->start($tx);
 
@@ -1678,6 +1672,6 @@ Open a WebSocket connection with transparent handshake.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

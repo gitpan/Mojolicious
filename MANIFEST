@@ -69,6 +69,7 @@ lib/Mojolicious/Guides/Cheatsheet.pod
 lib/Mojolicious/Guides/CodingGuidelines.pod
 lib/Mojolicious/Guides/Cookbook.pod
 lib/Mojolicious/Guides/FAQ.pod
+lib/Mojolicious/Guides/Growing.pod
 lib/Mojolicious/Guides/Rendering.pod
 lib/Mojolicious/Guides/Routing.pod
 lib/Mojolicious/Lite.pm
@@ -90,7 +91,7 @@ lib/Mojolicious/Renderer.pm
 lib/Mojolicious/Routes.pm
 lib/Mojolicious/Routes/Match.pm
 lib/Mojolicious/Routes/Pattern.pm
-lib/Mojolicious/Session.pm
+lib/Mojolicious/Sessions.pm
 lib/Mojolicious/Static.pm
 lib/Mojolicious/Types.pm
 lib/ojo.pm

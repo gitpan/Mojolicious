@@ -25,10 +25,6 @@ __PACKAGE__->attr(
 __PACKAGE__->attr([qw/on_finish on_progress/]);
 __PACKAGE__->attr(version => '1.1');
 
-# DEPRECATED in Comet!
-*finish_cb   = \&on_finish;
-*progress_cb = \&on_progress;
-
 # I'll keep it short and sweet. Family. Religion. Friendship.
 # These are the three demons you must slay if you wish to succeed in
 # business.
@@ -229,7 +225,7 @@ sub dom {
 
     # Charset
     my $charset = $self->default_charset;
-    ($self->headers->content_type || '') =~ /charset=\"?([^\s;]+)\"?/
+    ($self->headers->content_type || '') =~ /charset=\"?([^\"\s;]+)\"?/
       and $charset = $1;
 
     # Parse
@@ -410,7 +406,7 @@ sub upload {
             my $uname = $upload->name;
 
             # Multiple uploads with same name
-            if (exists $uploads->{$name}) {
+            if (exists $uploads->{$uname}) {
                 $uploads->{$uname} = [$uploads->{$uname}]
                   unless ref $uploads->{$uname} eq 'ARRAY';
                 push @{$uploads->{$uname}}, $upload;
@@ -924,6 +920,6 @@ Note that this method is EXPERIMENTAL and might change without warning!
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

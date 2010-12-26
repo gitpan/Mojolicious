@@ -41,7 +41,6 @@ sub register {
             unless ($ec->{$cache}) {
 
                 # Initialize
-                $template->{namespace} ||= "Mojo::Template::$cache";
                 my $mt = $ec->{$cache} = Mojo::Template->new($template);
 
                 # Self
@@ -54,20 +53,21 @@ sub register {
                 $prepend .= q/no strict 'refs'; no warnings 'redefine';/;
 
                 # Helpers
-                $prepend .= 'my $_H = $self->app->renderer->helper;';
-                for my $name (sort keys %{$r->helper}) {
+                $prepend .= 'my $_H = $self->app->renderer->helpers;';
+                for my $name (sort keys %{$r->helpers}) {
                     next unless $name =~ /^\w+$/;
                     $prepend .= "sub $name; *$name = sub { ";
                     $prepend .= "return \$_H->{'$name'}->(\$self, \@_) };";
                 }
 
                 # Be less relaxed for everything else
-                $prepend .= q/use strict; use warnings;/;
+                $prepend .= 'use strict;';
 
                 # Stash
+                $prepend .= 'my $_S = $self->stash;';
                 for my $var (keys %{$c->stash}) {
                     next unless $var =~ /^\w+$/;
-                    $prepend .= " my \$$var = \$self->stash->{'$var'};";
+                    $prepend .= " my \$$var = \$_S->{'$var'};";
                 }
 
                 # Prepend
@@ -146,6 +146,6 @@ Register renderer in L<Mojolicious> application.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

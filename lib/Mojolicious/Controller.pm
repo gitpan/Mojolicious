@@ -6,6 +6,7 @@ use warnings;
 use base 'Mojo::Base';
 
 use Mojo::ByteStream;
+use Mojo::Command;
 use Mojo::Cookie::Response;
 use Mojo::Exception;
 use Mojo::Transaction::HTTP;
@@ -18,71 +19,13 @@ require Carp;
 __PACKAGE__->attr([qw/app match/]);
 __PACKAGE__->attr(tx => sub { Mojo::Transaction::HTTP->new });
 
-# DEPRECATED in Comet!
-*finished        = \&on_finish;
-*receive_message = \&on_message;
-
 # Exception template
-our $EXCEPTION = <<'EOF';
-% my $e = delete $self->stash->{'exception'};
-<!doctype html><html>
-    <head>
-        <title>Exception</title>
-        <style type="text/css">
-            body {
-                font: 0.9em Verdana, "Bitstream Vera Sans", sans-serif;
-            }
-            .snippet {
-                font: 115% Monaco, "Courier New", monospace;
-            }
-        </style>
-    </head>
-    <body>
-        <% if ($self->app->mode eq 'development') { %>
-            <div class="snippet"><pre><%= $e->message %></pre></div>
-            <div>
-                <% for my $line (@{$e->lines_before}) { %>
-                    <div class="snippet">
-                        <%= $line->[0] %>: <%= $line->[1] %>
-                    </div>
-                <% } %>
-                <% if ($e->line->[0]) { %>
-                    <div class="snippet">
-                        <b><%= $e->line->[0] %>: <%= $e->line->[1] %></b>
-                    </div>
-                <% } %>
-                <% for my $line (@{$e->lines_after}) { %>
-                    <div class="snippet">
-                        <%= $line->[0] %>: <%= $line->[1] %>
-                    </div>
-                <% } %>
-            </div>
-            <div class="snippet"><pre><%= dumper $self->stash %></pre></div>
-        <% } else { %>
-            <div>Page temporarily unavailable, please come back later.</div>
-        <% } %>
-    </body>
-</html>
-EOF
+our $EXCEPTION =
+  Mojo::Command->new->get_data('exception.html.ep', __PACKAGE__);
 
 # Not found template
-our $NOT_FOUND = <<'EOF';
-<!doctype html><html>
-    <head>
-        <title>Not Found</title>
-        <style type="text/css">
-            body {
-                font: 0.9em Verdana, "Bitstream Vera Sans", sans-serif;
-            }
-        </style>
-    </head>
-    <body>
-        <div>
-            Page not found, want to go <%= link_to home => url_for->base %>?
-        </div>
-    </body>
-</html>
-EOF
+our $NOT_FOUND =
+  Mojo::Command->new->get_data('not_found.html.ep', __PACKAGE__);
 
 # Reserved stash values
 my $STASH_RE = qr/
@@ -209,36 +152,25 @@ sub flash {
     my $session = $self->stash->{'mojo.session'};
     if ($_[0] && !defined $_[1] && !ref $_[0]) {
         return unless $session && ref $session eq 'HASH';
-        return unless my $flash = $session->{old_flash};
+        return unless my $flash = $session->{flash};
         return unless ref $flash eq 'HASH';
         return $flash->{$_[0]};
     }
 
     # Initialize
     $session = $self->session;
-    my $flash = $session->{flash};
+    my $flash = $session->{new_flash};
     $flash = {} unless $flash && ref $flash eq 'HASH';
-    $session->{flash} = $flash;
+    $session->{new_flash} = $flash;
 
     # Hash
     return $flash unless @_;
 
     # Set
     my $values = exists $_[1] ? {@_} : $_[0];
-    $session->{flash} = {%$flash, %$values};
+    $session->{new_flash} = {%$flash, %$values};
 
     return $self;
-}
-
-# DEPRECATED in Comet!
-sub helper {
-    my $self = shift;
-
-    # Name
-    return unless my $name = shift;
-
-    # Run
-    return $self->$name(@_);
 }
 
 # My parents may be evil, but at least they're stupid.
@@ -375,7 +307,7 @@ sub render {
     $res->code(200) unless $res->code;
 
     # Output
-    $res->body($output);
+    $res->body($output) unless $res->body;
 
     # Type
     my $headers = $res->headers;
@@ -407,7 +339,7 @@ sub render_exception {
     my ($self, $e) = @_;
 
     # Exception
-    $e = Mojo::Exception->new($e) unless ref $e;
+    $e = Mojo::Exception->new($e);
 
     # Error
     $self->app->log->error($e);
@@ -415,12 +347,49 @@ sub render_exception {
     # Recursion
     return if $self->stash->{'mojo.exception'};
 
+    # Request
+    my $s     = {};
+    my $stash = $self->stash;
+    for my $key (keys %$stash) {
+        next if $key =~ /^mojo\./;
+        next unless defined(my $value = $stash->{$key});
+        $s->{$key} = $value;
+    }
+    my $req = $self->req;
+    my $url = $req->url;
+    my @r   = (
+        Method     => $req->method,
+        Path       => $url->to_string,
+        Base       => $url->base->to_string,
+        Parameters => $self->dumper($req->params->to_hash),
+        Stash      => $self->dumper($s),
+        Session    => $self->dumper($self->session),
+        Version    => $req->version
+    );
+
+    # Info
+    my @i = (
+        Perl        => "$] ($^O)",
+        Mojolicious => "$Mojolicious::VERSION ($Mojolicious::CODENAME)",
+        Home        => $self->app->home,
+        Include     => $self->dumper(\@INC),
+        PID         => $$,
+        Name        => $0,
+        Executable  => $^X,
+        Time        => scalar localtime(time)
+    );
+
+
     # Exception template
     my $options = {
         template         => 'exception',
         format           => 'html',
         handler          => undef,
         status           => 500,
+        layout           => undef,
+        extends          => undef,
+        request          => \@r,
+        info             => \@i,
         exception        => $e,
         'mojo.exception' => 1
     };
@@ -432,6 +401,10 @@ sub render_exception {
             format           => 'html',
             handler          => 'ep',
             status           => 500,
+            layout           => undef,
+            extends          => undef,
+            request          => \@r,
+            info             => \@i,
             exception        => $e,
             'mojo.exception' => 1
         );
@@ -442,20 +415,34 @@ sub render_exception {
 }
 
 sub render_inner {
-    my ($self, $name, $content) = @_;
+    my $self    = shift;
+    my $name    = shift;
+    my $content = pop;
 
     # Initialize
     my $stash = $self->stash;
-    $stash->{'mojo.content'} ||= {};
+    my $c = $stash->{'mojo.content'} ||= {};
     $name ||= 'content';
 
     # Set
-    $stash->{'mojo.content'}->{$name}
-      ||= ref $content eq 'CODE' ? $content->() : $content
-      if defined $content;
+    if (defined $content) {
+
+        # Reset with multiple values
+        if (@_) {
+            $c->{$name} = '';
+            for my $part (@_, $content) {
+                $c->{$name} .= ref $part eq 'CODE' ? $part->() : $part;
+            }
+        }
+
+        # First come
+        else {
+            $c->{$name} ||= ref $content eq 'CODE' ? $content->() : $content;
+        }
+    }
 
     # Get
-    $content = $stash->{'mojo.content'}->{$name};
+    $content = $c->{$name};
     $content = '' unless defined $content;
     return Mojo::ByteStream->new("$content");
 }
@@ -475,6 +462,8 @@ sub render_json {
     return $self->render($args);
 }
 
+# Excuse me, sir, you're snowboarding off the trail.
+# Lick my frozen metal ass.
 sub render_not_found {
     my ($self, $resource) = @_;
 
@@ -491,11 +480,21 @@ sub render_not_found {
     # Recursion
     return if $stash->{'mojo.not_found'};
 
+    # Check for POD plugin
+    my $guide =
+        $self->app->renderer->helpers->{pod_to_html}
+      ? $self->url_for('/perldoc')
+      : 'http://mojolicio.us/perldoc';
+
+
     # Render not found template
     my $options = {
         template         => 'not_found',
         format           => 'html',
         status           => 404,
+        layout           => undef,
+        extends          => undef,
+        guide            => $guide,
         'mojo.not_found' => 1
     };
 
@@ -506,6 +505,9 @@ sub render_not_found {
             format           => 'html',
             handler          => 'ep',
             status           => 404,
+            layout           => undef,
+            extends          => undef,
+            guide            => $guide,
             'mojo.not_found' => 1
         );
     }
@@ -588,7 +590,7 @@ sub rendered {
     $app->plugins->run_hook_reverse(after_dispatch => $self);
 
     # Session
-    $app->session->store($self);
+    $app->sessions->store($self);
 
     # Finished
     $stash->{'mojo.finished'} = 1;
@@ -731,17 +733,14 @@ sub url_for {
         Mojolicious::Routes::Match->new($self)->root($self->app->routes))
       unless $self->match;
 
-    # Path
-    if ($target =~ /^\//) {
-        my $url = Mojo::URL->new->base($self->req->url->base->clone);
-        return $url->parse($target);
-    }
-
     # URL
-    elsif ($target =~ /^\w+\:\/\//) { return Mojo::URL->new($target) }
+    if ($target =~ /^\w+\:\/\//) { return Mojo::URL->new($target) }
 
     # Route
-    return $self->match->url_for($target, @_);
+    elsif (my $url = $self->match->url_for($target, @_)) { return $url }
+
+    # Path
+    return Mojo::URL->new->base($self->req->url->base->clone)->parse($target);
 }
 
 # I wax my rocket every day!
@@ -798,6 +797,361 @@ sub write_chunk {
 }
 
 1;
+__DATA__
+
+@@ exception.html.ep
+% my $e = delete $self->stash->{'exception'};
+<!doctype html><html>
+    <head>
+        <title>Exception</title>
+        <meta http-equiv="Pragma" content="no-cache">
+        <meta http-equiv="Expires" content="-1">
+        %= base_tag
+        %= javascript 'js/jquery.js'
+        %= stylesheet 'css/prettify-mojo.css'
+        %= javascript 'js/prettify.js'
+        %= stylesheet begin
+            a img { border: 0; }
+            body {
+                background-color: #f5f6f8;
+                color: #333;
+                font: 0.9em Verdana, sans-serif;
+                margin-left: 3em;
+                margin-right: 3em;
+                margin-top: 0;
+                text-shadow: #ddd 0 1px 0;
+            }
+            h1 {
+                font: 1.5em Georgia, Times, serif;
+                margin: 0;
+                text-shadow: #333 0 1px 0;
+            }
+            pre {
+                margin: 0;
+                white-space: pre-wrap;
+            }
+            table {
+                border-collapse: collapse;
+                margin-top: 1em;
+                margin-bottom: 1em;
+                width: 100%;
+            }
+            td { padding: 0.3em; }
+            .box {
+                background-color: #fff;
+                -moz-box-shadow: 0px 0px 2px #ccc;
+                -webkit-box-shadow: 0px 0px 2px #ccc;
+                box-shadow: 0px 0px 2px #ccc;
+                overflow: hidden;
+                padding: 1em;
+            }
+            .code {
+                background-color: #1a1a1a;
+                background: url("mojolicious-pinstripe.gif") fixed;
+                color: #eee;
+                font-family: 'Menlo', 'Monaco', Courier, monospace !important;
+                text-shadow: #333 0 1px 0;
+            }
+            .file {
+                margin-bottom: 0.5em;
+                margin-top: 1em;
+            }
+            .important { background-color: rgba(47, 48, 50, .75); }
+            .infobox tr:nth-child(odd) .value { background-color: #ddeeff; }
+            .infobox tr:nth-child(even) .value { background-color: #eef9ff; }
+            .key {
+                text-align: right;
+                text-weight: bold;
+            }
+            .preview {
+                background-color: #1a1a1a;
+                background: url("mojolicious-pinstripe.gif") fixed;
+                -moz-border-radius: 5px;
+                border-radius: 5px;
+                margin-bottom: 1em;
+                padding: 0.5em;
+            }
+            .tap {
+                font: 0.5em Verdana, sans-serif;
+                text-align: center;
+            }
+            .value {
+                padding-left: 1em;
+                width: 100%;
+            }
+            #footer {
+                margin-top: 1.5em;
+                text-align: center;
+                width: 100%;
+            }
+            #showcase {
+                margin-top: 1em;
+                -moz-border-radius-topleft: 5px;
+                border-top-left-radius: 5px;
+                -moz-border-radius-topright: 5px;
+                border-top-right-radius: 5px;
+            }
+            #more, #trace {
+                -moz-border-radius-bottomleft: 5px;
+                border-bottom-left-radius: 5px;
+                -moz-border-radius-bottomright: 5px;
+                border-bottom-right-radius: 5px;
+            }
+            #request {
+                -moz-border-radius-topleft: 5px;
+                border-top-left-radius: 5px;
+                -moz-border-radius-topright: 5px;
+                border-top-right-radius: 5px;
+                margin-top: 1em;
+            }
+        % end
+    </head>
+    <body onload="prettyPrint()">
+        % if ($self->app->mode eq 'development') {
+            % my $code = begin
+                <code class="prettyprint"><%= shift %></code>
+            % end
+            % my $cv = begin
+                % my ($key, $value, $i) = @_;
+                %= tag 'tr', $i ? (class => 'important') : undef, begin
+                    <td class="key"><%= $key %>.</td>
+                    <td class="value">
+                       %== $code->($value)
+                    </td>
+                % end
+            % end
+            % my $kv = begin
+                % my ($key, $value) = @_;
+                <tr>
+                    <td class="key"><%= $key %>:</td>
+                    <td class="value">
+                        <pre><%= $value %></pre>
+                    </td>
+                </tr>
+            % end
+            <div id="showcase" class="code box">
+                <h1><%= $e->message %></h1>
+                <div id="context">
+                    <table>
+                        % for my $line (@{$e->lines_before}) {
+                            %== $cv->($line->[0], $line->[1])
+                        % }
+                        % if (defined $e->line->[1]) {
+                            %== $cv->($e->line->[0], $e->line->[1], 1)
+                        % }
+                        % for my $line (@{$e->lines_after}) {
+                            %== $cv->($line->[0], $line->[1])
+                        % }
+                    </table>
+                </div>
+                % if (defined $e->line->[2]) {
+                    <div id="insight">
+                        <table>
+                            % for my $line (@{$e->lines_before}) {
+                                %== $cv->($line->[0], $line->[2])
+                            % }
+                            %== $cv->($e->line->[0], $e->line->[2], 1)
+                            % for my $line (@{$e->lines_after}) {
+                                %== $cv->($line->[0], $line->[2])
+                            % }
+                        </table>
+                    </div>
+                    <div class="tap">tap for more</div>
+                    %= javascript begin
+                        var current = '#context';
+                        $('#showcase').click(function() {
+                            $(current).slideToggle('slow', function() {
+                                if (current == '#context') {
+                                    current = '#insight';
+                                }
+                                else {
+                                    current = '#context';
+                                }
+                                $(current).slideToggle('slow');
+                            });
+                        });
+                        $('#insight').toggle();
+                    % end
+                % }
+            </div>
+            <div class="box" id="trace">
+                % if (@{$e->frames}) {
+                    <div id="frames">
+                        % for my $frame (@{$e->frames}) {
+                            % if (my $line = $frame->[3]) {
+                                <div class="file"><%= $frame->[1] %></div>
+                                <div class="code preview">
+                                    %= "$frame->[2]."
+                                    %== $code->($line)
+                                </div>
+                            % }
+                        % }
+                    </div>
+                    <div class="tap">tap for more</div>
+                    %= javascript begin
+                        $('#trace').click(function() {
+                            $('#frames').slideToggle('slow');
+                        });
+                        $('#frames').toggle();
+                    % end
+                % }
+            </div>
+            <div class="box infobox" id="request">
+                <table>
+                    % for (my $i = 0; $i < @$request; $i += 2) {
+                        % my $key = $request->[$i];
+                        % my $value = $request->[$i + 1];
+                        %== $kv->($key, $value)
+                    % }
+                    % for my $name (@{$self->req->headers->names}) {
+                        % my $value = $self->req->headers->header($name);
+                        %== $kv->($name, $value)
+                    % }
+                </table>
+            </div>
+            <div class="box infobox" id="more">
+                <div id="infos">
+                    <table>
+                        % for (my $i = 0; $i < @$info; $i += 2) {
+                            %== $kv->($info->[$i], $info->[$i + 1])
+                        % }
+                    </table>
+                </div>
+                <div class="tap">tap for more</div>
+            </div>
+            <div id="footer">
+                %= link_to 'http://mojolicio.us' => begin
+                    <img src="mojolicious-black.png" alt="Mojolicious logo">
+                % end
+            </div>
+            %= javascript begin
+                $('#more').click(function() {
+                    $('#infos').slideToggle('slow');
+                });
+                $('#infos').toggle();
+            % end
+        % } else {
+            Page temporarily unavailable, please come back later.
+        % }
+    </body>
+</html>
+
+@@ not_found.html.ep
+<!doctype html><html>
+    <head>
+        <title>Not Found</title>
+        %= base_tag
+        %= stylesheet 'css/prettify-mojo.css'
+        %= javascript 'js/prettify.js'
+        %= stylesheet begin
+            a {
+                color: inherit;
+                text-decoration: none;
+            }
+            a img { border: 0; }
+            body {
+                background-color: #f5f6f8;
+                color: #333;
+                font: 0.9em Verdana, sans-serif;
+                margin: 0;
+                text-align: center;
+                text-shadow: #ddd 0 1px 0;
+            }
+            h1 {
+                font: 1.5em Georgia, Times, serif;
+                margin-bottom: 1em;
+                margin-top: 1em;
+                text-shadow: #666 0 1px 0;
+            }
+            #footer {
+                background-color: #caecf6;
+                padding-top: 20em;
+                width: 100%;
+            }
+            #footer a img { margin-top: 20em; }
+            #documentation {
+                background-color: #ecf1da;
+                padding-bottom: 20em;
+                padding-top: 20em;
+            }
+            #documentation h1 { margin-bottom: 3em; }
+            #header {
+                margin-bottom: 20em;
+                margin-top: 15em;
+                width: 100%;
+            }
+            #perldoc {
+                background-color: #eee;
+                border: 2px dashed #1a1a1a;
+                color: #000;
+                display: inline-block;
+                margin-left: 0.1em;
+                padding: 0.5em;
+                white-space: nowrap;
+            }
+            #preview {
+                background-color: #1a1a1a;
+                background: url("mojolicious-pinstripe.gif") fixed;
+                -moz-border-radius: 5px;
+                border-radius: 5px;
+                font-family: 'Menlo', 'Monaco', Courier, monospace !important;
+                font-size: 1.5em;
+                margin: 0;
+                margin-left: auto;
+                margin-right: auto;
+                padding: 0.5em;
+                padding-left: 1em;
+                text-align: left;
+                width: 500px;
+            }
+            #suggestion {
+                background-color: #2f3032;
+                color: #eee;
+                padding-bottom: 20em;
+                padding-top: 20em;
+                text-shadow: #333 0 1px 0;
+            }
+        % end
+    </head>
+    <body onload="prettyPrint()">
+        % if ($self->app->mode eq 'development') {
+            <div id="header">
+                <img src="mojolicious-box.png" alt="Mojolicious banner">
+                <h1>This page is brand new and has not been unboxed yet!</h1>
+            </div>
+            <div id="suggestion">
+                <img src="mojolicious-arrow.png" alt="Arrow">
+                <h1>Perhaps you would like to add a route for it?</h1>
+                <div id="preview">
+                    <pre class="prettyprint">
+get '/<%= $self->req->url->path %>' => sub {
+    my $self = shift;
+    $self->render(text => 'Hello world!');
+};</pre>
+                </div>
+            </div>
+            <div id="documentation">
+                <h1>
+                    You might also enjoy our excellent documentation in
+                    <div id="perldoc">
+                        <%= link_to 'perldoc Mojolicious::Guides', $guide %>
+                    </div>
+                </h1>
+                <img src="amelia.png" alt="Amelia">
+            </div>
+            <div id="footer">
+                <h1>And don't forget to have fun!</h1>
+                <p><img src="mojolicious-clouds.png" alt="Clouds"></p>
+                %= link_to 'http://mojolicio.us' => begin
+                    <img src="mojolicious-black.png" alt="Mojolicious logo">
+                % end
+            </div>
+        % } else {
+            Page not found, want to go <%= link_to home => url_for->base %>?
+        % }
+    </body>
+</html>
+
 __END__
 
 =head1 NAME
@@ -852,18 +1206,18 @@ implements the following new ones.
     
 A L<Mojo::Client> prepared for the current environment.
 
-    my $tx = $c->client->get('http://mojolicious.org');
+    my $tx = $c->client->get('http://mojolicio.us');
 
     $c->client->post_form('http://kraih.com/login' => {user => 'mojo'});
 
-    $c->client->get('http://mojolicious.org' => sub {
+    $c->client->get('http://mojolicio.us' => sub {
         my $client = shift;
         $c->render_data($client->res->body);
     })->start;
 
 Some environments such as L<Mojo::Server::Daemon> even allow async requests.
 
-    $c->client->async->get('http://mojolicious.org' => sub {
+    $c->client->async->get('http://mojolicio.us' => sub {
         my $client = shift;
         $c->render_data($client->res->body);
     })->start;
@@ -965,12 +1319,11 @@ Render binary data, similar to C<render_text> but data will not be encoded.
 
 =head2 C<render_exception>
 
-    $c->render_exception($e);
+    $c->render_exception('Oops!');
+    $c->render_exception(Mojo::Exception->new('Oops!'));
 
-Render the exception template C<exception.html.$handler>.
-Will set the status code to C<500> meaning C<Internal Server Error>.
-Takes a L<Mojo::Exception> object or error message and will fall back to
-rendering a static C<500> page using L<Mojolicious::Static>.
+Render the exception template C<exception.html.$handler> and set the response
+status code to C<500>.
 
 =head2 C<render_inner>
 
@@ -994,9 +1347,8 @@ Render a data structure as JSON.
     $c->render_not_found;
     $c->render_not_found($resource);
     
-Render the not found template C<not_found.html.$handler>.
-Also sets the response status code to C<404>, will fall back to rendering a
-static C<404> page using L<Mojolicious::Static>.
+Render the not found template C<not_found.html.$handler> and set the response
+status code to C<404>.
 
 =head2 C<render_partial>
 
@@ -1138,6 +1490,6 @@ An empty chunk marks the end of the stream.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

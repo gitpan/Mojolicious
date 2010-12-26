@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Mojolicious
-version:            0.999950
+version:            1.0
 abstract:           The Web In A Box!
 author:
     - Sebastian Riedel <sri@cpan.org>
@@ -45,7 +45,7 @@ requires:
     Time::HiRes:          0
 resources:
     bugtracker:   http://github.com/kraih/mojo/issues
-    homepage:     http://mojolicious.org
+    homepage:     http://mojolicio.us
     license:      http://dev.perl.org/licenses/
     MailingList:  http://groups.google.com/group/mojolicious
     repository:   http://github.com/kraih/mojo

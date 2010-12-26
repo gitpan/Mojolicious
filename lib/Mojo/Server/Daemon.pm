@@ -25,11 +25,8 @@ __PACKAGE__->attr([qw/backlog group listen silent user/]);
 __PACKAGE__->attr(ioloop => sub { Mojo::IOLoop->singleton });
 __PACKAGE__->attr(keep_alive_timeout => 5);
 __PACKAGE__->attr(max_clients        => 1000);
-__PACKAGE__->attr(max_requests       => 100);
+__PACKAGE__->attr(max_requests       => 25);
 __PACKAGE__->attr(websocket_timeout  => 300);
-
-# DEPRECATED in Comet!
-*max_keep_alive_requests = \&max_requests;
 
 sub DESTROY {
     my $self = shift;
@@ -426,6 +423,8 @@ Optional modules L<IO::KQueue>, L<IO::Epoll>, L<IO::Socket::SSL> and
 L<Net::Rendezvous::Publish> are supported transparently and used if
 installed.
 
+See L<Mojolicious::Guides::Cookbook> for deployment recipes.
+
 =head1 ATTRIBUTES
 
 L<Mojo::Server::Daemon> inherits all attributes from L<Mojo::Server> and
@@ -478,7 +477,7 @@ Maximum number of parallel client connections, defaults to C<1000>.
     my $max_requests = $daemon->max_requests;
     $daemon          = $daemon->max_requests(100);
 
-Maximum number of keep alive requests per connection, defaults to C<100>.
+Maximum number of keep alive requests per connection, defaults to C<25>.
 
 =head2 C<silent>
 
@@ -526,6 +525,6 @@ Set user and group for process.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

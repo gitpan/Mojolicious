@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 205;
+use Test::More tests => 226;
 
 use Mojo::Transaction::HTTP;
 
@@ -19,6 +19,9 @@ $r->route('/clean')->to(clean => 1);
 
 # /clean/too
 $r->route('/clean/too')->to(something => 1);
+
+# /0
+$r->route('/0')->to(null => 1);
 
 # /*/test
 my $test = $r->route('/:controller/test')->to(action => 'test');
@@ -132,6 +135,11 @@ $auth->route('/about/')->to('pref#about');
 $auth->bridge->to('album#allow')->route('/album/create/')->to('album#create');
 $auth->route('/gift/')->to('gift#index')->name('gift');
 
+# /regex/alternatives/*
+$r->route('/regex/alternatives/:alternatives',
+    alternatives => qr/foo|bar|baz/)
+  ->to(controller => 'regex', action => 'alternatives');
+
 # Make sure stash stays clean
 my $tx = Mojo::Transaction::HTTP->new;
 $tx->req->method('GET');
@@ -149,6 +157,14 @@ is $m->stack->[0]->{clean},     undef, 'no value';
 is $m->stack->[0]->{something}, 1,     'right value';
 is $m->url_for, '/clean/too', 'right URL';
 is @{$m->stack}, 1, 'right number of elements';
+
+# Null route
+$tx = Mojo::Transaction::HTTP->new;
+$tx->req->method('GET');
+$tx->req->url->parse('/0');
+$m = Mojolicious::Routes::Match->new($tx)->match($r);
+is $m->stack->[0]->{null}, 1, 'right value';
+is $m->url_for, '/0', 'right URL';
 
 # Real world example using most features at once
 $tx = Mojo::Transaction::HTTP->new;
@@ -513,3 +529,41 @@ is $m->url_for, '/edge/auth/gift', 'right URL';
 is $m->url_for('gift'),    '/edge/auth/gift', 'right URL';
 is $m->url_for('current'), '/edge/auth/gift', 'right URL';
 is @{$m->stack}, 2, 'right number of elements';
+
+# Regex
+# Special edge case with nested bridges
+$tx = Mojo::Transaction::HTTP->new;
+$tx->req->method('GET');
+$tx->req->url->parse('/regex/alternatives/foo');
+$m = Mojolicious::Routes::Match->new($tx)->match($r);
+is $m->stack->[0]->{controller},   'regex',        'right value';
+is $m->stack->[0]->{action},       'alternatives', 'right value';
+is $m->stack->[0]->{alternatives}, 'foo',          'right value';
+is $m->stack->[0]->{format},       undef,          'no value';
+is $m->stack->[1], undef, 'no value';
+is $m->url_for, '/regex/alternatives/foo', 'right URL';
+$tx = Mojo::Transaction::HTTP->new;
+$tx->req->method('GET');
+$tx->req->url->parse('/regex/alternatives/bar');
+$m = Mojolicious::Routes::Match->new($tx)->match($r);
+is $m->stack->[0]->{controller},   'regex',        'right value';
+is $m->stack->[0]->{action},       'alternatives', 'right value';
+is $m->stack->[0]->{alternatives}, 'bar',          'right value';
+is $m->stack->[0]->{format},       undef,          'no value';
+is $m->stack->[1], undef, 'no value';
+is $m->url_for, '/regex/alternatives/bar', 'right URL';
+$tx = Mojo::Transaction::HTTP->new;
+$tx->req->method('GET');
+$tx->req->url->parse('/regex/alternatives/baz');
+$m = Mojolicious::Routes::Match->new($tx)->match($r);
+is $m->stack->[0]->{controller},   'regex',        'right value';
+is $m->stack->[0]->{action},       'alternatives', 'right value';
+is $m->stack->[0]->{alternatives}, 'baz',          'right value';
+is $m->stack->[0]->{format},       undef,          'no value';
+is $m->stack->[1], undef, 'no value';
+is $m->url_for, '/regex/alternatives/baz', 'right URL';
+$tx = Mojo::Transaction::HTTP->new;
+$tx->req->method('GET');
+$tx->req->url->parse('/regex/alternatives/yada');
+$m = Mojolicious::Routes::Match->new($tx)->match($r);
+is $m->stack->[0], undef, 'no value';

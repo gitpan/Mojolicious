@@ -1,5 +1,29 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+1.0 2010-12-26 00:00:00
+        - Code name "Snowflake", this is a major release.
+        - Deprecated session method in Mojolicious.
+        - Deprecated handler and helper attributes in Mojolicious::Renderer.
+        - Added new exception and not_found templates.
+        - Added POD browser to Mojolicious::Plugin::PodRenderer.
+        - Added EXPERIMENTAL content_for helper.
+        - Disabled debug log messages for static files.
+        - Improved Hypnotoad web server to restart workers regularly.
+        - Improved documentation.
+        - Improved query manipulation in Mojo::URL. (yko)
+        - Improved TLS exception handling.
+        - Improved nested exception handling. (spleenjack)
+        - Improved tests. (janus)
+        - Fixed relative path handling.
+        - Fixed application generator. (yko)
+        - Fixed support for multiline expressions in Mojo::Template.
+        - Fixed multiple --reload related leaks and reduced overall memory
+          usage.
+        - Fixed exception handling for included templates.
+        - Fixed a small Mojo::Server::PSGI header bug.
+        - Fixed a small Mojo::DOM selector bug.
+        - Fixed typos. (punytan)
+
 0.999950 2010-11-30 00:00:00
         - Added EXPERIMENTAL Hypnotoad web server.
         - Added EXPERIMENTAL built in exception and not_found templates.

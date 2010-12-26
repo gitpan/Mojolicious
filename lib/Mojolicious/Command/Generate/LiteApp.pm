@@ -33,23 +33,24 @@ __DATA__
 
 use Mojolicious::Lite;
 
-get '/' => 'index';
+# Documentation browser under "/perldoc" (this plugin requires Perl 5.10)
+plugin 'pod_renderer';
 
-get '/:groovy' => sub {
+get '/welcome' => sub {
     my $self = shift;
-    $self->render(text => $self->param('groovy'), layout => 'funky');
+    $self->render('index');
 };
 
 app->start;
 <%%= '__DATA__' %%>
 
 <%%= '@@ index.html.ep' %%>
-% layout 'funky';
-Yea baby!
+% layout 'default';
+Welcome to Mojolicious!
 
-<%%= '@@ layouts/funky.html.ep' %%>
+<%%= '@@ layouts/default.html.ep' %%>
 <!doctype html><html>
-    <head><title>Funky!</title></head>
+    <head><title>Welcome!</title></head>
     <body><%== content %></body>
 </html>
 __END__
@@ -100,6 +101,6 @@ Run this command.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

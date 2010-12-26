@@ -122,6 +122,9 @@ sub shape_match {
     # Debug
     warn "    $regex\n" if DEBUG;
 
+    # Make sure path starts with a slash
+    $$pathref = "/$$pathref" unless $$pathref =~ /^\//;
+
     # Match
     if (my @captures = $$pathref =~ /$regex/) {
 
@@ -448,6 +451,6 @@ Match pattern against a path and remove matching parts.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

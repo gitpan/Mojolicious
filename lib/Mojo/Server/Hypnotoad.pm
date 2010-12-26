@@ -201,7 +201,7 @@ sub _config {
     $daemon->group($c->{group}) if $c->{group};
 
     # Keep alive requests
-    $daemon->max_requests($c->{keep_alive_requests} || 100);
+    $daemon->max_requests($c->{keep_alive_requests} || 25);
 
     # Keep alive timeout
     $daemon->keep_alive_timeout($c->{keep_alive_timeout} || 5);
@@ -216,6 +216,9 @@ sub _config {
 
     # WebSocket timeout
     $daemon->websocket_timeout($c->{websocket_timeout} || 300);
+
+    # Accept limit
+    $daemon->ioloop->max_accepts($c->{accepts} || 1000);
 }
 
 sub _heartbeat {
@@ -236,7 +239,7 @@ sub _heartbeat {
         my $pid = $1;
 
         # Heartbeat
-        $self->{_workers}->{$pid}->{time} = time;
+        $self->{_workers}->{$pid}->{time} = time if $self->{_workers}->{$pid};
     }
 }
 
@@ -440,7 +443,7 @@ sub _spawn {
     my $cb;
     $cb = sub {
         my $loop = shift;
-        $loop->timer($c->{heartbeat} => $cb);
+        $loop->timer($c->{heartbeat} => $cb) if $loop->max_connections;
         $self->{_writer}->syswrite("$$\n") or exit 0;
     };
     $cb->($loop);
@@ -494,6 +497,8 @@ L<Net::Rendezvous::Publish> are supported transparently and used if
 installed.
 
 Note that this module is EXPERIMENTAL and might change without warning!
+
+See L<Mojolicious::Guides::Cookbook> for deployment recipes.
 
 =head1 SIGNALS
 
@@ -565,6 +570,15 @@ The following parameters are currently available.
 
 =over 4
 
+=item accepts
+
+    accepts => 100
+
+Maximum number of connections a worker is allowed to accept before stopping
+gracefully, defaults to C<1000>.
+Setting the value to C<0> will allow workers to accept new connections
+infinitely.
+
 =item backlog
 
     backlog => 128
@@ -608,7 +622,7 @@ to C<2>.
 
     keep_alive_requests => 50
 
-Number of keep alive requests per connection, defaults to C<100>.
+Number of keep alive requests per connection, defaults to C<25>.
 
 =item keep_alive_timeout
 
@@ -683,6 +697,6 @@ Start server.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

@@ -23,6 +23,7 @@ Mojolicious::Plugin - Plugin Base Class
 =head1 DESCRIPTION
 
 L<Mojolicous::Plugin> is an abstract base class for L<Mojolicious> plugins.
+
 See L<Mojolicious::Plugins> for more information.
 
 =head1 METHODS
@@ -41,6 +42,6 @@ C<add_hooks> method of L<Mojolicious::Plugins> to hook into the request flow.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

@@ -78,9 +78,9 @@ sub clone {
 
 sub parse {
     my ($self, $path) = @_;
-    $path ||= '';
 
     # Meta
+    $path = '' unless defined $path;
     $self->leading_slash(1)  if $path =~ /^\//;
     $self->trailing_slash(1) if $path =~ /\/$/;
 
@@ -211,6 +211,6 @@ Turn path into a string.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

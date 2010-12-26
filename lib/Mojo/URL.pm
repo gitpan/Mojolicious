@@ -174,6 +174,7 @@ sub parse {
 
     $self->scheme($scheme);
     $self->authority($authority);
+    $path =~ s/^\/// unless defined $scheme;
     $self->path->parse($path);
     $self->query->parse($query);
     $self->fragment($fragment);
@@ -219,9 +220,18 @@ sub query {
     # Set
     if (@_) {
 
-        # Replace with array
-        if (@_ > 1 || (ref $_[0] && ref $_[0] eq 'ARRAY')) {
+        # Replace with list
+        if (@_ > 1) {
             $self->{query} = Mojo::Parameters->new(ref $_[0] ? @{$_[0]} : @_);
+        }
+
+        # Merge with array
+        elsif (ref $_[0] && ref $_[0] eq 'ARRAY') {
+            my $q = $self->{query} ||= Mojo::Parameters->new;
+            my $merge = Mojo::Parameters->new(@{$_[0]});
+            for my $name ($merge->param) {
+                $q->param($name => $merge->param($name));
+            }
         }
 
         # Append hash
@@ -299,7 +309,7 @@ sub to_rel {
     splice @{$path->parts}, 0, $splice if $splice;
 
     $rel->path($path);
-    $rel->path->leading_slash(0) if $splice;
+    $rel->path->leading_slash(0);
 
     return $rel;
 }
@@ -497,7 +507,7 @@ defaults to a L<Mojo::Path> object.
 
     my $query = $url->query;
     $url      = $url->query(replace => 'with');
-    $url      = $url->query([replace => 'with']);
+    $url      = $url->query([merge => 'with']);
     $url      = $url->query({append => 'to'});
     $url      = $url->query(Mojo::Parameters->new);
 
@@ -525,6 +535,6 @@ Turn URL into a string.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

@@ -13,9 +13,7 @@ sub import {
     no strict 'refs';
     no warnings 'redefine';
     *{"${caller}::b"} = sub {
-        bless {
-            bytestream => @_ < 2 ? defined $_[0] ? "$_[0]" : '' : join('', @_)
-        }, 'Mojo::ByteStream';
+        bless {bytestream => join('', @_)}, 'Mojo::ByteStream';
       }
       if @_ > 1;
 }
@@ -24,8 +22,7 @@ sub import {
 # Well, I think the veal died of loneliness.
 sub new {
     my $self = shift->SUPER::new();
-    $self->{bytestream} =
-      @_ < 2 ? defined $_[0] ? "$_[0]" : '' : join('', @_);
+    $self->{bytestream} = join '', @_;
     return $self;
 }
 
@@ -455,6 +452,6 @@ escaping only the characters C<&>, C<E<lt>>, C<E<gt>>, C<"> and C<'>.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

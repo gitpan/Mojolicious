@@ -8,8 +8,9 @@ use overload 'bool' => sub {1}, fallback => 1;
 use overload '""' => sub { shift->to_string }, fallback => 1;
 
 use IO::File;
+use Scalar::Util 'blessed';
 
-__PACKAGE__->attr([qw/line lines_before lines_after/] => sub { [] });
+__PACKAGE__->attr([qw/frames line lines_before lines_after/] => sub { [] });
 __PACKAGE__->attr([qw/message raw_message/] => 'Exception!');
 __PACKAGE__->attr(verbose => sub { $ENV{MOJO_EXCEPTION_VERBOSE} || 0 });
 
@@ -19,14 +20,69 @@ sub new {
     my $self = shift->SUPER::new();
 
     # Message
-    $self->message(shift);
-    my $message = $self->message;
+    return $self unless @_;
+
+    # Detect
+    return $self->_detect(@_);
+}
+
+sub throw {
+    my $self = shift;
+
+    # Exception
+    my $e = Mojo::Exception->new;
+
+    # Trace
+    $e->trace(2);
+
+    # Detect and throw
+    die $e->_detect(@_);
+}
+
+sub trace {
+    my ($e, $start) = @_;
+
+    # Start
+    $start = 1 unless defined $start;
+
+    # Trace
+    my @frames;
+    while (my ($p, $f, $l) = caller($start++)) {
+
+        # Append
+        push @frames, [$p, $f, $l];
+
+        # Line
+        if (-r $f) {
+            next unless my $handle = IO::File->new("< $f");
+            my @lines = <$handle>;
+            push @{$frames[-1]}, $lines[$l - 1];
+        }
+    }
+    $e->frames(\@frames);
+
+    return $e;
+}
+
+sub _detect {
+    my $self = shift;
+
+    # Message
+    my $message = shift;
+    return $message if blessed $message && $message->isa('Mojo::Exception');
+    $self->message($message);
     $self->raw_message($message);
 
     # Trace name and line
     my @trace;
     while ($message =~ /at\s+(.+?)\s+line\s+(\d+)/g) {
         push @trace, {file => $1, line => $2};
+    }
+
+    # Stacktrace
+    if (my $first = $self->frames->[0]) {
+        unshift @trace, {file => $first->[1], line => $first->[2]}
+          if $first->[1];
     }
 
     # Frames
@@ -44,23 +100,24 @@ sub new {
             my @lines  = <$handle>;
 
             # Line
-            $self->_parse_context(\@lines, $line);
+            $self->_parse_context($line, [\@lines]);
 
             # Done
-            last;
+            return $self;
         }
     }
 
     # Parse specific file
-    return $self unless my $lines = shift;
-    my @lines = split /\n/, $lines;
+    return $self unless @_;
+    my @lines;
+    for my $lines (@_) { push @lines, [split /\n/, $lines] }
 
     # Cleanup plain messages
     unless (ref $message) {
         my $filter = sub {
             my $num  = shift;
             my $new  = "template line $num";
-            my $line = $lines[$num];
+            my $line = $lines[0]->[$num];
             $new .= qq/, near "$line"/ if defined $line;
             $new .= '.';
             return $new;
@@ -73,8 +130,18 @@ sub new {
     my $line;
     $line = $1 if $self->message =~ /at\s+template\s+line\s+(\d+)/;
 
+    # Stacktrace
+    unless ($line) {
+        for my $frame (@{$self->frames}) {
+            if ($frame->[1] =~ /^\(eval\ \d+\)$/) {
+                $line = $frame->[2];
+                last;
+            }
+        }
+    }
+
     # Context
-    $self->_parse_context(\@lines, $line) if $line;
+    $self->_parse_context($line, \@lines) if $line;
 
     return $self;
 }
@@ -110,50 +177,49 @@ sub to_string {
 }
 
 sub _parse_context {
-    my ($self, $lines, $line) = @_;
+    my ($self, $line, $lines) = @_;
 
     # Wrong file
-    return unless defined $lines->[$line - 1];
+    return unless defined $lines->[0]->[$line - 1];
 
     # Context
-    my $code = $lines->[$line - 1];
-    chomp $code;
-    $self->line([$line, $code]);
+    $self->line([$line]);
+    for my $l (@$lines) {
+        my $code = $l->[$line - 1];
+        chomp $code;
+        push @{$self->line}, $code;
+    }
 
     # Cleanup
     $self->lines_before([]);
     $self->lines_after([]);
 
-    # -2
-    my $previous_line = $line - 3;
-    $code = $previous_line >= 0 ? $lines->[$previous_line] : undef;
-    if (defined $code) {
-        chomp $code;
-        push @{$self->lines_before}, [$line - 2, $code];
+    # Before
+    for my $i (2 .. 6) {
+        my $previous = $line - $i;
+        last if $previous < 0;
+        if (defined($lines->[0]->[$previous])) {
+            unshift @{$self->lines_before}, [$previous + 1];
+            for my $l (@$lines) {
+                my $code = $l->[$previous];
+                chomp $code;
+                push @{$self->lines_before->[0]}, $code;
+            }
+        }
     }
 
-    # -1
-    $previous_line = $line - 2;
-    $code = $previous_line >= 0 ? $lines->[$previous_line] : undef;
-    if (defined $code) {
-        chomp $code;
-        push @{$self->lines_before}, [$line - 1, $code];
-    }
-
-    # +1
-    my $next_line = $line;
-    $code = $next_line >= 0 ? $lines->[$next_line] : undef;
-    if (defined $code) {
-        chomp $code;
-        push @{$self->lines_after}, [$line + 1, $code];
-    }
-
-    # +2
-    $next_line = $line + 1;
-    $code = $next_line >= 0 ? $lines->[$next_line] : undef;
-    if (defined $code) {
-        chomp $code;
-        push @{$self->lines_after}, [$line + 2, $code];
+    # After
+    for my $i (0 .. 4) {
+        my $next = $line + $i;
+        next if $next < 0;
+        if (defined($lines->[0]->[$next])) {
+            push @{$self->lines_after}, [$next + 1];
+            for my $l (@$lines) {
+                next unless defined(my $code = $l->[$next]);
+                chomp $code;
+                push @{$self->lines_after->[-1]}, $code;
+            }
+        }
     }
 
     return $self;
@@ -178,6 +244,13 @@ L<Mojo::Exception> is a container for exceptions with context information.
 =head1 ATTRIBUTES
 
 L<Mojo::Exception> implements the following attributes.
+
+=head2 C<frames>
+
+    my $frames = $e->frames;
+    $e         = $e->frames($frames);
+
+Stacktrace.
 
 =head2 C<line>
 
@@ -233,6 +306,19 @@ following new ones.
 
 Construct a new L<Mojo::Exception> object.
 
+=head2 C<throw>
+
+    Mojo::Exception->throw('Oops!');
+    Mojo::Exception->throw('Oops!', $file);
+
+Throw exception with stacktrace.
+
+=head2 C<trace>
+
+    $e = $e->trace;
+
+Perform stacktrace.
+
 =head2 C<to_string>
 
     my $string = $e->to_string;
@@ -242,6 +328,6 @@ Render exception with context.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

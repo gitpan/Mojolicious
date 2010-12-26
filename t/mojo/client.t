@@ -62,7 +62,7 @@ $client->ioloop->listen(
     on_read => sub {
         my ($loop, $id, $chunk) = @_;
         $buffer2->{$id} .= $chunk;
-        if (index $buffer2->{$id}, "\x0d\x0a\x0d\x0a") {
+        if (index($buffer2->{$id}, "\x0d\x0a\x0d\x0a") >= 0) {
             delete $buffer2->{$id};
             $loop->write(
                 $id => "HTTP/1.1 200 OK\x0d\x0a"
@@ -167,6 +167,7 @@ is $tx->res->body, 'works!', 'right content';
 
 # Taint connection
 $client->ioloop->write($last => 'broken!');
+sleep 1;
 
 # GET / (mock server tainted connection)
 $tx = $client->get("http://localhost:$port/mock");
@@ -184,6 +185,7 @@ is $tx->res->body, 'works!', 'right content';
 
 # Taint connection
 $client->ioloop->write($last => 'broken!');
+sleep 1;
 
 # GET / (mock server tainted connection)
 $tx = $client->get("http://localhost:$port/mock");

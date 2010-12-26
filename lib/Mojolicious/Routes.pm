@@ -608,6 +608,9 @@ sub _generate_route {
 sub _walk_stack {
     my ($self, $c) = @_;
 
+    # Stacktrace
+    local $SIG{__DIE__} = sub { Mojo::Exception->throw(@_) };
+
     # Stack
     my $stack = $c->match->stack;
 
@@ -1005,6 +1008,6 @@ Note that this method is EXPERIMENTAL and might change without warning!
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

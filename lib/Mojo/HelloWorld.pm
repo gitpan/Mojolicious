@@ -6,6 +6,7 @@ use warnings;
 use base 'Mojo';
 
 use Mojo::JSON;
+use Mojo::Cookie::Response;
 
 # How is education supposed to make me feel smarter? Besides,
 # every time I learn something new, it pushes some old stuff out of my brain.
@@ -32,6 +33,30 @@ sub handler {
     $res->code(200);
     $res->headers->content_type('text/plain');
     $res->body('Your Mojo is working!');
+    $tx->resume;
+}
+
+sub _cookies {
+    my ($self, $tx) = @_;
+
+    # Response
+    my $res = $tx->res;
+
+    # Cookies
+    my $params = $tx->req->params->to_hash;
+    for my $key (sort keys %$params) {
+        $res->cookies(
+            Mojo::Cookie::Response->new(
+                name  => $key,
+                value => $params->{$key}
+            )
+        );
+    }
+
+    # Response
+    $res->code(200);
+    $res->body('nomnomnom');
+
     $tx->resume;
 }
 
@@ -67,7 +92,7 @@ sub _diag {
 
     # Path
     my $path = $tx->req->url->path;
-    $path =~ s/^\/diag// or return $self->_hello($tx);
+    $path =~ s/^diag// or return $self->_hello($tx);
 
     # WebSocket
     return $self->_websocket($tx) if $path =~ /^\/websocket/;
@@ -78,6 +103,7 @@ sub _diag {
       unless $tx->res->headers->content_type;
 
     # Dispatch
+    return $self->_cookies($tx)        if $path =~ /^\/cookies/;
     return $self->_chunked_params($tx) if $path =~ /^\/chunked_params/;
     return $self->_dump_env($tx)       if $path =~ /^\/dump_env/;
     return $self->_dump_params($tx)    if $path =~ /^\/dump_params/;
@@ -90,11 +116,12 @@ sub _diag {
 <!doctype html><html>
     <head><title>Mojo Diagnostics</title></head>
     <body>
-        <a href="/diag/chunked_params">Chunked Request Parameters</a><br />
-        <a href="/diag/dump_env">Dump Environment Variables</a><br />
-        <a href="/diag/dump_params">Dump Request Parameters</a><br />
-        <a href="/diag/proxy">Proxy</a><br />
-        <a href="/diag/upload">Upload</a><br />
+        <a href="/diag/cookies">Cookies</a>
+        <a href="/diag/chunked_params">Chunked Request Parameters</a><br>
+        <a href="/diag/dump_env">Dump Environment Variables</a><br>
+        <a href="/diag/dump_params">Dump Request Parameters</a><br>
+        <a href="/diag/proxy">Proxy</a><br>
+        <a href="/diag/upload">Upload</a><br>
         <a href="/diag/websocket">WebSocket</a>
     </body>
 </html>
@@ -180,14 +207,14 @@ sub _proxy {
     <body>
         Sync:
         <form action="$url" method="GET">
-            <input type="text" name="url" value="http://"/>
-            <input type="submit" value="Fetch" />
+            <input type="text" name="url" value="http://">
+            <input type="submit" value="Fetch">
         </form>
-        <br />
+        <br>
         Async:
         <form action="$url" method="GET">
-            <input type="text" name="async_url" value="http://"/>
-            <input type="submit" value="Fetch" />
+            <input type="text" name="async_url" value="http://">
+            <input type="submit" value="Fetch">
         </form>
     </body>
 </html>
@@ -226,8 +253,8 @@ sub _upload {
     <body>
         File:
         <form action="$url" method="POST" enctype="multipart/form-data">
-            <input type="file" name="file" />
-            <input type="submit" value="Upload" />
+            <input type="file" name="file">
+            <input type="submit" value="Upload">
         </form>
     </body>
 </html>
@@ -327,6 +354,6 @@ Handle request.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

@@ -130,11 +130,12 @@ Mojo::Server::CGI - CGI Server
 
 L<Mojo::Server::CGI> is a simple and portable implementation of RFC 3875.
 
+See L<Mojolicious::Guides::Cookbook> for deployment recipes.
+
 =head1 ATTRIBUTES
 
 L<Mojo::Server::CGI> inherits all attributes from L<Mojo::Server> and
 implements the following new ones.
-See L<Mojolicious::Guides::Cookbook> for deployment recipes.
 
 =head2 C<nph>
 
@@ -156,6 +157,6 @@ Process CGI.
 
 =head1 SEE ALSO
 
-L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicious.org>.
+L<Mojolicious>, L<Mojolicious::Guides>, L<http://mojolicio.us>.
 
 =cut

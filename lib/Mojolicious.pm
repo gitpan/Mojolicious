@@ -10,7 +10,7 @@ use Mojolicious::Commands;
 use Mojolicious::Plugins;
 use Mojolicious::Renderer;
 use Mojolicious::Routes;
-use Mojolicious::Session;
+use Mojolicious::Sessions;
 use Mojolicious::Static;
 use Mojolicious::Types;
 
@@ -30,12 +30,21 @@ __PACKAGE__->attr(
         return ref $self;
     }
 );
-__PACKAGE__->attr(session => sub { Mojolicious::Session->new });
-__PACKAGE__->attr(static  => sub { Mojolicious::Static->new });
-__PACKAGE__->attr(types   => sub { Mojolicious::Types->new });
+__PACKAGE__->attr(sessions => sub { Mojolicious::Sessions->new });
+__PACKAGE__->attr(static   => sub { Mojolicious::Static->new });
+__PACKAGE__->attr(types    => sub { Mojolicious::Types->new });
 
-our $CODENAME = 'Hot Beverage';
-our $VERSION  = '0.999950';
+# DEPRECATED in Hot Beverage!
+*session = sub {
+    warn <<EOF;
+Mojolicious->session is DEPRECATED in favor of Mojolicious->sessions!!!
+But you most likely meant to use Mojolicious::Controller->session anyway.
+EOF
+    shift->sessions(@_);
+};
+
+our $CODENAME = 'Snowflake';
+our $VERSION  = '1.0';
 
 # These old doomsday devices are dangerously unstable.
 # I'll rest easier not knowing where they are.
@@ -172,17 +181,10 @@ sub dispatch {
     $c->res->code(undef) if $c->tx->is_websocket;
 
     # Session
-    $self->session->load($c);
+    $self->sessions->load($c);
 
     # Hook
     $self->plugins->run_hook(before_dispatch => $c);
-
-    # New request
-    my $req    = $c->req;
-    my $method = $req->method;
-    my $path   = $req->url->path || '/';
-    my $ua     = $req->headers->user_agent || 'Anonymojo';
-    $self->log->debug(qq/$method $path ($ua)./);
 
     # Try to find a static file
     $self->static->dispatch($c);
@@ -236,6 +238,8 @@ sub handler {
     }
 }
 
+# This snow is beautiful. I'm glad global warming never happened.
+# Actually, it did. But thank God nuclear winter canceled it out.
 sub helper {
     my $self = shift;
     my $name = shift;
@@ -251,6 +255,13 @@ sub helper {
     $r->add_helper($name, @_);
 }
 
+# He knows when you are sleeping.
+# He knows when you're on the can.
+# He'll hunt you down and blast your ass, from here to Pakistan.
+# Oh...
+# You better not breathe, you better not move.
+# You're better off dead, I'm tellin' you, dude.
+# Santa Claus is gunning you down!
 sub hook {
     my ($self, $name, $cb) = @_;
 
@@ -270,11 +281,8 @@ sub process { shift->dispatch(@_) }
 sub start {
     my $class = shift;
 
-    # We can be called on class or instance
-    $class = ref $class || $class;
-
     # We are the application
-    $ENV{MOJO_APP} ||= $class;
+    $ENV{MOJO_APP} = ref $class ? $class : $class->new;
 
     # Start!
     return Mojolicious::Commands->start(@_);
@@ -384,10 +392,28 @@ Web development for humans, making hard things possible and everything fun.
 
     use Mojolicious::Lite;
 
-    get '/hello' => sub { shift->render(text => 'Hello World!') }
+    # Simple route with plain text response
+    get '/hello' => sub { shift->render(text => 'Hello World!') };
 
+    # Route to template in DATA section
     get '/time' => 'clock';
 
+    # RESTful web service sending JSON responses
+    get '/:offset' => sub {
+        my $self   = shift;
+        my $offset = $self->param('offset') || 23;
+        $self->render(json => {list => [0 .. $offset]});
+    };
+
+    # Scrape information from remote sites
+    post '/title' => sub {
+        my $self = shift;
+        my $url  = $self->param('url') || 'http://mojolicio.us';
+        $self->render(text =>
+              $self->client->get($url)->res->dom->at('head > title')->text);
+    };
+
+    # WebSocket echo service
     websocket '/echo' => sub {
         my $self = shift;
         $self->on_message(
@@ -398,19 +424,6 @@ Web development for humans, making hard things possible and everything fun.
         );
     };
 
-    get '/title' => sub {
-        my $self = shift;
-        my $url  = $self->param('url');
-        $self->render(text =>
-              $self->client->get($url)->res->dom->at('title')->text);
-    };
-
-    post '/:offset' => sub {
-        my $self   = shift;
-        my $offset = $self->param('offset') || 23;
-        $self->render(json => {list => [0 .. $offset]});
-    };
-
     app->start;
     __DATA__
 
@@ -419,6 +432,9 @@ Web development for humans, making hard things possible and everything fun.
     <%= link_to clock => begin %>
         The time is <%= $hour %>:<%= $minute %>:<%= $second %>.
     <% end %>
+
+Single file prototypes like this one can easily grow into well structured
+applications.
 
 =head2 Have Some Cake
 
@@ -439,65 +455,6 @@ Loosely coupled building blocks, use what you like and just ignore the rest.
     .-------. .-----------. .--------. .------------. .-------------.
     |  CGI  | |  FastCGI  | |  PSGI  | |  HTTP 1.1  | |  WebSocket  |
     '-------' '-----------' '--------' '------------' '-------------'
-
-=head2 Highlights
-
-These are some of the most important building blocks of L<Mojolicious>.
-
-=over 4
-
-=item L<Mojolicious::Lite>
-
-Micro Web Framework built on top of L<Mojolicious> for prototypes and small
-applications.
-
-=item L<Mojo::Client>
-
-Full featured async io HTTP 1.1 and WebSocket client.
-
-=item L<Mojo::DOM>
-
-Very fun and minimalistic XML/HTML5 DOM parser with CSS3 selector support.
-
-=item L<Mojo::JSON>
-
-Minimalistic JSON implementation that just works.
-
-=item L<Mojo::Server::Daemon>
-
-Highly portable async io HTTP 1.1 and WebSocket server, perfect for
-development and testing.
-
-=item L<Mojo::Server::Hypnotoad>
-
-Full featured UNIX optimized preforking async io HTTP 1.1 and WebSocket
-server with support for zero downtime software upgrades (hot deployment).
-
-=item L<Mojo::Server::CGI>, L<Mojo::Server::FastCGI>, L<Mojo::Server::PSGI>
-
-Transparent CGI, FastCGI and PSGI support out of the box.
-
-=item L<Mojo::Template>
-
-Very perlish and minimalistic template system.
-
-=item L<Mojo::ByteStream>
-
-Countless portable and very convenient bytestream manipulation methods.
-
-=item L<Mojolicious::Commands>
-
-Pluggable command line system and the backbone of the C<mojo> script.
-
-=item L<Test::Mojo>
-
-Test driven development toolkit for web applications.
-
-=item L<ojo>
-
-Fun oneliners using everything above.
-
-=back
 
 For more documentation see L<Mojolicious::Guides> and the tutorial in
 L<Mojolicious::Lite>!
@@ -582,12 +539,12 @@ application name which is not very secure, so you should change it!!!
 As long as you are using the unsecure default there will be debug messages in
 the log file reminding you to change your passphrase.
 
-=head2 C<session>
+=head2 C<sessions>
 
-    my $session = $app->session;
-    $app        = $app->session(Mojolicious::Session->new);
+    my $sessions = $app->sessions;
+    $app         = $app->sessions(Mojolicious::Sessions->new);
 
-Simple singed cookie based sessions, by default a L<Mojolicious::Session>
+Simple singed cookie based sessions, by default a L<Mojolicious::Sessions>
 object.
 
 =head2 C<static>
@@ -686,7 +643,7 @@ gets parsed.
 One use case would be upload progress bars.
 (Passed the transaction and application instances)
 
-    $app->hook(before_request => sub {
+    $app->hook(after_build_tx => sub {
         my ($tx, $app) = @_;
     });
 
@@ -771,7 +728,7 @@ startup.
 
 =head2 Web
 
-    http://mojolicious.org
+    http://mojolicio.us
 
 =head2 IRC
 
@@ -791,6 +748,8 @@ startup.
 
 Every major release of L<Mojolicious> has a code name, these are the ones
 that have been used in the past.
+
+1.0, C<Snowflake> (u2744)
 
 0.999930, C<Hot Beverage> (u2615)
 
@@ -849,6 +808,8 @@ Breno G. de Oliveira
 Burak Gursoy
 
 Ch Lamprecht
+
+Charlie Brady
 
 Chas. J. Owens IV
 
