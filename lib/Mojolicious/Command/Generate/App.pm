@@ -154,11 +154,15 @@ $t->get_ok('/welcome')->status_is(200)->content_type_is('text/html')
   ->content_like(qr/Mojolicious Web Framework/i);
 @@ layout
 <!doctype html><html>
-    <head><title>Welcome</title></head>
-    <body><%== content %></body>
+    <head>
+        <title><%= title %></title>
+        <%= base_tag %>
+    </head>
+    <body><%= content %></body>
 </html>
 @@ welcome
 % layout 'default';
+% title 'Welcome';
 <h2><%= $message %></h2>
 This page was generated from the template
 "templates/example/welcome.html.ep" and the layout

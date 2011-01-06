@@ -8,7 +8,7 @@ use utf8;
 # Disable epoll and kqueue
 BEGIN { $ENV{MOJO_POLL} = 1 }
 
-use Test::More tests => 669;
+use Test::More tests => 686;
 
 # Pollution
 123 =~ m/(\d+)/;
@@ -309,7 +309,12 @@ get '/foo' => sub {
 
 # GET /layout
 get '/layout' => sub {
-    shift->render_text('Yea baby!', layout => 'layout', handler => 'epl');
+    shift->render_text(
+        'Yea baby!',
+        layout  => 'layout',
+        handler => 'epl',
+        title   => 'Layout'
+    );
 };
 
 # POST /template
@@ -769,9 +774,8 @@ is $finished, 23, 'finished';
 
 # GET / (IRI)
 $t->get_ok('/привет/мир')->status_is(200)
-  ->content_type_is('text/html');
-is b($t->tx->res->body)->decode('UTF-8'), 'привет мир',
-  'right content';
+  ->content_type_is('text/html;charset=UTF-8')
+  ->content_is('привет мир');
 
 # GET /root
 $t->get_ok('/root.html')->status_is(200)
@@ -798,7 +802,7 @@ $t->get_ok('/tags/lala?a=b&b=0&c=2&d=3&escaped=1%22+%222')->status_is(200)
 <foo />
 <foo bar="baz" />
 <foo one="two" three="four">Hello</foo>
-<a href="path">Path</a>
+<a href="/path">Path</a>
 <a href="http://example.com/" title="Foo">Foo</a>
 <a href="http://example.com/">Example</a>
 <a href="/template">Home</a>
@@ -823,7 +827,7 @@ $t->get_ok('/tags/lala?a=b&b=0&c=2&d=3&escaped=1%22+%222')->status_is(200)
     <input type="submit" value="Ok!" />
     <input id="bar" type="submit" value="Ok too!" />
 </form>
-<form action="">
+<form action="/">
     <input name="foo" />
 </form>
 <input name="escaped" value="1&quot; &quot;2" />
@@ -858,7 +862,7 @@ $t->get_ok('/tags/lala?c=b&d=3&e=4&f=5')->status_is(200)->content_is(<<EOF);
 <foo />
 <foo bar="baz" />
 <foo one="two" three="four">Hello</foo>
-<a href="path">Path</a>
+<a href="/path">Path</a>
 <a href="http://example.com/" title="Foo">Foo</a>
 <a href="http://example.com/">Example</a>
 <a href="/template">Home</a>
@@ -881,7 +885,7 @@ $t->get_ok('/tags/lala?c=b&d=3&e=4&f=5')->status_is(200)->content_is(<<EOF);
     <input type="submit" value="Ok!" />
     <input id="bar" type="submit" value="Ok too!" />
 </form>
-<form action="">
+<form action="/">
     <input name="foo" />
 </form>
 <input name="escaped" />
@@ -1046,19 +1050,21 @@ $t->get_ok('/content_for')->status_is(200)
 $t->get_ok('/template_inheritance')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_is("<title>Welcome</title>Sidebar!Hello World!\nDefault footer!");
+  ->content_is(
+    "<title>Works!</title>\n<br>Sidebar!Hello World!\nDefault footer!");
 
 # GET /layout_without_inheritance
 $t->get_ok('/layout_without_inheritance')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_is('Default header!Default sidebar!Default footer!');
+  ->content_is(
+    "<title></title>\nDefault header!Default sidebar!Default footer!");
 
 # GET /double_inheritance
 $t->get_ok('/double_inheritance')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_is('<title>Welcome</title>Sidebar too!Default footer!');
+  ->content_is("<title>Works!</title>\n<br>Sidebar too!Default footer!");
 
 # GET /plugin_with_template
 $t->get_ok('/plugin_with_template')->status_is(200)
@@ -1215,7 +1221,7 @@ $t->post_ok('/bar/baz')->status_is(200)
 $t->get_ok('/layout')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_is("Yea baby! with layout\n");
+  ->content_is("LayoutYea baby! with layout\n");
 
 # GET /firefox
 $t->get_ok('/firefox/bar', {'User-Agent' => 'Firefox'})->status_is(200)
@@ -1233,9 +1239,9 @@ $t->get_ok('/firefox/bar', {'User-Agent' => 'Explorer'})->status_is(404)
 $t->post_form_ok('/utf8', 'UTF-8' => {name => 'Вячеслав'})
   ->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By'   => 'Mojolicious (Perl)')
-  ->header_is('Content-Length' => 40)->content_type_is('text/html')
-  ->content_is(
-    b("Вячеслав Тихановский\n")->encode->to_string);
+  ->header_is('Content-Length' => 40)
+  ->content_type_is('text/html;charset=UTF-8')
+  ->content_is("Вячеслав Тихановский\n");
 
 # POST /utf8 (multipart/form-data)
 $t->post_form_ok(
@@ -1244,9 +1250,9 @@ $t->post_form_ok(
     {'Content-Type' => 'multipart/form-data'}
   )->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By'   => 'Mojolicious (Perl)')
-  ->header_is('Content-Length' => 40)->content_type_is('text/html')
-  ->content_is(b("Вячеслав Тихановский\n")->encode('UTF-8')
-      ->to_string);
+  ->header_is('Content-Length' => 40)
+  ->content_type_is('text/html;charset=UTF-8')
+  ->content_is("Вячеслав Тихановский\n");
 
 # POST /malformed_utf8
 my $tx = Mojo::Transaction::HTTP->new;
@@ -1502,6 +1508,12 @@ $t->get_ok('/redirect/condition/1' => {'X-Condition-Test' => 1})
 $t->get_ok('/bridge2stash' => {'X-Flash' => 1})->status_is(200)
   ->content_is("stash too!!!!!!!!\n");
 
+# GET /favicon.ico (random static requests)
+$t->get_ok('/favicon.ico')->status_is(200);
+$t->get_ok('/mojolicious-white.png')->status_is(200);
+$t->get_ok('/mojolicious-black.png')->status_is(200);
+$t->get_ok('/favicon.ico')->status_is(200);
+
 # GET /bridge2stash (with cookies, session and flash)
 $t->get_ok('/bridge2stash')->status_is(200)
   ->content_is(
@@ -1522,6 +1534,22 @@ $t->get_ok('/with/under/count', {'X-Bender' => 'Rodriguez'})->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->header_is('X-Under'      => 1)->content_is("counter\n");
+
+# GET /bridge2stash (again)
+$t->get_ok('/bridge2stash', {'X-Flash' => 1})->status_is(200)
+  ->content_is(
+    "stash too!cookie!signed_cookie!!bad_cookie--12345678!session!!/!\n");
+
+# GET /bridge2stash (with cookies, session and flash)
+$t->get_ok('/bridge2stash')->status_is(200)
+  ->content_is(
+    "stash too!cookie!signed_cookie!!bad_cookie--12345678!session!flash!/!\n"
+  );
+
+# GET /bridge2stash (with cookies and session but no flash)
+$t->get_ok('/bridge2stash' => {'X-Flash2' => 1})->status_is(200)
+  ->content_is(
+    "stash too!cookie!signed_cookie!!bad_cookie--12345678!session!!/!\n");
 
 # GET /possible
 $t->get_ok('/possible')->status_is(200)
@@ -1699,8 +1727,9 @@ work!
 
 @@ template_inheritance.html.ep
 % layout 'template_inheritance';
+% title 'Works!';
 <% content header => begin =%>
-<%= b('<title>Welcome</title>') %>
+<%= b('<br>') %>
 <% end =%>
 <% content sidebar => begin =%>
 Sidebar!
@@ -1708,6 +1737,7 @@ Sidebar!
 Hello World!
 
 @@ layouts/template_inheritance.html.ep
+<title><%= title %></title>
 % stash foo => 'Default';
 <%= content header => begin =%>
 Default header!
@@ -1772,7 +1802,8 @@ Just works!\
 <%= shift->param('name') %> Тихановский
 
 @@ layouts/layout.html.epl
-<%= shift->render_inner %> with layout
+% my $self = shift;
+<%= $self->title %><%= $self->render_inner %> with layout
 
 @@ autostash.html.ep
 % $self->layout('layout');

@@ -1,5 +1,22 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+1.01 2011-01-06 00:00:00
+        - Relicensed some of the images to make sure Mojolicious can be
+          shipped with commercial products.
+        - Updated IO::Socket::SSL requirement to 1.37 due to bugs in older
+          versions.
+        - Added EXPERIMENTAL TLS certificate authentication support.
+          (tempire)
+        - Added EXPERIMENTAL title helper.
+        - Added EXPERIMENTAL render_later method to Mojolicious::Controller.
+        - Improved documentation.
+        - Improved test. (Charlie Brady)
+        - Improved charset handling in Mojolicious slightly.
+        - Updated application generators with base tags.
+        - Fixed relative path handling in Mojo::URL.
+        - Fixed punycode bug. (kits)
+        - Fixed a bug where the static dispatcher would eat the flash.
+
 1.0 2010-12-26 00:00:00
         - Code name "Snowflake", this is a major release.
         - Deprecated session method in Mojolicious.

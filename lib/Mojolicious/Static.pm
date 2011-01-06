@@ -37,7 +37,8 @@ sub dispatch {
     # Serve static file
     unless ($self->serve($c, join('/', @parts))) {
 
-        # Finish
+        # Rendered
+        $c->stash->{'mojo.static'} = 1;
         $c->rendered;
 
         return;
@@ -3415,7 +3416,7 @@ L<Mojolicious::Static> has a few popular static files bundled.
 
 Amelia Perl logo.
 
-    Copyright (C) 2010, Sebastian Riedel.
+    Copyright (C) 2010-2011, Sebastian Riedel.
 
 Licensed under the CC-SA License, Version 3.0
 L<http://creativecommons.org/licenses/by-sa/3.0>.
@@ -3424,72 +3425,72 @@ L<http://creativecommons.org/licenses/by-sa/3.0>.
 
 Mojolicious favicon.
 
-    Copyright (C) 2010, Sebastian Riedel.
+    Copyright (C) 2010-2011, Sebastian Riedel.
 
-Licensed under the CC-NC-ND License, Version 3.0
+Licensed under the CC-ND License, Version 3.0
 L<http://creativecommons.org/licenses/by-nc-nd/3.0>.
 
 =head2 C<mojolicious-arrow.png>
 
 Mojolicious arrow for C<not_found> template.
 
-    Copyright (C) 2010, Sebastian Riedel.
+    Copyright (C) 2010-2011, Sebastian Riedel.
 
-Licensed under the CC-NC-ND License, Version 3.0
+Licensed under the CC-ND License, Version 3.0
 L<http://creativecommons.org/licenses/by-nc-nd/3.0>.
 
 =head2 C<mojolicious-black.png>
 
 Black Mojolicious logo.
 
-    Copyright (C) 2010, Sebastian Riedel.
+    Copyright (C) 2010-2011, Sebastian Riedel.
 
-Licensed under the CC-NC-ND License, Version 3.0
+Licensed under the CC-ND License, Version 3.0
 L<http://creativecommons.org/licenses/by-nc-nd/3.0>.
 
 =head2 C<mojolicious-box.png>
 
 Mojolicious box for C<not_found> template.
 
-    Copyright (C) 2010, Sebastian Riedel.
+    Copyright (C) 2010-2011, Sebastian Riedel.
 
-Licensed under the CC-NC-ND License, Version 3.0
+Licensed under the CC-ND License, Version 3.0
 L<http://creativecommons.org/licenses/by-nc-nd/3.0>.
 
 =head2 C<mojolicious-clouds.png>
 
 Mojolicious clouds for C<not_found> template.
 
-    Copyright (C) 2010, Sebastian Riedel.
+    Copyright (C) 2010-2011, Sebastian Riedel.
 
-Licensed under the CC-NC-ND License, Version 3.0
+Licensed under the CC-ND License, Version 3.0
 L<http://creativecommons.org/licenses/by-nc-nd/3.0>.
 
 =head2 C<mojolicious-pinstripe.gif>
 
 Mojolicious pinstripe effect for multiple templates.
 
-    Copyright (C) 2010, Sebastian Riedel.
+    Copyright (C) 2010-2011, Sebastian Riedel.
 
-Licensed under the CC-NC-ND License, Version 3.0
+Licensed under the CC-ND License, Version 3.0
 L<http://creativecommons.org/licenses/by-nc-nd/3.0>.
 
 =head2 C<mojolicious-white.png>
 
 White Mojolicious logo.
 
-    Copyright (C) 2010, Sebastian Riedel.
+    Copyright (C) 2010-2011, Sebastian Riedel.
 
-Licensed under the CC-NC-ND License, Version 3.0
+Licensed under the CC-ND License, Version 3.0
 L<http://creativecommons.org/licenses/by-nc-nd/3.0>.
 
 =head2 C<css/prettify-mojo.css>
 
 Mojolicious theme for C<prettify.js>.
 
-    Copyright (C) 2010, Sebastian Riedel.
+    Copyright (C) 2010-2011, Sebastian Riedel.
 
-Licensed under the CC-NC-ND License, Version 3.0
+Licensed under the CC-ND License, Version 3.0
 L<http://creativecommons.org/licenses/by-nc-nd/3.0>.
 
 =head2 C</js/jquery.js>

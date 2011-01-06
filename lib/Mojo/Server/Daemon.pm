@@ -28,6 +28,18 @@ __PACKAGE__->attr(max_clients        => 1000);
 __PACKAGE__->attr(max_requests       => 25);
 __PACKAGE__->attr(websocket_timeout  => 300);
 
+my $SOCKET_RE = qr/^
+    (http(?:s)?)\:\/\/   # Scheme
+    (.+)                 # Host
+    \:(\d+)              # Port
+    (?:
+        \:(.*?)          # Certificate
+        \:(.*?)          # Key
+        (?:\:(.+)?)?     # Certificate Authority
+    )?
+    $
+/x;
+
 sub DESTROY {
     my $self = shift;
 
@@ -257,12 +269,13 @@ sub _listen {
     if ($listen =~ /^file\:\/\/(.+)$/) { unlink $options->{file} = $1 }
 
     # Internet socket
-    elsif ($listen =~ /^(http(?:s)?)\:\/\/(.+)\:(\d+)(?:\:(.*)\:(.*))?$/) {
+    elsif ($listen =~ $SOCKET_RE) {
         $tls = $options->{tls} = 1 if $1 eq 'https';
         $options->{address}  = $2 if $2 ne '*';
         $options->{port}     = $3;
         $options->{tls_cert} = $4 if $4;
         $options->{tls_key}  = $5 if $5;
+        $options->{tls_ca}   = $6 if $6;
     }
 
     # Listen backlog size

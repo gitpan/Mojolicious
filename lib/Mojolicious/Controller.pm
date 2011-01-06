@@ -462,6 +462,8 @@ sub render_json {
     return $self->render($args);
 }
 
+sub render_later { shift->stash->{'mojo.rendered'} = 1 }
+
 # Excuse me, sir, you're snowboarding off the trail.
 # Lick my frozen metal ass.
 sub render_not_found {
@@ -574,8 +576,8 @@ sub rendered {
     # Resume
     $self->tx->resume;
 
-    # Rendered
-    $self->stash->{'mojo.rendered'} = 1;
+    # Disable auto rendering
+    $self->render_later;
 
     # Stash
     my $stash = $self->stash;
@@ -1179,7 +1181,8 @@ implements the following new ones.
     my $app = $c->app;
     $c      = $c->app(Mojolicious->new);
 
-A reference back to the application that dispatched to this controller.
+A reference back to the L<Mojolicious> application that dispatched to this
+controller.
 
 =head2 C<match>
 
@@ -1342,6 +1345,13 @@ C<extends> features.
 
 Render a data structure as JSON.
 
+=head2 C<render_later>
+
+    $c->render_later;
+
+Disable auto rendering.
+Note that this method is EXPERIMENTAL and might change without warning!
+
 =head2 C<render_not_found>
 
     $c->render_not_found;
@@ -1384,14 +1394,14 @@ Note that this method is EXPERIMENTAL and might change without warning!
 
     my $req = $c->req;
 
-Alias for C<$c->tx->req>.
+Alias for C<$c-E<gt>tx-E<gt>req>.
 Usually refers to a L<Mojo::Message::Request> object.
 
 =head2 C<res>
 
     my $res = $c->res;
 
-Alias for C<$c->tx->res>.
+Alias for C<$c-E<gt>tx-E<gt>res>.
 Usually refers to a L<Mojo::Message::Response> object.
 
 =head2 C<send_message>

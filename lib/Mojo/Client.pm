@@ -25,7 +25,7 @@ use Scalar::Util 'weaken';
 use constant DEBUG => $ENV{MOJO_CLIENT_DEBUG} || 0;
 
 # You can't let a single bad experience scare you away from drugs.
-__PACKAGE__->attr([qw/app http_proxy https_proxy tx/]);
+__PACKAGE__->attr([qw/app cert http_proxy https_proxy key tx/]);
 __PACKAGE__->attr(cookie_jar => sub { Mojo::CookieJar->new });
 __PACKAGE__->attr(ioloop     => sub { Mojo::IOLoop->new });
 __PACKAGE__->attr(keep_alive_timeout => 15);
@@ -609,10 +609,12 @@ sub _connect {
 
         # Connect
         $id = $loop->connect(
-            address => $address,
-            port    => $port,
-            handle  => $id,
-            tls     => $scheme eq 'https' ? 1 : 0,
+            address  => $address,
+            port     => $port,
+            handle   => $id,
+            tls      => $scheme eq 'https' ? 1 : 0,
+            tls_cert => $self->cert,
+            tls_key  => $self->key,
             on_connect => sub { $self->_connected($_[1]) }
         );
 
@@ -810,9 +812,11 @@ sub _handle {
         # Idle connection
         return unless $old;
 
+        # Response
+        my $res = $old->res;
+
         # Interrupted
-        $old->res->error('Interrupted, maybe a timeout?')
-          unless $old->is_done;
+        $res->error('Interrupted, maybe a timeout?') unless $res->is_done;
 
         # Extract cookies
         if (my $jar = $self->cookie_jar) { $jar->extract($old) }
@@ -1148,6 +1152,9 @@ Mojo::Client - Async IO HTTP 1.1 And WebSocket Client
         print "Error: $message";
     }
 
+    # TLS certificate authentication
+    $client->cert('tls.crt')->key('tls.key')->get('https://mojolicio.us');
+    
     # Parallel requests
     my $callback = sub { print shift->res->body };
     $client->get('http://mojolicio.us' => $callback);
@@ -1189,6 +1196,14 @@ L<Mojo::Client> implements the following attributes.
 A Mojo application to associate this client with.
 If set, local requests will be processed in this application.
 
+=head2 C<cert>
+
+    my $cert = $client->cert;
+    $client  = $client->cert('tls.crt');
+
+Path to TLS certificate file.
+Note that this attribute is EXPERIMENTAL and might change without warning!
+
 =head2 C<cookie_jar>
 
     my $cookie_jar = $client->cookie_jar;
@@ -1225,6 +1240,14 @@ will be used.
     $client                = $client->keep_alive_timeout(15);
 
 Timeout in seconds for keep alive between requests, defaults to C<15>.
+
+=head2 C<key>
+
+    my $key = $client->key;
+    $client = $client->key('tls.crt');
+
+Path to TLS key file.
+Note that this attribute is EXPERIMENTAL and might change without warning!
 
 =head2 C<log>
 

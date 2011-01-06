@@ -20,20 +20,16 @@ sub register {
             # Stash
             my $stash = $self->stash;
 
-            # Static file
-            $stash->{'mojo.static'} = 1 if $self->res->code;
-
-
             # New request
             my $req    = $self->req;
             my $method = $req->method;
             my $path   = $req->url->path;
             my $ua     = $req->headers->user_agent || 'Anonymojo';
-            $self->app->log->debug("$method /$path ($ua).")
+            $self->app->log->debug("$method $path ($ua).")
               unless $stash->{'mojo.static'};
 
             # Start
-            $self->stash('mojo.started' => [Time::HiRes::gettimeofday()]);
+            $stash->{'mojo.started'} = [Time::HiRes::gettimeofday()];
         }
     );
 

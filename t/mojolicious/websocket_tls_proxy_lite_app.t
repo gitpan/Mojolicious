@@ -8,7 +8,7 @@ BEGIN { $ENV{MOJO_POLL} = 1 }
 
 use Test::More;
 use Mojo::IOLoop;
-plan skip_all => 'IO::Socket::SSL 1.34 required for this test!'
+plan skip_all => 'IO::Socket::SSL 1.37 required for this test!'
   unless Mojo::IOLoop::TLS;
 plan tests => 16;
 
@@ -116,7 +116,7 @@ $loop->listen(
 
 # GET / (normal request)
 is $client->get("https://localhost:$port/")->success->body,
-  "Hello World!  https://localhost:$port/", 'right content';
+  "Hello World! / https://localhost:$port/", 'right content';
 
 # WebSocket /test (normal websocket)
 my $result;

@@ -191,23 +191,17 @@ simply equal to the route without non-word characters.
     # /
     get '/' => 'index';
 
-    # /foo
-    get '/foo' => '*';
-
-    # /bar
-    get '/bar' => sub {
-        my $self = shift;
-        $self->render(text => 'Hi!')
-    } => 'bar';
+    # /hello
+    get '/hello' => '*';
 
     __DATA__
 
     @@ index.html.ep
-    <%= link_to Foo => 'foo' %>.
-    <%= link_to Bar => 'bar' %>.
+    <%= link_to Hello => 'hello' %>.
+    <%= link_to Reload => 'index' %>.
 
-    @@ foo.html.ep
-    <a href="<%= url_for 'index' %>">Home</a>.
+    @@ hello.html.ep
+    Hello World!
 
 =head2 Layouts
 
@@ -216,24 +210,33 @@ Templates can have layouts.
     # GET /with_layout
     get '/with_layout' => sub {
         my $self = shift;
-        $self->render('with_layout', layout => 'green');
+        $self->render('with_layout');
     };
 
     __DATA__
 
     @@ with_layout.html.ep
+    % title 'Green!';
+    % layout 'green';
     We've got content!
 
     @@ layouts/green.html.ep
     <!doctype html><html>
-        <head><title>Green!</title></head>
+        <head>
+            <title><%= title %></title>
+            <%= base_tag %>
+        </head>
         <body><%= content %></body>
     </html>
 
+All helper generated URLs are usually relative, in combination with the
+C<base_tag> helper this will keep your applications portable across many
+different deployment scenarios.
+
 =head2 Blocks
 
-Template blocks that can be used like functions in Perl scripts are built
-with C<begin> and C<end>.
+Template blocks can be used like normal Perl functions and are always
+delimited by the C<begin> and C<end> keywords.
 
     # GET /with_block
     get '/with_block' => 'block';
@@ -267,7 +270,7 @@ content.
     __DATA__
 
     @@ captured.html.ep
-    % layout 'blue';
+    % layout 'blue', title => 'Green!';
     <% content_for header => begin %>
         <meta http-equiv="Pragma" content="no-cache">
     <% end %>
@@ -279,7 +282,8 @@ content.
     @@ layouts/blue.html.ep
     <!doctype html><html>
         <head>
-            <title>Green!</title>
+            <title><%= title %></title>
+            <%= base_tag %>
             <%= content_for 'header' %>
         </head>
         <body><%= content %></body>
@@ -458,6 +462,7 @@ multiple features at once.
 
         $self->render(
             template => 'welcome',
+            title    => 'Welcome!',
             layout   => 'funky',
             groovy   => $groovy
         );
@@ -467,6 +472,7 @@ multiple features at once.
     __DATA__
 
     @@ index.html.ep
+    % title 'Groovy!';
     % layout 'funky';
     Who is groovy?
     <%= form_for test => (method => 'post') => begin %>
@@ -485,7 +491,10 @@ multiple features at once.
 
     @@ layouts/funky.html.ep
     <!doctype html><html>
-        <head><title>Funky!</title></head>
+        <head>
+            <title><%= title %></title>
+            <%= base_tag %>
+        </head>
         <body><%= content %>
         </body>
     </html>
@@ -614,12 +623,16 @@ request), this is very useful in combination with C<redirect_to>.
 
     @@ layouts/default.html.ep
     <!doctype html><html>
-        <head><title>Mojolicious rocks!</title></head>
+        <head>
+            <title><%= title %></title>
+            <%= base_tag %>
+        </head>
         <body><%= content %></body>
     </html>
 
     @@ login.html.ep
     % layout 'default';
+    % title 'Login';
     <%= form_for login => begin %>
         <% if (param 'name') { %>
             <b>Wrong name or password, please try again.</b><br>
@@ -633,6 +646,7 @@ request), this is very useful in combination with C<redirect_to>.
 
     @@ index.html.ep
     % layout 'default';
+    % title 'Welcome';
     <% if (my $message = flash 'message' ) { %>
         <b><%= $message %></b><br>
     <% } %>

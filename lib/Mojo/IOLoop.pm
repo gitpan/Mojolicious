@@ -46,7 +46,7 @@ use constant KQUEUE_WRITE  => KQUEUE ? IO::KQueue::EVFILT_WRITE() : 0;
 # TLS support requires IO::Socket::SSL
 use constant TLS => $ENV{MOJO_NO_TLS}
   ? 0
-  : eval 'use IO::Socket::SSL 1.34 "inet4"; 1';
+  : eval 'use IO::Socket::SSL 1.37 "inet4"; 1';
 use constant TLS_READ  => TLS ? IO::Socket::SSL::SSL_WANT_READ()  : 0;
 use constant TLS_WRITE => TLS ? IO::Socket::SSL::SSL_WANT_WRITE() : 0;
 
@@ -194,7 +194,9 @@ sub connect {
         buffer     => '',
         on_connect => $args->{on_connect},
         connecting => 1,
-        tls        => $args->{tls}
+        tls        => $args->{tls},
+        tls_cert   => $args->{tls_cert},
+        tls_key    => $args->{tls_key}
     };
     (my $id) = "$c" =~ /0x([\da-f]+)/;
     $self->{_cs}->{$id} = $c;
@@ -277,7 +279,7 @@ sub listen {
     my $args = ref $_[0] ? $_[0] : {@_};
 
     # TLS check
-    croak "IO::Socket::SSL 1.34 required for TLS support"
+    croak "IO::Socket::SSL 1.37 required for TLS support"
       if $args->{tls} && !TLS;
 
     # Options
@@ -362,13 +364,27 @@ sub listen {
     $c->{handle} = $socket;
     $self->{_reverse}->{$socket} = $id;
 
-    # TLS options
-    $c->{tls} = {
-        SSL_startHandshake => 0,
-        SSL_cert_file      => $args->{tls_cert} || $self->_prepare_cert,
-        SSL_key_file       => $args->{tls_key} || $self->_prepare_key
-      }
-      if $args->{tls};
+    # TLS
+    if ($args->{tls}) {
+
+        # Defaults
+        my %options = (
+            SSL_startHandshake => 0,
+            SSL_cert_file      => $args->{tls_cert} || $self->_prepare_cert,
+            SSL_key_file       => $args->{tls_key} || $self->_prepare_key,
+        );
+
+        # Client certificate verification
+        %options = (
+            SSL_verify_callback => $args->{tls_verify},
+            SSL_ca_file => -T $args->{tls_ca} ? $args->{tls_ca} : undef,
+            SSL_ca_path     => -d $args->{tls_ca} ? $args->{tls_ca} : undef,
+            SSL_verify_mode => $args->{tls_ca}    ? 0x03            : undef,
+            %options
+        ) if $args->{tls_ca};
+
+        $c->{tls} = {%options, %{$args->{tls_args} || {}}};
+    }
 
     # Accept limit
     $self->{_accepts} = $self->max_accepts if $self->max_accepts;
@@ -543,6 +559,12 @@ sub one_tick {
         $self->_run_callback('idle', $self->{_idle}->{$idle}->{cb}, $idle)
           unless @read || @write || @error || @hup || $timers;
     }
+}
+
+sub handle {
+    my ($self, $id) = @_;
+    return unless my $c = $self->{_cs}->{$id};
+    return $c->{handle};
 }
 
 sub remote_info {
@@ -738,6 +760,8 @@ sub start_tls {
     my %options = (
         SSL_startHandshake => 0,
         SSL_error_trap     => sub { $self->_error($id, $_[1]) },
+        SSL_cert_file      => $args->{tls_cert},
+        SSL_key_file       => $args->{tls_key},
         Timeout            => $self->connect_timeout,
         %{$args->{tls_args} || {}}
     );
@@ -1230,7 +1254,7 @@ sub _prepare_connections {
         if ($c->{finish} && !length $c->{buffer}) {
 
             # Buffer empty
-            $self->_drop_immediately($id);
+            $self->_hup($id);
             next;
         }
 
@@ -1838,6 +1862,14 @@ Protocol to use, defaults to C<tcp>.
 
 Enable TLS.
 
+=item C<tls_cert>
+
+Path to the TLS certificate file.
+
+=item C<tls_key>
+
+Path to the TLS key file.
+
 =back
 
 =head2 C<connection_timeout>
@@ -1861,6 +1893,13 @@ data in its write buffer.
     my $port = $loop->generate_port;
 
 Find a free TCP port, this is a utility function primarily used for tests.
+
+=head2 C<handle>
+
+    my $handle = $loop->handle($id);
+
+Get handle for id.
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<is_running>
 
@@ -1932,6 +1971,10 @@ Path to the TLS cert file, defaulting to a built in test certificate.
 =item C<tls_key>
 
 Path to the TLS key file, defaulting to a built in test key.
+
+=item C<tls_ca>
+
+Path to TLS certificate authority file or directory.
 
 =back
 

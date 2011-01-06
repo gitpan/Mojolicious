@@ -46,12 +46,16 @@ app->start;
 
 <%%= '@@ index.html.ep' %%>
 % layout 'default';
+% title 'Welcome';
 Welcome to Mojolicious!
 
 <%%= '@@ layouts/default.html.ep' %%>
 <!doctype html><html>
-    <head><title>Welcome!</title></head>
-    <body><%== content %></body>
+    <head>
+        <title><%= title %></title>
+        <%= base_tag %>
+    </head>
+    <body><%= content %></body>
 </html>
 __END__
 =head1 NAME

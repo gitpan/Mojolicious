@@ -44,7 +44,7 @@ EOF
 };
 
 our $CODENAME = 'Snowflake';
-our $VERSION  = '1.0';
+our $VERSION  = '1.01';
 
 # These old doomsday devices are dangerously unstable.
 # I'll rest easier not knowing where they are.
@@ -114,8 +114,8 @@ sub new {
     $static->root($home->rel_dir('public'));
 
     # Hide own controller methods
-    $r->hide(qw/AUTOLOAD DESTROY client cookie finish finished flash/);
-    $r->hide(qw/handler helper on_message param redirect_to render/);
+    $r->hide(qw/AUTOLOAD DESTROY client cookie delayed finish finished/);
+    $r->hide(qw/flash handler helper on_message param redirect_to render/);
     $r->hide(qw/render_data render_exception render_inner render_json/);
     $r->hide(qw/render_not_found render_partial render_static render_text/);
     $r->hide(qw/rendered send_message session signed_cookie url_for/);
@@ -851,6 +851,8 @@ Kazuhiro Shibuya
 
 Kevin Old
 
+KITAMURA Akatsuki
+
 Lars Balker Rasmussen
 
 Leon Brocard
@@ -925,7 +927,7 @@ Zak B. Elep
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2008-2010, Sebastian Riedel.
+Copyright (C) 2008-2011, Sebastian Riedel.
 
 This program is free software, you can redistribute it and/or modify it under
 the terms of the Artistic License version 2.0.
