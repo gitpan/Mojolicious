@@ -1,5 +1,62 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+1.1 2011-02-14 00:00:00
+        - Code name "Smiling Cat Face With Heart-Shaped Eyes", this is a
+          major release.
+        - Deprecated wildcard route names in favor of automatically generated
+          default names for all routes.
+        - Removed native IIS support since it has become unmaintainable.
+        - Added EXPERIMENTAL much prettier attribute generator to Mojo::Base.
+        - Added EXPERIMENTAL on_start attribute to Mojo::Client.
+        - Added EXPERIMENTAL support for route shortcuts.
+        - Added EXPERIMENTAL support for NO_PROXY. (l0b0)
+        - Added EXPERIMENTAL user_agent attribute to Mojo::Client.
+        - Added EXPERIMENTAL support for mode specific not_found and
+          exception templates.
+        - Added EXPERIMENTAL support for route caching.
+        - Added EXPERIMENTAL support for CSS3 selectors to the get command.
+        - Added image helper to Mojolicious::Plugin::TagHelpers.
+        - Added support for secure session cookies. (crab)
+        - Improved HTML5 compatibility of Mojo::DOM.
+        - Replaced Mojo::JSON parser with a much faster and stricter
+          implementation. (chansen)
+        - Improved Mojo::JSON string encoding. (chansen)
+        - Updated to jQuery to version 1.5.
+        - Removed experimental status from Mojo::DOM and ojo.
+        - Removed experimental status from many attributes and methods all
+          over Mojolicious.
+        - Renamed after and before in Mojo::DOM to add_after and add_before.
+        - Improved documentation browser slightly.
+        - Improved CSS3 support in Mojo::DOM.
+        - Changed Mojolicious::Plugin::EplRenderer to not render 404 errors
+          for missing templates.
+        - Changed exception template to use pre instead of h1 tags for error
+          messages. (vaneska)
+        - Made Simpsons and Futurama quotes easier to distinguish from normal
+          comments.
+        - Made routes reusable outside of Mojolicious. (forwardever)
+        - Fixed a few home detection bugs.
+        - Fixed a complicated application embedding bug.
+        - Fixed a Apache mod_rewrite compatibility bug in
+          Mojo::Message::Request. (dekimsey)
+        - Fixed a small bug in the relaxed HTTP parser.
+        - Fixed a small bug in Mojolicious::Command::Get.
+        - Fixed a small bug in Mojolicious::Plugin::JsonConfig.
+        - Fixed support for broken redirects.
+        - Fixed --reload delay problem.
+        - Fixed shagadelic function of Mojolicious::Lite.
+        - Fixed optgroup support in select_field helper.
+        - Fixed tests that can't run on Windows.
+        - Fixed delayed rendering bug. (yko)
+        - Fixed nested route bug.
+        - Fixed a small multipart parser bug.
+        - Fixed small any route bug.
+        - Fixed small empty route bug.
+        - Fixed URL merging in Mojo::URL.
+        - Fixed version detection in Mojolicious::Command::Version.
+        - Fixed Mojo::Client cloning.
+        - Fixed typos.
+
 1.01 2011-01-06 00:00:00
         - Relicensed some of the images to make sure Mojolicious can be
           shipped with commercial products.
@@ -140,7 +197,7 @@ This file documents the revision history for Perl extension Mojolicious.
         - Renamed tag helper input to input_tag.
         - Added EXPERIMENTAL non-blocking DNS support to Mojo::IOLoop.
           (und3f)
-        - Added EXPERIMENTAL support for IPv4 and IPv6 addess checks to
+        - Added EXPERIMENTAL support for IPv4 and IPv6 address checks to
           Mojo::URL.
         - Added stylesheet tag helper.
         - Added before and after methods to Mojo::DOM.

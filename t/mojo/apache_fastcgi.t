@@ -7,7 +7,7 @@ use warnings;
 BEGIN { $ENV{MOJO_POLL} = 1 }
 
 # mod_fastcgi doesn't like small chunks
-BEGIN { $ENV{MOJO_CHUNK_SIZE} = 262144 }
+BEGIN { $ENV{MOJO_CHUNK_SIZE} = 256000 }
 
 use Test::More;
 
@@ -24,7 +24,7 @@ plan skip_all => 'set TEST_APACHE to enable this test (developer only!)'
   unless $ENV{TEST_APACHE};
 plan tests => 8;
 
-# Robots don't have any emotions, and sometimes that makes me very sad.
+# "Robots don't have any emotions, and sometimes that makes me very sad."
 use_ok 'Mojo::Server::FastCGI';
 
 # Setup
@@ -81,20 +81,20 @@ EOF
 my $pid = open my $server, '-|', '/usr/sbin/httpd', '-X', '-f', $config;
 sleep 1
   while !IO::Socket::INET->new(
-    Proto    => 'tcp',
-    PeerAddr => 'localhost',
-    PeerPort => $port
+  Proto    => 'tcp',
+  PeerAddr => 'localhost',
+  PeerPort => $port
   );
 
 # Request
 my $client = Mojo::Client->new;
 my ($code, $body);
 $client->get(
-    "http://127.0.0.1:$port/" => sub {
-        my $self = shift;
-        $code = $self->res->code;
-        $body = $self->res->body;
-    }
+  "http://127.0.0.1:$port/" => sub {
+    my $self = shift;
+    $code = $self->res->code;
+    $body = $self->res->body;
+  }
 )->start;
 is $code,   200,      'right status';
 like $body, qr/Mojo/, 'right content';
@@ -106,11 +106,11 @@ my $result = '';
 for my $key (sort keys %$params) { $result .= $params->{$key} }
 ($code, $body) = undef;
 $client->post_form(
-    "http://127.0.0.1:$port/diag/chunked_params" => $params => sub {
-        my $self = shift;
-        $code = $self->res->code;
-        $body = $self->res->body;
-    }
+  "http://127.0.0.1:$port/diag/chunked_params" => $params => sub {
+    my $self = shift;
+    $code = $self->res->code;
+    $body = $self->res->body;
+  }
 )->start;
 is $code, 200, 'right status';
 is $body, $result, 'right content';
@@ -118,12 +118,12 @@ is $body, $result, 'right content';
 # Upload
 ($code, $body) = undef;
 $client->post_form(
-    "http://127.0.0.1:$port/diag/upload" => {file => {content => $result}} =>
-      sub {
-        my $self = shift;
-        $code = $self->res->code;
-        $body = $self->res->body;
-    }
+  "http://127.0.0.1:$port/diag/upload" => {file => {content => $result}} =>
+    sub {
+    my $self = shift;
+    $code = $self->res->code;
+    $body = $self->res->body;
+  }
 )->start;
 is $code, 200, 'right status';
 is $body, $result, 'right content';
@@ -132,7 +132,7 @@ is $body, $result, 'right content';
 kill 'INT', $pid;
 sleep 1
   while IO::Socket::INET->new(
-    Proto    => 'tcp',
-    PeerAddr => 'localhost',
-    PeerPort => $port
+  Proto    => 'tcp',
+  PeerAddr => 'localhost',
+  PeerPort => $port
   );

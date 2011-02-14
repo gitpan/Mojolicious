@@ -8,7 +8,7 @@ BEGIN { $ENV{MOJO_POLL} = 1 }
 
 use Test::More;
 
-# I ate the blue ones... they taste like burning.
+# "I ate the blue ones... they taste like burning."
 use File::Spec;
 use File::Temp;
 use FindBin;
@@ -22,8 +22,8 @@ plan skip_all => 'set TEST_HYPNOTOAD to enable this test (developer only!)'
   unless $ENV{TEST_HYPNOTOAD};
 plan tests => 40;
 
-# Daddy, I'm scared. Too scared to even wet my pants.
-# Just relax and it'll come, son.
+# "Daddy, I'm scared. Too scared to even wet my pants.
+#  Just relax and it'll come, son."
 use_ok 'Mojo::Server::Hypnotoad';
 
 # Config
@@ -43,9 +43,9 @@ my $pid = open my $server, '-|', $^X, "$prefix/hypnotoad", '--foreground',
   $config, "$prefix/mojo";
 sleep 1
   while !IO::Socket::INET->new(
-    Proto    => 'tcp',
-    PeerAddr => 'localhost',
-    PeerPort => $port
+  Proto    => 'tcp',
+  PeerAddr => 'localhost',
+  PeerPort => $port
   );
 
 my $client = Mojo::Client->new;
@@ -147,7 +147,7 @@ $tx2->req->body('foo bar baz');
 $tx3 = Mojo::Transaction::HTTP->new;
 $tx3->req->method('GET');
 $tx3->req->url->parse(
-    "http://127.0.0.1:$port/diag/chunked_params?a=foo&b=12");
+  "http://127.0.0.1:$port/diag/chunked_params?a=foo&b=12");
 $tx4 = Mojo::Transaction::HTTP->new;
 $tx4->req->method('GET');
 $tx4->req->url->parse("http://127.0.0.1:$port/13/");
@@ -164,10 +164,10 @@ like $tx2->res->content->asset->slurp, qr/Mojo/, 'right content';
 is $tx3->res->content->asset->slurp,   'foo12',  'right content';
 
 # Stop
-kill $^O eq 'MSWin32' ? 'KILL' : 'INT', $pid;
+kill 'INT', $pid;
 sleep 1
   while IO::Socket::INET->new(
-    Proto    => 'tcp',
-    PeerAddr => 'localhost',
-    PeerPort => $port
+  Proto    => 'tcp',
+  PeerAddr => 'localhost',
+  PeerPort => $port
   );

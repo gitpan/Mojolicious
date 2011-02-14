@@ -1,9 +1,5 @@
 package Mojolicious::Plugin::JsonConfig;
-
-use strict;
-use warnings;
-
-use base 'Mojolicious::Plugin';
+use Mojo::Base 'Mojolicious::Plugin';
 
 require File::Basename;
 require File::Spec;
@@ -11,125 +7,130 @@ require File::Spec;
 use Mojo::JSON;
 use Mojo::Template;
 
-# And so we say goodbye to our beloved pet, Nibbler, who's gone to a place
-# where I, too, hope one day to go. The toilet.
+use constant DEBUG => $ENV{MOJO_JSON_CONFIG_DEBUG} || 0;
+
+# "And so we say goodbye to our beloved pet, Nibbler, who's gone to a place
+#  where I, too, hope one day to go. The toilet."
 sub register {
-    my ($self, $app, $conf) = @_;
+  my ($self, $app, $conf) = @_;
 
-    # Plugin config
-    $conf ||= {};
+  # Plugin config
+  $conf ||= {};
 
-    # File
-    my $file = $conf->{file};
-    my $mode_file;
-    unless ($file) {
+  # File
+  my $file = $conf->{file} || $ENV{MOJO_JSON_CONFIG};
+  unless ($file) {
 
-        # Basename
-        $file = File::Basename::basename($0);
+    # Basename
+    $file = File::Basename::basename($ENV{MOJO_EXE} || $0);
 
-        # Remove .pl, .p6 and .t extentions
-        $file =~ s/(?:\.p(?:l|6))|\.t$//i;
+    # Remove .pl, .p6 and .t extentions
+    $file =~ s/(?:\.p(?:l|6))|\.t$//i;
 
-        # Mode specific config file
-        $mode_file = join '.', $file, $app->mode, ($conf->{ext} || 'json');
+    # Default extension
+    $file .= '.' . ($conf->{ext} || 'json');
+  }
 
-        # Default extension
-        $file .= '.' . ($conf->{ext} || 'json');
-    }
+  # Debug
+  warn "JSON CONFIG FILE $file\n" if DEBUG;
 
-    # Absolute path
-    $file = $app->home->rel_file($file)
-      unless File::Spec->file_name_is_absolute($file);
-    $mode_file = $app->home->rel_file($mode_file)
-      if defined $mode_file && !File::Spec->file_name_is_absolute($mode_file);
+  # Mode specific config file
+  my $mode;
+  if ($file =~ /^(.*)\.([^\.]+)$/) {
+    $mode = join '.', $1, $app->mode, $2;
 
-    # Read config file
-    my $config = {};
-    my $template = $conf->{template} || {};
-    if (-e $file) { $config = $self->_read_config($file, $template, $app) }
+    # Debug
+    warn "MODE SPECIFIC JSON CONFIG FILE $mode\n" if DEBUG;
+  }
 
-    # Check for default
-    else {
+  # Absolute path
+  $file = $app->home->rel_file($file)
+    unless File::Spec->file_name_is_absolute($file);
+  $mode = $app->home->rel_file($mode)
+    if defined $mode && !File::Spec->file_name_is_absolute($mode);
 
-        # All missing
-        die qq/Config file "$file" missing, maybe you need to create it?\n/
-          unless $conf->{default};
+  # Read config file
+  my $config = {};
+  my $template = $conf->{template} || {};
+  if (-e $file) { $config = $self->_read_config($file, $template, $app) }
 
-        # Debug
-        $app->log->debug(
-            qq/Config file "$file" missing, using default config./);
-    }
+  # Check for default
+  else {
 
-    # Merge with mode specific config file
-    if (defined $mode_file && -e $mode_file) {
-        my $mode_config = $self->_read_config($mode_file, $template, $app);
-        $config = {%$config, %$mode_config};
-    }
+    # All missing
+    die qq/Config file "$file" missing, maybe you need to create it?\n/
+      unless $conf->{default};
 
-    # Stash key
-    my $stash_key = $conf->{stash_key} || 'config';
+    # Debug
+    $app->log->debug(qq/Config file "$file" missing, using default config./);
+  }
 
-    # Merge
-    $config = {%{$conf->{default}}, %$config} if $conf->{default};
+  # Merge with mode specific config file
+  if (defined $mode && -e $mode) {
+    $config = {%$config, %{$self->_read_config($mode, $template, $app)}};
+  }
 
-    # Default
-    $app->defaults($stash_key => $config);
+  # Merge
+  $config = {%{$conf->{default}}, %$config} if $conf->{default};
 
-    return $config;
+  # Default
+  $app->defaults(($conf->{stash_key} || 'config') => $config);
+
+  return $config;
 }
 
 sub _parse_config {
-    my ($self, $encoded, $name) = @_;
+  my ($self, $encoded, $name) = @_;
 
-    # Parse
-    my $json   = Mojo::JSON->new;
-    my $config = $json->decode($encoded);
-    my $error  = $json->error;
-    die qq/Couldn't parse config "$name": $error/ if !$config && $error;
-    die qq/Invalid config "$name"./ if !$config || ref $config ne 'HASH';
+  # Parse
+  my $json   = Mojo::JSON->new;
+  my $config = $json->decode($encoded);
+  my $error  = $json->error;
+  die qq/Couldn't parse config "$name": $error/ if !$config && $error;
+  die qq/Invalid config "$name"./ if !$config || ref $config ne 'HASH';
 
-    return $config;
+  return $config;
 }
 
 sub _read_config {
-    my ($self, $file, $template, $app) = @_;
+  my ($self, $file, $template, $app) = @_;
 
-    # Debug
-    $app->log->debug(qq/Reading config file "$file"./);
+  # Debug
+  $app->log->debug(qq/Reading config file "$file"./);
 
-    # Slurp UTF-8 file
-    open FILE, "<:encoding(UTF-8)", $file
-      or die qq/Couldn't open config file "$file": $!/;
-    my $encoded = do { local $/; <FILE> };
-    close FILE;
+  # Slurp UTF-8 file
+  open FILE, "<:encoding(UTF-8)", $file
+    or die qq/Couldn't open config file "$file": $!/;
+  my $encoded = do { local $/; <FILE> };
+  close FILE;
 
-    # Process
-    $encoded = $self->_render_config($encoded, $template, $app);
-    return $self->_parse_config($encoded, $file, $app);
+  # Process
+  $encoded = $self->_render_config($encoded, $template, $app);
+  return $self->_parse_config($encoded, $file, $app);
 }
 
 sub _render_config {
-    my ($self, $encoded, $template, $app) = @_;
+  my ($self, $encoded, $template, $app) = @_;
 
-    # Instance
-    my $prepend = 'my $app = shift;';
+  # Instance
+  my $prepend = 'my $app = shift;';
 
-    # Be less strict
-    $prepend .= q/no strict 'refs'; no warnings 'redefine';/;
+  # Be less strict
+  $prepend .= q/no strict 'refs'; no warnings 'redefine';/;
 
-    # Helper
-    $prepend .= "sub app; *app = sub { \$app };";
+  # Helper
+  $prepend .= "sub app; *app = sub { \$app };";
 
-    # Be strict again
-    $prepend .= q/use strict; use warnings;/;
+  # Be strict again
+  $prepend .= q/use strict; use warnings;/;
 
-    # Render
-    my $mt = Mojo::Template->new($template);
-    $mt->prepend($prepend);
-    $encoded = $mt->render($encoded, $app);
-    utf8::encode $encoded;
+  # Render
+  my $mt = Mojo::Template->new($template);
+  $mt->prepend($prepend);
+  $encoded = $mt->render($encoded, $app);
+  utf8::encode $encoded;
 
-    return $encoded;
+  return $encoded;
 }
 
 1;
@@ -141,26 +142,26 @@ Mojolicious::Plugin::JsonConfig - JSON Configuration Plugin
 
 =head1 SYNOPSIS
 
-    # myapp.json
-    {
-        "foo"       : "bar",
-        "music_dir" : "<%= app->home->rel_dir('music') %>"
-    }
+  # myapp.json
+  {
+    "foo"       : "bar",
+    "music_dir" : "<%= app->home->rel_dir('music') %>"
+  }
 
-    # Mojolicious
-    $self->plugin('json_config');
+  # Mojolicious
+  my $config = $self->plugin('json_config');
 
-    # Mojolicious::Lite
-    plugin 'json_config';
+  # Mojolicious::Lite
+  my $config = plugin 'json_config';
 
-    # Reads myapp.json by default and puts the parsed version into the stash
-    my $config = $self->stash('config');
+  # Reads myapp.json by default and puts the parsed version into the stash
+  my $config = $self->stash('config');
 
-    # Everything can be customized with options
-    my $config = plugin json_config => {
-        file      => '/etc/myapp.conf',
-        stash_key => 'conf'
-    };
+  # Everything can be customized with options
+  my $config = plugin json_config => {
+    file      => '/etc/myapp.conf',
+    stash_key => 'conf'
+  };
 
 =head1 DESCRIPTION
 
@@ -171,41 +172,44 @@ The application object can be accessed via C<$app> or the C<app> helper.
 You can extend the normal config file C<myapp.json> with C<mode> specific
 ones like C<myapp.$mode.json>.
 
-=head2 Options
+=head1 OPTIONS
 
-=over 4
+=head2 C<default>
 
-=item default
+  # Mojolicious::Lite
+  plugin json_config => {default => {foo => 'bar'}};
 
-    # Mojolicious::Lite
-    plugin json_config => {default => {foo => 'bar'}};
+Default configuration.
 
-=item ext
+=head2 C<ext>
 
-    # Mojolicious::Lite
-    plugin json_config => {ext => 'conf'};
+  # Mojolicious::Lite
+  plugin json_config => {ext => 'conf'};
 
 File extension of config file, defaults to C<json>.
 
-=item file
+=head2 C<file>
 
-    # Mojolicious::Lite
-    plugin json_config => {file => 'myapp.conf'};
-    plugin json_config => {file => '/etc/foo.json'};
+  # Mojolicious::Lite
+  plugin json_config => {file => 'myapp.conf'};
+  plugin json_config => {file => '/etc/foo.json'};
 
-By default C<myapp.json> is searched in the application home directory.
+Configuration file, defaults to the value of C<MOJO_JSON_CONFIG> or
+C<myapp.json> in the application home directory.
 
-=item stash_key
+=head2 C<stash_key>
 
-    # Mojolicious::Lite
-    plugin json_config => {stash_key => 'conf'};
+  # Mojolicious::Lite
+  plugin json_config => {stash_key => 'conf'};
 
-=item template
+Configuration stash key.
 
-    # Mojolicious::Lite
-    plugin json_config => {template => {line_start => '.'}};
+=head2 C<template>
 
-=back
+  # Mojolicious::Lite
+  plugin json_config => {template => {line_start => '.'}};
+
+Template options.
 
 =head1 METHODS
 
@@ -214,7 +218,7 @@ L<Mojolicious::Plugin> and implements the following new ones.
 
 =head2 C<register>
 
-    $plugin->register;
+  $plugin->register;
 
 Register plugin in L<Mojolicious> application.
 

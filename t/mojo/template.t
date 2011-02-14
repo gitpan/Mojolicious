@@ -6,9 +6,9 @@ use strict;
 use warnings;
 
 sub import {
-    my $caller = caller;
-    no strict 'refs';
-    *{$caller . '::foo'} = sub {'works!'};
+  my $caller = caller;
+  no strict 'refs';
+  *{$caller . '::foo'} = sub {'works!'};
 }
 
 package MyTemplateException;
@@ -29,8 +29,8 @@ use File::Spec;
 use File::Temp;
 use FindBin;
 
-# When I held that gun in my hand, I felt a surge of power...
-# like God must feel when he's holding a gun.
+# "When I held that gun in my hand, I felt a surge of power...
+#  like God must feel when he's holding a gun."
 use_ok 'Mojo::Template';
 
 # Trim line
@@ -765,7 +765,7 @@ EOF
 is $output, "23\nsomething\nelse\n23\n", 'prepending code';
 $mt = Mojo::Template->new;
 $mt->prepend(
-    q/{no warnings 'redefine'; no strict 'refs'; *foo = sub { 23 }}/);
+  q/{no warnings 'redefine'; no strict 'refs'; *foo = sub { 23 }}/);
 $output = $mt->render('<%= foo() %>');
 is $output, "23\n", 'right result';
 $output = $mt->render('%= foo()');
