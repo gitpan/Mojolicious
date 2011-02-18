@@ -177,9 +177,6 @@ sub connect {
   # Arguments
   my $args = ref $_[0] ? $_[0] : {@_};
 
-  # TLS check
-  return if $args->{tls} && !TLS;
-
   # Protocol
   $args->{proto} ||= 'tcp';
 
@@ -295,6 +292,9 @@ sub listen {
   $ENV{MOJO_REUSE} ||= '';
   my $fd;
   if ($ENV{MOJO_REUSE} =~ /(?:^|\,)$reuse\:(\d+)/) { $fd = $1 }
+
+  # Refresh listen sockets
+  $self->_not_listening;
 
   # Connection
   my $c = {
@@ -683,14 +683,15 @@ sub resolve {
       for (1 .. $packet[3]) {
 
         # Parse
-        (my ($t, $a), $content) = (unpack 'nnnNn/aa*', $content)[1, 4, 5];
+        (my ($t, $ttl, $a), $content) =
+          (unpack 'nnnNn/aa*', $content)[1, 3, 4, 5];
         my @answer = _parse_answer($t, $a, $chunk, $content);
 
         # No answer
         next unless @answer;
 
         # Answer
-        push @answers, \@answer;
+        push @answers, [@answer, $ttl];
 
         # Debug
         warn "ANSWER $answer[0] $answer[1]\n" if DEBUG;
@@ -739,8 +740,11 @@ sub start_tls {
   my $self = shift;
   my $id   = shift;
 
-  # Shortcut
-  $self->drop($id) and return unless TLS;
+  # No TLS support
+  unless (TLS) {
+    $self->_error($id, 'IO::Socket::SSL 1.37 required for TLS support.');
+    return;
+  }
 
   # Arguments
   my $args = ref $_[0] ? $_[0] : {@_};
@@ -845,9 +849,6 @@ sub _accept {
   # Accept
   my $socket = $listen->accept or return;
 
-  # Unlock
-  $self->on_unlock->($self);
-
   # Reverse map
   my $r = $self->{_reverse};
 
@@ -904,23 +905,8 @@ sub _accept {
   my $cb = $c->{on_accept} = $l->{on_accept};
   $self->_run_event('accept', $cb, $id) if $cb && !$l->{tls};
 
-  # Remove listen sockets
-  $listen = $self->{_listen} || {};
-  my $loop = $self->{_loop};
-  for my $lid (keys %$listen) {
-    my $socket = $listen->{$lid}->{handle};
-
-    # Remove listen socket from kqueue
-    if (KQUEUE) {
-      $loop->EV_SET(fileno $socket, KQUEUE_READ, KQUEUE_DELETE);
-    }
-
-    # Remove listen socket from poll or epoll
-    else { $loop->remove($socket) }
-  }
-
-  # Not listening anymore
-  delete $self->{_listening};
+  # Stop listening
+  $self->_not_listening;
 }
 
 sub _add_event {
@@ -1100,6 +1086,33 @@ sub _hup {
 
   # HUP callback
   $self->_run_event('hup', $event, $id);
+}
+
+sub _not_listening {
+  my $self = shift;
+
+  # Loop
+  return unless my $loop = $self->{_loop};
+
+  # Unlock
+  $self->on_unlock->($self);
+
+  # Remove listen sockets
+  my $listen = $self->{_listen} || {};
+  for my $lid (keys %$listen) {
+    my $socket = $listen->{$lid}->{handle};
+
+    # Remove listen socket from kqueue
+    if (KQUEUE) {
+      $loop->EV_SET(fileno $socket, KQUEUE_READ, KQUEUE_DELETE);
+    }
+
+    # Remove listen socket from poll or epoll
+    else { $loop->remove($socket) }
+  }
+
+  # Not listening anymore
+  delete $self->{_listening};
 }
 
 sub _not_writing {

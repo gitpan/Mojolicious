@@ -32,49 +32,12 @@ our $DEVELOPMENT_NOT_FOUND =
   Mojo::Command->new->get_data('not_found.development.html.ep', __PACKAGE__);
 
 # Reserved stash values
-my $STASH_RE = qr/
-  ^
-  (?:
-  action
-  |
-  app
-  |
-  cb
-  |
-  class
-  |
-  controller
-  |
-  data
-  |
-  exception
-  |
-  extends
-  |
-  format
-  |
-  handler
-  |
-  json
-  |
-  layout
-  |
-  method
-  |
-  namespace
-  |
-  partial
-  |
-  path
-  |
-  status
-  |
-  template
-  |
-  text
-  )
-  $
-  /x;
+my @RESERVED =
+  qw/action app cb class controller data exception extends format/;
+push @RESERVED,
+  qw/handler json layout method namespace partial path status template text/;
+my $STASH_RE = join '|', @RESERVED;
+$STASH_RE = qr/^(?:$STASH_RE)$/;
 
 # "Is all the work done by the children?
 #  No, not the whipping."
@@ -1192,7 +1155,7 @@ get '<%= $self->req->url->path->to_abs_string %>' => sub {
           %= link_to 'perldoc Mojolicious::Guides', $guide
         </div>
       </h1>
-      %= image 'amelia.png', alt => 'Amelia'
+      %= image '/amelia.png', alt => 'Amelia'
     </div>
     <div id="footer">
       <h1>And don't forget to have fun!</h1>
@@ -1264,13 +1227,6 @@ A L<Mojo::Client> prepared for the current environment.
   $c->client->post_form('http://kraih.com/login' => {user => 'mojo'});
 
   $c->client->get('http://mojolicio.us' => sub {
-    my $client = shift;
-    $c->render_data($client->res->body);
-  })->start;
-
-Some environments such as L<Mojo::Server::Daemon> even allow async requests.
-
-  $c->client->async->get('http://mojolicio.us' => sub {
     my $client = shift;
     $c->render_data($client->res->body);
   })->start;
@@ -1402,11 +1358,6 @@ Render a data structure as JSON.
 
 Disable auto rendering.
 Note that this method is EXPERIMENTAL and might change without warning!
-
-  $c->render_later;
-  $c->client->async->get(
-    'http://mojolicio.us' => sub { $c->render(data => shift->res->body) }
-  )->start;
 
 =head2 C<render_not_found>
 

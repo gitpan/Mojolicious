@@ -38,7 +38,7 @@ EOF
 };
 
 our $CODENAME = 'Smiling Cat Face With Heart-Shaped Eyes';
-our $VERSION  = '1.1';
+our $VERSION  = '1.11';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -949,6 +949,8 @@ Ask Bjoern Hansen
 Audrey Tang
 
 Breno G. de Oliveira
+
+Brian Duggan
 
 Burak Gursoy
 

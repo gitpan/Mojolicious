@@ -26,6 +26,7 @@ has cookie_jar => sub { Mojo::CookieJar->new };
 has ioloop     => sub { Mojo::IOLoop->new };
 has keep_alive_timeout => 15;
 has log                => sub { Mojo::Log->new };
+has managed            => 1;
 has max_connections    => 5;
 has max_redirects      => sub { $ENV{MOJO_MAX_REDIRECTS} || 0 };
 has user_agent         => 'Mojolicious (Perl)';
@@ -33,6 +34,24 @@ has websocket_timeout  => 300;
 
 # Singleton
 our $CLIENT;
+
+# DEPRECATED in Smiling Cat Face With Heart-Shaped Eyes!
+*async = sub {
+  warn <<EOF;
+Mojo::Client->async is DEPRECATED in favor of Mojo::Client->managed!!!
+EOF
+  my $self = shift;
+  my $clone = $self->{_async} ||= $self->clone;
+  $clone->ioloop(
+      Mojo::IOLoop->singleton->is_running
+    ? Mojo::IOLoop->singleton
+    : $self->ioloop
+  );
+  $clone->managed(0);
+  $clone->{_server} = $self->{_server};
+  $clone->{_port}   = $self->{_port};
+  return $clone;
+};
 
 # Make sure we leave a clean ioloop behind
 sub DESTROY {
@@ -50,33 +69,6 @@ sub DESTROY {
   for my $cached (@$cache) {
     $loop->drop($cached->[1]);
   }
-}
-
-# "Homer, it's easy to criticize.
-#  Fun, too."
-sub async {
-  my $self = shift;
-
-  # Already async or async not possible
-  return $self if $self->{_is_async};
-
-  # Create async client
-  unless ($self->{_async}) {
-
-    # Clone and cache async client
-    my $clone = $self->{_async} = $self->clone;
-    $clone->{_is_async} = 1;
-
-    # Make async client use the global ioloop if available
-    my $singleton = Mojo::IOLoop->singleton;
-    $clone->ioloop($singleton->is_running ? $singleton : $self->ioloop);
-
-    # Inherit test server
-    $clone->{_server} = $self->{_server};
-    $clone->{_port}   = $self->{_port};
-  }
-
-  return $self->{_async};
 }
 
 # "Ah, alcohol and night-swimming. It's a winning combination."
@@ -232,6 +224,8 @@ sub build_form_tx {
   return $tx, $cb;
 }
 
+# "Homer, it's easy to criticize.
+#  Fun, too."
 sub build_tx {
   my $self = shift;
 
@@ -470,7 +464,7 @@ sub start {
   my $queue = delete $self->{_queue} || [];
 
   # Process sync subrequests in new client
-  if (!$self->{_is_async} && $self->{_processing}) {
+  if ($self->managed && $self->{_processing}) {
     my $clone = $self->clone;
     $clone->queue(@$_) for @$queue;
     return $clone->start;
@@ -480,7 +474,7 @@ sub start {
   else { $self->_tx_start(@$_) for @$queue }
 
   # Process sync requests
-  if (!$self->{_is_async} && $self->{_processing}) {
+  if ($self->managed && $self->{_processing}) {
 
     # Start loop
     my $loop = $self->ioloop;
@@ -527,7 +521,7 @@ sub test_server {
 #  ...Where are we going?"
 sub websocket {
   my $self = shift;
-  $self->queue($self->build_websocket_tx(@_));
+  $self->_tx_queue_or_start($self->build_websocket_tx(@_));
 }
 
 sub _cache {
@@ -638,13 +632,6 @@ sub _connect {
       tls_key  => $self->key,
       on_connect => sub { $self->_connected($_[1]) }
     );
-
-    # Error
-    unless (defined $id) {
-      $tx->req->error("Couldn't connect.");
-      $self->_tx_finish($tx, $cb);
-      return;
-    }
 
     # Add new connection
     $self->{_cs}->{$id} = {cb => $cb, tx => $tx};
@@ -842,7 +829,7 @@ sub _handle {
   }
 
   # Cleanup
-  $self->ioloop->stop if !$self->{_is_async} && !$self->{_processing};
+  $self->ioloop->stop if $self->managed && !$self->{_processing};
 }
 
 sub _hup { shift->_handle(pop, 1) }
@@ -971,9 +958,11 @@ sub _tx_info {
 sub _tx_queue_or_start {
   my ($self, $tx, $cb) = @_;
 
+  # Async
+  return $self->start($tx, $cb) unless $self->managed;
+
   # Quick start
-  $self->start($tx, sub { $tx = $_[1] }) and return $tx
-    if !$cb && !$self->{_is_async};
+  $self->start($tx, sub { $tx = $_[1] }) and return $tx unless $cb;
 
   # Queue transaction with callback
   $self->queue($tx, $cb);
@@ -1275,6 +1264,23 @@ Note that this attribute is EXPERIMENTAL and might change without warning!
 A L<Mojo::Log> object used for logging, by default the application log will
 be used.
 
+=head2 C<managed>
+
+  my $managed = $client->managed;
+  $client     = $client->managed(0);
+
+Automatic L<Mojo::IOLoop> management, defaults to C<1>.
+Disabling it will for example allow you to share the same event loop with
+multiple clients.
+Note that this attribute is EXPERIMENTAL and might change without warning!
+
+  $client->managed(0)->get('http://mojolicio.us' => sub {
+    my $client = shift;
+    print shift->res->body;
+    $client->ioloop->stop;
+  });
+  $client->ioloop->start;
+
 =head2 C<max_connections>
 
   my $max_connections = $client->max_connections;
@@ -1348,15 +1354,6 @@ following new ones.
 Construct a new L<Mojo::Client> object.
 Use C<singleton> if you want to share keep alive connections with other
 clients.
-
-=head2 C<async>
-
-  my $async = $client->async;
-
-Clone client instance and start using the global shared L<Mojo::IOLoop>
-singleton if it is running.
-Note that all cloned clients have their own keep alive connection queue, so
-you can quickly run out of file descriptors with too many active clients.
 
 =head2 C<build_form_tx>
 
@@ -1731,8 +1728,6 @@ Send a message via WebSocket, only available from callbacks.
   $client = $client->start(@transactions => sub {...});
 
 Start processing all queued transactions.
-Will be blocking unless you have a global shared ioloop and use the C<async>
-method.
 
 =head2 C<test_server>
 
