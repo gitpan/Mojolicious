@@ -32,10 +32,10 @@ our $DEVELOPMENT_NOT_FOUND =
   Mojo::Command->new->get_data('not_found.development.html.ep', __PACKAGE__);
 
 # Reserved stash values
-my @RESERVED =
-  qw/action app cb class controller data exception extends format/;
-push @RESERVED,
-  qw/handler json layout method namespace partial path status template text/;
+my @RESERVED = (
+  qw/action app cb class controller data exception extends format handler/,
+  qw/json layout method namespace partial path status template text/
+);
 my $STASH_RE = join '|', @RESERVED;
 $STASH_RE = qr/^(?:$STASH_RE)$/;
 
@@ -582,7 +582,7 @@ sub req { shift->tx->req }
 sub res { shift->tx->res }
 
 sub send_message {
-  my $self = shift;
+  my ($self, $message, $cb) = @_;
 
   # Transaction
   my $tx = $self->tx;
@@ -592,7 +592,17 @@ sub send_message {
     unless $tx->is_websocket;
 
   # Send
-  $tx->send_message(@_);
+  $tx->send_message(
+    $message,
+    sub {
+
+      # Cleanup
+      shift;
+
+      # Callback
+      $self->$cb(@_) if $cb;
+    }
+  );
 
   # Rendered
   $self->rendered;
@@ -1055,6 +1065,12 @@ __DATA__
     Page not found, want to go <%= link_to home => url_for->base %>?
   </body>
 </html>
+<!-- a padding to disable MSIE and Chrome friendly error page -->
+<!-- a padding to disable MSIE and Chrome friendly error page -->
+<!-- a padding to disable MSIE and Chrome friendly error page -->
+<!-- a padding to disable MSIE and Chrome friendly error page -->
+<!-- a padding to disable MSIE and Chrome friendly error page -->
+<!-- a padding to disable MSIE and Chrome friendly error page -->
 
 @@ not_found.development.html.ep
 <!doctype html><html>
@@ -1179,7 +1195,7 @@ Mojolicious::Controller - Controller Base Class
 
 =head1 DESCRIPTION
 
-L<Mojolicous::Controller> is the base class for your L<Mojolicious>
+L<Mojolicious::Controller> is the base class for your L<Mojolicious>
 controllers.
 It is also the default controller class for L<Mojolicious> unless you set
 C<controller_class> in your application.
@@ -1317,8 +1333,6 @@ It will set a default template to use based on the controller and action name
 or fall back to the route name.
 You can call it with a hash of options which can be preceded by an optional
 template name.
-Note that all render arguments get localized, so stash values won't be
-changed after the render call.
 
 =head2 C<render_data>
 
@@ -1356,8 +1370,12 @@ Render a data structure as JSON.
 
   $c->render_later;
 
-Disable auto rendering.
-Note that this method is EXPERIMENTAL and might change without warning!
+Disable auto rendering, especially for long polling this can be quite useful.
+
+  $c->render_later;
+  Mojo::IOLoop->singleton->timer(2 => sub {
+    $c->render(text => 'Delayed by 2 seconds!');
+  });
 
 =head2 C<render_not_found>
 
@@ -1369,8 +1387,8 @@ status code to C<404>.
 
 =head2 C<render_partial>
 
-  my $output = $c->render_partial;
-  my $output = $c->render_partial(action => 'foo');
+  my $output = $c->render_partial('menubar');
+  my $output = $c->render_partial('menubar', format => 'txt');
     
 Same as C<render> but returns the rendered result.
 
@@ -1390,7 +1408,7 @@ C<public> directory of your application.
 Render the given content as Perl characters, which will be encoded to bytes.
 See C<render_data> for an alternative without encoding.
 Note that this does not change the content type of the response, which is
-C<text/html> by default.
+C<text/html;charset=UTF-8> by default.
 
   $c->render_text('Hello World!', format => 'txt');
 
@@ -1417,6 +1435,7 @@ Usually refers to a L<Mojo::Message::Response> object.
 =head2 C<send_message>
 
   $c = $c->send_message('Hi there!');
+  $c = $c->send_message('Hi there!', sub {...});
 
 Send a message via WebSocket, only works if there is currently a WebSocket
 connection in progress.

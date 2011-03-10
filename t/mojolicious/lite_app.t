@@ -5,14 +5,14 @@ use warnings;
 
 use utf8;
 
-# Disable epoll and kqueue
-BEGIN { $ENV{MOJO_POLL} = 1 }
+# Disable IPv6, epoll and kqueue
+BEGIN { $ENV{MOJO_NO_IPV6} = $ENV{MOJO_POLL} = 1 }
 
 # Development
 my $backup;
 BEGIN { $backup = $ENV{MOJO_MODE} || ''; $ENV{MOJO_MODE} = 'development' }
 
-use Test::More tests => 724;
+use Test::More tests => 721;
 
 # Pollution
 123 =~ m/(\d+)/;
@@ -59,6 +59,18 @@ is app->test_helper2, 'Mojolicious::Controller', 'right value';
 
 # Test renderer
 app->renderer->add_handler(dead => sub { die 'renderer works!' });
+
+# GET /unicode/a%E4b
+get '/unicode/aäb' => sub {
+  my $self = shift;
+  $self->render(text => $self->url_for);
+};
+
+# GET /unicode/*
+get '/unicode/:stuff' => sub {
+  my $self = shift;
+  $self->render(text => $self->param('stuff') . $self->url_for);
+};
 
 # GET /
 get '/' => 'root';
@@ -172,12 +184,6 @@ get ':number' => [number => qr/0/] => sub {
   my $self = shift;
   $self->render_text($self->tx->remote_address . $self->param('number'));
 };
-
-# GET /tags
-get 'tags/:test' => 'tags';
-
-# PUT /selection
-put 'selection';
 
 # DELETE /inline/epl
 del '/inline/epl' => sub { shift->render(inline => '<%= 1 + 1%>') };
@@ -652,6 +658,19 @@ $client->ioloop->timer(
   }
 );
 
+# GET /unicode/a%E4b
+$t->get_ok('/unicode/a%E4b')->status_is(200)->content_is('/unicode/a%E4b');
+
+# GET /unicode/☃
+$t->get_ok('/unicode/☃')->status_is(200)
+  ->content_is('☃/unicode/%E2%98%83');
+
+# GET /unicode/a b
+$t->get_ok('/unicode/a b')->status_is(200)->content_is('a b/unicode/a%20b');
+
+# GET /unicode/a\b
+$t->get_ok('/unicode/a\\b')->status_is(200)->content_is('a\\b/unicode/a%5Cb');
+
 # GET /
 $t->get_ok('/')->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
@@ -862,185 +881,6 @@ $ENV{MOJO_REVERSE_PROXY} = 1;
 $t->get_ok('/0', {'X-Forwarded-For' => '192.168.2.2, 192.168.2.1'})
   ->status_is(200)->content_is('192.168.2.10');
 $ENV{MOJO_REVERSE_PROXY} = $backup2;
-
-# GET /tags
-$t->get_ok('/tags/lala?a=b&b=0&c=2&d=3&escaped=1%22+%222')->status_is(200)
-  ->content_is(<<EOF);
-<foo />
-<foo bar="baz" />
-<foo one="two" three="four">Hello</foo>
-<a href="/path">Path</a>
-<a href="http://example.com/" title="Foo">Foo</a>
-<a href="http://example.com/">Example</a>
-<a href="/template">Home</a>
-<a href="/tags/23" title="Foo">Foo</a>
-<form action="/template" method="post">
-  <input name="foo" />
-</form>
-<form action="/tags/24" method="post">
-  <input name="foo" />
-  <input name="foo" type="checkbox" value="1" />
-  <input checked="checked" name="a" type="checkbox" value="2" />
-  <input name="b" type="radio" value="1" />
-  <input checked="checked" name="b" type="radio" value="0" />
-  <input name="c" type="hidden" value="foo" />
-  <input name="d" type="file" />
-  <textarea cols="40" name="e" rows="50">
-    default!
-  </textarea>
-  <textarea name="f"></textarea>
-  <input name="g" type="password" />
-  <input id="foo" name="h" type="password" />
-  <input type="submit" value="Ok!" />
-  <input id="bar" type="submit" value="Ok too!" />
-</form>
-<form action="/">
-  <input name="foo" />
-</form>
-<input name="escaped" value="1&quot; &quot;2" />
-<input name="a" value="b" />
-<input name="a" value="b" />
-<script src="/script.js" type="text/javascript"></script>
-<script type="text/javascript">//<![CDATA[
-
-  var a = 'b';
-
-//]]></script>
-<script type="foo">//<![CDATA[
-
-  var a = 'b';
-
-//]]></script>
-<link href="/foo.css" media="screen" rel="stylesheet" type="text/css" />
-<style type="text/css">/*<![CDATA[*/
-
-  body {color: #000}
-
-/*]]>*/</style>
-<style type="foo">/*<![CDATA[*/
-
-  body {color: #000}
-
-/*]]>*/</style>
-EOF
-
-# GET /tags (alternative)
-$t->get_ok('/tags/lala?c=b&d=3&e=4&f=5')->status_is(200)->content_is(<<EOF);
-<foo />
-<foo bar="baz" />
-<foo one="two" three="four">Hello</foo>
-<a href="/path">Path</a>
-<a href="http://example.com/" title="Foo">Foo</a>
-<a href="http://example.com/">Example</a>
-<a href="/template">Home</a>
-<a href="/tags/23" title="Foo">Foo</a>
-<form action="/template" method="post">
-  <input name="foo" />
-</form>
-<form action="/tags/24" method="post">
-  <input name="foo" />
-  <input name="foo" type="checkbox" value="1" />
-  <input name="a" type="checkbox" value="2" />
-  <input name="b" type="radio" value="1" />
-  <input name="b" type="radio" value="0" />
-  <input name="c" type="hidden" value="foo" />
-  <input name="d" type="file" />
-  <textarea cols="40" name="e" rows="50">4</textarea>
-  <textarea name="f">5</textarea>
-  <input name="g" type="password" />
-  <input id="foo" name="h" type="password" />
-  <input type="submit" value="Ok!" />
-  <input id="bar" type="submit" value="Ok too!" />
-</form>
-<form action="/">
-  <input name="foo" />
-</form>
-<input name="escaped" />
-<input name="a" />
-<input name="a" value="c" />
-<script src="/script.js" type="text/javascript"></script>
-<script type="text/javascript">//<![CDATA[
-
-  var a = 'b';
-
-//]]></script>
-<script type="foo">//<![CDATA[
-
-  var a = 'b';
-
-//]]></script>
-<link href="/foo.css" media="screen" rel="stylesheet" type="text/css" />
-<style type="text/css">/*<![CDATA[*/
-
-  body {color: #000}
-
-/*]]>*/</style>
-<style type="foo">/*<![CDATA[*/
-
-  body {color: #000}
-
-/*]]>*/</style>
-EOF
-
-# PUT /selection (empty)
-$t->put_ok('/selection')->status_is(200)
-  ->content_is("<form action=\"/selection\">\n  "
-    . '<select name="a">'
-    . '<option value="b">b</option>'
-    . '<optgroup label="c">'
-    . '<option value="d">d</option>'
-    . '<option value="e">E</option>'
-    . '<option value="f">f</option>'
-    . '</optgroup>'
-    . '<option value="g">g</option>'
-    . '</select>' . "\n  "
-    . '<select multiple="multiple" name="foo">'
-    . '<option value="bar">bar</option>'
-    . '<option value="baz">baz</option>'
-    . '</select>' . "\n  "
-    . '<input type="submit" value="Ok" />' . "\n"
-    . '</form>'
-    . "\n");
-
-# PUT /selection (values)
-$t->put_ok('/selection?a=e&foo=bar')->status_is(200)
-  ->content_is("<form action=\"/selection\">\n  "
-    . '<select name="a">'
-    . '<option value="b">b</option>'
-    . '<optgroup label="c">'
-    . '<option value="d">d</option>'
-    . '<option selected="selected" value="e">E</option>'
-    . '<option value="f">f</option>'
-    . '</optgroup>'
-    . '<option value="g">g</option>'
-    . '</select>' . "\n  "
-    . '<select multiple="multiple" name="foo">'
-    . '<option selected="selected" value="bar">bar</option>'
-    . '<option value="baz">baz</option>'
-    . '</select>' . "\n  "
-    . '<input type="submit" value="Ok" />' . "\n"
-    . '</form>'
-    . "\n");
-
-# PUT /selection (multiple values)
-$t->put_ok('/selection?foo=bar&a=e&foo=baz')->status_is(200)
-  ->content_is("<form action=\"/selection\">\n  "
-    . '<select name="a">'
-    . '<option value="b">b</option>'
-    . '<optgroup label="c">'
-    . '<option value="d">d</option>'
-    . '<option selected="selected" value="e">E</option>'
-    . '<option value="f">f</option>'
-    . '</optgroup>'
-    . '<option value="g">g</option>'
-    . '</select>' . "\n  "
-    . '<select multiple="multiple" name="foo">'
-    . '<option selected="selected" value="bar">bar</option>'
-    . '<option selected="selected" value="baz">baz</option>'
-    . '</select>' . "\n  "
-    . '<input type="submit" value="Ok" />' . "\n"
-    . '</form>'
-    . "\n");
 
 # DELETE /inline/epl
 $t->delete_ok('/inline/epl')->status_is(200)->content_is("2\n");
@@ -1688,63 +1528,6 @@ controller and action!
 
 @@ dead_template.html.ep
 <%= dead 'works too!' %>
-
-@@ tags.html.ep
-<%= tag 'foo' %>
-<%= tag 'foo', bar => 'baz' %>
-<%= tag 'foo', one => 'two', three => 'four' => begin %>Hello<% end %>
-<%= link_to Path => '/path' %>
-<%= link_to 'http://example.com/', title => 'Foo', sub { 'Foo' } %>
-<%= link_to 'http://example.com/' => begin %>Example<% end %>
-<%= link_to Home => 'index' %>
-<%= link_to Foo => 'tags', {test => 23}, title => 'Foo' %>
-<%= form_for 'index', method => 'post' => begin %>
-  <%= input_tag 'foo' %>
-<% end %>
-%= form_for 'tags', {test => 24}, method => 'post' => begin
-  %= text_field 'foo'
-  %= check_box foo => 1
-  %= check_box a => 2
-  %= radio_button b => '1'
-  %= radio_button b => '0'
-  %= hidden_field c => 'foo'
-  %= file_field 'd'
-  %= text_area e => (cols => 40, rows => 50) => begin
-    default!
-  %= end
-  %= text_area 'f'
-  %= password_field 'g'
-  %= password_field 'h', id => 'foo'
-  %= submit_button 'Ok!'
-  %= submit_button 'Ok too!', id => 'bar'
-%= end
-<%= form_for '/' => begin %>
-  <%= input_tag 'foo' %>
-<% end %>
-<%= input_tag 'escaped' %>
-<%= input_tag 'a' %>
-<%= input_tag 'a', value => 'c' %>
-<%= javascript '/script.js' %>
-<%= javascript begin %>
-  var a = 'b';
-<% end %>
-<%= javascript type => 'foo' => begin %>
-  var a = 'b';
-<% end %>
-<%= stylesheet '/foo.css' %>
-<%= stylesheet begin %>
-  body {color: #000}
-<% end %>
-<%= stylesheet type => 'foo' => begin %>
-  body {color: #000}
-<% end %>
-
-@@ selection.html.ep
-%= form_for selection => begin
-  %= select_field a => ['b', {c => ['d', [ E => 'e'], 'f']}, 'g']
-  %= select_field foo => [qw/bar baz/], multiple => 'multiple'
-  %= submit_button
-%= end
 
 @@ static.txt
 Just some

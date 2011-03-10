@@ -77,6 +77,7 @@ lib/Mojolicious/Lite.pm
 lib/Mojolicious/Plugin.pm
 lib/Mojolicious/Plugin/AgentCondition.pm
 lib/Mojolicious/Plugin/Charset.pm
+lib/Mojolicious/Plugin/Config.pm
 lib/Mojolicious/Plugin/DefaultHelpers.pm
 lib/Mojolicious/Plugin/EplRenderer.pm
 lib/Mojolicious/Plugin/EpRenderer.pm
@@ -156,9 +157,9 @@ t/mojolicious/dispatch.t
 t/mojolicious/dispatcher_lite_app.t
 t/mojolicious/embedded_lite_app.t
 t/mojolicious/exception_lite_app.t
-t/mojolicious/external.json
+t/mojolicious/external.conf
 t/mojolicious/external.pl
-t/mojolicious/external.testing.json
+t/mojolicious/external.testing.conf
 t/mojolicious/external_lite_app.t
 t/mojolicious/i18n_lite_app.t
 t/mojolicious/json_config_lite_app.json
@@ -189,6 +190,7 @@ t/mojolicious/rebased_lite_app.t
 t/mojolicious/renderer.t
 t/mojolicious/routes.t
 t/mojolicious/secret.txt
+t/mojolicious/tag_helper_lite_app.t
 t/mojolicious/templates/23.html.epl
 t/mojolicious/templates/encoding.koi8-r.ep
 t/mojolicious/templates/exception.html.epl

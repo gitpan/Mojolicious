@@ -1,5 +1,29 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+1.12 2011-03-10 00:00:00
+        - Relicensed all artwork to CC-SA, so the whole distribution can be
+          considered "open" again.
+        - Deprecated MOJO_JSON_CONFIG environment variable in favor of
+          MOJO_CONFIG. (crab)
+        - Added EXPERIMENTAL support for IPv6.
+        - Added more Perl-ish configuration plugin.
+        - Added drain callback support for WebSockets.
+        - Added line numbers to Mojo::JSON error messages. (marcus)
+        - Removed experimental status from hypnotoad and
+          Mojolicious::Plugin::TagHelpers.
+        - Removed experimental status from many attributes and methods all
+          over Mojolicious.
+        - Improved attribute support of the select_field tag helper. (yko)
+        - Improved text_field tag helper.
+        - Improved tag helper attribute escaping.
+        - Improved attrs method in Mojo::DOM.
+        - Updated to jQuery to version 1.5.1.
+        - Fixed XSS issue in link_to helper.
+        - Fixed route unescaping bug.
+        - Fixed small Mojo::DOM bug. (yko)
+        - Fixed small documentation bug.
+        - Fixed typos. (kimoto)
+
 1.11 2011-02-18 00:00:00
         - Deprecated Mojo::Client async method in favor of the managed
           attribute.

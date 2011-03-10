@@ -38,7 +38,7 @@ EOF
 };
 
 our $CODENAME = 'Smiling Cat Face With Heart-Shaped Eyes';
-our $VERSION  = '1.11';
+our $VERSION  = '1.12';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -375,8 +375,8 @@ magic and no requirements besides Perl 5.8.7.
 
 =item *
 
-Full stack HTTP 1.1 and WebSocket client/server implementation with TLS,
-Bonjour, IDNA, Comet (long polling), chunking and multipart support.
+Full stack HTTP 1.1 and WebSocket client/server implementation with IPv6,
+TLS, Bonjour, IDNA, Comet (long polling), chunking and multipart support.
 
 =item *
 
@@ -456,7 +456,7 @@ structured applications.
     my $r    = $self->routes;
 
     # Route prefix for "MyApp::Example" controller
-    my $example = $r->under('/example')->to('example#');
+    my $example = $r->route('/example')->to('example#');
 
     # GET routes connecting the controller prefix with actions
     $example->get('/hello')->to('#hello');
@@ -677,7 +677,7 @@ Also sets up the renderer, static dispatcher and a default set of plugins.
   $app         = $app->defaults({foo => 'bar'});
   $app         = $app->defaults(foo => 'bar');
 
-Default values for the stash.
+Default values for the stash, assigned for every new request.
 
   $app->defaults->{foo} = 'bar';
   my $foo = $app->defaults->{foo};
@@ -717,7 +717,7 @@ and the application object, as well as a function in C<ep> templates.
 
   $app->hook(after_dispatch => sub { ... });
 
-Add hooks to named events.
+Extend L<Mojolicious> by adding hooks to named events.
 
 The following events are available and run in the listed order.
 
@@ -789,6 +789,10 @@ Route condition for C<User-Agent> headers.
 =item L<Mojolicious::Plugin::Charset>
 
 Change the application charset.
+
+=item L<Mojolicious::Plugin::Config>
+
+Perl-ish configuration files.
 
 =item L<Mojolicious::Plugin::DefaultHelpers>
 

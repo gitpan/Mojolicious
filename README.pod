@@ -34,8 +34,8 @@ magic and no requirements besides Perl 5.8.7.
 
 =item *
 
-Full stack HTTP 1.1 and WebSocket client/server implementation with TLS,
-Bonjour, IDNA, Comet (long polling), chunking and multipart support.
+Full stack HTTP 1.1 and WebSocket client/server implementation with IPv6,
+TLS, Bonjour, IDNA, Comet (long polling), chunking and multipart support.
 
 =item *
 
@@ -121,7 +121,7 @@ structured applications.
     my $r    = $self->routes;
 
     # Route prefix for "MyApp::Example" controller
-    my $example = $r->under('/example')->to('example#');
+    my $example = $r->route('/example')->to('example#');
 
     # GET routes connecting the controller prefix with actions
     $example->get('/hello')->to('#hello');

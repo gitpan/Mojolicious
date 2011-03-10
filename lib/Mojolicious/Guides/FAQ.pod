@@ -18,8 +18,9 @@ While there are no rules in L<Mojolicious::Guides::CodingGuidelines> that
 forbid dependencies, we do currently discourage adding non-optional ones in
 favor of a faster and more painless installation process.
 And we do in fact already use several optional CPAN modules such as
-L<IO::KQueue>, L<IO::Epoll>, L<IO::Socket::SSL>, L<Net::Rendezvous::Publish>
-and L<Plack> to provide advanced functionality if they are installed.
+L<IO::KQueue>, L<IO::Epoll>, L<IO::Socket::IP>, L<IO::Socket::SSL>,
+L<Net::Rendezvous::Publish> and L<Plack> to provide advanced functionality if
+they are installed.
 
 =head2 Why reinvent wheels?
 
@@ -30,6 +31,19 @@ While we are strong believers of the Perl mantra
 "There is more than one way to do it.", we also believe that well designed
 defaults result in a much more pleasant user experience.
 We want the best of both worlds.
+
+=head2 What about backwards compatibility?
+
+In conformance with L<Mojolicious::Guides::CodingGuidelines>, we will always
+deprecate a feature for at least one major release before removing or
+changing it in incompatible ways.
+New features can however be marked as experimental to explicitly exclude them
+from these rules.
+This gives us the necessary freedom to ensure a healthy future for
+L<Mojolicious>.
+So, as long as you are not using anything marked experimental, untested or
+undocumented, you can always count on backwards compatibility, everything
+else would be considered a bug.
 
 =head2 What does the error "Maximum message size exceeded." mean?
 
@@ -107,6 +121,12 @@ Once thats done you can contact the developers via GitHub
 
 If you decide to fix the bug yourself make sure to also take a look at
 L<Mojolicious::Guides::CodingGuidelines>.
+
+=head2 Which namespace should i use for Mojolicious plugins?
+
+For all new plugins that you might want to release to CPAN we suggest using
+the "Mojolicious::Plugin" namespace.
+While "MojoX" has been used a lot in the past, it is now deprecated.
 
 =head1 MORE
 

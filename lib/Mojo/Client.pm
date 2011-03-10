@@ -440,7 +440,7 @@ sub singleton { $CLIENT ||= shift->new(@_) }
 # "Wow, Barney. You brought a whole beer keg.
 #  Yeah... where do I fill it up?"
 sub send_message {
-  my $self = shift;
+  my ($self, $message, $cb) = @_;
 
   # Transaction
   my $tx = $self->tx;
@@ -448,8 +448,22 @@ sub send_message {
   # WebSocket
   croak 'Transaction is not a WebSocket' unless $tx->is_websocket;
 
+  # Weaken
+  weaken $self;
+  weaken $tx;
+
   # Send
-  $tx->send_message(@_);
+  $tx->send_message(
+    $message,
+    sub {
+
+      # Cleanup
+      shift;
+      local $self->{tx} = $tx;
+
+      $self->$cb(@_) if $cb;
+    }
+  );
 
   return $self;
 }
@@ -972,6 +986,10 @@ sub _tx_queue_or_start {
 sub _tx_start {
   my ($self, $tx, $cb) = @_;
 
+  # Callback needed
+  croak 'Unmanaged client requests require a callback'
+    if !$self->managed && !$cb;
+
   # Embedded server
   if ($self->app) {
     my $req = $tx->req;
@@ -1186,10 +1204,10 @@ Mojo::Client - Async IO HTTP 1.1 And WebSocket Client
 =head1 DESCRIPTION
 
 L<Mojo::Client> is a full featured async io HTTP 1.1 and WebSocket client
-with C<TLS>, C<epoll> and C<kqueue> support.
+with C<IPv6>, C<TLS>, C<epoll> and C<kqueue> support.
 
-Optional modules L<IO::KQueue>, L<IO::Epoll> and L<IO::Socket::SSL> are
-supported transparently and used if installed.
+Optional modules L<IO::KQueue>, L<IO::Epoll>, L<IO::Socket::IP> and
+L<IO::Socket::SSL> are supported transparently and used if installed.
 
 =head1 ATTRIBUTES
 
@@ -1209,7 +1227,6 @@ If set, local requests will be processed in this application.
   $client  = $client->cert('tls.crt');
 
 Path to TLS certificate file.
-Note that this attribute is EXPERIMENTAL and might change without warning!
 
 =head2 C<cookie_jar>
 
@@ -1254,7 +1271,6 @@ Timeout in seconds for keep alive between requests, defaults to C<15>.
   $client = $client->key('tls.crt');
 
 Path to TLS key file.
-Note that this attribute is EXPERIMENTAL and might change without warning!
 
 =head2 C<log>
 
@@ -1313,7 +1329,6 @@ Note that this attribute is EXPERIMENTAL and might change without warning!
 Callback to be invoked whenever a new transaction is about to start, this
 includes automatically prepared proxy C<CONNECT> requests and followed
 redirects.
-Note that this attribute is EXPERIMENTAL and might change without warning!
 
   $client->on_start(sub {
     my ($client, $tx) = @_;
@@ -1333,7 +1348,6 @@ L<Mojo::Transaction::HTTP> or L<Mojo::Transaction::WebSocket> object.
   $client        = $client->user_agent('Mojolicious');
 
 Value for C<User-Agent> request header, defaults to C<Mojolicious (Perl)>.
-Note that this attribute is EXPERIMENTAL and might change without warning!
 
 =head2 C<websocket_timeout>
 
@@ -1718,6 +1732,7 @@ everywhere inside the process.
 =head2 C<send_message>
 
   $client = $client->send_message('Hi there!');
+  $client = $client->send_message('Hi there!', sub {...});
 
 Send a message via WebSocket, only available from callbacks.
 
