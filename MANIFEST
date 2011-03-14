@@ -46,6 +46,7 @@ lib/Mojo/Transaction/HTTP.pm
 lib/Mojo/Transaction/WebSocket.pm
 lib/Mojo/Upload.pm
 lib/Mojo/URL.pm
+lib/Mojo/UserAgent.pm
 lib/Mojo/Util.pm
 lib/Mojolicious.pm
 lib/Mojolicious/Command/Cgi.pm
@@ -121,9 +122,6 @@ t/mojo/certs/client.key
 t/mojo/certs/server.crt
 t/mojo/certs/server.key
 t/mojo/cgi.t
-t/mojo/client.t
-t/mojo/client_online.t
-t/mojo/client_tls.t
 t/mojo/content.t
 t/mojo/cookie.t
 t/mojo/cookiejar.t
@@ -151,6 +149,9 @@ t/mojo/psgi.t
 t/mojo/server.t
 t/mojo/template.t
 t/mojo/url.t
+t/mojo/user_agent.t
+t/mojo/user_agent_online.t
+t/mojo/user_agent_tls.t
 t/mojolicious/app.t
 t/mojolicious/charset_lite_app.t
 t/mojolicious/dispatch.t
@@ -180,6 +181,7 @@ t/mojolicious/lib/PluginWithTemplate.pm
 t/mojolicious/lib/SingleFileTestApp.pm
 t/mojolicious/lite_app.t
 t/mojolicious/longpolling_lite_app.t
+t/mojolicious/ojo.t
 t/mojolicious/pattern.t
 t/mojolicious/pod_renderer_lite_app.t
 t/mojolicious/production_app.t
