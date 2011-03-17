@@ -5,7 +5,7 @@ use warnings;
 
 use utf8;
 
-use Test::More tests => 411;
+use Test::More tests => 430;
 
 # "Homer gave me a kidney: it wasn't his, I didn't need it,
 #  and it came postage due- but I appreciated the gesture!"
@@ -1129,3 +1129,98 @@ is $dom->find('table > tr > td')->[0]->text, "A\n      ", 'right text';
 is $dom->find('table > tr > td')->[1]->text, 'B',         'right text';
 is $dom->find('table > tr > td')->[2]->text, "C\n    ",   'right text';
 is $dom->find('table > tr > td')->[3]->text, "D\n",       'right text';
+
+# Real world table
+$dom->parse(<<EOF);
+<html>
+  <head>
+    <title>Real World!</title>
+  <body>
+    <p>Just a test
+    <table class=RealWorld>
+      <thead>
+        <tr>
+          <th class=one>One
+          <th class=two>Two
+          <th class=three>Three
+          <th class=four>Four
+      <tbody>
+        <tr>
+          <td class=alpha>Alpha
+          <td class=beta>Beta
+          <td class=gamma><a href="#gamma">Gamma</a>
+          <td class=delta>Delta
+        <tr>
+          <td class=alpha>Alpha Two
+          <td class=beta>Beta Two
+          <td class=gamma><a href="#gamma-two">Gamma Two</a>
+          <td class=delta>Delta Two
+    </table>
+EOF
+is $dom->find('html > head > title')->[0]->text, 'Real World!', 'right text';
+is $dom->find('html > body > p')->[0]->text, "Just a test\n    ",
+  'right text';
+is $dom->find('p')->[0]->text, "Just a test\n    ", 'right text';
+is $dom->find('thead > tr > .three')->[0]->text, "Three\n          ",
+  'right text';
+is $dom->find('thead > tr > .four')->[0]->text, "Four\n      ", 'right text';
+is $dom->find('tbody > tr > .beta')->[0]->text, "Beta\n          ",
+  'right text';
+is $dom->find('tbody > tr > .gamma')->[0]->text,     '',      'no text';
+is $dom->find('tbody > tr > .gamma > a')->[0]->text, 'Gamma', 'right text';
+is $dom->find('tbody > tr > .alpha')->[1]->text, "Alpha Two\n          ",
+  'right text';
+is $dom->find('tbody > tr > .gamma > a')->[1]->text, 'Gamma Two',
+  'right text';
+
+# Real world list
+$dom->parse(<<EOF);
+<html>
+  <head>
+    <title>Real World!</title>
+  <body>
+    <ul>
+      <li>
+        Test
+        <br>
+        123
+        <p>
+
+      <li>
+        Test
+        <br>
+        321
+        <p>
+    </ul>
+EOF
+is $dom->find('html > head > title')->[0]->text, 'Real World!', 'right text';
+is $dom->find('body > ul > li')->[0]->text,
+  "\n        Test\n        \n        123\n        ",
+  'right text';
+is $dom->find('body > ul > li > p')->[0]->text, '', 'no text';
+is $dom->find('body > ul > li')->[1]->text,
+  "\n        Test\n        \n        321\n        ",
+  'right text';
+is $dom->find('body > ul > li > p')->[1]->text, '', 'no text';
+
+# Real world JavaScript and CSS
+$dom->parse(<<EOF);
+<html>
+  <head>
+    <style test=works>#style { foo: style('<test>'); }</style>
+    <script>
+      if (a < b) {
+        alert('<123>');
+      }
+    </script>
+    < sCriPt two="23" >if (b > c) { alert('&<ohoh>') }< / scRiPt >
+  <body>Foo!</body>
+EOF
+is $dom->find('html > body')->[0]->text, 'Foo!', 'right text';
+is $dom->find('html > head > style')->[0]->text,
+  "#style { foo: style('<test>'); }", 'right text';
+is $dom->find('html > head > script')->[0]->text,
+  "\n      if (a < b) {\n        alert('<123>');\n      }\n    ",
+  'right text';
+is $dom->find('html > head > script')->[1]->text,
+  "if (b > c) { alert('&<ohoh>') }", 'right text';
