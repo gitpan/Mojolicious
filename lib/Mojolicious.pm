@@ -29,7 +29,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Smiling Cat Face With Heart-Shaped Eyes';
-our $VERSION  = '1.14';
+our $VERSION  = '1.15';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -123,7 +123,7 @@ sub new {
   $self->plugin('powered_by');
 
   # Reduced log output outside of development mode
-  $self->log->level('error') unless $mode eq 'development';
+  $self->log->level('info') unless $mode eq 'development';
 
   # Run mode
   $mode = $mode . '_mode';
@@ -1025,6 +1025,8 @@ Maxim Vuets
 Mirko Westermeier
 
 Mons Anderson
+
+Moritz Lenz
 
 Oleg Zhelo
 
