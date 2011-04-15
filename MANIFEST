@@ -103,6 +103,7 @@ LICENSE
 Makefile.PL
 MANIFEST			This list of files
 MANIFEST.SKIP
+META.yml
 README.pod
 script/hypnotoad
 script/mojo
@@ -218,4 +219,3 @@ t/mojolicious/websocket_proxy_lite_app.t
 t/mojolicious/websocket_tls_proxy_lite_app.t
 t/pod.t
 t/pod_coverage.t
-META.yml                                 Module meta-data (added by MakeMaker)
