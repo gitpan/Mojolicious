@@ -11,7 +11,7 @@ use List::Util 'first';
 use Mojo::URL;
 use Scalar::Util 'weaken';
 use Socket qw/IPPROTO_TCP TCP_NODELAY/;
-use Time::HiRes 'time';
+use Time::HiRes qw/time usleep/;
 
 # Debug
 use constant DEBUG => $ENV{MOJO_IOLOOP_DEBUG} || 0;
@@ -359,17 +359,6 @@ sub listen {
   # Refresh listen sockets
   $self->_not_listening;
 
-  # Connection
-  my $c = {
-    file => $args->{file} ? 1 : 0,
-    on_accept => $args->{on_accept},
-    on_error  => $args->{on_error},
-    on_hup    => $args->{on_hup},
-    on_read   => $args->{on_read},
-  };
-  (my $id) = "$c" =~ /0x([\da-f]+)/;
-  $self->{_listen}->{$id} = $c;
-
   # Allow file descriptor inheritance
   local $^F = 1000;
 
@@ -416,6 +405,19 @@ sub listen {
     $reuse = ",$reuse" if length $ENV{MOJO_REUSE};
     $ENV{MOJO_REUSE} .= "$reuse:$fd";
   }
+
+  # Connection
+  my $c = {
+    file => $args->{file} ? 1 : 0,
+    on_accept => $args->{on_accept},
+    on_error  => $args->{on_error},
+    on_hup    => $args->{on_hup},
+    on_read   => $args->{on_read},
+  };
+  (my $id) = "$c" =~ /0x([\da-f]+)/;
+  $self->{_listen}->{$id} = $c;
+
+  # File descriptor
   $self->{_fds}->{$fd} = $id;
 
   # Socket
@@ -616,9 +618,13 @@ sub one_tick {
   }
 
   # Idle
-  for my $idle (keys %{$self->{_idle}}) {
-    $self->_run_callback('idle', $self->{_idle}->{$idle}->{cb}, $idle)
-      unless @read || @write || @error || @hup || $timers;
+  unless (@read || @write || @error || @hup || $timers) {
+    for my $idle (keys %{$self->{_idle}}) {
+      $self->_run_callback('idle', $self->{_idle}->{$idle}->{cb}, $idle);
+    }
+
+    # Only kqueue blocks when idle
+    usleep 1000000 * $timeout unless KQUEUE;
   }
 }
 
@@ -706,7 +712,7 @@ sub resolve {
 
       # Query (Internet)
       for my $part (@parts) {
-        $req .= pack 'C/a', $part if defined $part;
+        $req .= pack 'C/a*', $part if defined $part;
       }
       $req .= pack 'Cnn', 0, $t, 0x0001;
 
@@ -1060,9 +1066,11 @@ sub _connect {
 
     # Timer
     $c->{connect_timer} =
-      $self->timer(
-      $self->connect_timeout => sub { shift->_error($id, 'Connect timeout.') }
-      );
+      $self->timer($self->connect_timeout,
+      sub { shift->_error($id, 'Connect timeout.') });
+
+    # IPv6
+    $handle->connect if IPV6;
   }
   $c->{handle} = $handle;
   $self->{_reverse}->{$handle} = $id;
@@ -1070,15 +1078,14 @@ sub _connect {
   # Non-blocking
   $handle->blocking(0);
 
-  # IPv6
-  $handle->connect if IPV6;
-
   # File descriptor
   return unless defined(my $fd = fileno $handle);
   $self->{_fds}->{$fd} = $id;
 
-  # Add handle to poll
-  $self->_writing($id);
+  # Sockets start writing right away
+  $handle->isa('IO::Socket')
+    ? $self->_writing($id)
+    : $self->_not_writing($id);
 
   # Start TLS
   if ($args->{tls}) { $self->start_tls($id => $args) }
@@ -1465,10 +1472,6 @@ sub _prepare_loop {
     $self->{_loop} = IO::Poll->new;
   }
 
-  # Dummy handle to make empty poll respect the timeout and block
-  $self->{_loop}
-    ->mask(IO::Socket::INET->new(Listen => 1), EPOLL ? EPOLL_POLLIN : POLLIN);
-
   return $self->{_loop};
 }
 
@@ -1754,11 +1757,8 @@ Mojo::IOLoop - Minimalistic Reactor For Async TCP Clients And Servers
 
   use Mojo::IOLoop;
 
-  # Create loop
-  my $loop = Mojo::IOLoop->new;
-
   # Listen on port 3000
-  $loop->listen(
+  Mojo::IOLoop->listen(
     port => 3000,
     on_read => sub {
       my ($self, $id, $chunk) = @_;
@@ -1772,7 +1772,7 @@ Mojo::IOLoop - Minimalistic Reactor For Async TCP Clients And Servers
   );
 
   # Connect to port 3000 with TLS activated
-  my $id = $loop->connect(
+  my $id = Mojo::IOLoop->connect(
     address => 'localhost',
     port => 3000,
     tls => 1,
@@ -1791,14 +1791,14 @@ Mojo::IOLoop - Minimalistic Reactor For Async TCP Clients And Servers
   );
 
   # Add a timer
-  $loop->timer(5 => sub {
+  Mojo::IOLoop->timer(5 => sub {
     my $self = shift;
     $self->drop($id);
   });
 
   # Start and stop loop
-  $loop->start;
-  $loop->stop;
+  Mojo::IOLoop->start;
+  Mojo::IOLoop->stop;
 
 =head1 DESCRIPTION
 
@@ -2213,6 +2213,8 @@ The remote port.
 
 Resolve domain into C<A>, C<AAAA>, C<CNAME>, C<MX>, C<NS>, C<PTR> or C<TXT>
 records, C<*> will query for all at once.
+Since this is a "stub resolver" it depends on a recursive name server for DNS
+resolution.
 Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<singleton>

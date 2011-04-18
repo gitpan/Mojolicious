@@ -90,6 +90,7 @@ sub _diag {
 
   # Path
   my $path = $tx->req->url->path->to_abs_string;
+  $path = '/diag/websocket' if $path eq '/chat';
   $path =~ s/^\/diag// or return $self->_hello($tx);
 
   # WebSocket
@@ -267,12 +268,10 @@ sub _websocket {
 
   # WebSocket request
   if ($tx->is_websocket) {
-    $tx->send_message('Congratulations, your Mojo is working!');
     $tx->on_message(
       sub {
         my ($tx, $message) = @_;
-        return unless $message eq 'test 123';
-        $tx->send_message('With WebSocket support!');
+        $tx->send_message($message);
         $tx->resume;
       }
     );
@@ -296,18 +295,18 @@ sub _websocket {
           alert(data);
         }
         function wsopen(event) {
-          ws.send("test 123");
+          ws.send("WebSocket support works!");
         }
         ws.onmessage = wsmessage;
         ws.onopen = wsopen;
       }
       else {
-        alert("Sorry, your browser does not support WebSocket.");
+        alert("Sorry, your browser does not support WebSockets.");
       }
     </script>
   </head>
   <body>
-    Testing WebSocket, please make sure you have JavaScript enabled.
+    Testing WebSockets, please make sure you have JavaScript enabled.
   </body>
 </html>
 EOF

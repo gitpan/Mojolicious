@@ -1,5 +1,37 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+1.17 2011-04-18 00:00:00
+        - Deprecated Mojolicious process method in favor of the on_process
+          attribute.
+        - Added Failraptor.
+        - Added support for MOJO_CERT_FILE and MOJO_KEY_FILE environment
+          variables.
+        - Added EXPERIMENTAL xml attribute to Mojo::DOM.
+        - Added EXPERIMENTAL build_url method to Test::Mojo.
+        - Added EXPERIMENTAL dnt (Do Not Track) method to Mojo::Headers.
+        - Added WOFF mime type. (reezer)
+        - Updated WebSocket implementation to ietf-06. (sri, crab)
+        - Updated jQuery to version 1.5.2.
+        - Improved documentation.
+        - Improved HTML healing capabilities of Mojo::DOM.
+        - Improved Mojo::DOM to ignore useless end tags.
+        - Improved Mojo::DOM inline DTD support. (akron)
+        - Improved Mojo::DOM text extraction.
+        - Improved Mojolicious::Plugin::I18n default lexicon handling. (yko)
+        - Improved a Mojo::IOLoop workaround.
+        - Moved all bundled static files to "lib/Mojolicious/public".
+        - Made Test::Mojo a little more user friendly.
+        - Fixed small CGI/FastCGI header generation bug.
+        - Fixed readonly handle support in Mojo::IOLoop.
+        - Fixed a Mojo::IOLoop resolver bug. (Charlie Brady)
+        - Fixed small Mojo::Asset::File bug. (crab)
+        - Fixed small Mojo::DOM selector bug. (tempire)
+        - Fixed small Mojo::DOM namespace detection bug. (akron)
+        - Fixed small route pattern escaping bug.
+        - Fixed small reload bug.
+        - Fixed small perldoc browser bug. (kberov)
+        - Fixed cookbook recipe. (moritz)
+
 1.16 2011-04-15 00:00:00
         - Emergency release for a critical security issue that can expose
           files on your system, everybody should update!
@@ -8,6 +40,7 @@ This file documents the revision history for Perl extension Mojolicious.
         - Changed default log level in "production" mode from "error" to
           "info".
         - Improved lookup method in Mojo::IOLoop.
+        - Fixed small Mojo::Util bug.
         - Fixed a serious Mojo::DOM bug. (moritz)
 
 1.14 2011-03-17 00:00:00
@@ -46,7 +79,7 @@ This file documents the revision history for Perl extension Mojolicious.
         - Improved text_field tag helper.
         - Improved tag helper attribute escaping.
         - Improved attrs method in Mojo::DOM.
-        - Updated to jQuery to version 1.5.1.
+        - Updated jQuery to version 1.5.1.
         - Fixed XSS issue in link_to helper.
         - Fixed route unescaping bug.
         - Fixed small Mojo::DOM bug. (yko)

@@ -4,26 +4,26 @@ use Mojo::Base 'Mojo::Transaction';
 # "I'm not calling you a liar but...
 #  I can't think of a way to finish that sentence."
 use Mojo::Transaction::HTTP;
-use Mojo::Util qw/decode encode md5_bytes/;
+use Mojo::Util qw/b64_encode decode encode sha1_bytes/;
+
+use constant DEBUG => $ENV{MOJO_WEBSOCKET_DEBUG} || 0;
+
+# Unique value from the spec
+use constant GUID => '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
+
+# Core module since Perl 5.9.3
+use constant SHA1 => eval 'use Digest::SHA (); 1';
 
 has handshake => sub { Mojo::Transaction::HTTP->new };
-has on_message => sub {
-  sub { }
-};
+has [qw/masked on_message/];
+has max_websocket_size => sub { $ENV{MOJO_MAX_WEBSOCKET_SIZE} || 5242880 };
 
 sub client_challenge {
   my $self = shift;
 
-  # Request
-  my $req = $self->req;
-
-  # Headers
-  my $headers = $self->req->headers;
-
   # WebSocket challenge
-  my $solution = $self->_challenge($headers->sec_websocket_key1,
-    $headers->sec_websocket_key2, $req->body);
-  return unless $solution eq $self->res->body;
+  my $solution = $self->_challenge($self->req->headers->sec_websocket_key);
+  return unless $solution eq $self->res->headers->sec_websocket_accept;
   return 1;
 }
 
@@ -39,17 +39,15 @@ sub client_handshake {
   my $headers = $req->headers;
 
   # Default headers
-  $headers->upgrade('WebSocket')  unless $headers->upgrade;
+  $headers->upgrade('websocket')  unless $headers->upgrade;
   $headers->connection('Upgrade') unless $headers->connection;
   $headers->sec_websocket_protocol('mojo')
     unless $headers->sec_websocket_protocol;
 
   # Generate challenge
-  $headers->sec_websocket_key1($self->_generate_key)
-    unless $headers->sec_websocket_key1;
-  $headers->sec_websocket_key2($self->_generate_key)
-    unless $headers->sec_websocket_key2;
-  $req->body(pack 'N*', int(rand 9999999) + 1, int(rand 9999999) + 1);
+  my $key = pack 'N*', int(rand 9999999);
+  b64_encode $key, '';
+  $headers->sec_websocket_key($key) unless $headers->sec_websocket_key;
 
   return $self;
 }
@@ -62,10 +60,12 @@ sub finish {
   my $self = shift;
 
   # Send closing handshake
-  $self->_send_bytes("\xff");
+  $self->_send_frame(1, '');
 
   # Finish after writing
-  return $self->{_finished} = 1;
+  $self->{_finished} = 1;
+
+  return $self;
 }
 
 sub is_websocket {1}
@@ -96,8 +96,7 @@ sub send_message {
   $message = '' unless defined $message;
   encode 'UTF-8', $message;
 
-  # Send message with framing
-  $self->_send_bytes("\x00$message\xff");
+  $self->_send_frame(4, $message);
 }
 
 sub server_handshake {
@@ -115,26 +114,15 @@ sub server_handshake {
   # Response headers
   my $res_headers = $res->headers;
 
-  # URL
-  my $url = $req->url;
-
   # Handshake
   $res->code(101);
-  $res_headers->upgrade('WebSocket');
+  $res_headers->upgrade('websocket');
   $res_headers->connection('Upgrade');
-  my $scheme = $url->to_abs->scheme eq 'https' ? 'wss' : 'ws';
-  my $location = $url->to_abs->scheme($scheme)->to_string;
-  $res_headers->sec_websocket_location($location);
-  my $origin = $req_headers->origin;
-  $res_headers->sec_websocket_origin($origin) if $origin;
-  my $protocol = $req_headers->sec_websocket_protocol;
-  $res_headers->sec_websocket_protocol($protocol) if $protocol;
-  $res->body(
-    $self->_challenge(
-      $req_headers->sec_websocket_key1, $req_headers->sec_websocket_key2,
-      $req->body
-    )
-  );
+  my $protocol = $req_headers->sec_websocket_protocol || '';
+  $protocol =~ /^\s*([^\,]+)/;
+  $res_headers->sec_websocket_protocol($1) if $1;
+  $res_headers->sec_websocket_accept(
+    $self->_challenge($req_headers->sec_websocket_key));
 
   return $self;
 }
@@ -148,23 +136,45 @@ sub server_read {
   $self->{_read} = '' unless defined $self->{_read};
   $self->{_read} .= $chunk if defined $chunk;
 
+  # Message buffer
+  $self->{_message} = '' unless defined $self->{_message};
+
   # Full frames
-  while ((my $i = index $self->{_read}, "\xff") >= 0) {
+  while (my $frame = $self->_parse_frame) {
 
-    # Closing handshake
-    return $self->finish if $i == 0;
+    # Op
+    my $op = $frame->[1] || 0;
 
-    # Frame
-    my $message = substr $self->{_read}, 0, $i + 1, '';
+    # Ping
+    if ($op == 2) {
 
-    # Remove framing
-    $message =~ s/^[\x00]//;
-    $message =~ s/[\xff]$//;
+      # Pong
+      $self->_send_frame(3, $frame->[2]);
+      next;
+    }
+
+    # Close
+    elsif ($op == 1) {
+      $self->finish;
+      next;
+    }
+
+    # Append
+    $self->{_message} .= $frame->[2];
+
+    # Continuation
+    next unless $op;
 
     # Callback
+    my $message = $self->{_message};
+    $self->{_message} = '';
     decode 'UTF-8', $message if $message;
-    $self->on_message->($self, $message);
+    return $self->finish unless my $cb = $self->on_message;
+    $self->$cb($message);
   }
+
+  # Check message size
+  $self->finish if length $self->{_message} > $self->max_websocket_size;
 
   # Resume
   $self->on_resume->($self);
@@ -191,55 +201,190 @@ sub server_write {
   return $write;
 }
 
-sub _challenge {
-  my ($self, $key1, $key2, $key3) = @_;
+sub _build_frame {
+  my ($self, $op, $payload) = @_;
 
-  # Shortcut
-  return unless $key1 && $key2 && $key3;
+  # Debug
+  warn "BUILDING FRAME\n" if DEBUG;
 
-  # Calculate solution for challenge
-  my $c1 = pack 'N', join('', $key1 =~ /(\d)/g) / ($key1 =~ tr/\ //);
-  my $c2 = pack 'N', join('', $key2 =~ /(\d)/g) / ($key2 =~ tr/\ //);
-  return md5_bytes "$c1$c2$key3";
-}
+  # Head
+  my $frame = 0;
+  vec($frame, 0, 8) = $op | 0b10000000;
 
-sub _generate_key {
-  my $self = shift;
+  # Debug
+  warn "PAYLOAD: $payload\n" if DEBUG;
 
-  # Number of spaces
-  my $spaces = int(rand 12) + 1;
+  # Mask payload
+  if ($self->masked) {
 
-  # Number
-  my $number = int(rand 99999) + 10;
+    # Debug
+    warn "MASKING PAYLOAD\n" if DEBUG;
 
-  # Key
-  my $key = $number * $spaces;
-
-  # Insert whitespace
-  while ($spaces--) {
-
-    # Random position
-    my $pos = int(rand(length($key) - 2)) + 1;
-
-    # Insert a space at $pos position
-    substr($key, $pos, 0) = ' ';
+    # Mask
+    my $mask = pack 'N', int(rand 9999999);
+    $payload = $mask . _xor_mask($payload, $mask);
   }
 
-  return $key;
+  # Length
+  my $len = length $payload;
+
+  # Empty prefix
+  my $prefix = 0;
+
+  # Small payload
+  if ($len < 126) {
+    vec($prefix, 0, 8) = $len;
+    $frame .= $prefix;
+  }
+
+  # Extended payload (16bit)
+  elsif ($len < 65536) {
+    vec($prefix, 0, 8) = 126;
+    $frame .= $prefix;
+    $frame .= pack 'n', $len;
+  }
+
+  # Extended payload (64bit)
+  else {
+    vec($prefix, 0, 8) = 127;
+    $frame .= $prefix;
+    $frame .= pack 'NN', $len >> 32, $len & 0xFFFFFFFF;
+  }
+
+  # Debug
+  if (DEBUG) {
+    warn 'HEAD: ' . unpack('B*', $frame) . "\n";
+    warn "OPCODE: $op\n";
+  }
+
+  # Payload
+  $frame .= $payload;
+
+  return $frame;
 }
 
-sub _send_bytes {
-  my ($self, $bytes) = @_;
+sub _challenge {
+  my ($self, $key) = @_;
 
-  # Add to buffer
+  # No key or SHA1 support
+  return '' unless $key && SHA1;
+
+  # Checksum
+  my $challenge = sha1_bytes($key . GUID);
+
+  # Accept
+  b64_encode $challenge, '';
+
+  return $challenge;
+}
+
+sub _parse_frame {
+  my $self = shift;
+
+  # Buffer
+  my $buffer = $self->{_read};
+
+  # Debug
+  warn "PARSING FRAME\n" if DEBUG;
+
+  # Head
+  return unless length $buffer > 2;
+  my $head = substr $buffer, 0, 2, '';
+
+  # Debug
+  warn 'HEAD: ' . unpack('B*', $head) . "\n" if DEBUG;
+
+  # FIN
+  my $fin = (vec($head, 0, 8) & 0b10000000) == 0b10000000 ? 1 : 0;
+
+  # Debug
+  warn "FIN: $fin\n" if DEBUG;
+
+  # Opcode
+  my $op = vec($head, 0, 8) & 0b00001111;
+
+  # Debug
+  warn "OPCODE: $op\n" if DEBUG;
+
+  # Length
+  my $len = vec($head, 1, 8) & 0b01111111;
+
+  # Debug
+  warn "LENGTH: $len\n" if DEBUG;
+
+  # No payload
+  if ($len == 0) { warn "NOTHING\n" if DEBUG }
+
+  # Small payload
+  elsif ($len < 126) { warn "SMALL\n" if DEBUG }
+
+  # Extended payload (16bit)
+  elsif ($len == 126) {
+    return unless length $buffer > 2;
+    $head = substr $buffer, 0, 2, '';
+    $len = unpack 'n', $head;
+
+    # Debug
+    warn "EXTENDED (16bit): $len\n" if DEBUG;
+  }
+
+  # Extended payload (64bit)
+  elsif ($len == 127) {
+    return unless length $buffer > 8;
+    $head = substr $buffer, 0, 8, '';
+    $len = unpack 'N', substr($head, 4, 4);
+
+    # Debug
+    warn "EXTENDED (64bit): $len\n" if DEBUG;
+  }
+
+  # Payload
+  return unless length $buffer >= $len;
+  my $payload = $len ? substr($buffer, 0, $len, '') : '';
+
+  # Unmask payload
+  unless ($self->masked) {
+    $payload = _xor_mask($payload, substr($payload, 0, 4, ''));
+
+    # Debug
+    warn "UNMASKING PAYLOAD\n" if DEBUG;
+  }
+
+  # Debug
+  warn "PAYLOAD: $payload\n" if DEBUG;
+
+  # Update buffer
+  $self->{_read} = $buffer;
+
+  return [$fin, $op, $payload];
+}
+
+sub _send_frame {
+  my ($self, $op, $payload) = @_;
+
+  # Build frame
   $self->{_write} = '' unless defined $self->{_write};
-  $self->{_write} .= $bytes if defined $bytes;
+  $self->{_write} .= $self->_build_frame($op, $payload);
 
   # Writing
   $self->{_state} = 'write';
 
   # Resume
   $self->on_resume->($self);
+}
+
+sub _xor_mask {
+  my ($input, $mask) = @_;
+
+  # 512 byte mask
+  $mask = $mask x 128;
+
+  # Mask
+  my $output = '';
+  $output .= $_ ^ $mask while length($_ = substr($input, 0, 512, '')) == 512;
+  $output .= $_ ^ substr($mask, 0, length, '');
+
+  return $output;
 }
 
 1;
@@ -270,6 +415,20 @@ L<Mojo::Transaction> and implements the following new ones.
   $ws           = $ws->handshake(Mojo::Transaction::HTTP->new);
 
 The original handshake transaction.
+
+=head2 C<masked>
+
+  my $masked = $ws->masked;
+  $ws        = $ws->masked(1);
+
+Mask outgoing frames with XOR cipher and a random 32bit key.
+
+=head2 C<max_websocket_size>
+
+  my $size = $ws->max_websocket_size;
+  $ws      = $ws->max_websocket_size(1024);
+
+Maximum WebSocket message size in bytes, defaults to C<5242880>.
 
 =head2 C<on_message>
 
@@ -325,7 +484,7 @@ The connection this websocket is using.
 
 =head2 C<finish>
 
-  $ws->finish;
+  $ws = $ws->finish;
 
 Finish the WebSocket connection gracefully.
 

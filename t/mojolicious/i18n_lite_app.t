@@ -8,6 +8,14 @@ BEGIN { $ENV{MOJO_NO_IPV6} = $ENV{MOJO_POLL} = 1 }
 
 use Test::More tests => 24;
 
+package MyTestApp::I18N::de;
+use base 'MyTestApp::I18N';
+
+use strict;
+use warnings;
+
+our %Lexicon = (hello => 'hallo');
+
 # "Aw, he looks like a little insane drunken angel."
 package main;
 use Mojolicious::Lite;
@@ -15,14 +23,7 @@ use Mojolicious::Lite;
 use Test::Mojo;
 
 # I18N plugin
-BEGIN { plugin i18n => {namespace => 'MyTestApp::I18N'} }
-
-package MyTestApp::I18N::de;
-use Mojo::Base 'MyTestApp::I18N';
-
-our %Lexicon = (hello => 'hallo');
-
-package main;
+plugin i18n => {namespace => 'MyTestApp::I18N'};
 
 # GET /
 get '/' => 'index';

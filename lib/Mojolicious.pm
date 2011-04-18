@@ -11,7 +11,20 @@ use Mojolicious::Static;
 use Mojolicious::Types;
 
 has controller_class => 'Mojolicious::Controller';
-has mode => sub { ($ENV{MOJO_MODE} || 'development') };
+has mode             => sub { ($ENV{MOJO_MODE} || 'development') };
+has on_process       => sub {
+  sub {
+    my ($self, $c) = @_;
+
+    # DEPRECATED in Smiling Cat Face With Heart-Shaped Eyes!
+    warn <<EOF and return $self->process($c) if $self->can('process');
+Mojolicious->process is DEPRECATED in favor of Mojolicious->on_process!!!
+EOF
+
+    # Dispatch
+    $self->dispatch($c);
+  };
+};
 has plugins  => sub { Mojolicious::Plugins->new };
 has renderer => sub { Mojolicious::Renderer->new };
 has routes   => sub { Mojolicious::Routes->new };
@@ -29,7 +42,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Smiling Cat Face With Heart-Shaped Eyes';
-our $VERSION  = '1.16';
+our $VERSION  = '1.17';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -186,8 +199,8 @@ sub dispatch {
   # Already rendered
   return if $res->code;
 
-  # Websocket handshake
-  $c->res->code(101) if $tx->is_websocket;
+  # Default to failed Websocket handshake
+  $c->res->code(426) if $tx->is_websocket;
 
   # Error or 200
   my ($error, $code) = $tx->req->error;
@@ -228,7 +241,9 @@ sub handler {
 
   # Build default controller and process
   eval {
-    $self->process($class->new(app => $self, stash => $stash, tx => $tx));
+    $self->on_process->(
+      $self, $class->new(app => $self, stash => $stash, tx => $tx)
+    );
   };
 
   # Fatal exception
@@ -274,9 +289,6 @@ sub plugin {
   my $self = shift;
   $self->plugins->register_plugin(shift, $self, @_);
 }
-
-# This will run for each request
-sub process { shift->dispatch(@_) }
 
 # DEPRECATED in Hot Beverage!
 sub session {
@@ -442,6 +454,12 @@ Web development for humans, making hard things possible and everything fun.
     The time is <%= $hour %>:<%= $minute %>:<%= $second %>.
   <% end %>
 
+To run this example with the built in development server just put the code
+into a file and execute it with C<perl>.
+
+  % perl example.pl daemon
+  Server available at http://127.0.0.1:3000.
+
 =head2 Growing
 
 Single file prototypes like the one above can easily grow into well
@@ -583,6 +601,20 @@ to your application named C<$mode_mode>.
   sub production_mode {
     my $self = shift;
   }
+
+=head2 C<on_process>
+
+  my $process = $app->on_process;
+  $app        = $app->on_process(sub {...});
+
+Request processing callback, defaults to calling the C<dispatch> method.
+Generally you will use a plugin or controller instead of this, consider it
+the sledgehammer in your toolbox.
+
+  $app->on_process(sub {
+    my ($self, $c) = @_;
+    $self->dispatch($c);
+  });
 
 =head2 C<plugins>
 
@@ -737,6 +769,7 @@ One use case would be upload progress bars.
 =item before_dispatch
 
 Triggered right before the static and routes dispatchers start their work.
+Very useful for rewriting incoming requests and other preprocessing tasks.
 (Passed the default controller instance)
 
   $app->hook(before_dispatch => sub {
@@ -748,6 +781,7 @@ Triggered right before the static and routes dispatchers start their work.
 Triggered after the static dispatcher determined if a static file should be
 served and before the routes dispatcher starts its work, the callbacks of
 this hook run in reverse order.
+Mostly used for custom dispatchers and postprocessing static file responses.
 (Passed the default controller instance)
 
   $app->hook(after_static_dispatch => sub {
@@ -756,8 +790,11 @@ this hook run in reverse order.
 
 =item after_dispatch
 
-Triggered after the static and routes dispatchers are finished and a response
-has been rendered, the callbacks of this hook run in reverse order.
+Triggered after a response has been rendered, the callbacks of this hook run
+in reverse order.
+Note that this hook can trigger before C<after_static_dispatch> due to its
+dynamic nature.
+Useful for all kinds of postprocessing tasks.
 (Passed the current controller instance)
 
   $app->hook(after_dispatch => sub {
@@ -836,20 +873,6 @@ Template specific helper collection.
 
 =back
 
-=head2 C<process>
-
-  $app->process($c);
-
-This method can be overloaded to do logic on a per request basis, by default
-just calls dispatch and passes it a L<Mojolicious::Controller> object.
-Generally you will use a plugin or controller instead of this, consider it
-the sledgehammer in your toolbox.
-
-  sub process {
-      my ($self, $c) = @_;
-      $self->dispatch($c);
-  }
-
 =head2 C<start>
 
   Mojolicious->start;
@@ -888,6 +911,42 @@ startup.
 =head2 Repository
 
   http://github.com/kraih/mojo
+
+=head1 BUNDLED FILES
+
+L<Mojolicious> ships with a few popular static files bundled in the C<public>
+directory.
+
+=head2 Mojolicious Artwork
+
+  Copyright (C) 2010-2011, Sebastian Riedel.
+
+Licensed under the CC-SA License, Version 3.0
+L<http://creativecommons.org/licenses/by-sa/3.0>.
+
+=head2 jQuery
+
+  Version 1.5.2
+
+jQuery is a fast and concise JavaScript Library that simplifies HTML document
+traversing, event handling, animating, and Ajax interactions for rapid web
+development. jQuery is designed to change the way that you write JavaScript.
+
+  Copyright 2011, John Resig.
+
+Licensed under the MIT License, L<http://creativecommons.org/licenses/MIT>.
+
+=head2 Prettify.js
+
+  Version 21-Jul-2010
+
+A Javascript module and CSS file that allows syntax highlighting of source
+code snippets in an html page.
+
+  Copyright (C) 2006, Google Inc.
+
+Licensed under the Apache License, Version 2.0
+L<http://www.apache.org/licenses/LICENSE-2.0>.
 
 =head1 CODE NAMES
 
@@ -951,6 +1010,8 @@ Ashley Dev
 Ask Bjoern Hansen
 
 Audrey Tang
+
+Ben van Staveren
 
 Breno G. de Oliveira
 

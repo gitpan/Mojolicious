@@ -21,10 +21,12 @@ use Scalar::Util 'weaken';
 use constant DEBUG => $ENV{MOJO_USERAGENT_DEBUG} || 0;
 
 # "You can't let a single bad experience scare you away from drugs."
-has [qw/app cert http_proxy https_proxy key no_proxy on_start/];
+has [qw/app http_proxy https_proxy no_proxy on_start/];
+has cert       => sub { $ENV{MOJO_CERT_FILE} };
 has cookie_jar => sub { Mojo::CookieJar->new };
 has ioloop     => sub { Mojo::IOLoop->new };
 has keep_alive_timeout => 15;
+has key                => sub { $ENV{MOJO_KEY_FILE} };
 has log                => sub { Mojo::Log->new };
 has max_connections    => 5;
 has max_redirects      => sub { $ENV{MOJO_MAX_REDIRECTS} || 0 };
@@ -240,7 +242,8 @@ sub build_websocket_tx {
   }
 
   # Handshake
-  Mojo::Transaction::WebSocket->new(handshake => $tx)->client_handshake;
+  Mojo::Transaction::WebSocket->new(handshake => $tx, masked => 1)
+    ->client_handshake;
 
   return $tx unless wantarray;
   return $tx, $cb;
@@ -551,7 +554,7 @@ sub _connect_proxy {
 
   # WebSocket and/or HTTPS
   return
-    unless ($req->headers->upgrade || '') eq 'WebSocket'
+    unless ($req->headers->upgrade || '') eq 'websocket'
     || ($url->scheme || '') eq 'https';
 
   # CONNECT request
@@ -862,11 +865,8 @@ sub _start_tx {
     }
   }
 
-  # Make sure WebSocket requests have an origin header
-  my $headers = $req->headers;
-  $headers->origin($url) if $headers->upgrade && !$headers->origin;
-
   # We identify ourself
+  my $headers = $req->headers;
   $headers->user_agent($self->name) unless $headers->user_agent;
 
   # Inject cookies
@@ -978,7 +978,7 @@ sub _upgrade {
   return unless ($res->code || '') eq '101';
 
   # Upgrade to WebSocket transaction
-  my $new = Mojo::Transaction::WebSocket->new(handshake => $old);
+  my $new = Mojo::Transaction::WebSocket->new(handshake => $old, masked => 1);
   $new->kept_alive($old->kept_alive);
 
   # WebSocket challenge
@@ -1115,7 +1115,7 @@ If set, local requests will be processed in this application.
   my $cert = $ua->cert;
   $ua      = $ua->cert('tls.crt');
 
-Path to TLS certificate file.
+Path to TLS certificate file, defaults to the value of C<MOJO_CERT_FILE>.
 
 =head2 C<cookie_jar>
 
@@ -1159,7 +1159,7 @@ Timeout in seconds for keep alive between requests, defaults to C<15>.
   my $key = $ua->key;
   $ua     = $ua->key('tls.crt');
 
-Path to TLS key file.
+Path to TLS key file, defaults to the value of C<MOJO_KEY_FILE>.
 
 =head2 C<log>
 
@@ -1183,7 +1183,7 @@ before it starts closing the oldest cached ones, defaults to C<5>.
   $ua               = $ua->max_redirects(3);
 
 Maximum number of redirects the user agent will follow before it fails,
-defaults to C<0>.
+defaults to the value of C<MOJO_MAX_REDIRECTS> or C<0>.
 
 =head2 C<name>
 
@@ -1237,13 +1237,13 @@ following new ones.
   my $tx = $ua->build_form_tx(
     'http://kraih.com/foo',
     {test => 123},
-    {Connection => 'close'}
+    {Accept => '*/*'}
   );
   my $tx = $ua->build_form_tx(
     'http://kraih.com/foo',
     'UTF-8',
     {test => 123},
-    {Connection => 'close'}
+    {Accept => '*/*'}
   );
   my $tx = $ua->build_form_tx(
     'http://kraih.com/foo',
@@ -1268,11 +1268,9 @@ Versatile L<Mojo::Transaction::HTTP> builder for forms.
 
   my $tx = $ua->build_tx(GET => 'mojolicio.us');
   my $tx = $ua->build_tx(POST => 'http://mojolicio.us');
+  my $tx = $ua->build_tx(GET => 'http://kraih.com' => {Accept => '*/*'});
   my $tx = $ua->build_tx(
-    GET => 'http://kraih.com' => {Connection => 'close'}
-  );
-  my $tx = $ua->build_tx(
-    POST => 'http://kraih.com' => {Connection => 'close'} => 'Hi!'
+    POST => 'http://kraih.com' => {{Accept => '*/*'} => 'Hi!'
   );
 
 Versatile general purpose L<Mojo::Transaction::HTTP> builder.
@@ -1298,16 +1296,14 @@ a successful handshake is performed.
 =head2 C<delete>
 
   my $tx = $ua->delete('http://kraih.com');
-  my $tx = $ua->delete('http://kraih.com' => {Connection => 'close'});
-  my $tx = $ua->delete(
-    'http://kraih.com' => {Connection => 'close'} => 'Hi!'
-  );
+  my $tx = $ua->delete('http://kraih.com' => {Accept => '*/*'};
+  my $tx = $ua->delete('http://kraih.com' => {Accept => '*/*'} => 'Hi!');
 
 Perform blocking HTTP C<DELETE> request.
 You can also append a callback to perform requests non-blocking.
 
   $ua->delete('http://kraih.com' => sub {
-    print shift->res->body;
+    print pop->res->body;
     Mojo::IOLoop->stop;
   });
   Mojo::IOLoop->start;
@@ -1322,16 +1318,14 @@ C<https_proxy>, C<NO_PROXY> and C<no_proxy> for proxy information.
 =head2 C<get>
 
   my $tx = $ua->get('http://kraih.com');
-  my $tx = $ua->get('http://kraih.com' => {Connection => 'close'});
-  my $tx = $ua->get(
-    'http://kraih.com' => {Connection => 'close'} => 'Hi!'
-  );
+  my $tx = $ua->get('http://kraih.com' => {Accept => '*/*'});
+  my $tx = $ua->get('http://kraih.com' => {Accept => '*/*'} => 'Hi!');
 
 Perform blocking HTTP C<GET> request.
 You can also append a callback to perform requests non-blocking.
 
   $ua->get('http://kraih.com' => sub {
-    print shift->res->body;
+    print pop->res->body;
     Mojo::IOLoop->stop;
   });
   Mojo::IOLoop->start;
@@ -1339,16 +1333,14 @@ You can also append a callback to perform requests non-blocking.
 =head2 C<head>
 
   my $tx = $ua->head('http://kraih.com');
-  my $tx = $ua->head('http://kraih.com' => {Connection => 'close'});
-  my $tx = $ua->head(
-    'http://kraih.com' => {Connection => 'close'} => 'Hi!'
-  );
+  my $tx = $ua->head('http://kraih.com' => {Accept => '*/*'});
+  my $tx = $ua->head('http://kraih.com' => {Accept => '*/*'} => 'Hi!');
 
 Perform blocking HTTP C<HEAD> request.
 You can also append a callback to perform requests non-blocking.
 
   $ua->head('http://kraih.com' => sub {
-    print shift->res->body;
+    print pop->res->body;
     Mojo::IOLoop->stop;
   });
   Mojo::IOLoop->start;
@@ -1363,16 +1355,14 @@ Note that this method is EXPERIMENTAL and might change without warning!
 =head2 C<post>
 
   my $tx = $ua->post('http://kraih.com');
-  my $tx = $ua->post('http://kraih.com' => {Connection => 'close'});
-  my $tx = $ua->post(
-    'http://kraih.com' => {Connection => 'close'} => 'Hi!'
-  );
+  my $tx = $ua->post('http://kraih.com' => {Accept => '*/*'});
+  my $tx = $ua->post('http://kraih.com' => {Accept => '*/*'} => 'Hi!');
 
 Perform blocking HTTP C<POST> request.
 You can also append a callback to perform requests non-blocking.
 
   $ua->post('http://kraih.com' => sub {
-    print shift->res->body;
+    print pop->res->body;
     Mojo::IOLoop->stop;
   });
   Mojo::IOLoop->start;
@@ -1388,13 +1378,13 @@ You can also append a callback to perform requests non-blocking.
   my $tx  = $ua->post_form(
     'http://kraih.com/foo',
     {test => 123},
-    {Connection => 'close'}
+    {Accept => '*/*'}
   );
   my $tx  = $ua->post_form(
     'http://kraih.com/foo',
     'UTF-8',
     {test => 123},
-    {Connection => 'close'}
+    {Accept => '*/*'}
   );
   my $tx = $ua->post_form(
     'http://kraih.com/foo',
@@ -1413,7 +1403,7 @@ Perform blocking HTTP C<POST> request with form data.
 You can also append a callback to perform requests non-blocking.
 
   $ua->post_form('http://kraih.com' => {q => 'test'} => sub {
-    print shift->res->body;
+    print pop->res->body;
     Mojo::IOLoop->stop;
   });
   Mojo::IOLoop->start;
@@ -1421,16 +1411,14 @@ You can also append a callback to perform requests non-blocking.
 =head2 C<put>
 
   my $tx = $ua->put('http://kraih.com');
-  my $tx = $ua->put('http://kraih.com' => {Connection => 'close'});
-  my $tx = $ua->put(
-    'http://kraih.com' => {Connection => 'close'} => 'Hi!'
-  );
+  my $tx = $ua->put('http://kraih.com' => {Accept => '*/*'});
+  my $tx = $ua->put('http://kraih.com' => {Accept => '*/*'} => 'Hi!');
 
 Perform blocking HTTP C<PUT> request.
 You can also append a callback to perform requests non-blocking.
 
   $ua->put('http://kraih.com' => sub {
-    print shift->res->body;
+    print pop->res->body;
     Mojo::IOLoop->stop;
   });
   Mojo::IOLoop->start;
@@ -1438,13 +1426,12 @@ You can also append a callback to perform requests non-blocking.
 =head2 C<start>
 
   $ua = $ua->start($tx);
-  $ua = $ua->start($tx => sub {...});
 
 Process blocking transaction.
 You can also append a callback to perform transactions non-blocking.
 
   $ua->start($tx => sub {
-    print shift->res->body;
+    print pop->res->body;
     Mojo::IOLoop->stop;
   });
   Mojo::IOLoop->start;

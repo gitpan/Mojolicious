@@ -181,6 +181,18 @@ C<DATA> section.
   @@ baz.html.ep
   The magic numbers are <%= $one %> and <%= $two %>.
 
+=head2 HTTP
+
+L<Mojo::Message::Request> and L<Mojo::Message::Response> give you full access
+to all HTTP features and information.
+
+  # /agent
+  get '/agent' => sub {
+    my $self = shift;
+    $self->res->headers->header('X-Bender' => 'Bite my shiny metal ass!');
+    $self->render(text => $self->req->headers->user_agent);
+  };
+
 =head2 Route Names
 
 All routes can have a name associated with them, this allows automatic
@@ -407,6 +419,10 @@ this process can be easily customized.
     my $bar  = $self->param('bar');
     $self->render(text => "Our :bar placeholder matched $bar");
   };
+
+Just make sure not to use C<^> and C<$> or capturing groups C<(...)>, because
+placeholders become part of a larger regular expression internally,
+C<(?:...)> is fine though.
 
 =head2 Optional Placeholders
 

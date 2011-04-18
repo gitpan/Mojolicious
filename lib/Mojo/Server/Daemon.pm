@@ -217,6 +217,9 @@ sub _finish {
       # Make sure connection stays active
       $tx->keep_alive(1);
 
+      # Upgrade connection timeout
+      $self->ioloop->connection_timeout($id, $self->websocket_timeout);
+
       # Weaken
       weaken $self;
 
@@ -274,6 +277,9 @@ sub _listen {
     $options->{tls_ca}   = $6 if $6;
   }
 
+  # Invalid
+  else { croak qq/Invalid listen value "$listen"/ }
+
   # Listen backlog size
   my $backlog = $self->backlog;
   $options->{backlog} = $backlog if $backlog;
@@ -316,6 +322,7 @@ sub _listen {
   $self->app->log->info("Server listening ($listen)");
 
   # Friendly message
+  $listen =~ s/^(https?\:\/\/)\*/${1}127.0.0.1/i;
   print "Server available at $listen.\n" unless $self->silent;
 }
 
@@ -359,9 +366,6 @@ sub _upgrade {
 
   # WebSocket handshake handler
   my $ws = $c->{websocket} = $self->on_websocket->($self, $tx);
-
-  # Upgrade connection timeout
-  $self->ioloop->connection_timeout($id, $self->websocket_timeout);
 
   # Not resumable yet
   $ws->on_resume(sub {1});

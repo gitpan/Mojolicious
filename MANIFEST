@@ -90,6 +90,34 @@ lib/Mojolicious/Plugin/PoweredBy.pm
 lib/Mojolicious/Plugin/RequestTimer.pm
 lib/Mojolicious/Plugin/TagHelpers.pm
 lib/Mojolicious/Plugins.pm
+lib/Mojolicious/public/amelia.png
+lib/Mojolicious/public/css/prettify-mojo.css
+lib/Mojolicious/public/css/prettify.css
+lib/Mojolicious/public/failraptor.png
+lib/Mojolicious/public/favicon.ico
+lib/Mojolicious/public/js/jquery.js
+lib/Mojolicious/public/js/lang-apollo.js
+lib/Mojolicious/public/js/lang-css.js
+lib/Mojolicious/public/js/lang-hs.js
+lib/Mojolicious/public/js/lang-lisp.js
+lib/Mojolicious/public/js/lang-lua.js
+lib/Mojolicious/public/js/lang-ml.js
+lib/Mojolicious/public/js/lang-proto.js
+lib/Mojolicious/public/js/lang-scala.js
+lib/Mojolicious/public/js/lang-sql.js
+lib/Mojolicious/public/js/lang-vb.js
+lib/Mojolicious/public/js/lang-vhdl.js
+lib/Mojolicious/public/js/lang-wiki.js
+lib/Mojolicious/public/js/lang-yaml.js
+lib/Mojolicious/public/js/prettify.js
+lib/Mojolicious/public/mojolicious-arrow.png
+lib/Mojolicious/public/mojolicious-black.png
+lib/Mojolicious/public/mojolicious-box.png
+lib/Mojolicious/public/mojolicious-clouds.png
+lib/Mojolicious/public/mojolicious-noraptor.png
+lib/Mojolicious/public/mojolicious-notfound.png
+lib/Mojolicious/public/mojolicious-pinstripe.gif
+lib/Mojolicious/public/mojolicious-white.png
 lib/Mojolicious/Renderer.pm
 lib/Mojolicious/Routes.pm
 lib/Mojolicious/Routes/Match.pm
@@ -103,7 +131,6 @@ LICENSE
 Makefile.PL
 MANIFEST			This list of files
 MANIFEST.SKIP
-META.yml
 README.pod
 script/hypnotoad
 script/mojo
@@ -164,6 +191,7 @@ t/mojolicious/external.pl
 t/mojolicious/external.testing.conf
 t/mojolicious/external_lite_app.t
 t/mojolicious/i18n_lite_app.t
+t/mojolicious/i18n_shortcut_lite_app.t
 t/mojolicious/json_config_lite_app.json
 t/mojolicious/json_config_lite_app.t
 t/mojolicious/json_config_mode_lite_app.json
@@ -219,3 +247,4 @@ t/mojolicious/websocket_proxy_lite_app.t
 t/mojolicious/websocket_tls_proxy_lite_app.t
 t/pod.t
 t/pod_coverage.t
+META.yml                                 Module meta-data (added by MakeMaker)

@@ -12,7 +12,7 @@ BEGIN { $ENV{MOJO_NO_IPV6} = $ENV{MOJO_POLL} = 1 }
 my $backup;
 BEGIN { $backup = $ENV{MOJO_MODE} || ''; $ENV{MOJO_MODE} = 'development' }
 
-use Test::More tests => 720;
+use Test::More tests => 723;
 
 # Pollution
 123 =~ m/(\d+)/;
@@ -196,7 +196,7 @@ get '/inline/ep/too' => sub { shift->render(inline => '0', handler => 'ep') };
 # GET /inline/ep/partial
 get '/inline/ep/partial' => sub {
   my $self = shift;
-  $self->stash(inline_template => "<%= 'just' %>");
+  $self->stash(inline_template => "♥<%= 'just ♥' %>");
   $self->render(
     inline  => '<%= include inline => $inline_template %>works!',
     handler => 'ep'
@@ -209,7 +209,8 @@ get '/source' => sub { shift->render_static('../lite_app.t') };
 # GET /foo_relaxed/*
 get '/foo_relaxed/(.test)' => sub {
   my $self = shift;
-  $self->render_text($self->stash('test'));
+  $self->render_text(
+    $self->stash('test') . ($self->req->headers->dnt ? 1 : 0));
 };
 
 # GET /foo_wildcard/*
@@ -818,9 +819,9 @@ $t->get_ok('/regex/in/template')->status_is(200)
   ->content_is("test(test)(\\Qtest\\E)(\n");
 
 # GET /stream (with basic auth)
-my $port = $t->ua->test_server;
-$t->get_ok("sri:foo\@localhost:$port/stream?foo=bar")->status_is(200)
-  ->header_is(Server         => 'Mojolicious (Perl)')
+$t->get_ok(
+  $t->build_url->userinfo('sri:foo')->path('/stream')->query(foo => 'bar'))
+  ->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_like(qr/^foobarsri\:foohttp:\/\/localhost\:\d+\/stream$/);
 
@@ -876,7 +877,7 @@ $t->get_ok('/inline/ep/too')->status_is(200)->content_is("0\n");
 
 # GET /inline/ep/partial
 $t->get_ok('/inline/ep/partial')->status_is(200)
-  ->content_is("just\nworks!\n");
+  ->content_is("♥just ♥\nworks!\n");
 
 # GET /source
 $t->get_ok('/source')->status_is(200)->content_like(qr/get_ok\('\/source/);
@@ -890,7 +891,11 @@ $t->get_ok('/', '1234' x 1024)->status_is(413)
 $ENV{MOJO_MAX_MESSAGE_SIZE} = $backup2;
 
 # GET /foo_relaxed/123
-$t->get_ok('/foo_relaxed/123')->status_is(200)->content_is('123');
+$t->get_ok('/foo_relaxed/123')->status_is(200)->content_is('1230');
+
+# GET /foo_relaxed/123 (Do Not Track)
+$t->get_ok('/foo_relaxed/123', {DNT => 1})->status_is(200)
+  ->content_is('1231');
 
 # GET /foo_relaxed
 $t->get_ok('/foo_relaxed/')->status_is(404);

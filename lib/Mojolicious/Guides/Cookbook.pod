@@ -30,7 +30,7 @@ Perl works on.
 Another huge advantage is that it supports TLS and WebSockets out of the box.
 
   % ./script/myapp daemon --listen https://*:3000
-  Server available at https://*:3000.
+  Server available at https://127.0.0.1:3000.
 
 A development certificate for testing purposes is built right in, so it just
 works.
@@ -51,7 +51,7 @@ It is based on the normal builtin web server but optimized specifically for
 production environments out of the box.
 
   % hypnotoad script/myapp
-  Server available at http://*:8080.
+  Server available at http://127.0.0.1:8080.
 
 Config files are plain Perl scripts for maximal customizability.
 
@@ -97,7 +97,7 @@ auto detected.
 C<CGI> is supported out of the box and your L<Mojolicious> application will
 automatically detect that it is executed as a C<CGI> script.
 
-  ScriptAlias / /home/sri/myapp/script/myapp
+  ScriptAlias / /home/sri/myapp/script/myapp/
 
 =head2 Apache/FastCGI
 
@@ -176,6 +176,28 @@ requests.
     $self->req->url->base->scheme('https')
       if $self->req->headers->header('X-Forwarded-Protocol') eq 'https';
   });
+
+=head2 Embedding
+
+You can also use the builtin web server to embed L<Mojolicious> applications
+into alien environments like foreign event loops.
+
+  use Mojolicious::Lite;
+  use Mojo::Server::Daemon;
+
+  # Normal action
+  get '/' => sub {
+    my $self = shift;
+    $self->render(text => 'Hello World!');
+  };
+
+  # Connect application with custom daemon
+  my $daemon =
+    Mojo::Server::Daemon->new(app => app, listen => ['http://*:8080']);
+  $daemon->prepare_ioloop;
+
+  # Call "one_tick" repeatedly from the alien environment
+  $daemon->ioloop->one_tick while 1;
 
 =head1 USER AGENT
 
@@ -357,10 +379,10 @@ time.
       # Extract URLs
       print "[$id] $url\n";
       $tx->res->dom('a[href]')->each(sub {
+        my $e = shift;
 
         # Build absolute URL
-        my $url = Mojo::URL->new(shift->attrs->{href});
-        $url    = $url->base($tx->req->url)->to_abs;
+        my $url = Mojo::URL->new($e->attrs('href'))->to_abs($tx->req->url);
         print " -> $url\n";
 
         # Enqueue
