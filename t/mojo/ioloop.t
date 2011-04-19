@@ -3,6 +3,9 @@
 use strict;
 use warnings;
 
+# Disable IPv6, epoll and kqueue
+BEGIN { $ENV{MOJO_NO_IPV6} = $ENV{MOJO_POLL} = 1 }
+
 use Test::More tests => 9;
 
 use_ok 'Mojo::IOLoop';
@@ -17,10 +20,11 @@ my $loop = Mojo::IOLoop->new;
 
 # Readonly handle
 my $ro = IO::Handle->new;
-$ro->fdopen(fileno(STDIN), 'r');
+$ro->fdopen(fileno(DATA), 'r');
 my $error;
 $loop->connect(
   handle   => $ro,
+  on_read  => sub { },
   on_error => sub { $error = pop }
 );
 
@@ -85,15 +89,20 @@ my $port = Mojo::IOLoop->generate_port;
 my $handle;
 $loop->listen(
   port      => $port,
-  on_accept => sub { $handle = shift->handle(pop) }
+  on_accept => sub {
+    my $self = shift;
+    $handle = $self->handle(pop);
+    $self->stop;
+  }
 );
 $loop->connect(
   address => 'localhost',
   port    => $port,
 );
-$loop->timer('0.5' => sub { shift->stop });
 $loop->start;
 isa_ok $handle, 'IO::Socket', 'right reference';
 
 # Readonly handle
 is $error, undef, 'no error';
+
+__DATA__

@@ -12,7 +12,7 @@ BEGIN { $ENV{MOJO_NO_IPV6} = $ENV{MOJO_POLL} = 1 }
 my $backup;
 BEGIN { $backup = $ENV{MOJO_MODE} || ''; $ENV{MOJO_MODE} = 'development' }
 
-use Test::More tests => 723;
+use Test::More tests => 743;
 
 # Pollution
 123 =~ m/(\d+)/;
@@ -179,8 +179,11 @@ get '/template.txt' => 'template';
 
 # GET /0
 get ':number' => [number => qr/0/] => sub {
-  my $self = shift;
-  $self->render_text($self->tx->remote_address . $self->param('number'));
+  my $self    = shift;
+  my $url     = $self->req->url->to_abs;
+  my $address = $self->tx->remote_address;
+  my $number  = $self->param('number');
+  $self->render_text("$url-$address-$number");
 };
 
 # DELETE /inline/epl
@@ -272,6 +275,12 @@ get '/nested-includes' => sub {
     layout   => 'layout',
     handler  => 'ep'
   );
+};
+
+# GET /localized/include
+get '/localized/include' => sub {
+  my $self = shift;
+  $self->render('localized', test => 'foo');
 };
 
 # GET /outerlayout
@@ -859,11 +868,42 @@ $t->get_ok('/.html')->status_is(200)
   ->content_is(
   "/root.html\n/root.html\n/root.html\n/root.html\n/root.html\n");
 
-# GET /0 (reverse proxy)
+# GET /0 ("X-Forwarded-For")
+$t->get_ok('/0', {'X-Forwarded-For' => '192.168.2.2, 192.168.2.1'})
+  ->status_is(200)
+  ->content_like(qr/http\:\/\/localhost\:\d+\/0\-127\.0\.0\.1\-0/);
+
+# GET /0 (reverse proxy with "X-Forwarded-For")
 my $backup2 = $ENV{MOJO_REVERSE_PROXY};
 $ENV{MOJO_REVERSE_PROXY} = 1;
 $t->get_ok('/0', {'X-Forwarded-For' => '192.168.2.2, 192.168.2.1'})
-  ->status_is(200)->content_is('192.168.2.10');
+  ->status_is(200)
+  ->content_like(qr/http\:\/\/localhost\:\d+\/0\-192\.168\.2\.1\-0/);
+$ENV{MOJO_REVERSE_PROXY} = $backup2;
+
+# GET /0 ("X-Forwarded-Host")
+$t->get_ok('/0', {'X-Forwarded-Host' => 'mojolicio.us:8080'})->status_is(200)
+  ->content_like(qr/http\:\/\/localhost\:\d+\/0\-127\.0\.0\.1\-0/);
+
+# GET /0 (reverse proxy with "X-Forwarded-Host")
+$backup2 = $ENV{MOJO_REVERSE_PROXY};
+$ENV{MOJO_REVERSE_PROXY} = 1;
+$t->get_ok('/0', {'X-Forwarded-Host' => 'mojolicio.us:8080'})->status_is(200)
+  ->content_is('http://mojolicio.us:8080/0-127.0.0.1-0');
+$ENV{MOJO_REVERSE_PROXY} = $backup2;
+
+# GET /0 ("X-Forwarded-HTTPS" and "X-Forwarded-Host")
+$t->get_ok('/0',
+  {'X-Forwarded-HTTPS' => 1, 'X-Forwarded-Host' => 'mojolicio.us'})
+  ->status_is(200)
+  ->content_like(qr/http\:\/\/localhost\:\d+\/0\-127\.0\.0\.1\-0/);
+
+# GET /0 (reverse proxy with "X-Forwarded-HTTPS" and "X-Forwarded-Host")
+$backup2 = $ENV{MOJO_REVERSE_PROXY};
+$ENV{MOJO_REVERSE_PROXY} = 1;
+$t->get_ok('/0',
+  {'X-Forwarded-HTTPS' => 1, 'X-Forwarded-Host' => 'mojolicio.us'})
+  ->status_is(200)->content_is('https://mojolicio.us/0-127.0.0.1-0');
 $ENV{MOJO_REVERSE_PROXY} = $backup2;
 
 # DELETE /inline/epl
@@ -964,6 +1004,12 @@ $t->get_ok('/nested-includes')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_is("layouted Nested Hello\n[\n  1,\n  2\n]\nthere<br>!\n\n\n\n");
+
+# GET /localized/include
+$t->get_ok('/localized/include')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is("localized1 foo\nlocalized2 321\n\n\nfoo\n\n");
 
 # GET /outerlayout
 $t->get_ok('/outerlayout')->status_is(200)
@@ -1610,6 +1656,21 @@ Not Bender!
 
 @@ root_path.html.epl
 %== shift->url_for('root');
+
+@@ localized.html.ep
+% layout 'localized1';
+<%= $test %>
+<%= include 'localized_partial', test => 321, layout => 'localized2' %>
+<%= $test %>
+
+@@ localized_partial.html.ep
+<%= $test %>
+
+@@ layouts/localized1.html.ep
+localized1 <%= content %>
+
+@@ layouts/localized2.html.ep
+localized2 <%= content %>
 
 @@ outerlayout.html.ep
 Hello
