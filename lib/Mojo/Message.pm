@@ -9,13 +9,12 @@ use Mojo::Parameters;
 use Mojo::Upload;
 use Mojo::Util qw/decode url_unescape/;
 
-use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 256000;
+use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 131072;
 
 has content => sub { Mojo::Content::Single->new };
 has default_charset  => 'UTF-8';
 has dom_class        => 'Mojo::DOM';
 has json_class       => 'Mojo::JSON';
-has max_line_size    => sub { $ENV{MOJO_MAX_LINE_SIZE} || 10240 };
 has max_message_size => sub { $ENV{MOJO_MAX_MESSAGE_SIZE} || 5242880 };
 has version          => '1.1';
 has [qw/on_finish on_progress/];
@@ -361,6 +360,8 @@ sub json {
 
 sub leftovers { shift->content->leftovers }
 
+sub max_line_size { shift->headers->max_line_size(@_) }
+
 sub param {
   my $self = shift;
   $self->{body_params} ||= $self->body_params;
@@ -471,20 +472,21 @@ sub _parse {
     $self->{_buffer} .= $chunk;
   }
 
-  # Start line
-  $self->_parse_start_line unless $self->{_state};
-
   # Check message size
   return $self->error('Maximum message size exceeded.', 413)
     if $self->{_raw_size} > $self->max_message_size;
 
-  # Check line size
-  my $headers = $self->headers;
-  if (!$headers->is_done) {
-    my $blen = index $self->{_buffer}, "\x0a";
-    $blen = length $self->{_buffer} if $blen < 0;
+  # Start line
+  unless ($self->{_state}) {
+
+    # Check line size
+    my $len = index $self->{_buffer}, "\x0a";
+    $len = length $self->{_buffer} if $len < 0;
     return $self->error('Maximum line size exceeded.', 413)
-      if $blen + length $headers->leftovers > $self->max_line_size;
+      if $len > $self->max_line_size;
+
+    # Parse
+    $self->_parse_start_line;
   }
 
   # Content
@@ -514,6 +516,10 @@ sub _parse {
     # Parse
     else { $self->content($content->parse($buffer)) }
   }
+
+  # Check line size
+  return $self->error('Maximum line size exceeded.', 413)
+    if $self->headers->is_limit_exceeded;
 
   # Done
   $self->{_state} = 'done' if $self->content->is_done;
@@ -650,13 +656,6 @@ Class to be used for DOM manipulation, defaults to L<Mojo::DOM>.
 
 Class to be used for JSON deserialization with C<json>, defaults to
 L<Mojo::JSON>.
-
-=head2 C<max_line_size>
-
-  my $size = $message->max_line_size;
-  $message = $message->max_line_size(1024);
-
-Maximum line size in bytes, defaults to C<10240>.
 
 =head2 C<max_message_size>
 
@@ -817,6 +816,7 @@ Check if parser is done.
   my $limit = $message->is_limit_exceeded;
 
 Check if message has exceeded C<max_line_size> or C<max_message_size>.
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<is_multipart>
 
@@ -837,6 +837,13 @@ C<undef> otherwise.
   my $bytes = $message->leftovers;
 
 Remove leftover data.
+
+=head2 C<max_line_size>
+
+  $message->max_line_size(1024);
+
+Maximum line size in bytes.
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<param>
 
