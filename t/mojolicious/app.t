@@ -6,7 +6,7 @@ use warnings;
 # Disable IPv6, epoll and kqueue
 BEGIN { $ENV{MOJO_NO_IPV6} = $ENV{MOJO_POLL} = 1 }
 
-use Test::More tests => 218;
+use Test::More tests => 249;
 
 use FindBin;
 use lib "$FindBin::Bin/lib";
@@ -30,22 +30,23 @@ $ENV{MOJO_MODE} = 'development';
 # Foo::fun
 my $url = $t->build_url;
 $url->path('/fun/time');
-$t->get_ok($url, {'X-Test' => 'Hi there!'})->status_is(200)
+$t->get_ok($url, {'X-Test' => 'Hi there!'})->status_isnt(404)->status_is(200)
+  ->header_isnt('X-Bender' => 'Bite my shiny metal ass!')
   ->header_is('X-Bender' => undef)->header_is(Server => 'Mojolicious (Perl)')
-  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_isnt('Have')
   ->content_is('Have fun!');
 
 # Foo::baz (missing action without template)
 $t->get_ok('/foo/baz')->status_is(404)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_like(qr/Not Found/);
+  ->content_unlike(qr/Something/)->content_like(qr/Not Found/);
 
 # Foo::yada (action-less template)
 $t->get_ok('/foo/yada')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_is("look ma! no action!\n");
+  ->content_like(qr/look ma! no action!/);
 
 # SyntaxError::foo (syntax error in controller)
 $t->get_ok('/syntax_error/foo')->status_is(500)
@@ -58,6 +59,36 @@ $t->get_ok('/foo/syntaxerror')->status_is(500)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_like(qr/^Missing right curly/);
+
+# Exceptional::this_one_dies (action dies)
+$t->get_ok('/exceptional/this_one_dies')->status_is(500)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is("Action died: doh!\n");
+
+# Exceptional::this_one_might_die (bridge dies)
+$t->get_ok('/exceptional_too/this_one_dies')->status_is(500)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is("Action died: double doh!\n");
+
+# Exceptional::this_one_dies (action behind bridge dies)
+$t->get_ok('/exceptional_too/this_one_dies', {'X-DoNotDie' => 1})
+  ->status_is(500)->header_is(Server => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is("Action died: doh!\n");
+
+# Exceptional::this_one_does_not_exist (action does not exist)
+$t->get_ok('/exceptional/this_one_does_not_exist')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->json_content_is({error => 'not found!'});
+
+# Exceptional::this_one_does_not_exist (action behind bridge does not exist)
+$t->get_ok('/exceptional_too/this_one_does_not_exist', {'X-DoNotDie' => 1})
+  ->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->json_content_is({error => 'not found!'});
 
 # Foo::fun
 $t->get_ok('/fun/time', {'X-Test' => 'Hi there!'})->status_is(200)
@@ -138,7 +169,7 @@ $t->get_ok('/foo/withlayout', {'X-Test' => 'Hi there!'})->status_is(200)
 $t->get_ok('/foo/withblock.txt', {'X-Test' => 'Hi there!'})->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_type_is('text/plain')
+  ->content_type_isnt('text/html')->content_type_is('text/plain')
   ->content_like(qr/Hello Baerbel\.\s+Hello Wolfgang\./);
 
 # MojoliciousTest2::Foo::test
@@ -291,6 +322,7 @@ $t->get_ok('/shortcut/act')->status_is(200)
 
 # Session with domain
 $t->get_ok('/foo/session')->status_is(200)
+  ->header_unlike('Set-Cookie', qr/foo/)
   ->header_like('Set-Cookie' => qr/; Domain=\.example\.com/)
   ->content_is('Bender rockzzz!');
 

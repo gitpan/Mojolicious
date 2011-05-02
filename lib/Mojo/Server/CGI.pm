@@ -11,7 +11,7 @@ has nph => 0;
 sub run {
   my $self = shift;
 
-  my $tx  = $self->on_build_tx->($self);
+  my $tx  = $self->on_transaction->($self);
   my $req = $tx->req;
 
   # Environment
@@ -29,11 +29,10 @@ sub run {
   }
 
   # Handle
-  $self->on_handler->($self, $tx);
-
-  my $res = $tx->res;
+  $self->on_request->($self, $tx);
 
   # Response start line
+  my $res    = $tx->res;
   my $offset = 0;
   if ($self->nph) {
     while (1) {
@@ -125,7 +124,7 @@ Mojo::Server::CGI - CGI Server
   use Mojo::Server::CGI;
 
   my $cgi = Mojo::Server::CGI->new;
-  $cgi->on_handler(sub {
+  $cgi->on_request(sub {
     my ($self, $tx) = @_;
 
     # Request

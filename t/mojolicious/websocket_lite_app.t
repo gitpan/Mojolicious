@@ -62,11 +62,12 @@ websocket '/socket' => sub {
   $self->send_message(
     $self->req->headers->host,
     sub {
-      shift->send_message(
+      my $self = shift;
+      $self->send_message(
         Mojo::IOLoop->singleton->connection_timeout($self->tx->connection));
+      $self->finish;
     }
   );
-  $self->finish;
 };
 
 # WebSocket /early_start
@@ -303,7 +304,7 @@ $ua->websocket(
         my ($tx, $message) = @_;
         $result .= $message;
         $tx->finish and $running-- if $message eq 'test1';
-        $loop->on_idle(sub { $loop->stop }) unless $running;
+        $loop->idle(sub { $loop->stop }) unless $running;
       }
     );
     $tx->on_finish(sub { $finished += 1 });
@@ -319,7 +320,7 @@ $ua->websocket(
         my ($tx, $message) = @_;
         $result2 .= $message;
         $tx->finish and $running-- if $message eq 'test1';
-        $loop->on_idle(sub { $loop->stop }) unless $running;
+        $loop->idle(sub { $loop->stop }) unless $running;
       }
     );
     $tx->on_finish(sub { $finished += 2 });
@@ -468,8 +469,8 @@ $ua->websocket(
         $tx->finish;
       }
     );
-    $tx->send_message('hi!' x 100000);
+    $tx->send_message('hi' x 100000);
   }
 );
 $loop->start;
-is $result, 'hi!' x 100000, 'right result';
+is $result, 'hi' x 100000, 'right result';

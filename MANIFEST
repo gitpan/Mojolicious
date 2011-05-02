@@ -186,9 +186,10 @@ t/mojolicious/dispatch.t
 t/mojolicious/dispatcher_lite_app.t
 t/mojolicious/embedded_lite_app.t
 t/mojolicious/exception_lite_app.t
-t/mojolicious/external.conf
-t/mojolicious/external.pl
-t/mojolicious/external.testing.conf
+t/mojolicious/external/myapp.conf
+t/mojolicious/external/myapp.pl
+t/mojolicious/external/myapp.testing.conf
+t/mojolicious/external/public/index.html
 t/mojolicious/external_lite_app.t
 t/mojolicious/i18n_lite_app.t
 t/mojolicious/i18n_shortcut_lite_app.t
@@ -199,6 +200,7 @@ t/mojolicious/json_config_mode_lite_app.t
 t/mojolicious/json_config_mode_lite_app.testing.json
 t/mojolicious/lib/EmbeddedTestApp.pm
 t/mojolicious/lib/MojoliciousTest.pm
+t/mojolicious/lib/MojoliciousTest/Exceptional.pm
 t/mojolicious/lib/MojoliciousTest/Foo.pm
 t/mojolicious/lib/MojoliciousTest/Foo/Bar.pm
 t/mojolicious/lib/MojoliciousTest/Plugin/TestPlugin.pm

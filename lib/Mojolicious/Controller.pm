@@ -47,11 +47,9 @@ sub AUTOLOAD {
   # Method
   my ($package, $method) = our $AUTOLOAD =~ /^([\w\:]+)\:\:(\w+)$/;
 
-  # Helper
+  # Call helper
   Carp::croak(qq/Can't locate object method "$method" via "$package"/)
     unless my $helper = $self->app->renderer->helpers->{$method};
-
-  # Run
   return $self->$helper(@_);
 }
 
@@ -71,8 +69,6 @@ EOF
 #  She also liked to shut up!"
 sub cookie {
   my ($self, $name, $value, $options) = @_;
-
-  # Shortcut
   return unless $name;
 
   # Response cookie
@@ -107,14 +103,8 @@ sub cookie {
 # "Something's wrong, she's not responding to my poking stick."
 sub finish {
   my $self = shift;
-
-  # Transaction
-  my $tx = $self->tx;
-
-  # WebSocket check
+  my $tx   = $self->tx;
   Carp::croak('No WebSocket connection to finish') unless $tx->is_websocket;
-
-  # Finish WebSocket
   $tx->finish;
 }
 
@@ -150,8 +140,6 @@ sub flash {
 # "My parents may be evil, but at least they're stupid."
 sub on_finish {
   my ($self, $cb) = @_;
-
-  # Transaction finished
   $self->tx->on_finish(sub { shift and $self->$cb(@_) });
 }
 
@@ -161,23 +149,12 @@ sub on_finish {
 sub on_message {
   my $self = shift;
 
-  # Transaction
   my $tx = $self->tx;
-
-  # WebSocket check
   Carp::croak('No WebSocket connection to receive messages from')
     unless $tx->is_websocket;
-
-  # Callback
   my $cb = shift;
-
-  # Receive
   $tx->on_message(sub { shift and $self->$cb(@_) });
-
-  # Websocket handshake
   $tx->res->code(101);
-
-  # Rendered
   $self->rendered;
 
   return $self;
@@ -189,10 +166,8 @@ sub param {
   my $self = shift;
   my $name = shift;
 
-  # Captures
-  my $p = $self->stash->{'mojo.captures'} || {};
-
   # List
+  my $p = $self->stash->{'mojo.captures'} || {};
   unless (defined $name) {
     my %seen;
     return sort grep { !$seen{$_}++ } keys %$p, $self->req->param;
@@ -217,10 +192,8 @@ sub param {
 sub redirect_to {
   my $self = shift;
 
-  # Response
-  my $res = $self->res;
-
   # Code
+  my $res = $self->res;
   $res->code(302);
 
   # Headers
@@ -228,7 +201,6 @@ sub redirect_to {
   $headers->location($self->url_for(@_)->to_abs);
   $headers->content_length(0);
 
-  # Rendered
   $self->rendered;
 
   return $self;
@@ -244,7 +216,6 @@ sub render {
   my $template;
   $template = shift if @_ % 2 && !ref $_[0];
 
-  # Arguments
   my $args = ref $_[0] ? $_[0] : {@_};
 
   # Template
@@ -275,21 +246,13 @@ sub render {
   # Partial
   return $output if $args->{partial};
 
-  # Response
+  # Prepare response
   my $res = $self->res;
-
-  # Status
-  $res->code($stash->{status}) if $stash->{status};
-  $res->code(200) unless $res->code;
-
-  # Output
+  if    ($stash->{status}) { $res->code($stash->{status}) }
+  elsif (!$res->code)      { $res->code(200) }
   $res->body($output) unless $res->body;
-
-  # Type
   my $headers = $res->headers;
   $headers->content_type($type) unless $headers->content_type;
-
-  # Rendered
   $self->rendered;
 
   # Success
@@ -302,11 +265,7 @@ sub render_data { shift->render(data => shift, @_) }
 #  Neat."
 sub render_exception {
   my ($self, $e) = @_;
-
-  # Exception
   $e = Mojo::Exception->new($e);
-
-  # Error
   $self->app->log->error($e);
 
   # Recursion
@@ -321,10 +280,7 @@ sub render_exception {
     $snapshot->{$key} = $value;
   }
 
-  # Mode
-  my $mode = $self->app->mode;
-
-  # Exception template
+  my $mode    = $self->app->mode;
   my $options = {
     template         => "exception.$mode",
     format           => 'html',
@@ -350,14 +306,8 @@ sub render_exception {
         $mode eq 'development' ? $DEVELOPMENT_EXCEPTION : $EXCEPTION;
       $options->{handler} = 'ep';
       $self->render($options);
-
-      # Render
-      $self->render($options);
     }
   }
-
-  # Rendered
-  $self->rendered;
 }
 
 sub render_inner {
@@ -398,13 +348,8 @@ sub render_inner {
 sub render_json {
   my $self = shift;
   my $json = shift;
-
-  # Arguments
   my $args = ref $_[0] ? $_[0] : {@_};
-
-  # JSON
   $args->{json} = $json;
-
   return $self->render($args);
 }
 
@@ -414,18 +359,12 @@ sub render_later { shift->stash->{'mojo.rendered'} = 1 }
 #  Lick my frozen metal ass."
 sub render_not_found {
   my ($self, $resource) = @_;
-
-  # Debug
   $self->app->log->debug(qq/Resource "$resource" not found./)
     if $resource;
 
-  # Stash
-  my $stash = $self->stash;
-
-  # Exception
-  return if $stash->{'mojo.exception'};
-
   # Recursion
+  my $stash = $self->stash;
+  return if $stash->{'mojo.exception'};
   return if $stash->{'mojo.not_found'};
 
   # Check for POD plugin
@@ -434,10 +373,7 @@ sub render_not_found {
     ? $self->url_for('/perldoc')
     : 'http://mojolicio.us/perldoc';
 
-  # Mode
-  my $mode = $self->app->mode;
-
-  # Render not found template
+  my $mode    = $self->app->mode;
   my $options = {
     template         => "not_found.$mode",
     format           => 'html',
@@ -460,31 +396,19 @@ sub render_not_found {
       $options->{inline} =
         $mode eq 'development' ? $DEVELOPMENT_NOT_FOUND : $NOT_FOUND;
       $options->{handler} = 'ep';
-
-      # Render
       $self->render($options);
     }
   }
-
-  # Rendered
-  $self->rendered;
 }
 
 # "You called my thesis a fat sack of barf, and then you stole it?
 #  Welcome to academia."
 sub render_partial {
-  my $self = shift;
-
-  # Template as first argument
+  my $self     = shift;
   my $template = @_ % 2 ? shift : undef;
+  my $args     = {@_};
 
-  # Arguments
-  my $args = {@_};
-
-  # Template
   $args->{template} = $template if defined $template;
-
-  # Partial
   $args->{partial} = 1;
 
   return Mojo::ByteStream->new($self->render($args));
@@ -492,16 +416,10 @@ sub render_partial {
 
 sub render_static {
   my ($self, $file) = @_;
-
-  # Application
   my $app = $self->app;
-
-  # Static
   $app->static->serve($self, $file)
     and $app->log->debug(
     qq/Static file "$file" not found, public directory missing?/);
-
-  # Rendered
   $self->rendered;
 }
 
@@ -516,26 +434,16 @@ sub rendered {
   # Disable auto rendering
   $self->render_later;
 
-  # Stash
-  my $stash = $self->stash;
-
   # Already finished
+  my $stash = $self->stash;
   unless ($stash->{'mojo.finished'}) {
 
-    # Application
+    # Finalize transaction
     my $app = $self->app;
-
-    # Session
     $app->sessions->store($self);
-
-    # Hook
     $app->plugins->run_hook_reverse(after_dispatch => $self);
-
-    # Finished
     $stash->{'mojo.finished'} = 1;
   }
-
-  # Resume
   $self->tx->resume;
 
   return $self;
@@ -547,30 +455,11 @@ sub res { shift->tx->res }
 sub send_message {
   my ($self, $message, $cb) = @_;
 
-  # Transaction
   my $tx = $self->tx;
-
-  # WebSocket check
   Carp::croak('No WebSocket connection to send message to')
     unless $tx->is_websocket;
-
-  # Send
-  $tx->send_message(
-    $message,
-    sub {
-
-      # Cleanup
-      shift;
-
-      # Callback
-      $self->$cb(@_) if $cb;
-    }
-  );
-
-  # Websocket handshake
+  $tx->send_message($message, sub { shift and $self->$cb(@_) if $cb });
   $tx->res->code(101);
-
-  # Rendered
   $self->rendered;
 
   return $self;
@@ -588,11 +477,9 @@ sub session {
     return $session->{$_[0]};
   }
 
-  # Initialize
+  # Hash
   $session = {} unless $session && ref $session eq 'HASH';
   $stash->{'mojo.session'} = $session;
-
-  # Hash
   return $session unless @_;
 
   # Set
@@ -604,14 +491,10 @@ sub session {
 
 sub signed_cookie {
   my ($self, $name, $value, $options) = @_;
-
-  # Shortcut
   return unless $name;
 
-  # Secret
-  my $secret = $self->app->secret;
-
   # Response cookie
+  my $secret = $self->app->secret;
   if (defined $value) {
 
     # Sign value
@@ -654,10 +537,8 @@ sub signed_cookie {
 sub stash {
   my $self = shift;
 
-  # Initialize
-  $self->{stash} ||= {};
-
   # Hash
+  $self->{stash} ||= {};
   return $self->{stash} unless @_;
 
   # Get
@@ -689,9 +570,6 @@ sub url_for {
   # Absolute URL
   return Mojo::URL->new($target) if $target =~ /^\w+\:\/\//;
 
-  # Request
-  my $req = $self->req;
-
   # Make sure we have a match for named routes
   my $match;
   unless ($match = $self->match) {
@@ -699,25 +577,20 @@ sub url_for {
     $match->root($self->app->routes);
   }
 
-  # URL
-  my $url = Mojo::URL->new;
-
   # Base
+  my $url = Mojo::URL->new;
+  my $req = $self->req;
   $url->base($req->url->base->clone);
   my $base = $url->base;
   $base->userinfo(undef);
 
-  # Path
-  my $path = $url->path;
-
   # Relative URL
+  my $path = $url->path;
   if ($target =~ /^\//) { $url->parse($target) }
 
   # Route
   else {
     my ($p, $ws) = $match->path_for($target, @_);
-
-    # Path
     $path->parse($p) if $p;
 
     # Fix scheme for WebSockets
@@ -736,53 +609,27 @@ sub url_for {
 sub write {
   my ($self, $chunk, $cb) = @_;
 
-  # Callback only
   if (ref $chunk && ref $chunk eq 'CODE') {
     $cb    = $chunk;
     $chunk = undef;
   }
-
-  # Write
-  $self->res->write(
-    $chunk,
-    sub {
-
-      # Cleanup
-      shift;
-
-      # Callback
-      $self->$cb(@_) if $cb;
-    }
-  );
-
-  # Rendered
+  $self->res->write($chunk, sub { shift and $self->$cb(@_) if $cb });
   $self->rendered;
+
+  return $self;
 }
 
 sub write_chunk {
   my ($self, $chunk, $cb) = @_;
 
-  # Callback only
   if (ref $chunk && ref $chunk eq 'CODE') {
     $cb    = $chunk;
     $chunk = undef;
   }
-
-  # Write
-  $self->res->write_chunk(
-    $chunk,
-    sub {
-
-      # Cleanup
-      shift;
-
-      # Callback
-      $self->$cb(@_) if $cb;
-    }
-  );
-
-  # Rendered
+  $self->res->write_chunk($chunk, sub { shift and $self->$cb(@_) if $cb });
   $self->rendered;
+
+  return $self;
 }
 
 1;
@@ -1174,7 +1021,7 @@ __DATA__
         <pre class="prettyprint">
 get '<%= $self->req->url->path->to_abs_string %>' => sub {
     my $self = shift;
-    $self->render(text => 'Hello world!');
+    $self->render_text('Hello world!');
 };</pre>
       </div>
     </div>

@@ -36,15 +36,21 @@ sub build_url {
 sub content_is {
   my ($self, $value, $desc) = @_;
 
-  # Description
   $desc ||= 'exact match for content';
-
-  # Transaction
   my $tx = $self->tx;
-
-  # Test
   local $Test::Builder::Level = $Test::Builder::Level + 1;
   Test::More::is($self->_get_content($tx), $value, $desc);
+
+  return $self;
+}
+
+sub content_isnt {
+  my ($self, $value, $desc) = @_;
+
+  $desc ||= 'no match for content';
+  my $tx = $self->tx;
+  local $Test::Builder::Level = $Test::Builder::Level + 1;
+  Test::More::isnt($self->_get_content($tx), $value, $desc);
 
   return $self;
 }
@@ -52,15 +58,21 @@ sub content_is {
 sub content_like {
   my ($self, $regex, $desc) = @_;
 
-  # Description
   $desc ||= 'content is similar';
-
-  # Transaction
   my $tx = $self->tx;
-
-  # Test
   local $Test::Builder::Level = $Test::Builder::Level + 1;
   Test::More::like($self->_get_content($tx), $regex, $desc);
+
+  return $self;
+}
+
+sub content_unlike {
+  my ($self, $regex, $desc) = @_;
+
+  $desc ||= 'content is not similar';
+  my $tx = $self->tx;
+  local $Test::Builder::Level = $Test::Builder::Level + 1;
+  Test::More::unlike($self->_get_content($tx), $regex, $desc);
 
   return $self;
 }
@@ -70,30 +82,40 @@ sub content_like {
 #  I'm not popular enough to be different."
 sub content_type_is {
   my ($self, $type) = @_;
-
-  # Transaction
   my $tx = $self->tx;
-
-  # Test
   local $Test::Builder::Level = $Test::Builder::Level + 1;
   Test::More::is($tx->res->headers->content_type,
     $type, "Content-Type: $type");
+  return $self;
+}
 
+sub content_type_isnt {
+  my ($self, $type) = @_;
+  my $tx = $self->tx;
+  local $Test::Builder::Level = $Test::Builder::Level + 1;
+  Test::More::isnt($tx->res->headers->content_type,
+    $type, "not Content-Type: $type");
   return $self;
 }
 
 sub content_type_like {
   my ($self, $regex, $desc) = @_;
 
-  # Description
   $desc ||= 'Content-Type is similar';
-
-  # Transaction
   my $tx = $self->tx;
-
-  # Test
   local $Test::Builder::Level = $Test::Builder::Level + 1;
   Test::More::like($tx->res->headers->content_type, $regex, $desc);
+
+  return $self;
+}
+
+sub content_type_unlike {
+  my ($self, $regex, $desc) = @_;
+
+  $desc ||= 'Content-Type is not similar';
+  my $tx = $self->tx;
+  local $Test::Builder::Level = $Test::Builder::Level + 1;
+  Test::More::unlike($tx->res->headers->content_type, $regex, $desc);
 
   return $self;
 }
@@ -105,14 +127,17 @@ sub delete_ok { shift->_request_ok('delete', @_) }
 
 sub element_exists {
   my ($self, $selector, $desc) = @_;
-
-  # Description
-  $desc ||= $selector;
-
-  # Test
+  $desc ||= qq/"$selector" exists/;
   local $Test::Builder::Level = $Test::Builder::Level + 1;
   Test::More::ok($self->tx->res->dom->at($selector), $desc);
+  return $self;
+}
 
+sub element_exists_not {
+  my ($self, $selector, $desc) = @_;
+  $desc ||= qq/"$selector" exists not/;
+  local $Test::Builder::Level = $Test::Builder::Level + 1;
+  Test::More::ok(!$self->tx->res->dom->at($selector), $desc);
   return $self;
 }
 
@@ -122,10 +147,7 @@ sub head_ok { shift->_request_ok('head', @_) }
 sub header_is {
   my ($self, $name, $value) = @_;
 
-  # Transaction
   my $tx = $self->tx;
-
-  # Test
   local $Test::Builder::Level = $Test::Builder::Level + 1;
   Test::More::is(scalar $tx->res->headers->header($name),
     $value, "$name: " . ($value ? $value : ''));
@@ -133,18 +155,35 @@ sub header_is {
   return $self;
 }
 
+sub header_isnt {
+  my ($self, $name, $value) = @_;
+
+  my $tx = $self->tx;
+  local $Test::Builder::Level = $Test::Builder::Level + 1;
+  Test::More::isnt(scalar $tx->res->headers->header($name),
+    $value, "not $name: " . ($value ? $value : ''));
+
+  return $self;
+}
+
 sub header_like {
   my ($self, $name, $regex, $desc) = @_;
 
-  # Description
   $desc ||= "$name is similar";
-
-  # Transaction
   my $tx = $self->tx;
-
-  # Test
   local $Test::Builder::Level = $Test::Builder::Level + 1;
   Test::More::like(scalar $tx->res->headers->header($name), $regex, $desc);
+
+  return $self;
+}
+
+sub header_unlike {
+  my ($self, $name, $regex, $desc) = @_;
+
+  $desc ||= "$name is not similar";
+  my $tx = $self->tx;
+  local $Test::Builder::Level = $Test::Builder::Level + 1;
+  Test::More::unlike(scalar $tx->res->headers->header($name), $regex, $desc);
 
   return $self;
 }
@@ -152,13 +191,8 @@ sub header_like {
 sub json_content_is {
   my ($self, $struct, $desc) = @_;
 
-  # Description
   $desc ||= 'exact match for JSON structure';
-
-  # Transaction
   my $tx = $self->tx;
-
-  # Test
   local $Test::Builder::Level = $Test::Builder::Level + 1;
   Test::More::is_deeply($tx->res->json, $struct, $desc);
 
@@ -173,19 +207,12 @@ sub post_form_ok {
   my $self = shift;
   my $url  = $_[0];
 
-  # Description
   my $desc = "post $url";
   utf8::encode $desc;
-
-  # User agent
   my $ua = $self->ua;
   $ua->app($self->app);
   $ua->max_redirects($self->max_redirects);
-
-  # Request
   $self->tx($ua->post_form(@_));
-
-  # Test
   local $Test::Builder::Level = $Test::Builder::Level + 1;
   Test::More::ok($self->tx->is_done, $desc);
 
@@ -197,14 +224,9 @@ sub put_ok { shift->_request_ok('put', @_) }
 
 sub reset_session {
   my $self = shift;
-
-  # User agent
   $self->ua->cookie_jar->empty;
   $self->ua->max_redirects($self->max_redirects);
-
-  # Transaction
   $self->tx(undef);
-
   return $self;
 }
 
@@ -212,13 +234,21 @@ sub reset_session {
 sub status_is {
   my ($self, $status) = @_;
 
-  # Description
   my $message =
     Mojo::Message::Response->new(code => $status)->default_message;
-
-  # Test
   local $Test::Builder::Level = $Test::Builder::Level + 1;
   Test::More::is($self->tx->res->code, $status, "$status $message");
+
+  return $self;
+}
+
+sub status_isnt {
+  my ($self, $status) = @_;
+
+  my $message =
+    Mojo::Message::Response->new(code => $status)->default_message;
+  local $Test::Builder::Level = $Test::Builder::Level + 1;
+  Test::More::isnt($self->tx->res->code, $status, "not $status $message");
 
   return $self;
 }
@@ -226,18 +256,27 @@ sub status_is {
 sub text_is {
   my ($self, $selector, $value, $desc) = @_;
 
-  # Description
   $desc ||= $selector;
-
-  # Text
   my $text;
   if (my $element = $self->tx->res->dom->at($selector)) {
     $text = $element->text;
   }
-
-  # Test
   local $Test::Builder::Level = $Test::Builder::Level + 1;
   Test::More::is($text, $value, $desc);
+
+  return $self;
+}
+
+sub text_isnt {
+  my ($self, $selector, $value, $desc) = @_;
+
+  $desc ||= $selector;
+  my $text;
+  if (my $element = $self->tx->res->dom->at($selector)) {
+    $text = $element->text;
+  }
+  local $Test::Builder::Level = $Test::Builder::Level + 1;
+  Test::More::isnt($text, $value, $desc);
 
   return $self;
 }
@@ -248,18 +287,27 @@ sub text_is {
 sub text_like {
   my ($self, $selector, $regex, $desc) = @_;
 
-  # Description
   $desc ||= $selector;
-
-  # Text
   my $text;
   if (my $element = $self->tx->res->dom->at($selector)) {
     $text = $element->text;
   }
-
-  # Test
   local $Test::Builder::Level = $Test::Builder::Level + 1;
   Test::More::like($text, $regex, $desc);
+
+  return $self;
+}
+
+sub text_unlike {
+  my ($self, $selector, $regex, $desc) = @_;
+
+  $desc ||= $selector;
+  my $text;
+  if (my $element = $self->tx->res->dom->at($selector)) {
+    $text = $element->text;
+  }
+  local $Test::Builder::Level = $Test::Builder::Level + 1;
+  Test::More::unlike($text, $regex, $desc);
 
   return $self;
 }
@@ -282,7 +330,6 @@ sub _get_content {
 sub _request_ok {
   my ($self, $method, $url, $headers, $body) = @_;
 
-  # Description
   my $desc = "$method $url";
   utf8::encode $desc;
 
@@ -290,15 +337,10 @@ sub _request_ok {
   $body = $headers if !ref $headers && @_ > 3;
   $headers = {} if !ref $headers;
 
-  # User agent
   my $ua = $self->ua;
   $ua->app($self->app);
   $ua->max_redirects($self->max_redirects);
-
-  # Request
   $self->tx($ua->$method($url, %$headers, $body));
-
-  # Test
   local $Test::Builder::Level = $Test::Builder::Level + 2;
   Test::More::ok($self->tx->is_done, $desc);
 
@@ -321,7 +363,7 @@ Test::Mojo - Testing Mojo!
 
   $t->get_ok('/welcome')
     ->status_is(200)
-    ->content_like(qr/Hello!/, 'welcome message!');
+    ->content_like(qr/Hello!/, 'welcome message');
 
   $t->post_form_ok('/search', {title => 'Perl', author => 'taro'})
     ->status_is(200)
@@ -330,6 +372,7 @@ Test::Mojo - Testing Mojo!
   $t->delete_ok('/something')
     ->status_is(200)
     ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+    ->header_isnt('X-Bender' => 'Bite my shiny metal ass!');
     ->content_is('Hello world!');
 
 =head1 DESCRIPTION
@@ -386,16 +429,30 @@ Note that this method is EXPERIMENTAL and might change without warning!
 =head2 C<content_is>
 
   $t = $t->content_is('working!');
-  $t = $t->content_is('working!', 'right content!');
+  $t = $t->content_is('working!', 'right content');
 
 Check response content for exact match.
+
+=head2 C<content_isnt>
+
+  $t = $t->content_isnt('working!');
+  $t = $t->content_isnt('working!', 'different content');
+
+Opposite of C<content_is>.
 
 =head2 C<content_like>
 
   $t = $t->content_like(qr/working!/);
-  $t = $t->content_like(qr/working!/, 'right content!');
+  $t = $t->content_like(qr/working!/, 'right content');
 
 Check response content for similar match.
+
+=head2 C<content_unlike>
+
+  $t = $t->content_unlike(qr/working!/);
+  $t = $t->content_unlike(qr/working!/, 'different content');
+
+Opposite of C<content_like>.
 
 =head2 C<content_type_is>
 
@@ -403,12 +460,25 @@ Check response content for similar match.
 
 Check response C<Content-Type> header for exact match.
 
+=head2 C<content_type_isnt>
+
+  $t = $t->content_type_isnt('text/html');
+
+Opposite of C<content_type_is>.
+
 =head2 C<content_type_like>
 
   $t = $t->content_type_like(qr/text/);
-  $t = $t->content_type_like(qr/text/, 'right content type!');
+  $t = $t->content_type_like(qr/text/, 'right content type');
 
 Check response C<Content-Type> header for similar match.
+
+=head2 C<content_type_unlike>
+
+  $t = $t->content_type_unlike(qr/text/);
+  $t = $t->content_type_unlike(qr/text/, 'different content type');
+
+Opposite of C<content_type_like>.
 
 =head2 C<delete_ok>
 
@@ -426,6 +496,13 @@ Perform a C<DELETE> request and check for success.
 
 Checks for existence of the CSS3 selectors first matching XML/HTML element
 with L<Mojo::DOM>.
+
+=head2 C<element_exists_not>
+
+  $t = $t->element_exists_not('div.foo[x=y]');
+  $t = $t->element_exists_not('html head title', 'has no title');
+
+Opposite of C<element_exists>.
 
 =head2 C<get_ok>
 
@@ -451,12 +528,25 @@ Perform a C<HEAD> request and check for success.
 
 Check response header for exact match.
 
+=head2 C<header_isnt>
+
+  $t = $t->header_isnt(Expect => 'fun');
+
+Opposite of C<header_is>.
+
 =head2 C<header_like>
 
   $t = $t->header_like(Expect => qr/fun/);
-  $t = $t->header_like(Expect => qr/fun/, 'right header!');
+  $t = $t->header_like(Expect => qr/fun/, 'right header');
 
 Check response header for similar match.
+
+=head2 C<header_unlike>
+
+  $t = $t->header_like(Expect => qr/fun/);
+  $t = $t->header_like(Expect => qr/fun/, 'different header');
+
+Opposite of C<header_like>.
 
 =head2 C<json_content_is>
 
@@ -472,7 +562,7 @@ Check response content for JSON data.
   $t = $t->post_ok('/foo', {Accept => '*/*'});
   $t = $t->post_ok('/foo', 'Hi!');
   $t = $t->post_ok('/foo', {Accept => '*/*'}, 'Hi!');
-  $t = $t->post_ok('/foo', 'Hi!', 'request worked!');
+  $t = $t->post_ok('/foo', 'Hi!', 'request worked');
 
 Perform a C<POST> request and check for success.
 
@@ -516,6 +606,12 @@ Reset user agent session.
 
 Check response status for exact match.
 
+=head2 C<status_isnt>
+
+  $t = $t->status_isnt(200);
+
+Opposite of C<status_is>.
+
 =head2 C<text_is>
 
   $t = $t->text_is('div.foo[x=y]' => 'Hello!');
@@ -524,6 +620,13 @@ Check response status for exact match.
 Checks text content of the CSS3 selectors first matching XML/HTML element for
 exact match with L<Mojo::DOM>.
 
+=head2 C<text_isnt>
+
+  $t = $t->text_isnt('div.foo[x=y]' => 'Hello!');
+  $t = $t->text_isnt('html head title' => 'Hello!', 'different title');
+
+Opposite of C<text_is>.
+
 =head2 C<text_like>
 
   $t = $t->text_like('div.foo[x=y]' => qr/Hello/);
@@ -531,6 +634,13 @@ exact match with L<Mojo::DOM>.
 
 Checks text content of the CSS3 selectors first matching XML/HTML element for
 similar match with L<Mojo::DOM>.
+
+=head2 C<text_unlike>
+
+  $t = $t->text_unlike('div.foo[x=y]' => qr/Hello/);
+  $t = $t->text_unlike('html head title' => qr/Hello/, 'different title');
+
+Opposite of C<text_like>.
 
 =head1 SEE ALSO
 

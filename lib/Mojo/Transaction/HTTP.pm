@@ -4,7 +4,7 @@ use Mojo::Base 'Mojo::Transaction';
 use Mojo::Message::Request;
 use Mojo::Message::Response;
 
-has [qw/on_handler on_upgrade/];
+has [qw/on_upgrade on_request/];
 has req => sub { Mojo::Message::Request->new };
 has res => sub { Mojo::Message::Response->new };
 
@@ -13,11 +13,8 @@ has res => sub { Mojo::Message::Response->new };
 sub client_read {
   my ($self, $chunk) = @_;
 
-  # Request and response
-  my $req = $self->req;
-  my $res = $self->res;
-
-  # Length
+  my $req  = $self->req;
+  my $res  = $self->res;
   my $read = length $chunk;
 
   # Preserve state
@@ -34,8 +31,6 @@ sub client_read {
 
   # Normal response
   else {
-
-    # Parse
     $res->parse($chunk);
 
     # Done
@@ -57,15 +52,12 @@ sub client_read {
 sub client_write {
   my $self = shift;
 
-  # Chunk
   my $chunk = '';
+  my $req   = $self->req;
 
   # Offsets
   $self->{_offset} ||= 0;
   $self->{_write}  ||= 0;
-
-  # Request
-  my $req = $self->req;
 
   # Writing
   unless ($self->{_state}) {
@@ -160,7 +152,6 @@ sub keep_alive {
     return $self;
   }
 
-  # Request and response
   my $req = $self->req;
   my $res = $self->res;
 
@@ -189,16 +180,21 @@ sub keep_alive {
   return $self->{keep_alive};
 }
 
+# DEPRECATED in Smiling Cat Face With Heart-Shaped Eyes!
+sub on_handler {
+  warn <<EOF;
+Mojo::Transaction::HTTP->on_handler is DEPRECATED in favor of
+Mojo::Transaction::HTTP->on_request!!!
+EOF
+  shift->on_request(@_);
+}
+
 sub server_leftovers {
   my $self = shift;
 
-  # Request
+  # Check leftovers
   my $req = $self->req;
-
-  # No leftovers
   return unless $req->content->has_leftovers;
-
-  # Leftovers
   my $leftovers = $req->leftovers;
 
   # Done
@@ -210,14 +206,11 @@ sub server_leftovers {
 sub server_read {
   my ($self, $chunk) = @_;
 
-  # Request and response
   my $req = $self->req;
   my $res = $self->res;
 
   # Parse
   $req->parse($chunk) unless $req->error;
-
-  # State
   $self->{_state} ||= 'read';
 
   # Parser error
@@ -225,7 +218,7 @@ sub server_read {
   if ($req->error && !$handled) {
 
     # Handler callback
-    $self->on_handler->($self);
+    $self->on_request->($self);
 
     # Close connection
     $res->headers->connection('Close');
@@ -242,7 +235,7 @@ sub server_read {
     $ws = $self->on_upgrade->($self) if $req->headers->upgrade;
 
     # Handler callback
-    $self->on_handler->($ws ? ($ws, $self) : $self);
+    $self->on_request->($ws ? ($ws, $self) : $self);
 
     # Protect handler from incoming pipelined requests
     $self->{_handled} = 1;
@@ -267,17 +260,14 @@ sub server_read {
 sub server_write {
   my $self = shift;
 
-  # Chunk
-  my $chunk = '';
-
   # Not writing
+  my $chunk = '';
   return $chunk unless $self->{_state};
 
   # Offsets
   $self->{_offset} ||= 0;
   $self->{_write}  ||= 0;
 
-  # Request and response
   my $req = $self->req;
   my $res = $self->res;
 
@@ -305,7 +295,6 @@ sub server_write {
     $self->{_write}  = $self->{_write} - $written;
     $self->{_offset} = $self->{_offset} + $written;
 
-    # Append
     $chunk .= $buffer;
 
     # Done
@@ -325,7 +314,6 @@ sub server_write {
     $self->{_write}  = $self->{_write} - $written;
     $self->{_offset} = $self->{_offset} + $written;
 
-    # Append
     $chunk .= $buffer;
 
     # Done
@@ -378,7 +366,6 @@ sub server_write {
       $self->{_write}  = $self->{_write} - $written;
       $self->{_offset} = $self->{_offset} + $written;
 
-      # Append
       if (defined $buffer) {
         $chunk .= $buffer;
         delete $self->{_delay};
@@ -438,19 +425,19 @@ and implements the following new ones.
 
 Connection can be kept alive.
 
-=head2 C<on_handler>
-
-  my $cb = $tx->on_handler;
-  $tx    = $tx->on_handler(sub {...});
-
-Handler callback.
-
 =head2 C<on_upgrade>
 
   my $cb = $tx->on_upgrade;
   $tx    = $tx->on_upgrade(sub {...});
 
 WebSocket upgrade callback.
+
+=head2 C<on_request>
+
+  my $cb = $tx->on_request;
+  $tx    = $tx->on_request(sub {...});
+
+Request callback.
 
 =head2 C<req>
 

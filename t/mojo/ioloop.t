@@ -6,7 +6,7 @@ use warnings;
 # Disable IPv6, epoll and kqueue
 BEGIN { $ENV{MOJO_NO_IPV6} = $ENV{MOJO_POLL} = 1 }
 
-use Test::More tests => 9;
+use Test::More tests => 11;
 
 use_ok 'Mojo::IOLoop';
 
@@ -30,7 +30,7 @@ $loop->connect(
 
 # Ticks
 my $ticks = 0;
-my $id = $loop->on_tick(sub { $ticks++ });
+my $id = $loop->recurring(0 => sub { $ticks++ });
 
 # Timer
 my $flag = 0;
@@ -63,7 +63,7 @@ is $hiresflag, 42, 'hires timer';
 
 # Idle callback
 my $idle = 0;
-$loop->on_idle(sub { $idle++ });
+$loop->idle(sub { $idle++ });
 
 # Another tick
 $loop->one_tick;
@@ -72,17 +72,25 @@ $loop->one_tick;
 ok $ticks > 2, 'more than two ticks';
 
 # Idle callback
-is $idle, 1, 'on_idle was called';
+is $idle, 1, 'one idle event';
 
 # Run again without first tick event handler
 my $before = $ticks;
 my $after  = 0;
-$loop->on_tick(sub { $after++ });
+$loop->recurring(0 => sub { $after++ });
 $loop->drop($id);
 $loop->timer(1 => sub { shift->stop });
 $loop->start;
 ok $after > 2, 'more than two ticks';
 is $ticks, $before, 'no additional ticks';
+
+
+# Recurring timer
+my $count = 0;
+$loop->recurring(0.5 => sub { $count++ });
+$loop->timer(3 => sub { shift->stop });
+$loop->start;
+ok $count > 4, 'more than four recurring events';
 
 # Handle
 my $port = Mojo::IOLoop->generate_port;
@@ -108,5 +116,11 @@ isa_ok $handle, 'IO::Socket', 'right reference';
 
 # Readonly handle
 is $error, undef, 'no error';
+
+# Idle
+$idle = 0;
+Mojo::IOLoop->idle(sub { Mojo::IOLoop->stop if $idle++ });
+Mojo::IOLoop->start;
+is $idle, 2, 'two idle ticks';
 
 __DATA__

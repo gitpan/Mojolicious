@@ -14,7 +14,6 @@ use constant BONJOUR => $ENV{MOJO_NO_BONJOUR}
   ? 0
   : eval 'use Net::Rendezvous::Publish 0.04 (); 1';
 
-# Debug
 use constant DEBUG => $ENV{MOJO_DAEMON_DEBUG} || 0;
 
 has [qw/backlog group listen silent user/];
@@ -39,7 +38,6 @@ my $SOCKET_RE = qr/^
 sub DESTROY {
   my $self = shift;
 
-  # Shortcut
   return unless my $loop = $self->ioloop;
 
   # Cleanup connections
@@ -54,10 +52,8 @@ sub DESTROY {
 sub prepare_ioloop {
   my $self = shift;
 
-  # Loop
-  my $loop = $self->ioloop;
-
   # Listen
+  my $loop = $self->ioloop;
   my $listen = $self->listen || ['http://*:3000'];
   $self->_listen($_) for @$listen;
 
@@ -119,13 +115,11 @@ sub _build_tx {
   my ($self, $id, $c) = @_;
 
   # Build transaction
-  my $tx = $self->on_build_tx->($self);
+  my $tx = $self->on_transaction->($self);
+  $tx->connection($id);
 
   # Identify
   $tx->res->headers->server('Mojolicious (Perl)');
-
-  # Connection
-  $tx->connection($id);
 
   # Store connection information
   my $loop  = $self->ioloop;
@@ -139,16 +133,14 @@ sub _build_tx {
   # TLS
   $tx->req->url->base->scheme('https') if $c->{tls};
 
-  # Weaken
-  weaken $self;
-
   # Handler callback
-  $tx->on_handler(
+  weaken $self;
+  $tx->on_request(
     sub {
       my $tx = shift;
 
       # Handler
-      $self->on_handler->($self, $tx);
+      $self->on_request->($self, $tx);
 
       # Resume callback
       $tx->on_resume(sub { $self->_write($id) });
@@ -168,13 +160,16 @@ sub _build_tx {
   return $tx;
 }
 
+sub _close {
+  my ($self, $loop, $id) = @_;
+  $self->_drop($id);
+}
+
 sub _drop {
   my ($self, $id) = @_;
 
-  # Connection
+  # Finish
   my $c = $self->{_cs}->{$id};
-
-  # Transaction
   if (my $tx = $c->{websocket} || $c->{transaction}) { $tx->server_close }
 
   # Drop connection
@@ -183,11 +178,7 @@ sub _drop {
 
 sub _error {
   my ($self, $loop, $id, $error) = @_;
-
-  # Log
   $self->app->log->error($error);
-
-  # Drop
   $self->_drop($id);
 }
 
@@ -200,10 +191,8 @@ sub _finish {
     return $self->ioloop->drop($id);
   }
 
-  # Connection
-  my $c = $self->{_cs}->{$id};
-
   # Finish transaction
+  my $c = $self->{_cs}->{$id};
   delete $c->{transaction};
   $tx->server_close;
 
@@ -220,10 +209,8 @@ sub _finish {
       # Upgrade connection timeout
       $self->ioloop->connection_timeout($id, $self->websocket_timeout);
 
-      # Weaken
-      weaken $self;
-
       # Resume callback
+      weaken $self;
       $ws->on_resume(sub { $self->_write($id) });
     }
 
@@ -247,20 +234,10 @@ sub _finish {
   }
 }
 
-sub _hup {
-  my ($self, $loop, $id) = @_;
-
-  # Drop
-  $self->_drop($id);
-}
-
 sub _listen {
   my ($self, $listen) = @_;
-
-  # Shortcut
   return unless $listen;
 
-  # Options
   my $options = {};
   my $tls;
 
@@ -284,10 +261,8 @@ sub _listen {
   my $backlog = $self->backlog;
   $options->{backlog} = $backlog if $backlog;
 
-  # Weaken
-  weaken $self;
-
   # Callbacks
+  weaken $self;
   $options->{on_accept} = sub {
     my ($loop, $id) = @_;
 
@@ -297,8 +272,8 @@ sub _listen {
     # Keep alive timeout
     $loop->connection_timeout($id => $self->keep_alive_timeout);
   };
+  $options->{on_close} = sub { $self->_close(@_) };
   $options->{on_error} = sub { $self->_error(@_) };
-  $options->{on_hup}   = sub { $self->_hup(@_) };
   $options->{on_read}  = sub { $self->_read(@_) };
 
   # Listen
@@ -318,30 +293,22 @@ sub _listen {
     ) if $port && !$tls;
   }
 
-  # Log
-  $self->app->log->info("Server listening ($listen)");
-
   # Friendly message
+  $self->app->log->info("Server listening ($listen)");
   $listen =~ s/^(https?\:\/\/)\*/${1}127.0.0.1/i;
   print "Server available at $listen.\n" unless $self->silent;
 }
 
 sub _read {
   my ($self, $loop, $id, $chunk) = @_;
-
-  # Debug
   warn "< $chunk\n" if DEBUG;
 
-  # Connection
+  # Make sure we have a transaction
   my $c = $self->{_cs}->{$id};
-
-  # Transaction
   my $tx = $c->{transaction} || $c->{websocket};
-
-  # New transaction
   $tx = $c->{transaction} = $self->_build_tx($id, $c) unless $tx;
 
-  # Read
+  # Parse chunk
   $tx->server_read($chunk);
 
   # Last keep alive request
@@ -361,10 +328,8 @@ sub _upgrade {
   # WebSocket
   return unless $tx->req->headers->upgrade =~ /WebSocket/i;
 
-  # Connection
-  my $c = $self->{_cs}->{$id};
-
   # WebSocket handshake handler
+  my $c = $self->{_cs}->{$id};
   my $ws = $c->{websocket} = $self->on_websocket->($self, $tx);
 
   # Not resumable yet
@@ -374,28 +339,20 @@ sub _upgrade {
 sub _write {
   my ($self, $id) = @_;
 
-  # Connection
-  my $c = $self->{_cs}->{$id};
-
-  # Transaction
-  return unless my $tx = $c->{transaction} || $c->{websocket};
-
   # Not writing
+  my $c = $self->{_cs}->{$id};
+  return unless my $tx = $c->{transaction} || $c->{websocket};
   return unless $tx->is_writing;
 
   # Get chunk
   my $chunk = $tx->server_write;
 
-  # Weaken
-  weaken $self;
-
   # Callback
+  weaken $self;
   my $cb = sub { $self->_write($id) };
 
   # Done
   if ($tx->is_done) {
-
-    # Finish
     $self->_finish($id, $tx);
 
     # No followup
@@ -407,8 +364,6 @@ sub _write {
 
   # Write
   $self->ioloop->write($id, $chunk, $cb);
-
-  # Debug
   warn "> $chunk\n" if DEBUG;
 }
 
@@ -424,7 +379,7 @@ Mojo::Server::Daemon - Async IO HTTP 1.1 And WebSocket Server
   use Mojo::Server::Daemon;
 
   my $daemon = Mojo::Server::Daemon->new(listen => ['http://*:8080']);
-  $daemon->on_handler(sub {
+  $daemon->on_request(sub {
     my ($self, $tx) = @_;
 
     # Request

@@ -12,17 +12,19 @@ BEGIN {
 }
 
 # "Who are you, and why should I care?"
-use Test::More tests => 3;
+use Test::More tests => 6;
 
 # "Of all the parasites I've had over the years,
 #  these worms are among the best."
 use FindBin;
-$ENV{MOJO_CONFIG} = 'external.conf';
-$ENV{MOJO_HOME}   = $FindBin::Bin;
-require "$ENV{MOJO_HOME}/external.pl";
+require "$FindBin::Bin/external/myapp.pl";
 use Test::Mojo;
 
 my $t = Test::Mojo->new;
 
 # GET /
 $t->get_ok('/')->status_is(200)->content_is("works!too!works!!!\n");
+
+# GET /index.html
+$t->get_ok('/index.html')->status_is(200)
+  ->content_is('External static file!');

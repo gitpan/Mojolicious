@@ -58,8 +58,6 @@ sub accept_connection {
 
     $self->{_listen} = $listen;
   }
-
-  # Debug
   $self->app->log->debug('FastCGI listen socket opened.') if DEBUG;
 
   # Accept
@@ -68,8 +66,6 @@ sub accept_connection {
     $self->app->log->error("Can't accept FastCGI connection: $!");
     return;
   }
-
-  # Debug
   $self->app->log->debug('Accepted FastCGI connection.') if DEBUG;
 
   return $c;
@@ -93,7 +89,6 @@ sub read_record {
   # Ignore padding bytes
   $body = $plen ? substr($body, 0, $clen, '') : $body;
 
-  # Debug
   if (DEBUG) {
     my $t = $self->type_name($type);
     $self->app->log->debug(
@@ -105,12 +100,10 @@ sub read_record {
 
 sub read_request {
   my ($self, $c) = @_;
-
-  # Debug
   $self->app->log->debug('Reading FastCGI request.') if DEBUG;
 
   # Transaction
-  my $tx = $self->on_build_tx->($self);
+  my $tx = $self->on_transaction->($self);
   $tx->connection($c);
   my $req = $tx->req;
 
@@ -156,8 +149,6 @@ sub read_request {
 
         # Environment
         $env->{$name} = $value;
-
-        # Debug
         $self->app->log->debug(qq/FastCGI param: $name - "$value"./)
           if DEBUG;
 
@@ -219,11 +210,9 @@ sub run {
       next;
     }
 
-    # Debug
-    $self->app->log->debug('Handling FastCGI request.') if DEBUG;
-
     # Handle
-    $self->on_handler->($self, $tx);
+    $self->app->log->debug('Handling FastCGI request.') if DEBUG;
+    $self->on_request->($self, $tx);
 
     # Response
     $self->write_response($tx);
@@ -267,7 +256,6 @@ sub write_records {
     # FCGI version 1 record
     my $template = "CCnnCxa${payload_len}x$pad_len";
 
-    # Debug
     if (DEBUG) {
       my $chunk = substr($body, $offset, $payload_len);
       $self->app->log->debug(
@@ -307,8 +295,6 @@ sub write_records {
 
 sub write_response {
   my ($self, $tx) = @_;
-
-  # Debug
   $self->app->log->debug('Writing FastCGI response.') if DEBUG;
 
   my $c   = $tx->connection;
@@ -416,7 +402,7 @@ Mojo::Server::FastCGI - FastCGI Server
   use Mojo::Server::FastCGI;
 
   my $fcgi = Mojo::Server::FastCGI->new;
-  $fcgi->on_handler(sub {
+  $fcgi->on_request(sub {
     my ($self, $tx) = @_;
 
     # Request

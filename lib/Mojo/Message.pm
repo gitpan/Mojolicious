@@ -45,21 +45,15 @@ sub body {
   $self->content(Mojo::Content::Single->new)
     if $self->content->isa('Mojo::Content::MultiPart');
 
-  # Content
-  my $content = $self->content;
-
   # Get
+  my $content = $self->content;
   return $content->on_read ? $content->on_read : $self->content->asset->slurp
     unless @_;
 
   # New content
   my $new = shift;
-
-  # Cleanup
   $content->on_read(undef);
   $content->asset(Mojo::Asset::Memory->new);
-
-  # Shortcut
   return $self unless defined $new;
 
   # Callback
@@ -88,8 +82,6 @@ sub body_params {
 
   # "x-application-urlencoded" and "application/x-www-form-urlencoded"
   if ($type =~ /(?:x-application|application\/x-www-form)-urlencoded/i) {
-
-    # Parse
     $params->parse($self->content->asset->slurp);
   }
 
@@ -122,14 +114,9 @@ sub body_size { shift->content->body_size }
 #  On top of a pile of money, with many beautiful women."
 sub build_body {
   my $self = shift;
-
-  # Body
   my $body = $self->content->build_body(@_);
-
-  # Finished
   $self->{_state} = 'done';
   if (my $cb = $self->on_finish) { $self->$cb }
-
   return $body;
 }
 
@@ -139,9 +126,7 @@ sub build_headers {
   # HTTP 0.9 has no headers
   return '' if $self->version eq '0.9';
 
-  # Fix headers
   $self->fix_headers;
-
   return $self->content->build_headers;
 }
 
@@ -169,8 +154,6 @@ sub build_start_line {
 
 sub cookie {
   my ($self, $name) = @_;
-
-  # Shortcut
   return unless $name;
 
   # Map
@@ -304,10 +287,7 @@ sub has_leftovers { shift->content->has_leftovers }
 
 sub header_size {
   my $self = shift;
-
-  # Fix headers
   $self->fix_headers;
-
   return $self->content->header_size;
 }
 
@@ -374,25 +354,13 @@ sub parse_until_body { shift->_parse(1, @_) }
 sub start_line_size { length shift->build_start_line }
 
 sub to_string {
-  my $self    = shift;
-  my $message = '';
-
-  # Start line
-  $message .= $self->build_start_line;
-
-  # Headers
-  $message .= $self->build_headers;
-
-  # Body
-  $message .= $self->build_body;
-
-  return $message;
+  my $self = shift;
+  return $self->build_start_line . $self->build_headers . $self->build_body;
 }
 
 sub upload {
   my ($self, $name) = @_;
 
-  # Shortcut
   return unless $name;
 
   # Map

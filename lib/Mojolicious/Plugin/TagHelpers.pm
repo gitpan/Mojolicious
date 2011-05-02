@@ -260,10 +260,8 @@ sub _input {
   my $c    = shift;
   my $name = shift;
 
-  # Attributes
-  my %attrs;
-
   # Odd
+  my %attrs;
   if (@_ % 2) {
     my $value = shift;
     %attrs = @_;
@@ -317,6 +315,7 @@ sub _tag {
   my %attrs = @_;
   for my $key (sort keys %attrs) {
     my $value = $attrs{$key};
+    $value = '' unless defined $value;
     xml_escape $value;
     $tag .= qq/ $key="$value"/;
   }
