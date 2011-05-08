@@ -5,7 +5,7 @@ use warnings;
 
 use utf8;
 
-use Test::More tests => 503;
+use Test::More tests => 524;
 
 # "Homer gave me a kidney: it wasn't his, I didn't need it,
 #  and it came postage due- but I appreciated the gesture!"
@@ -21,7 +21,7 @@ is x('<div>Hello ♥!</div>')->at('div')->text, 'Hello ♥!', 'right text';
 
 # Simple (basics)
 $dom = Mojo::DOM->new->parse(
-  '<div><div foo="0" id="a">A</div><div id="b">B</div></div>');
+  '<div><div FOO="0" id="a">A</div><div id="b">B</div></div>');
 is $dom->at('#b')->text, 'B', 'right text';
 my @div;
 $dom->find('div[id]')->each(sub { push @div, shift->text });
@@ -42,6 +42,7 @@ is_deeply \@div, [qw/A/], 'found first div elements with id';
 $dom->find('div[id]')->while(sub { pop() < 2 && push @div, $_->text });
 is_deeply \@div, [qw/A/], 'found first div elements with id';
 is $dom->at('#a')->attrs('foo'), 0, 'right attribute';
+is $dom->at('#a')->attrs->{foo}, 0, 'right attribute';
 is "$dom", '<div><div foo="0" id="a">A</div><div id="b">B</div></div>',
   'right result';
 
@@ -399,7 +400,7 @@ is $dom->at('extension')->attrs('foo:id'), 'works', 'right id';
 like $dom->at('#works')->text,       qr/\[awesome\]\]/, 'right text';
 like $dom->at('[id="works"]')->text, qr/\[awesome\]\]/, 'right text';
 is $dom->find('description')->[1]->text, '<p>trololololo>', 'right text';
-is $dom->at('pubdate')->text,       'Mon, 12 Jul 2010 20:42:00', 'right text';
+is $dom->at('pubDate')->text,       'Mon, 12 Jul 2010 20:42:00', 'right text';
 like $dom->at('[id*="ork"]')->text, qr/\[awesome\]\]/,           'right text';
 like $dom->at('[id*="orks"]')->text, qr/\[awesome\]\]/, 'right text';
 like $dom->at('[id*="work"]')->text, qr/\[awesome\]\]/, 'right text';
@@ -444,19 +445,19 @@ $dom = Mojo::DOM->new->parse(<<'EOF');
 </XRDS>
 EOF
 is $dom->xml, 1, 'xml mode detected';
-is $dom->at('xrds')->namespace, 'xri://$xrds',         'right namespace';
-is $dom->at('xrd')->namespace,  'xri://$xrd*($v*2.0)', 'right namespace';
-my $s = $dom->find('xrds xrd service');
-is $s->[0]->at('type')->text, 'http://o.r.g/sso/2.0', 'right text';
+is $dom->at('XRDS')->namespace, 'xri://$xrds',         'right namespace';
+is $dom->at('XRD')->namespace,  'xri://$xrd*($v*2.0)', 'right namespace';
+my $s = $dom->find('XRDS XRD Service');
+is $s->[0]->at('Type')->text, 'http://o.r.g/sso/2.0', 'right text';
 is $s->[0]->namespace, 'xri://$xrd*($v*2.0)', 'right namespace';
-is $s->[1]->at('type')->text, 'http://o.r.g/sso/1.0', 'right text';
+is $s->[1]->at('Type')->text, 'http://o.r.g/sso/1.0', 'right text';
 is $s->[1]->namespace, 'xri://$xrd*($v*2.0)', 'right namespace';
 is $s->[2], undef, 'no text';
 
-# Yadis (with namespace)
-$dom = Mojo::DOM->new->parse(<<'EOF');
+# Yadis (roundtrip with namespace)
+my $yadis = <<'EOF';
 <?xml version="1.0" encoding="UTF-8"?>
-<xrds:XRDS xmlns:xrds="xri://$xrds" xmlns="xri://$xrd*($v*2.0)">
+<xrds:XRDS xmlns="xri://$xrd*($v*2.0)" xmlns:xrds="xri://$xrds">
   <XRD>
     <Service>
       <Type>http://o.r.g/sso/3.0</Type>
@@ -467,27 +468,31 @@ $dom = Mojo::DOM->new->parse(<<'EOF');
   </XRD>
   <XRD>
     <Service>
-      <Type>http://o.r.g/sso/2.0</Type>
+      <Type test="23">http://o.r.g/sso/2.0</Type>
     </Service>
     <Service>
-      <Type>http://o.r.g/sso/1.0</Type>
+      <Type Test="23" test="24">http://o.r.g/sso/1.0</Type>
     </Service>
   </XRD>
 </xrds:XRDS>
 EOF
+$dom = Mojo::DOM->new->parse($yadis);
 is $dom->xml, 1, 'xml mode detected';
-is $dom->at('xrds')->namespace, 'xri://$xrds',         'right namespace';
-is $dom->at('xrd')->namespace,  'xri://$xrd*($v*2.0)', 'right namespace';
-$s = $dom->find('xrds xrd service');
-is $s->[0]->at('type')->text, 'http://o.r.g/sso/3.0', 'right text';
+is $dom->at('XRDS')->namespace, 'xri://$xrds',         'right namespace';
+is $dom->at('XRD')->namespace,  'xri://$xrd*($v*2.0)', 'right namespace';
+$s = $dom->find('XRDS XRD Service');
+is $s->[0]->at('Type')->text, 'http://o.r.g/sso/3.0', 'right text';
 is $s->[0]->namespace, 'xri://$xrd*($v*2.0)', 'right namespace';
-is $s->[1]->at('type')->text, 'http://o.r.g/sso/4.0', 'right text';
+is $s->[1]->at('Type')->text, 'http://o.r.g/sso/4.0', 'right text';
 is $s->[1]->namespace, 'xri://$xrds', 'right namespace';
-is $s->[2]->at('type')->text, 'http://o.r.g/sso/2.0', 'right text';
+is $s->[2]->at('Type')->text, 'http://o.r.g/sso/2.0', 'right text';
 is $s->[2]->namespace, 'xri://$xrd*($v*2.0)', 'right namespace';
-is $s->[3]->at('type')->text, 'http://o.r.g/sso/1.0', 'right text';
+is $s->[3]->at('Type')->text, 'http://o.r.g/sso/1.0', 'right text';
 is $s->[3]->namespace, 'xri://$xrd*($v*2.0)', 'right namespace';
 is $s->[4], undef, 'no text';
+is $dom->at('[Test="23"]')->text, 'http://o.r.g/sso/1.0', 'right text';
+is $dom->at('[test="23"]')->text, 'http://o.r.g/sso/2.0', 'right text';
+is "$dom", $yadis, 'successful roundtrip';
 
 # Result and iterator order
 $dom = Mojo::DOM->new->parse('<a><b>1</b></a><b>2</b><b>3</b>');
@@ -641,6 +646,9 @@ my @li;
 $dom->find('li:nth-child(odd)')->each(sub { push @li, shift->text });
 is_deeply \@li, [qw/A C E G/], 'found all odd li elements';
 @li = ();
+$dom->find('li:NTH-CHILD(ODD)')->each(sub { push @li, shift->text });
+is_deeply \@li, [qw/A C E G/], 'found all odd li elements';
+@li = ();
 $dom->find('li:nth-last-child(odd)')->each(sub { push @li, shift->text });
 is_deeply \@li, [qw/B D F H/], 'found all odd li elements';
 is($dom->find(':nth-child(odd)')->[0]->type,       'ul', 'right type');
@@ -664,10 +672,16 @@ is_deeply \@li, [qw/B D F H/], 'found all odd li elements';
 $dom->find('li:nth-child(even)')->each(sub { push @li, shift->text });
 is_deeply \@li, [qw/B D F H/], 'found all even li elements';
 @li = ();
+$dom->find('li:NTH-CHILD(EVEN)')->each(sub { push @li, shift->text });
+is_deeply \@li, [qw/B D F H/], 'found all even li elements';
+@li = ();
 $dom->find('li:nth-last-child(even)')->each(sub { push @li, shift->text });
 is_deeply \@li, [qw/A C E G/], 'found all even li elements';
 @li = ();
 $dom->find('li:nth-child(2n+2)')->each(sub { push @li, shift->text });
+is_deeply \@li, [qw/B D F H/], 'found all even li elements';
+@li = ();
+$dom->find('li:nTh-chILd(2N+2)')->each(sub { push @li, shift->text });
 is_deeply \@li, [qw/B D F H/], 'found all even li elements';
 @li = ();
 $dom->find('li:nth-child( 2n + 2 )')->each(sub { push @li, shift->text });
@@ -727,6 +741,12 @@ is_deeply \@li, [qw/C F/], 'found every third li elements';
 $dom->find('li:nth-last-child(3n)')->each(sub { push @li, shift->text });
 is_deeply \@li, [qw/C F/], 'found every third li elements';
 @li = ();
+$dom->find('li:NTH-LAST-CHILD(3N)')->each(sub { push @li, shift->text });
+is_deeply \@li, [qw/C F/], 'found every third li elements';
+@li = ();
+$dom->find('li:Nth-Last-Child(3N)')->each(sub { push @li, shift->text });
+is_deeply \@li, [qw/C F/], 'found every third li elements';
+@li = ();
 $dom->find('li:nth-child(3)')->each(sub { push @li, shift->text });
 is_deeply \@li, [qw/C/], 'found third li element';
 @li = ();
@@ -737,6 +757,12 @@ $dom->find('li:nth-child(1n+0)')->each(sub { push @li, shift->text });
 is_deeply \@li, [qw/A B C D E F G/], 'found first three li elements';
 @li = ();
 $dom->find('li:nth-child(n+0)')->each(sub { push @li, shift->text });
+is_deeply \@li, [qw/A B C D E F G/], 'found first three li elements';
+@li = ();
+$dom->find('li:NTH-CHILD(N+0)')->each(sub { push @li, shift->text });
+is_deeply \@li, [qw/A B C D E F G/], 'found first three li elements';
+@li = ();
+$dom->find('li:Nth-Child(N+0)')->each(sub { push @li, shift->text });
 is_deeply \@li, [qw/A B C D E F G/], 'found first three li elements';
 @li = ();
 $dom->find('li:nth-child(n)')->each(sub { push @li, shift->text });
@@ -1536,3 +1562,27 @@ is $dom->at('#screw-up .ewww > a > img')->attrs('src'), '/test.png',
 is $dom->find('#screw-up .ewww > a > img')->[1]->attrs('src'), '/test2.png',
   'right attribute';
 is $dom->find('#screw-up .ewww > a > img')->[2], undef, 'no result';
+
+# Modifying an XML document
+$dom = Mojo::DOM->new->parse(<<'EOF');
+<?xml version='1.0' encoding='UTF-8'?>
+<XMLTest />
+EOF
+is $dom->xml, 1, 'xml mode detected';
+$dom->at('XMLTest')->replace_inner('<Element />');
+my $element = $dom->at('Element');
+is $element->type, 'Element', 'right type';
+is $element->xml,  1,         'xml mode detected';
+$element = $dom->at('XMLTest')->children->[0];
+is $element->type, 'Element', 'right child';
+is $element->parent->type, 'XMLTest', 'right parent';
+is $element->root->xml,    1,         'xml mode detected';
+$dom->replace('<XMLTest2 />');
+is $dom->xml, undef, 'xml mode not detected';
+is $dom->children->[0], '<xmltest2 />', 'right result';
+$dom->replace(<<EOF);
+<?xml version='1.0' encoding='UTF-8'?>
+<XMLTest3 />
+EOF
+is $dom->xml, 1, 'xml mode detected';
+is $dom->children->[0], '<XMLTest3 />', 'right result';

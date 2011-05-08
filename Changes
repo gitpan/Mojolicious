@@ -1,5 +1,30 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+1.31    2011-05-08 00:00:00
+        - Reverted deprecation of Perl 5.8.x support, by popular demand.
+        - Added FAQ entry to clarify the Perl 5.8.x situation.
+        - Improved documentation.
+        - Fixed case sensitivity of Mojo::DOM in XML mode.
+        - Fixed pseudo class case handling in Mojo::DOM. (akron)
+
+1.3     2011-05-05 00:00:00
+        - Code name "Tropical Drink", this is a major release.
+        - Deprecated Perl 5.8.x support.
+        - Deprecated Mojolicious::Renderer get_inline_template method in
+          favor of the get_data_template method.
+        - Added EXPERIMENTAL before_render hook.
+        - Added EXPERIMENTAL hook function to Mojolicious::Lite.
+        - Added workaround for uWSGI bug. (miyagawa)
+        - Improved Mojo::Template and Mojolicious::Routes exception handling.
+        - Improved debug log messages for template rendering.
+        - Updated Mojo::Base and Mojolicious::Lite to enable Perl 5.10
+          features if available.
+        - Updated jQuery to version 1.6.
+        - Fixed PSGI read error handling.
+        - Fixed 64bit WebSocket message bug.
+        - Fixed small Windows bug.
+        - Fixed typos. (metaperl)
+
 1.22    2011-05-02 00:00:00
         - Added opposite tests to Test::Mojo.
         - Deprecated Mojo::IOLoop on_tick method in favor of the recurring

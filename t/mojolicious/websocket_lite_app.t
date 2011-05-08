@@ -6,7 +6,11 @@ use warnings;
 # Disable IPv6, epoll and kqueue
 BEGIN { $ENV{MOJO_NO_IPV6} = $ENV{MOJO_POLL} = 1 }
 
-use Test::More tests => 41;
+# FreeBSD 8.0 and 8.1 are known to cause problems
+use Test::More;
+plan skip_all => 'This test does not work on some older versions of FreeBSD!'
+  if $^O =~ /freebsd/;
+plan tests => 41;
 
 # "Oh, dear. She’s stuck in an infinite loop and he’s an idiot.
 #  Well, that’s love for you."
@@ -116,7 +120,9 @@ websocket '/subreq' => sub {
 
 # WebSocket /echo
 websocket '/echo' => sub {
-  shift->on_message(
+  my $self = shift;
+  $self->tx->max_websocket_size(500000);
+  $self->on_message(
     sub {
       my ($self, $message) = @_;
       $self->send_message($message);
@@ -461,6 +467,7 @@ $result = undef;
 $ua->websocket(
   '/echo' => sub {
     my $tx = pop;
+    $tx->max_websocket_size(500000);
     $tx->on_finish(sub { $loop->stop });
     $tx->on_message(
       sub {
@@ -469,8 +476,8 @@ $ua->websocket(
         $tx->finish;
       }
     );
-    $tx->send_message('hi' x 100000);
+    $tx->send_message('hi' x 200000);
   }
 );
 $loop->start;
-is $result, 'hi' x 100000, 'right result';
+is $result, 'hi' x 200000, 'right result';

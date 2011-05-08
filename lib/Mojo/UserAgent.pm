@@ -1012,7 +1012,8 @@ object will be used.
   my $keep_alive_timeout = $ua->keep_alive_timeout;
   $ua                    = $ua->keep_alive_timeout(15);
 
-Timeout in seconds for keep alive between requests, defaults to C<15>.
+Maximum amount of time in seconds a connection can be inactive before being
+dropped, defaults to C<15>.
 
 =head2 C<key>
 
@@ -1079,7 +1080,8 @@ redirects.
   my $websocket_timeout = $ua->websocket_timeout;
   $ua                   = $ua->websocket_timeout(300);
 
-Timeout in seconds for WebSockets to be idle, defaults to C<300>.
+Maximum amount of time in seconds a WebSocket connection can be inactive
+before being dropped, defaults to C<300>.
 
 =head1 METHODS
 
