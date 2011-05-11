@@ -41,7 +41,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Tropical Drink';
-our $VERSION  = '1.31';
+our $VERSION  = '1.32';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -205,6 +205,11 @@ sub handler {
     $tx->res->code(500);
     $tx->resume;
   }
+
+  # Delayed
+  $self->log->debug(
+    'Waiting for delayed response, forgot to render or resume?')
+    unless $stash->{'mojo.rendered'} || $tx->is_writing;
 }
 
 # "This snow is beautiful. I'm glad global warming never happened.
@@ -321,7 +326,7 @@ I18N, first class unicode support and much more for you to discover.
 =item *
 
 Very clean, portable and Object Oriented pure Perl API without any hidden
-magic and no requirements besides Perl 5.8.7.
+magic and no requirements besides Perl 5.8.7 (although 5.10+ is recommended).
 
 =item *
 

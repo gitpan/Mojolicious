@@ -8,7 +8,9 @@ BEGIN { $ENV{MOJO_NO_IPV6} = $ENV{MOJO_POLL} = 1 }
 
 use Test::More;
 use Mojo::IOLoop;
-plan skip_all => 'IO::Socket::SSL 1.37 required for this test!'
+plan skip_all => 'set TEST_TLS to enable this test (developer only!)'
+  unless $ENV{TEST_TLS};
+plan skip_all => 'IO::Socket::SSL 1.43 required for this test!'
   unless Mojo::IOLoop::TLS;
 plan skip_all => 'Windows is too fragile for this test!'
   if Mojo::IOLoop::WINDOWS;

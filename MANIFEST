@@ -163,6 +163,7 @@ t/mojo/ioloop.t
 t/mojo/ioloop_online.t
 t/mojo/ioloop_tls.t
 t/mojo/json.t
+t/mojo/lib/exception.mt
 t/mojo/lib/LoaderException.pm
 t/mojo/lib/LoaderException2.pm
 t/mojo/lib/LoaderTest/A.pm
@@ -225,6 +226,7 @@ t/mojolicious/routes.t
 t/mojolicious/secret.txt
 t/mojolicious/tag_helper_lite_app.t
 t/mojolicious/templates/23.html.epl
+t/mojolicious/templates/dies_too.html.ep
 t/mojolicious/templates/encoding.koi8-r.ep
 t/mojolicious/templates/exception.html.epl
 t/mojolicious/templates/exception.testing.html.ep

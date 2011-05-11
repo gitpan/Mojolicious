@@ -3,6 +3,9 @@ package Mojo::Base;
 use strict;
 use warnings;
 
+# Mojo modules are modern!
+require feature if $] >= 5.010;
+
 # No imports because we get subclassed, a lot!
 require Carp;
 
@@ -233,6 +236,13 @@ Pass an optional second argument to set a default value, it should be a
 constant or a sub reference.
 The sub reference will be excuted at accessor read time if there's no set
 value.
+
+=head1 DEBUGGING
+
+You can set the C<MOJO_BASE_DEBUG> environment variable to get some advanced
+diagnostics information printed to C<STDERR>.
+
+  MOJO_BASE_DEBUG=1
 
 =head1 SEE ALSO
 
