@@ -12,7 +12,7 @@ BEGIN { $ENV{MOJO_NO_IPV6} = $ENV{MOJO_POLL} = 1 }
 my $backup;
 BEGIN { $backup = $ENV{MOJO_MODE} || ''; $ENV{MOJO_MODE} = 'development' }
 
-use Test::More tests => 777;
+use Test::More tests => 782;
 
 # Pollution
 123 =~ m/(\d+)/;
@@ -49,9 +49,9 @@ plugin 'PluginWithTemplate';
 app->defaults(default => 23);
 
 # Test helpers
-app->helper(test_helper  => sub { shift->param(@_) });
-app->helper(test_helper2 => sub { shift->app->controller_class });
-app->helper(dead         => sub { die $_[1] || 'works!' });
+helper test_helper  => sub { shift->param(@_) };
+helper test_helper2 => sub { shift->app->controller_class };
+helper dead         => sub { die $_[1] || 'works!' };
 is app->test_helper('foo'), undef, 'no value yet';
 is app->test_helper2, 'Mojolicious::Controller', 'right value';
 
@@ -114,6 +114,12 @@ get '/before/render' => {before_render => 1} => sub {
 get '/auto_name' => sub {
   my $self = shift;
   $self->render(text => $self->url_for('auto_name'));
+};
+
+# GET /reserved
+get '/reserved' => sub {
+  my $self = shift;
+  $self->render(text => $self->param('cb'));
 };
 
 # GET /custom_name
@@ -267,11 +273,10 @@ get '/with/header/condition' => (headers => {'X-Secret-Header' => 'bar'}) =>
   'with_header_condition';
 
 # POST /with/header/condition
-post '/with/header/condition' => (headers => {'X-Secret-Header' => 'bar'}) =>
-  sub {
+post '/with/header/condition' => sub {
   my $self = shift;
   $self->render_text('foo ' . $self->req->headers->header('X-Secret-Header'));
-  };
+} => (headers => {'X-Secret-Header' => 'bar'});
 
 # POST /with/body/and/desc
 post '/with/body/and/desc' => sub {
@@ -757,6 +762,12 @@ $t->get_ok('/auto_name')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_is('/custom_name');
+
+# GET /reserved
+$t->get_ok('/reserved?cb=just-works')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is('just-works');
 
 # GET /inline/exception
 $t->get_ok('/inline/exception')->status_is(500)

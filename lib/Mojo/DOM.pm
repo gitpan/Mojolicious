@@ -1150,7 +1150,7 @@ sub _start {
   warn "START $start\n" if DEBUG;
 
   # Autoclose optional HTML tags
-  if ($$current->[0] ne 'root') {
+  if (!$self->xml && $$current->[0] ne 'root') {
 
     # "<li>"
     if ($start eq 'li') { $self->_close($current, {li => 1}, 'ul') }
@@ -1238,11 +1238,10 @@ sub while { shift->_iterate(@_, 0) }
 
 sub _iterate {
   my ($self, $cb, $cond) = @_;
-
   return @$self unless $cb;
-  my $i = 1;
 
   # Iterate until condition is true
+  my $i = 1;
   if (defined $cond) { !!$_->$cb($i++) == $cond && last for @$self }
 
   # Iterate over all elements
@@ -1270,23 +1269,23 @@ Mojo::DOM - Minimalistic XML/HTML5 DOM Parser With CSS3 Selectors
 
   # Find
   my $b = $dom->at('#b');
-  print $b->text;
+  say $b->text;
 
   # Iterate
-  $dom->find('div[id]')->each(sub { print shift->text });
+  $dom->find('div[id]')->each(sub { say shift->text });
 
   # Loop
   for my $e ($dom->find('div[id]')->each) {
-    print $e->text;
+    say $e->text;
   }
 
   # Get the first 10 links
   $dom->find('a[href]')
-    ->while(sub { print shift->attrs->{href} && pop() < 10 });
+    ->while(sub { say shift->attrs->{href} && pop() < 10 });
 
   # Search for a link about a specific topic
   $dom->find('a[href]')
-    ->until(sub { $_->text =~ m/kraih/ && print $_->attrs->{href} });
+    ->until(sub { $_->text =~ m/kraih/ && say $_->attrs->{href} });
 
 =head1 DESCRIPTION
 
@@ -1570,16 +1569,52 @@ Element attributes.
 
 Children of element.
 
+  say $dom->children->[1]->children->[5]->text;
+
 =head2 C<find>
 
   my $collection = $dom->find('html title');
 
 Find elements with CSS3 selectors and return a collection.
 
-  print $dom->find('div')->[23]->text;
-  $dom->find('div')->each(sub { print shift->text });
-  $dom->find('div')->while(sub { print $_->text && $_->text =~ /foo/ });
-  $dom->find('div')->until(sub { $_->text =~ /foo/ && print $_->text });
+  say $dom->find('div')->[23]->text;
+
+Collections are blessed arrays supporting these methods.
+
+=over 2
+
+=item C<each>
+
+  my @elements = $dom->find('div')->each;
+  $dom         = $dom->find('div')->each(sub { say shift->text });
+  $dom         = $dom->find('div')->each(sub {
+    my ($e, $count) = @_;
+    say "$count: ", $e->text;
+  });
+
+Iterate over whole collection.
+
+=item C<while>
+
+  $dom = $dom->find('div')->while(sub { say($_->text) && $_->text =~ /x/ });
+  $dom = $dom->find('div')->while(sub {
+    my ($e, $count) = @_;
+    say("$count: ", $e->text) && $e->text =~ /x/;
+  });
+
+Iterate over collection while closure returns true.
+
+=item C<until>
+
+  $dom = $dom->find('div')->until(sub { $_->text =~ /x/ && say $_->text });
+  $dom = $dom->find('div')->until(sub {
+    my ($e, $count) = @_;
+    $e->text =~ /x/ && say "$count: ", $e->text;
+  });
+
+Iterate over collection until closure returns true.
+
+=back
 
 =head2 C<inner_xml>
 
@@ -1591,7 +1626,7 @@ Render content of this element to XML.
 
   my $namespace = $dom->namespace;
 
-Element namespace.
+Find element namespace.
 
 =head2 C<parent>
 

@@ -124,6 +124,12 @@ lib/Mojolicious/Routes/Match.pm
 lib/Mojolicious/Routes/Pattern.pm
 lib/Mojolicious/Sessions.pm
 lib/Mojolicious/Static.pm
+lib/Mojolicious/templates/exception.development.html.ep
+lib/Mojolicious/templates/exception.html.ep
+lib/Mojolicious/templates/mojobar.html.ep
+lib/Mojolicious/templates/not_found.development.html.ep
+lib/Mojolicious/templates/not_found.html.ep
+lib/Mojolicious/templates/perldoc.html.ep
 lib/Mojolicious/Types.pm
 lib/ojo.pm
 lib/Test/Mojo.pm
@@ -131,6 +137,7 @@ LICENSE
 Makefile.PL
 MANIFEST			This list of files
 MANIFEST.SKIP
+MYMETA.yml
 README.pod
 script/hypnotoad
 script/mojo
