@@ -5,7 +5,7 @@ use warnings;
 
 use utf8;
 
-use Test::More tests => 530;
+use Test::More tests => 535;
 
 # "Homer gave me a kidney: it wasn't his, I didn't need it,
 #  and it came postage due- but I appreciated the gesture!"
@@ -1617,3 +1617,55 @@ EOF
 is $dom->find('table > td > tr > thead')->[0]->text, 'foo', 'right text';
 is $dom->find('table > td > tr > thead')->[1]->text, 'bar', 'right text';
 is $dom->find('table > td > tr > thead')->[2], undef, 'no result';
+
+# Nested tables
+$dom = Mojo::DOM->new->parse(<<'EOF');
+<table id="foo">
+  <tr>
+    <td>
+      <table id="bar">
+        <tr>
+          <td>baz</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+EOF
+is $dom->find('#foo > tr > td > #bar > tr >td')->[0]->text, 'baz',
+  'right text';
+is $dom->find('table > tr > td > table > tr >td')->[0]->text, 'baz',
+  'right text';
+
+# Nested find
+$dom->parse(<<EOF);
+<c>
+  <a>foo</a>
+  <b>
+    <a>bar</a>
+    <c>
+      <a>baz</a>
+      <d>
+        <a>yada</a>
+      </d>
+    </c>
+  </b>
+</c>
+EOF
+my @results;
+$dom->find('b')->each(
+  sub {
+    $_->find('a')->each(sub { push @results, $_->text });
+  }
+);
+is_deeply \@results, [qw/bar baz yada/], 'right results';
+@results = ();
+$dom->find('a')->each(sub { push @results, $_->text });
+is_deeply \@results, [qw/foo bar baz yada/], 'right results';
+@results = ();
+$dom->find('b')->each(
+  sub {
+    $_->find('c a')->each(sub { push @results, $_->text });
+  }
+);
+is_deeply \@results, [qw/baz yada/], 'right results';

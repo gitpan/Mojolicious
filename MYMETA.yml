@@ -58,4 +58,4 @@ resources:
   homepage: http://mojolicio.us
   license: http://dev.perl.org/licenses/
   repository: http://github.com/kraih/mojo
-version: 1.33
+version: 1.34
