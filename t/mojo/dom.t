@@ -5,7 +5,7 @@ use warnings;
 
 use utf8;
 
-use Test::More tests => 535;
+use Test::More tests => 591;
 
 # "Homer gave me a kidney: it wasn't his, I didn't need it,
 #  and it came postage due- but I appreciated the gesture!"
@@ -14,13 +14,11 @@ use_ok 'ojo';
 
 use Mojo::Util 'encode';
 
-my $dom = Mojo::DOM->new;
-
 # ojo
 is x('<div>Hello ♥!</div>')->at('div')->text, 'Hello ♥!', 'right text';
 
 # Simple (basics)
-$dom = Mojo::DOM->new->parse(
+my $dom = Mojo::DOM->new->parse(
   '<div><div FOO="0" id="a">A</div><div id="b">B</div></div>');
 is $dom->at('#b')->text, 'B', 'right text';
 my @div;
@@ -317,34 +315,34 @@ is "$dom", '<div>foo<p>lalala</p>bar</div>', 'right text';
 $dom->find('p')->each(sub { shift->replace('') });
 is "$dom", '<div>foobar</div>', 'right text';
 $dom = Mojo::DOM->new->parse('<div>♥</div>');
-$dom->at('div')->replace_inner('☃');
+$dom->at('div')->replace_content('☃');
 is "$dom", '<div>☃</div>', 'right text';
 $dom = Mojo::DOM->new->parse('<div>♥</div>');
-$dom->at('div')->replace_inner("\x{2603}");
+$dom->at('div')->replace_content("\x{2603}");
 is "$dom", '<div>☃</div>', 'right text';
 
 # Replace element content
 $dom = Mojo::DOM->new->parse('<div>foo<p>lalala</p>bar</div>');
-$dom->at('p')->replace_inner('bar');
+$dom->at('p')->replace_content('bar');
 is "$dom", '<div>foo<p>bar</p>bar</div>', 'right text';
-$dom->at('p')->replace_inner(Mojo::DOM->new->parse('text'));
+$dom->at('p')->replace_content(Mojo::DOM->new->parse('text'));
 is "$dom", '<div>foo<p>text</p>bar</div>', 'right text';
 $dom = Mojo::DOM->new->parse('<div>foo</div><div>bar</div>');
-$dom->find('div')->each(sub { shift->replace_inner('<p>test</p>') });
+$dom->find('div')->each(sub { shift->replace_content('<p>test</p>') });
 is "$dom", '<div><p>test</p></div><div><p>test</p></div>', 'right text';
-$dom->find('p')->each(sub { shift->replace_inner('') });
+$dom->find('p')->each(sub { shift->replace_content('') });
 is "$dom", '<div><p /></div><div><p /></div>', 'right text';
 $dom = Mojo::DOM->new->parse('<div><p id="☃" /></div>');
-$dom->at('#☃')->replace_inner('♥');
+$dom->at('#☃')->replace_content('♥');
 is "$dom", '<div><p id="☃">♥</p></div>', 'right text';
 $dom = Mojo::DOM->new->parse('<div>foo<p>lalala</p>bar</div>');
-$dom->replace_inner('♥');
+$dom->replace_content('♥');
 is "$dom", '♥', 'right text';
-$dom->replace_inner('<div>foo<p>lalala</p>bar</div>');
+$dom->replace_content('<div>foo<p>lalala</p>bar</div>');
 is "$dom", '<div>foo<p>lalala</p>bar</div>', 'right text';
-$dom->replace_inner('');
+$dom->replace_content('');
 is "$dom", '', 'right text';
-$dom->replace_inner('<div>foo<p>lalala</p>bar</div>');
+$dom->replace_content('<div>foo<p>lalala</p>bar</div>');
 is "$dom", '<div>foo<p>lalala</p>bar</div>', 'right text';
 
 # Mixed search and tree walk
@@ -520,8 +518,8 @@ is $dom->at('div')->attrs->{test2}, '', 'empty attribute value';
 # Whitespaces before closing bracket
 $dom = Mojo::DOM->new->parse(qq/<div >content<\/div>/);
 ok $dom->at('div'), 'tag found';
-is $dom->at('div')->text,      'content', 'right text';
-is $dom->at('div')->inner_xml, 'content', 'right text';
+is $dom->at('div')->text,        'content', 'right text';
+is $dom->at('div')->content_xml, 'content', 'right text';
 
 # Class with hyphen
 $dom = Mojo::DOM->new->parse(
@@ -543,12 +541,12 @@ is_deeply \@div, [qw/A B 0/], 'found all div elements with id';
 # Empty tags
 $dom = Mojo::DOM->new->parse('<hr /><br/><br id="br"/><br />');
 is "$dom", '<hr /><br /><br id="br" /><br />', 'right result';
-is $dom->at('br')->inner_xml, '', 'empty result';
+is $dom->at('br')->content_xml, '', 'empty result';
 
 # Inner XML
 $dom = Mojo::DOM->new->parse('<a>xxx<x>x</x>xxx</a>');
-is $dom->at('a')->inner_xml, 'xxx<x>x</x>xxx', 'right result';
-is $dom->inner_xml, '<a>xxx<x>x</x>xxx</a>', 'right result';
+is $dom->at('a')->content_xml, 'xxx<x>x</x>xxx', 'right result';
+is $dom->content_xml, '<a>xxx<x>x</x>xxx</a>', 'right result';
 
 # Multiple selectors
 $dom = Mojo::DOM->new->parse(
@@ -946,7 +944,7 @@ $dom = Mojo::DOM->new->parse(<<EOF);
 </ul>
 <div>D</div>
 EOF
-$dom->at('li')->add_after('<p>A1</p>23');
+$dom->at('li')->append('<p>A1</p>23');
 is "$dom", <<EOF, 'right result';
 <ul>
     <li>A</li><p>A1</p>23
@@ -955,7 +953,7 @@ is "$dom", <<EOF, 'right result';
 </ul>
 <div>D</div>
 EOF
-$dom->at('li')->add_before('24')->add_before('<div>A-1</div>25');
+$dom->at('li')->prepend('24')->prepend('<div>A-1</div>25');
 is "$dom", <<EOF, 'right result';
 <ul>
     24<div>A-1</div>25<li>A</li><p>A1</p>23
@@ -966,7 +964,7 @@ is "$dom", <<EOF, 'right result';
 EOF
 is $dom->at('div')->text, 'A-1', 'right text';
 is $dom->at('iv'), undef, 'no result';
-$dom->add_before('l')->add_before('alal')->add_before('a');
+$dom->prepend('l')->prepend('alal')->prepend('a');
 is "$dom", <<EOF, 'no change';
 <ul>
     24<div>A-1</div>25<li>A</li><p>A1</p>23
@@ -975,7 +973,7 @@ is "$dom", <<EOF, 'no change';
 </ul>
 <div>D</div>
 EOF
-$dom->add_after('lalala');
+$dom->append('lalala');
 is "$dom", <<EOF, 'no change';
 <ul>
     24<div>A-1</div>25<li>A</li><p>A1</p>23
@@ -984,12 +982,32 @@ is "$dom", <<EOF, 'no change';
 </ul>
 <div>D</div>
 EOF
-$dom->find('div')->each(sub { shift->add_after('works') });
+$dom->find('div')->each(sub { shift->append('works') });
 is "$dom", <<EOF, 'right result';
 <ul>
     24<div>A-1</div>works25<li>A</li><p>A1</p>23
     <p>B</p>
     <li>C</li>
+</ul>
+<div>D</div>works
+EOF
+$dom->at('li')->prepend_content('A3<p>A2</p>')->prepend_content('A4');
+is $dom->at('li')->text, 'A4 A3 A', 'right text';
+is "$dom", <<EOF, 'right result';
+<ul>
+    24<div>A-1</div>works25<li>A4A3<p>A2</p>A</li><p>A1</p>23
+    <p>B</p>
+    <li>C</li>
+</ul>
+<div>D</div>works
+EOF
+$dom->find('li')->[1]->append_content('<p>C2</p>C3')->append_content('C4');
+is $dom->find('li')->[1]->text, 'C C3 C4', 'right text';
+is "$dom", <<EOF, 'right result';
+<ul>
+    24<div>A-1</div>works25<li>A4A3<p>A2</p>A</li><p>A1</p>23
+    <p>B</p>
+    <li>C<p>C2</p>C3C4</li>
 </ul>
 <div>D</div>works
 EOF
@@ -1569,7 +1587,7 @@ $dom = Mojo::DOM->new->parse(<<'EOF');
 <XMLTest />
 EOF
 is $dom->xml, 1, 'xml mode detected';
-$dom->at('XMLTest')->replace_inner('<Element />');
+$dom->at('XMLTest')->replace_content('<Element />');
 my $element = $dom->at('Element');
 is $element->type, 'Element', 'right type';
 is $element->xml,  1,         'xml mode detected';
@@ -1669,3 +1687,105 @@ $dom->find('b')->each(
   }
 );
 is_deeply \@results, [qw/baz yada/], 'right results';
+
+# Autoload children in XML mode
+$dom = Mojo::DOM->new(<<EOF, xml => 1);
+<a id="one">
+  <B class="two" test>
+    foo
+    <c id="three">bar</c>
+    <c ID="four">baz</c>
+  </B>
+</a>
+EOF
+is $dom->xml, 1, 'xml mode activated';
+is $dom->a->B->text, 'foo', 'right text';
+is $dom->a->B->c->[0]->text, 'bar', 'right text';
+is $dom->a->B->c->[1]->text, 'baz', 'right text';
+is $dom->a->B->c->[2], undef, 'no result';
+
+# Autoload children in HTML mode
+$dom = Mojo::DOM->new(<<EOF);
+<a id="one">
+  <B class="two" test>
+    foo
+    <c id="three">bar</c>
+    <c ID="four">baz</c>
+  </B>
+</a>
+EOF
+is $dom->xml, undef, 'xml mode not activated';
+is $dom->a->b->text, 'foo', 'right text';
+is $dom->a->b->c->[0]->text, 'bar', 'right text';
+is $dom->a->b->c->[1]->text, 'baz', 'right text';
+is $dom->a->b->c->[2], undef, 'no result';
+
+# Direct hash access to attributes in XML mode
+$dom = Mojo::DOM->new(<<EOF, xml => 1);
+<a id="one">
+  <B class="two" test>
+    foo
+    <c id="three">bar</c>
+    <c ID="four">baz</c>
+  </B>
+</a>
+EOF
+is $dom->xml, 1, 'xml mode activated';
+is $dom->a->{id}, 'one', 'right attribute';
+is_deeply [sort keys %{$dom->a}], ['id'], 'right attributes';
+is $dom->a->B->text, 'foo', 'right text';
+is $dom->at('a')->B->text, 'foo', 'right text';
+is $dom->find('a')->[0]->B->text, 'foo', 'right text';
+is $dom->a->B->{class}, 'two', 'right attribute';
+is $dom->at('a')->B->{class}, 'two', 'right attribute';
+is $dom->find('a')->[0]->B->{class}, 'two', 'right attribute';
+is_deeply [sort keys %{$dom->a->B}], [qw/class test/], 'right attributes';
+is $dom->a->B->c->[0]->text, 'bar', 'right text';
+is $dom->a->B->c->[0]->{id}, 'three', 'right attribute';
+is_deeply [sort keys %{$dom->a->B->c->[0]}], ['id'], 'right attributes';
+is $dom->a->B->c->[1]->text, 'baz', 'right text';
+is $dom->a->B->c->[1]->{ID}, 'four', 'right attribute';
+is_deeply [sort keys %{$dom->a->B->c->[1]}], ['ID'], 'right attributes';
+is $dom->a->B->c->[2], undef, 'no result';
+@results = ();
+$dom->a->B->c->each(sub { push @results, $_->text });
+is_deeply \@results, [qw/bar baz/], 'right results';
+is $dom->a->B->c, qq/<c id="three">bar<\/c>\n<c ID="four">baz<\/c>/,
+  'right result';
+is_deeply [keys %$dom], [], 'root has no attributes';
+is $dom->find('#nothing'), '', 'no result';
+
+# Direct hash access to attributes in HTML mode
+$dom = Mojo::DOM->new(<<EOF);
+<a id="one">
+  <B class="two" test>
+    foo
+    <c id="three">bar</c>
+    <c ID="four">baz</c>
+  </B>
+</a>
+EOF
+is $dom->xml, undef, 'xml mode not activated';
+is $dom->a->{id}, 'one', 'right attribute';
+is_deeply [sort keys %{$dom->a}], ['id'], 'right attributes';
+is $dom->a->b->text, 'foo', 'right text';
+is $dom->at('a')->b->text, 'foo', 'right text';
+is $dom->find('a')->[0]->b->text, 'foo', 'right text';
+is $dom->a->b->{class}, 'two', 'right attribute';
+is $dom->at('a')->b->{class}, 'two', 'right attribute';
+is $dom->find('a')->[0]->b->{class}, 'two', 'right attribute';
+is_deeply [sort keys %{$dom->a->b}], [qw/class test/], 'right attributes';
+is $dom->a->b->c->[0]->text, 'bar', 'right text';
+is $dom->a->b->c->[0]->{id}, 'three', 'right attribute';
+is_deeply [sort keys %{$dom->a->b->c->[0]}], ['id'], 'right attributes';
+is $dom->a->b->c->[1]->text, 'baz', 'right text';
+is $dom->a->b->c->[1]->{id}, 'four', 'right attribute';
+is_deeply [sort keys %{$dom->a->b->c->[1]}], ['id'], 'right attributes';
+is $dom->a->b->c->[2], undef, 'no result';
+@results = ();
+$dom->a->b->c->each(sub { push @results, $_->text });
+is_deeply \@results, [qw/bar baz/], 'right results';
+is $dom->a->b->c, qq/<c id="three">bar<\/c>\n<c id="four">baz<\/c>/,
+  'right result';
+is_deeply [keys %$dom], [], 'root has no attributes';
+is $dom->find('#nothing'), '', 'no result';

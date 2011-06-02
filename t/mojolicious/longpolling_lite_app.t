@@ -6,7 +6,7 @@ use warnings;
 # Disable IPv6, epoll and kqueue
 BEGIN { $ENV{MOJO_NO_IPV6} = $ENV{MOJO_POLL} = 1 }
 
-use Test::More tests => 86;
+use Test::More tests => 113;
 
 # "I was God once.
 #  Yes, I saw. You were doing well until everyone died."
@@ -22,8 +22,7 @@ get '/shortpoll' => sub {
   $self->on_finish(sub { $shortpoll++ });
   $self->res->code(200);
   $self->res->headers->content_type('text/plain');
-  $self->write_chunk('this was short.');
-  $self->write_chunk('');
+  $self->finish('this was short.');
 } => 'shortpoll';
 
 # GET /shortpoll/plain
@@ -37,6 +36,17 @@ get '/shortpoll/plain' => sub {
   $self->write('this was short and plain.');
 };
 
+# GET /shortpoll/nolength
+my $shortpoll_nolength;
+get '/shortpoll/nolength' => sub {
+  my $self = shift;
+  $self->on_finish(sub { $shortpoll_nolength = 'finished!' });
+  $self->res->code(200);
+  $self->res->headers->content_type('text/plain');
+  $self->write('this was short and had no length.');
+  $self->write('');
+};
+
 # GET /longpoll
 my $longpoll;
 get '/longpoll' => sub {
@@ -48,7 +58,23 @@ get '/longpoll' => sub {
   Mojo::IOLoop->timer(
     '0.5' => sub {
       $self->write_chunk('there,', sub { shift->write_chunk(' whats up?'); });
-      shift->timer('0.5' => sub { $self->write_chunk('') });
+      shift->timer('0.5' => sub { $self->finish });
+    }
+  );
+};
+
+# GET /longpoll/nolength
+my $longpoll_nolength;
+get '/longpoll/nolength' => sub {
+  my $self = shift;
+  $self->on_finish(sub { $longpoll_nolength = 'finished!' });
+  $self->res->code(200);
+  $self->res->headers->content_type('text/plain');
+  $self->write('hi ');
+  Mojo::IOLoop->timer(
+    '0.5' => sub {
+      $self->write('there,', sub { shift->write(' what length?'); });
+      shift->timer('0.5' => sub { $self->finish });
     }
   );
 };
@@ -98,8 +124,7 @@ get '/longpoll/delayed' => sub {
         sub {
           my $self = shift;
           $self->write_chunk('how');
-          $self->write_chunk('dy!');
-          $self->write_chunk('');
+          $self->finish('dy!');
         }
       );
     }
@@ -127,6 +152,27 @@ get '/longpoll/plain/delayed' => sub {
     }
   );
 } => 'delayed';
+
+# GET /longpoll/nolength/delayed
+my $longpoll_nolength_delayed;
+get '/longpoll/nolength/delayed' => sub {
+  my $self = shift;
+  $self->on_finish(sub { $longpoll_nolength_delayed = 'finished!' });
+  $self->res->code(200);
+  $self->res->headers->content_type('text/plain');
+  $self->write;
+  Mojo::IOLoop->timer(
+    '0.5' => sub {
+      $self->write(
+        sub {
+          my $self = shift;
+          $self->write('how');
+          $self->finish('dy nolength!');
+        }
+      );
+    }
+  );
+};
 
 # GET /longpoll/static/delayed
 my $longpoll_static_delayed;
@@ -203,13 +249,23 @@ is $t->tx->kept_alive, undef, 'connection was not kept alive';
 is $t->tx->keep_alive, 1,     'connection will be kept alive';
 is $shortpoll_plain, 'finished!', 'finished';
 
+# GET /shortpoll/nolength
+$t->get_ok('/shortpoll/nolength')->status_is(200)
+  ->header_is(Server           => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By'   => 'Mojolicious (Perl)')
+  ->header_is('Content-Length' => undef)->content_type_is('text/plain')
+  ->content_is('this was short and had no length.');
+is $t->tx->kept_alive, 1, 'connection was not kept alive';
+is $t->tx->keep_alive, 0, 'connection will be kept alive';
+is $shortpoll_nolength, 'finished!', 'finished';
+
 # GET /longpoll
 $t->get_ok('/longpoll')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_type_is('text/plain')->content_is('hi there, whats up?');
-is $t->tx->kept_alive, 1, 'connection was kept alive';
-is $t->tx->keep_alive, 1, 'connection will be kept alive';
+is $t->tx->kept_alive, undef, 'connection was kept alive';
+is $t->tx->keep_alive, 1,     'connection will be kept alive';
 is $longpoll, 'finished!', 'finished';
 
 # GET /longpoll (interrupted)
@@ -246,6 +302,15 @@ is $tx->res->code,  200,            'right status';
 is $tx->res->error, 'Interrupted!', 'right error';
 is $buffer, 'hi ', 'right content';
 
+# GET /longpoll/nolength
+$t->get_ok('/longpoll/nolength')->status_is(200)
+  ->header_is(Server           => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By'   => 'Mojolicious (Perl)')
+  ->header_is('Content-Length' => undef)->content_type_is('text/plain')
+  ->content_is('hi there, what length?');
+is $t->tx->keep_alive, 0, 'connection will not be kept alive';
+is $longpoll_nolength, 'finished!', 'finished';
+
 # GET /longpoll/nested
 $t->get_ok('/longpoll/nested')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
@@ -274,6 +339,14 @@ $t->get_ok('/longpoll/plain/delayed')->status_is(200)
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_type_is('text/plain')->content_is('howdy plain!');
 is $longpoll_plain_delayed, 'finished!', 'finished';
+
+# GET /longpoll/nolength/delayed
+$t->get_ok('/longpoll/nolength/delayed')->status_is(200)
+  ->header_is(Server           => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By'   => 'Mojolicious (Perl)')
+  ->header_is('Content-Length' => undef)->content_type_is('text/plain')
+  ->content_is('howdy nolength!');
+is $longpoll_nolength_delayed, 'finished!', 'finished';
 
 # GET /longpoll/static/delayed
 $t->get_ok('/longpoll/static/delayed')->status_is(200)

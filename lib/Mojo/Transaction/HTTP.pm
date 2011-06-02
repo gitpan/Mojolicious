@@ -66,9 +66,9 @@ sub client_write {
     my $headers = $req->headers;
     unless ($headers->connection) {
       if ($self->keep_alive || $self->kept_alive) {
-        $headers->connection('Keep-Alive');
+        $headers->connection('keep-alive');
       }
-      else { $headers->connection('Close') }
+      else { $headers->connection('close') }
     }
 
     # Ready for next state
@@ -180,15 +180,6 @@ sub keep_alive {
   return $self->{keep_alive};
 }
 
-# DEPRECATED in Smiling Cat Face With Heart-Shaped Eyes!
-sub on_handler {
-  warn <<EOF;
-Mojo::Transaction::HTTP->on_handler is DEPRECATED in favor of
-Mojo::Transaction::HTTP->on_request!!!
-EOF
-  shift->on_request(@_);
-}
-
 sub server_leftovers {
   my $self = shift;
 
@@ -221,7 +212,7 @@ sub server_read {
     $self->on_request->($self);
 
     # Close connection
-    $res->headers->connection('Close');
+    $res->headers->connection('close');
 
     # Protect handler from incoming pipelined requests
     $self->{_handled} = 1;
@@ -277,8 +268,8 @@ sub server_write {
     # Connection header
     my $headers = $res->headers;
     unless ($headers->connection) {
-      if   ($self->keep_alive) { $headers->connection('Keep-Alive') }
-      else                     { $headers->connection('Close') }
+      if   ($self->keep_alive) { $headers->connection('keep-alive') }
+      else                     { $headers->connection('close') }
     }
 
     # Ready for next state
@@ -332,8 +323,8 @@ sub server_write {
         $self->{_offset} = 0;
         $self->{_write}  = $res->body_size;
 
-        # Chunked
-        $self->{_write} = 1 if $res->is_chunked;
+        # Dynamic
+        $self->{_write} = 1 if $res->is_dynamic;
       }
     }
   }
@@ -378,8 +369,8 @@ sub server_write {
         $self->{_delay} = 1 unless $delay;
       }
 
-      # Chunked
-      $self->{_write} = 1 if $res->is_chunked;
+      # Dynamic
+      $self->{_write} = 1 if $res->is_dynamic;
 
       # Done
       $self->{_state} = 'done'

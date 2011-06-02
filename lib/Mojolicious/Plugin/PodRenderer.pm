@@ -60,12 +60,11 @@ sub register {
 
   # Perldoc
   $app->routes->any(
-    '/perldoc' => sub {
+    '/perldoc(:slash)(:mod)' => [slash => qr/\/*/, mod => qr/.*/] => sub {
       my $self = shift;
 
       # Find module
-      my $module = $self->req->url->query->params->[0]
-        || 'Mojolicious::Guides';
+      my $module = $self->param('mod') || 'Mojolicious::Guides';
       $module =~ s/\//\:\:/g;
       my $path = Pod::Simple::Search->new->find($module, @PATHS);
 
@@ -80,12 +79,13 @@ sub register {
       my $html = _pod_to_html(join '', <$file>);
 
       # Rewrite links
-      my $dom = Mojo::DOM->new->parse("$html");
+      my $dom     = Mojo::DOM->new("$html");
+      my $perldoc = $self->url_for('/perldoc/');
       $dom->find('a[href]')->each(
         sub {
           my $attrs = shift->attrs;
           if ($attrs->{href} =~ /^$cpan/) {
-            $attrs->{href} =~ s/^$cpan/perldoc/;
+            $attrs->{href} =~ s/^$cpan\?/$perldoc/;
             $attrs->{href} =~ s/%3A%3A/\//gi;
           }
         }
@@ -115,7 +115,7 @@ sub register {
           $anchor =~ s/\%//g;
           push @$sections, [] if $tag->type eq 'h1' || !@$sections;
           push @{$sections->[-1]}, $text, "/$url#$anchor";
-          $tag->replace_inner(
+          $tag->replace_content(
             $self->link_to(
               $text => "/$url#toc",
               class => 'mojoscroll',
@@ -132,6 +132,7 @@ sub register {
       # Combine everything to a proper response
       $self->content_for(mojobar => $self->include(inline => $MOJOBAR));
       $self->content_for(perldoc => "$dom");
+      $self->app->plugins->run_hook(before_perldoc => $self);
       $self->render(
         inline   => $PERLDOC,
         title    => $title,

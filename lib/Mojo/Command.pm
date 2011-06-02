@@ -123,13 +123,13 @@ sub get_all_data {
   return unless defined(my $content = $CACHE->{$class});
 
   # Ignore everything before __DATA__ (windows will seek to start of file)
-  $content =~ s/^.*\n__DATA__\n/\n/s;
+  $content =~ s/^.*\n__DATA__\r?\n/\n/s;
 
   # Ignore everything after __END__
-  $content =~ s/\n__END__\n.*$/\n/s;
+  $content =~ s/\n__END__\r?\n.*$/\n/s;
 
   # Split
-  my @data = split /^@@\s+(.+)\s*\r?\n/m, $content;
+  my @data = split /^@@\s+(.+?)\s*\r?\n/m, $content;
 
   # Remove split garbage
   shift @data;
@@ -192,12 +192,11 @@ sub render_to_rel_file {
   $self->render_to_file($data, $self->rel_dir($path), @_);
 }
 
-# "My cat's breath smells like cat food."
 sub run {
   my ($self, $name, @args) = @_;
 
-  # Hypnotoad
-  return Mojo::Server->new->app if defined $ENV{HYPNOTOAD_APP};
+  # Application loader
+  return Mojo::Server->new->app if defined $ENV{MOJO_APP_LOADER};
 
   # Try to detect environment
   $name = $self->detect($name) unless $ENV{MOJO_NO_DETECT};

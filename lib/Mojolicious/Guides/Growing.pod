@@ -111,7 +111,7 @@ Traditionally all session data was stored on the server side and only session
 ids were exchanged between browser and web server in the form of cookies.
 
   HTTP/1.1 200 OK
-  Set-Cookie: session=base64(hmac-md5(storable($session)))
+  Set-Cookie: session=base64(hmac-md5(json($session)))
 
 In L<Mojolicious> however we are taking this concept one step further by
 storing everything in C<HMAC-MD5> signed cookies, which is more compatible
@@ -192,7 +192,7 @@ This will be the foundation for our login manager example application.
 
   app->start;
 
-The built in web server makes working on your application a lot of fun thanks
+The built-in web server makes working on your application a lot of fun thanks
 to automatic reloading.
 
   % ./myapp.pl daemon --reload
@@ -459,7 +459,7 @@ like this.
   Welcome <%= session 'user' %>!<br>
   <%= link_to Logout => 'logout' %>
 
-More information about built in template helpers can be found in
+More information about built-in template helpers can be found in
 L<Mojolicious::Plugin::DefaultHelpers> and
 L<Mojolicious::Plugin::TagHelpers>.
 

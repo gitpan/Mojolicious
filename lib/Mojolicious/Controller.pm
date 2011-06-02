@@ -57,21 +57,12 @@ sub AUTOLOAD {
   my ($package, $method) = our $AUTOLOAD =~ /^([\w\:]+)\:\:(\w+)$/;
 
   # Call helper
-  Carp::croak(qq/Can't locate object method "$method" via "$package"/)
+  Carp::croak(qq/Can't locate object method "$method" via package "$package"/)
     unless my $helper = $self->app->renderer->helpers->{$method};
   return $self->$helper(@_);
 }
 
 sub DESTROY { }
-
-# DEPRECATED in Smiling Cat Face With Heart-Shaped Eyes!
-sub client {
-  warn <<EOF;
-Mojolicious::Controller->client is DEPRECATED in favor of
-Mojolicious::Controller->ua!!!
-EOF
-  return shift->app->client;
-}
 
 # "For the last time, I don't like lilacs!
 #  Your first wife was the one who liked lilacs!
@@ -111,10 +102,21 @@ sub cookie {
 
 # "Something's wrong, she's not responding to my poking stick."
 sub finish {
-  my $self = shift;
-  my $tx   = $self->tx;
-  Carp::croak('No WebSocket connection to finish') unless $tx->is_websocket;
-  $tx->finish;
+  my ($self, $chunk) = @_;
+
+  # WebSocket
+  my $tx = $self->tx;
+  return $tx->finish if $tx->is_websocket;
+
+  # Chunked stream
+  if ($tx->res->is_chunked) {
+    $self->write_chunk($chunk) if defined $chunk;
+    return $self->write_chunk('');
+  }
+
+  # Normal stream
+  $self->write($chunk) if defined $chunk;
+  $self->write('');
 }
 
 # "You two make me ashamed to call myself an idiot."
@@ -279,6 +281,39 @@ sub render {
   return 1;
 }
 
+sub render_content {
+  my $self    = shift;
+  my $name    = shift;
+  my $content = pop;
+
+  # Initialize
+  my $stash = $self->stash;
+  my $c = $stash->{'mojo.content'} ||= {};
+  $name ||= 'content';
+
+  # Set
+  if (defined $content) {
+
+    # Reset with multiple values
+    if (@_) {
+      $c->{$name} = '';
+      for my $part (@_, $content) {
+        $c->{$name} .= ref $part eq 'CODE' ? $part->() : $part;
+      }
+    }
+
+    # First come
+    else {
+      $c->{$name} ||= ref $content eq 'CODE' ? $content->() : $content;
+    }
+  }
+
+  # Get
+  $content = $c->{$name};
+  $content = '' unless defined $content;
+  return Mojo::ByteStream->new("$content");
+}
+
 sub render_data { shift->render(data => shift, @_) }
 
 # "The path to robot hell is paved with human flesh.
@@ -330,37 +365,13 @@ sub render_exception {
   }
 }
 
+# DEPRECATED in Smiling Face With Sunglasses!
 sub render_inner {
-  my $self    = shift;
-  my $name    = shift;
-  my $content = pop;
-
-  # Initialize
-  my $stash = $self->stash;
-  my $c = $stash->{'mojo.content'} ||= {};
-  $name ||= 'content';
-
-  # Set
-  if (defined $content) {
-
-    # Reset with multiple values
-    if (@_) {
-      $c->{$name} = '';
-      for my $part (@_, $content) {
-        $c->{$name} .= ref $part eq 'CODE' ? $part->() : $part;
-      }
-    }
-
-    # First come
-    else {
-      $c->{$name} ||= ref $content eq 'CODE' ? $content->() : $content;
-    }
-  }
-
-  # Get
-  $content = $c->{$name};
-  $content = '' unless defined $content;
-  return Mojo::ByteStream->new("$content");
+  warn <<EOF;
+Mojolicious::Controller->render_inner is DEPRECATED in favor of
+Mojolicious::Controller->render_content!!!
+EOF
+  shift->render_content(@_);
 }
 
 # "If you hate intolerance and being punched in the face by me,
@@ -379,8 +390,7 @@ sub render_later { shift->stash->{'mojo.rendered'} = 1 }
 #  Lick my frozen metal ass."
 sub render_not_found {
   my ($self, $resource) = @_;
-  $self->app->log->debug(qq/Resource "$resource" not found./)
-    if $resource;
+  $self->app->log->debug(qq/Resource "$resource" not found./) if $resource;
 
   # Recursion
   my $stash = $self->stash;
@@ -715,8 +725,9 @@ Access request cookie values and create new response cookies.
 =head2 C<finish>
 
   $c->finish;
+  $c->finish('Bye!');
 
-Gracefully end WebSocket connection.
+Gracefully end WebSocket connection or long poll stream.
 
 =head2 C<flash>
 
@@ -759,7 +770,8 @@ connection in progress.
   my @foo   = $c->param('foo');
   $c        = $c->param(foo => 'ba;r');
 
-Access GET/POST parameters and route captures.
+Access GET/POST parameters and route captures that are not reserved stash
+values.
 
   # Only GET parameters
   my $foo = $c->req->url->query->param('foo');
@@ -800,6 +812,16 @@ You can call it with a hash of options which can be preceded by an optional
 template name.
 It will also run the C<before_render> plugin hook.
 
+=head2 C<render_content>
+
+  my $output = $c->render_content;
+  my $output = $c->render_content('header');
+  my $output = $c->render_content(header => 'Hello world!');
+  my $output = $c->render_content(header => sub { 'Hello world!' });
+
+Contains partial rendered templates, used for the renderers C<layout> and
+C<extends> features.
+
 =head2 C<render_data>
 
   $c->render_data($bits);
@@ -813,18 +835,8 @@ will not be encoded.
   $c->render_exception('Oops!');
   $c->render_exception(Mojo::Exception->new('Oops!'));
 
-Render the exception template C<exception.html.$handler> and set the response
-status code to C<500>.
-
-=head2 C<render_inner>
-
-  my $output = $c->render_inner;
-  my $output = $c->render_inner('content');
-  my $output = $c->render_inner(content => 'Hello world!');
-  my $output = $c->render_inner(content => sub { 'Hello world!' });
-
-Contains partial rendered templates, used for the renderers C<layout> and
-C<extends> features.
+Render the exception template C<exception.$mode.html.$handler> or
+C<exception.html.$handler> and set the response status code to C<500>.
 
 =head2 C<render_json>
 
@@ -849,8 +861,8 @@ Disable auto rendering, especially for long polling this can be quite useful.
   $c->render_not_found;
   $c->render_not_found($resource);
     
-Render the not found template C<not_found.html.$handler> and set the response
-status code to C<404>.
+Render the not found template C<not_found.$mode.html.$handler> or
+C<not_found.html.$handler> and set the response status code to C<404>.
 
 =head2 C<render_partial>
 
@@ -977,13 +989,17 @@ Generate a portable L<Mojo::URL> object with base for a route, path or URL.
   $c->write(sub {...});
   $c->write('Hello!', sub {...});
 
-Write dynamic content matching the corresponding C<Content-Length> header
-chunk wise, the optional drain callback will be invoked once all data has
-been written to the kernel send buffer or equivalent.
+Write dynamic content chunk wise, the optional drain callback will be invoked
+once all data has been written to the kernel send buffer or equivalent.
 
+  # Keep connection alive (with Content-Length header)
   $c->res->headers->content_length(6);
+  $c->write('Hel', sub { shift->write('lo!') });
+
+  # Close connection when done (without Content-Length header)
   $c->write('Hel');
   $c->write('lo!');
+  $c->finish;
 
 =head2 C<write_chunk>
 
@@ -997,16 +1013,18 @@ which doesn't require a C<Content-Length> header, the optional drain callback
 will be invoked once all data has been written to the kernel send buffer or
 equivalent.
 
-  $c->write_chunk('Hel');
-  $c->write_chunk('lo!');
-  $c->write_chunk('');
+  $c->write_chunk('He');
+  $c->write_chunk('ll');
+  $c->finish('o!');
 
-An empty chunk marks the end of the stream.
+You can call C<finish> at any time to end the stream.
 
-  3
-  Hel
-  3
-  lo!
+  2
+  He
+  2
+  ll
+  2
+  o!
   0
 
 =head1 SEE ALSO

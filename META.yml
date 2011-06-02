@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Mojolicious
-version:            1.34
+version:            1.4
 abstract:           The Web In A Box!
 author:
     - Sebastian Riedel <sri@cpan.org>
@@ -37,7 +37,6 @@ requires:
     perl:                 5.008007
     POSIX:                0
     Scalar::Util:         0
-    Storable:             0
     Sys::Hostname:        0
     Test::Builder:        0
     Test::Harness:        0

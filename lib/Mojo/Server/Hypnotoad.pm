@@ -14,7 +14,9 @@ use POSIX qw/setsid WNOHANG/;
 use Scalar::Util 'weaken';
 
 # Preload
+use Mojo::DOM;
 use Mojo::UserAgent;
+use Mojolicious::Controller;
 
 use constant DEBUG => $ENV{HYPNOTOAD_DEBUG} || 0;
 
@@ -75,16 +77,7 @@ sub run {
 
   # Preload application
   warn "APPLICATION $ENV{HYPNOTOAD_APP}\n" if DEBUG;
-  my $file = $ENV{HYPNOTOAD_APP};
-  my $preload;
-  unless ($preload = do $file) {
-    die qq/Can't load application "$file": $@/ if $@;
-    die qq/Can't load application "$file": $!/ unless defined $preload;
-    die qq/Can't load application' "$file".\n/ unless $preload;
-  }
-  die qq/"$file" is not a valid application.\n/
-    unless ref $preload && $preload->isa('Mojo');
-  $daemon->app($preload);
+  $daemon->load_app($ENV{HYPNOTOAD_APP});
 
   # Load configuration
   $self->_config;

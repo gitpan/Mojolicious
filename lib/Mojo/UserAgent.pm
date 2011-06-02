@@ -760,7 +760,7 @@ sub _start_tx {
     }
   }
 
-  # We identify ourself
+  # We identify ourselves
   my $headers = $req->headers;
   $headers->user_agent($self->name) unless $headers->user_agent;
 
@@ -915,13 +915,15 @@ Mojo::UserAgent - Async IO HTTP 1.1 And WebSocket User Agent
   print $ua->get($trends)->res->json->{trends}->[0]->{name};
 
   # Extract data from HTML and XML resources
-  print $ua->get('mojolicio.us')->res->dom->at('title')->text;
+  print $ua->get('mojolicio.us')->res->dom->html->head->title->text;
 
   # Scrape the latest headlines from a news site
   my $news = 'http://digg.com';
   $ua->max_redirects(3);
-  $ua->get($news)->res->dom('h3 > a.story-title')->each(sub {
-    print shift->text . "\n";
+  $ua->get($news)->res->dom('h3.story-item-title > a[href]')->each(
+    my $e = shift;
+    print "$e->{href}:\n";
+    print $e->text, "\n";
   });
 
   # Form post with exception handling

@@ -172,6 +172,17 @@ HTTP request and response.
     $self->render(text => 'Hello World!');
   };
 
+=head2 GET/POST Parameters
+
+All C<GET> and C<POST> parameters are accessible via C<param>.
+
+  # /foo?user=sri
+  get '/foo' => sub {
+    my $self = shift;
+    my $user = $self->param('user');
+    $self->render(text => "Hello $user!");
+  };
+
 =head2 Stash
 
 The C<stash> is used to pass data to templates, which can be inlined in the
@@ -665,13 +676,55 @@ request), this is very useful in combination with C<redirect_to>.
 
 =head2 Secret
 
-Note that you should use a custom C<secret> to make signed cookies really secure.
+Note that you should use a custom C<secret> to make signed cookies really
+secure.
 
   app->secret('My secret passphrase here!');
 
+=head2 File Uploads
+
+All files uploaded via C<multipart/form-data> request are automatically
+available as L<Mojo::Upload> instances.
+And you don't have to worry about memory usage, because all files above
+C<250KB> will be automatically streamed into a temporary file.
+
+  use Mojolicious::Lite;
+
+  any '/upload' => sub {
+    my $self = shift;
+    if (my $example = $self->req->upload('example')) {
+      my $size = $example->size;
+      my $name = $example->filename;
+      $self->render(text => "Thanks for uploading $size byte file $name.");
+    }
+  };
+
+  app->start;
+  __DATA__
+
+  @@ upload.html.ep
+  <!doctype html><html>
+    <head><title>Upload</title></head>
+    <body>
+      <%= form_for upload =>
+            (method => 'post', enctype => 'multipart/form-data') => begin %>
+        <%= file_field 'example' %>
+        <%= submit_button 'Upload' %>
+      <% end %>
+    </body>
+  </html>
+
+To protect you from excessively large files there is also a global limit of
+C<5MB> by default, which you can tweak with the C<MOJO_MAX_MESSAGE_SIZE>
+environment variable.
+
+  # Increase limit to 1GB
+  $ENV{MOJO_MAX_MESSAGE_SIZE} = 1073741824;
+
 =head2 User Agent
 
-A full featured HTTP 1.1 and WebSocket user agent is built right in.
+With L<Mojo::UserAgent> there's a full featured HTTP 1.1 and WebSocket user
+agent built right in.
 Especially in combination with L<Mojo::JSON> and L<Mojo::DOM> this can be a
 very powerful tool.
 
@@ -751,8 +804,8 @@ L<Mojolicious> mode, default will be C<development>.
 
 =head2 Logging
 
-Log messages will be automatically written to a C<log/$mode.log> file if a
-C<log> directory exists.
+L<Mojo::Log> messages will be automatically written to a C<log/$mode.log>
+file if a C<log> directory exists.
 
   % mkdir log
 
@@ -761,6 +814,7 @@ For more control the L<Mojolicious> instance can be accessed directly.
   app->log->level('error');
   app->routes->route('/foo/:bar')->via('get')->to(cb => sub {
     my $self = shift;
+    $self->app->log->debug('Got a request for "Hello Mojo!".');
     $self->render(text => 'Hello Mojo!');
   });
 

@@ -10,7 +10,6 @@ lib/Mojo/Asset/Memory.pm
 lib/Mojo/Base.pm
 lib/Mojo/ByteStream.pm
 lib/Mojo/Cache.pm
-lib/Mojo/Client.pm
 lib/Mojo/Command.pm
 lib/Mojo/Content.pm
 lib/Mojo/Content/MultiPart.pm
@@ -51,6 +50,7 @@ lib/Mojo/Util.pm
 lib/Mojolicious.pm
 lib/Mojolicious/Command/Cgi.pm
 lib/Mojolicious/Command/Daemon.pm
+lib/Mojolicious/Command/Eval.pm
 lib/Mojolicious/Command/Fastcgi.pm
 lib/Mojolicious/Command/Generate.pm
 lib/Mojolicious/Command/Generate/App.pm
@@ -157,6 +157,7 @@ t/mojo/certs/client.key
 t/mojo/certs/server.crt
 t/mojo/certs/server.key
 t/mojo/cgi.t
+t/mojo/command.t
 t/mojo/content.t
 t/mojo/cookie.t
 t/mojo/cookiejar.t
@@ -177,6 +178,7 @@ t/mojo/lib/LoaderTest/A.pm
 t/mojo/lib/LoaderTest/B.pm
 t/mojo/lib/LoaderTest/C.pm
 t/mojo/lib/test.mt
+t/mojo/lib/utf8_exception.mt
 t/mojo/loader.t
 t/mojo/message.t
 t/mojo/parameters.t

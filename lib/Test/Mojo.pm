@@ -19,14 +19,6 @@ has 'tx';
 # Silent or loud tests
 $ENV{MOJO_LOG_LEVEL} ||= $ENV{HARNESS_IS_VERBOSE} ? 'debug' : 'fatal';
 
-# DEPRECATED in Smiling Cat Face With Heart-Shaped Eyes!
-sub client {
-  warn <<EOF;
-Test::Mojo->client is DEPRECATED in favor of Test::Mojo->ua!!!
-EOF
-  return shift->ua;
-}
-
 sub build_url {
   Mojo::URL->new('http://localhost:' . shift->ua->test_server . '/');
 }
@@ -342,7 +334,8 @@ sub _request_ok {
   $ua->max_redirects($self->max_redirects);
   $self->tx($ua->$method($url, %$headers, $body));
   local $Test::Builder::Level = $Test::Builder::Level + 2;
-  Test::More::ok($self->tx->is_done, $desc);
+  my ($error, $code) = $self->tx->error;
+  Test::More::ok(!$error || $code, $desc);
 
   return $self;
 }
