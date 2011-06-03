@@ -1,7 +1,9 @@
 package Mojo::Cookie;
 use Mojo::Base -base;
-use overload 'bool' => sub {1}, fallback => 1;
-use overload '""' => sub { shift->to_string }, fallback => 1;
+use overload
+  'bool'   => sub {1},
+  '""'     => sub { shift->to_string },
+  fallback => 1;
 
 use Carp 'croak';
 use Mojo::Util 'unquote';
@@ -12,9 +14,11 @@ has [qw/name path value version/];
 my $COOKIE_SEPARATOR_RE = qr/^\s*\,\s*/;
 my $EXPIRES_RE          = qr/^([^\;\,]+\,?[^\;\,]+)\s*/;
 my $NAME_RE             = qr/
-  ^\s*           # Start
+  ^\s*
   ([^\=\;\,]+)   # Relaxed Netscape token, allowing whitespace
-  \s*\=?\s*      # '=' (optional)
+  \s*
+  \=?            # '=' (optional)
+  \s*
 /x;
 my $SEPARATOR_RE = qr/^\s*\;\s*/;
 my $VALUE_RE     = qr/^([^\;\,]+)\s*/;
