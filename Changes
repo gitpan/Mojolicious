@@ -1,5 +1,19 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+1.42    2011-06-09 00:00:00
+        - Added EXPERIMENTAL support for unquoted wildcard placeholders in
+          Mojolicious::Routes::Pattern.
+        - Added EXPERIMENTAL status code support to rendred method in
+          Mojolicious::Controller.
+        - Updated WebSocket implementation to ietf-08.
+        - Improved layout tests.
+        - Improved documentation. (chromatic, sri)
+        - Fixed a bug that prevented Mojo::Base subclasses from using the
+          "-base" flag.
+        - Fixed a few small default status code bugs.
+        - Fixed route suggestion bug in "not_found.development.html.ep".
+        - Fixed typos.
+
 1.41    2011-06-03 00:00:00
         - Fixed param list bug in Mojolicious::Controller.
         - Fixed overload bug in Mojo::DOM. (yko)

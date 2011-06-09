@@ -239,7 +239,7 @@ equal to the route itself without non-word characters.
 
 Templates can have layouts.
 
-  # GET /with_layout
+  # /with_layout
   get '/with_layout' => sub {
     my $self = shift;
     $self->render('with_layout');
@@ -263,7 +263,7 @@ Templates can have layouts.
 Template blocks can be used like normal Perl functions and are always
 delimited by the C<begin> and C<end> keywords.
 
-  # GET /with_block
+  # /with_block
   get '/with_block' => 'block';
 
   __DATA__
@@ -286,7 +286,7 @@ delimited by the C<begin> and C<end> keywords.
 The C<content_for> helper can be used to pass around blocks of captured
 content.
 
-  # GET /captured
+  # /captured
   get '/captured' => sub {
     my $self = shift;
     $self->render('captured');
@@ -327,7 +327,7 @@ L<Mojolicious::Plugin::TagHelpers>.
     return "$agent ($ip)";
   };
 
-  # GET /secret
+  # /secret
   get '/secret' => sub {
     my $self = shift;
     my $user = $self->whois;
@@ -345,7 +345,6 @@ Route placeholders allow capturing parts of a request path until a C</> or
 C<.> separator occurs, results will be stored by name in the C<stash> and
 C<param>.
 
-  # /foo/* (everything except "/" and ".")
   # /foo/test
   # /foo/test123
   get '/foo/:bar' => sub {
@@ -354,7 +353,6 @@ C<param>.
     $self->render(text => "Our :bar placeholder matched $bar");
   };
 
-  # /*something/foo (everything except "/" and ".")
   # /test/foo
   # /test123/foo
   get '/(:bar)something/foo' => sub {
@@ -363,33 +361,15 @@ C<param>.
     $self->render(text => "Our :bar placeholder matched $bar");
   };
 
-=head2 Relaxed Placeholders
-
-Relaxed placeholders allow matching of everything until a C</> occurs.
-
-  # /*/hello (everything except "/")
-  # /test/hello
-  # /test123/hello
-  # /test.123/hello
-  get '/(.you)/hello' => sub {
-    shift->render('groovy');
-  };
-
-  __DATA__
-
-  @@ groovy.html.ep
-  Your name is <%= $you %>.
-
 =head2 Wildcard Placeholders
 
 Wildcard placeholders allow matching absolutely everything, including
 C</> and C<.>.
 
-  # /hello/* (everything)
   # /hello/test
   # /hello/test123
   # /hello/test.123/test/123
-  get '/hello/(*you)' => sub {
+  get '/hello/*you' => sub {
     shift->render('groovy');
   };
 
@@ -413,7 +393,7 @@ Routes can be restricted to specific request methods.
     shift->render(text => 'Bye!');
   };
 
-  # /baz
+  # * /baz
   any '/baz' => sub {
     my $self   = shift;
     my $method = $self->req->method;
@@ -425,14 +405,17 @@ Routes can be restricted to specific request methods.
 All placeholders get compiled to a regex internally, with regex constraints
 this process can be easily customized.
 
-  # /* (digits)
+  # /1
+  # /123
   any '/:foo' => [foo => qr/\d+/] => sub {
     my $self = shift;
     my $foo  = $self->param('foo');
     $self->render(text => "Our :foo placeholder matched $foo");
   };
 
-  # /* (everything else)
+  # /test
+  # /test.123
+  # /test/1.2.3
   any '/:bar' => [bar => qr/.*/] => sub {
     my $self = shift;
     my $bar  = $self->param('bar');
@@ -447,7 +430,8 @@ C<(?:...)> is fine though.
 
 Routes allow default values to make placeholders optional.
 
-  # /hello/*
+  # /hello
+  # /hello/Sara
   get '/hello/:name' => {name => 'Sebastian'} => sub {
     my $self = shift;
     $self->render('groovy', format => 'txt');
@@ -462,7 +446,8 @@ Routes allow default values to make placeholders optional.
 
 All those features can be easily used together.
 
-  # /everything/*?name=*
+  # /everything?name=Sebastian
+  # /everything/123?name=Sebastian
   get '/everything/:stuff' => [stuff => qr/\d+/] => {stuff => 23} => sub {
     shift->render('welcome');
   };
@@ -545,7 +530,7 @@ true value.
     return;
   };
 
-  # GET / (with authentication)
+  # / (with authentication)
   get '/' => 'index';
 
   app->start;
@@ -564,10 +549,10 @@ Prefixing multiple routes is another good use for C<under>.
   # /foo
   under '/foo';
 
-  # GET /foo/bar
+  # /foo/bar
   get '/bar' => sub { shift->render(text => 'bar!') };
 
-  # GET /foo/baz
+  # /foo/baz
   get '/baz' => sub { shift->render(text => 'baz!') };
 
   app->start;

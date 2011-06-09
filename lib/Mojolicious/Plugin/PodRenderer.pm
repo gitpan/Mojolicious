@@ -60,11 +60,11 @@ sub register {
 
   # Perldoc
   $app->routes->any(
-    '/perldoc(:slash)(:mod)' => [slash => qr/\/*/, mod => qr/.*/] => sub {
+    '/perldoc/(*module)' => {module => 'Mojolicious/Guides'} => sub {
       my $self = shift;
 
       # Find module
-      my $module = $self->param('mod') || 'Mojolicious::Guides';
+      my $module = $self->param('module');
       $module =~ s/\//\:\:/g;
       my $path = Pod::Simple::Search->new->find($module, @PATHS);
 

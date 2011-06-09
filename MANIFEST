@@ -171,6 +171,9 @@ t/mojo/ioloop.t
 t/mojo/ioloop_online.t
 t/mojo/ioloop_tls.t
 t/mojo/json.t
+t/mojo/lib/BaseTest/Base1.pm
+t/mojo/lib/BaseTest/Base2.pm
+t/mojo/lib/BaseTest/Base3.pm
 t/mojo/lib/exception.mt
 t/mojo/lib/LoaderException.pm
 t/mojo/lib/LoaderException2.pm
@@ -208,6 +211,7 @@ t/mojolicious/json_config_lite_app.t
 t/mojolicious/json_config_mode_lite_app.json
 t/mojolicious/json_config_mode_lite_app.t
 t/mojolicious/json_config_mode_lite_app.testing.json
+t/mojolicious/layouted_lite_app.t
 t/mojolicious/lib/EmbeddedTestApp.pm
 t/mojolicious/lib/MojoliciousTest.pm
 t/mojolicious/lib/MojoliciousTest/Exceptional.pm

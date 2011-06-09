@@ -1321,7 +1321,7 @@ sub _timer {
   for my $id (keys %$ts) {
     my $t = $ts->{$id};
     my $after = $t->{after} || 0;
-    if ($after <= time - ($t->{started} || $t->{recurring})) {
+    if ($after <= time - ($t->{started} || $t->{recurring} || 0)) {
       warn "TIMER $id\n" if DEBUG;
 
       # Normal timer
@@ -1652,7 +1652,7 @@ Open a TCP connection to a remote host.
 Note that TLS support depends on L<IO::Socket::SSL> and IPv6 support on
 L<IO::Socket::IP>.
 
-These options are currently available.
+These options are currently available:
 
 =over 2
 
@@ -1778,7 +1778,7 @@ Create a new listen socket.
 Note that TLS support depends on L<IO::Socket::SSL> and IPv6 support on
 L<IO::Socket::IP>.
 
-These options are currently available.
+These options are currently available:
 
 =over 2
 

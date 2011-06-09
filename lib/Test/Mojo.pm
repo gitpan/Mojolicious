@@ -194,7 +194,6 @@ sub json_content_is {
 # "God bless those pagans."
 sub post_ok { shift->_request_ok('post', @_) }
 
-# "Hey, I asked for ketchup! I'm eatin' salad here!"
 sub post_form_ok {
   my $self = shift;
   my $url  = $_[0];

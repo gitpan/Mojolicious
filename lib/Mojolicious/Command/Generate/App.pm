@@ -2,13 +2,13 @@ package Mojolicious::Command::Generate::App;
 use Mojo::Base 'Mojo::Command';
 
 has description => <<'EOF';
-Generate application directory structure.
+Generate Mojolicious application directory structure.
 EOF
 has usage => <<"EOF";
 usage: $0 generate app [NAME]
 EOF
 
-# "Why can't she just drink herself happy like a normal person?"
+# "I say, you've damaged our servants quarters... and our servants."
 sub run {
   my ($self, $class) = @_;
   $class ||= 'MyMojoliciousApp';

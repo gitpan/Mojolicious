@@ -9,6 +9,7 @@ use Mojo::Exception;
 
 use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 131072;
 
+# "If for any reason you're not completely satisfied, I hate you."
 has [qw/auto_escape compiled/];
 has [qw/append code prepend/] => '';
 has capture_end     => 'end';
@@ -649,7 +650,7 @@ them if necessary.
   <% no code just text [@@&& $i @@]
   EOF
 
-There is only one case that we can escape with a backslash, and thats a
+There is only one case that we can escape with a backslash, and that's a
 newline at the end of a template line.
 
   This is <%= 23 * 3 %> a\
