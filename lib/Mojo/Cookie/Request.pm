@@ -9,14 +9,11 @@ use Mojo::Util 'unquote';
 sub parse {
   my ($self, $string) = @_;
 
+  # Walk tree
   my @cookies;
   my $version = 1;
-
-  # Walk tree
   for my $knot ($self->_tokenize($string)) {
     for my $token (@{$knot}) {
-
-      # Token
       my ($name, $value) = @{$token};
 
       # Value might be quoted
@@ -44,8 +41,6 @@ sub parse {
 
 sub prefix {
   my $self = shift;
-
-  # Prefix
   my $version = $self->version || 1;
   return "\$Version=$version";
 }

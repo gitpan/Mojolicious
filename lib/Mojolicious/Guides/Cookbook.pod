@@ -12,7 +12,7 @@ Cooking with L<Mojolicious>, recipes for every taste.
 Getting L<Mojolicious> and L<Mojolicious::Lite> applications running on
 different platforms.
 
-=head2 Builtin Server
+=head2 Built-in Server
 
 L<Mojolicious> contains a very portable HTTP 1.1 compliant web server.
 It is usually used during development but is solid and fast enough for small
@@ -47,7 +47,7 @@ of multiple cpu cores and copy-on-write.
   |- Mojo::Server::Daemon [3]
   `- Mojo::Server::Daemon [4]
 
-It is based on the normal builtin web server but optimized specifically for
+It is based on the normal built-in web server but optimized specifically for
 production environments out of the box.
 
   % hypnotoad script/myapp
@@ -68,7 +68,7 @@ connection, just by sending it a C<USR2> signal.
 
 =head2 Nginx
 
-One of the most popular setups these days is the builtin web server behind a
+One of the most popular setups these days is the built-in web server behind a
 Nginx reverse proxy.
 
   upstream myapp {
@@ -179,7 +179,20 @@ requests.
 
 =head2 Embedding
 
-You can also use the builtin web server to embed L<Mojolicious> applications
+From time to time you might want to reuse parts of L<Mojolicious>
+applications like configuration files, database connection or helpers for
+other scripts, with this little mock server you can just embed them.
+
+  use Mojo::Server;
+
+  # Load application with mock server
+  my $server = Mojo::Server->new;
+  my $app = $server->load_app('./myapp.pl');
+
+  # Access fully initialized application
+  print $app->static->root;
+
+You can also use the built-in web server to embed L<Mojolicious> applications
 into alien environments like foreign event loops.
 
   use Mojolicious::Lite;
@@ -452,6 +465,21 @@ This can be an invaluable tool for testing your applications.
 =head1 HACKS
 
 Fun hacks you might not use very often but that might come in handy some day.
+
+=head2 Running Code Against Your Application
+
+Ever thought about running a quick oneliner against your L<Mojolicious>
+application to test something?
+Thanks to the C<eval> command you can do just that, the application instance
+itself can be accessed via C<app>.
+
+  % mojo generate lite_app
+  ...
+  % ./myapp.pl eval 'print app->static->root, "\n"'
+
+The C<verbose> option will automatically print the return value to C<STDOUT>.
+
+  % ./myapp.pl eval -v 'app->static->root'
 
 =head2 Making Your Application Installable
 

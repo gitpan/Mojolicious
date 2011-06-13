@@ -73,10 +73,9 @@ sub body_params {
   # Cached
   return $self->{_body_params} if $self->{_body_params};
 
+  # Charset
   my $params = Mojo::Parameters->new;
   my $type = $self->headers->content_type || '';
-
-  # Charset
   $params->charset($self->default_charset);
   $type =~ /charset=\"?(\S+)\"?/ and $params->charset($1);
 
@@ -98,6 +97,7 @@ sub body_params {
       # File
       next if $filename;
 
+      # Form value
       $params->append($name, $value);
     }
   }
@@ -182,7 +182,6 @@ sub cookie {
   my @cookies;
   @cookies = ref $cookies eq 'ARRAY' ? @$cookies : ($cookies) if $cookies;
 
-  # Context
   return wantarray ? @cookies : $cookies[0];
 }
 
@@ -366,7 +365,6 @@ sub to_string {
 
 sub upload {
   my ($self, $name) = @_;
-
   return unless $name;
 
   # Map
@@ -401,25 +399,26 @@ sub upload {
 sub uploads {
   my $self = shift;
 
+  # Only multipart messages have uplaods
   my @uploads;
   return \@uploads unless $self->is_multipart;
 
+  # Extract formdata
   my $formdata = $self->_parse_formdata;
-
-  # Formdata
   for my $data (@$formdata) {
     my $name     = $data->[0];
     my $filename = $data->[1];
     my $part     = $data->[2];
 
+    # Just a form value
     next unless $filename;
 
+    # Uploaded file
     my $upload = Mojo::Upload->new;
     $upload->name($name);
     $upload->asset($part->asset);
     $upload->filename($filename);
     $upload->headers($part->headers);
-
     push @uploads, $upload;
   }
 
@@ -514,9 +513,8 @@ sub _parse_start_line {
 sub _parse_formdata {
   my $self = shift;
 
-  my @formdata;
-
   # Check content
+  my @formdata;
   my $content = $self->content;
   return \@formdata unless $content->is_multipart;
 
@@ -564,8 +562,6 @@ sub _parse_formdata {
 
     # Form value
     unless ($filename) {
-
-      # Slurp
       $value = $part->asset->slurp;
 
       # Decode

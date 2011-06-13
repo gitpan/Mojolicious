@@ -199,6 +199,7 @@ sub run {
   # Preload application
   $self->app;
 
+  # New incoming request
   while (my $c = $self->accept_connection) {
 
     # Request
@@ -236,17 +237,13 @@ sub type_number {
 
 sub write_records {
   my ($self, $c, $type, $id, $body) = @_;
-
-  # Required
   return unless defined $c && defined $type && defined $id;
-
-  # Defaults
   $body ||= '';
-  my $body_len = length $body;
 
   # Write records
-  my $empty = $body ? 0 : 1;
-  my $offset = 0;
+  my $empty    = $body ? 0 : 1;
+  my $offset   = 0;
+  my $body_len = length $body;
   while (($body_len > 0) || $empty) {
 
     # Need to split content
@@ -262,11 +259,11 @@ sub write_records {
         qq/Writing FastCGI record: $type - $id - "$chunk"./);
     }
 
+    # Write whole record
     my $record = pack $template, 1, $self->type_number($type), $id,
       $payload_len,
       $pad_len,
       substr($body, $offset, $payload_len);
-
     my $woffset = 0;
     while ($woffset < length $record) {
       my $written = $c->syswrite($record, undef, $woffset);
@@ -283,10 +280,10 @@ sub write_records {
 
       $woffset += $written;
     }
-
     $body_len -= $payload_len;
     $offset += $payload_len;
 
+    # Done
     last if $empty;
   }
 
@@ -297,11 +294,9 @@ sub write_response {
   my ($self, $tx) = @_;
   $self->app->log->debug('Writing FastCGI response.') if DEBUG;
 
-  my $c   = $tx->connection;
-  my $res = $tx->res;
-
   # Status
-  my $code    = $res->code    || 404;
+  my $res     = $tx->res;
+  my $code    = $res->code || 404;
   my $message = $res->message || $res->default_message;
   $res->headers->status("$code $message") unless $res->headers->status;
 
@@ -309,6 +304,7 @@ sub write_response {
   $res->fix_headers;
 
   # Headers
+  my $c      = $tx->connection;
   my $offset = 0;
   while (1) {
     my $chunk = $res->get_header_chunk($offset);

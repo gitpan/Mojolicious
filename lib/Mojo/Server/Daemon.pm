@@ -23,6 +23,7 @@ has max_clients        => 1000;
 has max_requests       => 25;
 has websocket_timeout  => 300;
 
+# Regex for listen sockets
 my $SOCKET_RE = qr/^
   (http(?:s)?)\:\/\/   # Scheme
   (.+)                 # Host
@@ -38,9 +39,8 @@ my $SOCKET_RE = qr/^
 sub DESTROY {
   my $self = shift;
 
-  return unless my $loop = $self->ioloop;
-
   # Cleanup connections
+  return unless my $loop = $self->ioloop;
   my $cs = $self->{_cs} || {};
   for my $id (keys %$cs) { $loop->drop($id) }
 
@@ -86,10 +86,8 @@ sub setuidgid {
   if (my $group = $self->group) {
     if (my $gid = (getgrnam($group))[2]) {
 
-      # Cleanup
-      undef $!;
-
       # Switch
+      undef $!;
       $) = $gid;
       croak qq/Can't switch to effective group "$group": $!/ if $!;
     }
@@ -99,10 +97,8 @@ sub setuidgid {
   if (my $user = $self->user) {
     if (my $uid = (getpwnam($user))[2]) {
 
-      # Cleanup
-      undef $!;
-
       # Switch
+      undef $!;
       $> = $uid;
       croak qq/Can't switch to effective user "$user": $!/ if $!;
     }
@@ -168,7 +164,7 @@ sub _close {
 sub _drop {
   my ($self, $id) = @_;
 
-  # Finish
+  # Finish gracefully
   my $c = $self->{_cs}->{$id};
   if (my $tx = $c->{websocket} || $c->{transaction}) { $tx->server_close }
 
@@ -238,10 +234,9 @@ sub _listen {
   my ($self, $listen) = @_;
   return unless $listen;
 
+  # UNIX domain socket
   my $options = {};
   my $tls;
-
-  # UNIX domain socket
   if ($listen =~ /^file\:\/\/(.+)$/) { unlink $options->{file} = $1 }
 
   # Internet socket

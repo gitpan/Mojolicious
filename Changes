@@ -1,5 +1,12 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+1.43    2011-06-13 00:00:00
+        - Improved after_dispatch hook by allowing it to change session data.
+        - Improved documentation.
+        - Fixed a bug in Mojo::Template that caused template blocks to be
+          auto escaped.
+        - Fixed typos.
+
 1.42    2011-06-09 00:00:00
         - Added EXPERIMENTAL support for unquoted wildcard placeholders in
           Mojolicious::Routes::Pattern.
@@ -498,7 +505,7 @@ This file documents the revision history for Perl extension Mojolicious.
           Mojolicious::Plugin::JsonConfig. (marcus)
         - Added reserved route name current.
         - Simplified transaction pausing by replacing it with an automatism.
-        - Improved RFC3986 compliance of Mojo::Path. (janus)
+        - Improved RFC 3986 compliance of Mojo::Path. (janus)
         - Improved Mojo::Server::PSGI to preload applications.
         - Improved FastCGI detection for Dreamhost. (garu)
         - Improved keep alive timeout handling in Mojo::Client.

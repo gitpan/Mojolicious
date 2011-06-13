@@ -10,10 +10,9 @@ use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 131072;
 sub run {
   my ($self, $env) = @_;
 
+  # Environment
   my $tx  = $self->on_transaction->($self);
   my $req = $tx->req;
-
-  # Environment
   $req->parse($env);
 
   # Store connection information
@@ -34,10 +33,8 @@ sub run {
   # Handle
   $self->on_request->($self, $tx);
 
-  my $res = $tx->res;
-  my $code = $res->code || 404;
-
   # Fix headers
+  my $res = $tx->res;
   $res->fix_headers;
 
   # Response headers
@@ -55,6 +52,8 @@ sub run {
   # Finish transaction
   $tx->on_finish->($tx);
 
+  # PSGI response
+  my $code = $res->code || 404;
   return [$code, \@headers, $body];
 }
 

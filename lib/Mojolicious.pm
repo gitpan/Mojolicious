@@ -32,7 +32,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Smiling Face With Sunglasses';
-our $VERSION  = '1.42';
+our $VERSION  = '1.43';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -77,15 +77,14 @@ sub new {
     }
   );
 
+  # Root directories
+  my $home = $self->home;
+  $self->renderer->root($home->rel_dir('templates'));
+  $self->static->root($home->rel_dir('public'));
+
+  # Default to application namespace
   my $r = $self->routes;
   $r->namespace(ref $self);
-  my $renderer = $self->renderer;
-  my $static   = $self->static;
-  my $home     = $self->home;
-
-  # Root
-  $renderer->root($home->rel_dir('templates'));
-  $static->root($home->rel_dir('public'));
 
   # Hide own controller methods
   $r->hide(qw/AUTOLOAD DESTROY client cookie delayed finish finished/);
@@ -320,8 +319,8 @@ TLS, Bonjour, IDNA, Comet (long polling), chunking and multipart support.
 
 =item *
 
-Builtin async IO web server supporting epoll, kqueue, UNIX domain sockets and
-hot deployment, perfect for embedding.
+Built-in async IO web server supporting epoll, kqueue, UNIX domain sockets
+and hot deployment, perfect for embedding.
 
 =item *
 
@@ -375,10 +374,9 @@ Web development for humans, making hard things possible and everything fun.
   get '/time' => 'clock';
 
   # RESTful web service sending JSON responses
-  get '/:offset' => sub {
-    my $self   = shift;
-    my $offset = $self->param('offset') || 23;
-    $self->render_json({list => [0 .. $offset]});
+  get '/list/:offset' => sub {
+    my $self = shift;
+    $self->render_json({list => [0 .. $self->param('offset')]});
   };
 
   # Scrape and return information from remote sites
@@ -423,9 +421,8 @@ A controller collects several actions together.
 
   # RESTful web service sending JSON responses
   sub restful {
-    my $self   = shift;
-    my $offset = $self->param('offset') || 23;
-    $self->render_json({list => [0 .. $offset]});
+    my $self = shift;
+    $self->render_json({list => [0 .. $self->param('offset')]});
   }
 
   # Scrape and return information from remote sites
@@ -473,7 +470,7 @@ especially when working in a team.
     # (paths are relative to the controller)
     $example->get('/')->to('#hello');
     $example->get('/time')->to('#clock');
-    $example->get('/:offset')->to('#restful');
+    $example->get('/list/:offset')->to('#restful');
 
     # All common HTTP verbs are supported
     $example->post('/title')->to('#title');

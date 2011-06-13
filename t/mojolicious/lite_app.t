@@ -12,7 +12,7 @@ BEGIN { $ENV{MOJO_NO_IPV6} = $ENV{MOJO_POLL} = 1 }
 my $backup;
 BEGIN { $backup = $ENV{MOJO_MODE} || ''; $ENV{MOJO_MODE} = 'development' }
 
-use Test::More tests => 792;
+use Test::More tests => 807;
 
 # Pollution
 123 =~ m/(\d+)/;
@@ -645,6 +645,20 @@ under sub {
 # GET /bridge2stash
 get '/bridge2stash' =>
   sub { shift->render(template => 'bridge2stash', handler => 'ep'); };
+
+# Make sure after_dispatch can make session changes
+hook after_dispatch => sub {
+  my $self = shift;
+  return unless $self->req->url->path =~ /^\/late\/session/;
+  $self->session(late => 'works!');
+};
+
+# GET /late/session
+get '/late/session' => sub {
+  my $self = shift;
+  my $late = $self->session('late') || 'not yet!';
+  $self->render_text($late);
+};
 
 # Counter
 my $under = 0;
@@ -1551,13 +1565,31 @@ $t->get_ok('/redirect/condition/1' => {'X-Condition-Test' => 1})
 $t->get_ok('/bridge2stash' => {'X-Flash' => 1})->status_is(200)
   ->content_is("stash too!!!!!!!!\n");
 
+# GET /bridge2stash (with cookies, session and flash)
+$t->get_ok('/bridge2stash')->status_is(200)
+  ->content_is(
+  "stash too!cookie!signed_cookie!!bad_cookie--12345678!session!flash!/!\n");
+
+# GET /bridge2stash (broken session cookie)
+$t->reset_session;
+my $session = b("☃☃☃☃☃")->b64_encode('');
+my $hmac    = $session->clone->hmac_md5_sum($t->ua->app->secret);
+my $broken  = "\$Version=1; mojolicious=$session--$hmac; \$Path=/";
+$t->get_ok('/bridge2stash' => {Cookie => $broken})->status_is(200)
+  ->content_is("stash too!!!!!!!/!\n");
+
+# GET /bridge2stash (fresh start)
+$t->reset_session;
+$t->get_ok('/bridge2stash' => {'X-Flash' => 1})->status_is(200)
+  ->content_is("stash too!!!!!!!!\n");
+
 # GET /favicon.ico (random static requests)
 $t->get_ok('/favicon.ico')->status_is(200);
 $t->get_ok('/mojolicious-white.png')->status_is(200);
 $t->get_ok('/mojolicious-black.png')->status_is(200);
 $t->get_ok('/favicon.ico')->status_is(200);
 
-# GET /bridge2stash (with cookies, session and flash)
+# GET /bridge2stash (with cookies, session and flash again)
 $t->get_ok('/bridge2stash')->status_is(200)
   ->content_is(
   "stash too!cookie!signed_cookie!!bad_cookie--12345678!session!flash!/!\n");
@@ -1570,6 +1602,12 @@ $t->get_ok('/bridge2stash' => {'X-Flash2' => 1})->status_is(200)
 # GET /bridge2stash (with cookies and session cleared)
 $t->get_ok('/bridge2stash')->status_is(200)
   ->content_is("stash too!cookie!signed_cookie!!bad_cookie--12345678!!!!\n");
+
+# GET /late/session (late session does not affect rendering)
+$t->get_ok('/late/session')->status_is(200)->content_is('not yet!');
+
+# GET /late/session (previous late session does affect rendering)
+$t->get_ok('/late/session')->status_is(200)->content_is('works!');
 
 # GET /with/under/count
 $t->get_ok('/with/under/count', {'X-Bender' => 'Rodriguez'})->status_is(200)

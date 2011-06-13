@@ -40,6 +40,7 @@ EOF
 sub run {
   my $self = shift;
 
+  # Options
   local @ARGV = @_ if @_;
   my $method = 'GET';
   my @headers;
@@ -61,11 +62,10 @@ sub run {
     $headers->{$1} = $2;
   }
 
-  # URL
+  # URL and selector
   my $url = shift @ARGV;
   die $self->usage unless $url;
   decode 'UTF-8', $url;
-
   my $selector = shift @ARGV;
 
   # Fresh user agent

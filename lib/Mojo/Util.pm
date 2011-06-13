@@ -384,7 +384,6 @@ sub hmac_md5_sum { _hmac(\&_md5, @_) }
 sub hmac_sha1_sum { _hmac(\&_sha1, @_) }
 
 sub html_escape {
-
   my $escaped = '';
   for (1 .. length $_[0]) {
 
@@ -399,19 +398,22 @@ sub html_escape {
 }
 
 sub html_unescape {
-
-  # Unescape
   $_[0] =~ s/
     &
     (?:
-      \#(\d{1,7})             # Number
+      \#
+      (
+        (?:
+          \d{1,7}             # Number
+          |
+          x[0-9A-Fa-f]{1,6}   # Hex
+        )
+      )
       |
-      ([A-Za-z]{1,8})         # Named
-      |
-      \#x([0-9A-Fa-f]{1,6})   # Hex
+      ([A-Za-z]{1,8})         # Name
     )
     ;
-    /_unescape($1, $2, $3)/gex;
+  /_unescape($1, $2)/gex;
 }
 
 sub md5_bytes {
@@ -449,14 +451,12 @@ sub punycode_decode {
       # Digit
       my $digit = ord substr $_[0], 0, 1, '';
       $digit = $digit < 0x40 ? $digit + (26 - 0x30) : ($digit & 0x1f) - 1;
-
       $i += $digit * $w;
       my $t = $k - $bias;
       $t =
           $t < PUNYCODE_TMIN ? PUNYCODE_TMIN
         : $t > PUNYCODE_TMAX ? PUNYCODE_TMAX
         :                      $t;
-
       last if $digit < $t;
 
       $w *= (PUNYCODE_BASE - $t);
@@ -464,7 +464,6 @@ sub punycode_decode {
 
     # Bias
     $bias = _adapt($i - $oldi, @output + 1, $oldi == 0);
-
     $n += $i / (@output + 1);
     $i = $i % (@output + 1);
 
@@ -472,12 +471,14 @@ sub punycode_decode {
     splice @output, $i, 0, chr($n);
     $i++;
   }
+
   $_[0] = join '', @output;
 }
 
 sub punycode_encode {
   use integer;
 
+  # Defaults
   my $output = $_[0];
   my $len    = length $_[0];
 
@@ -525,7 +526,6 @@ sub punycode_encode {
               $t < PUNYCODE_TMIN ? PUNYCODE_TMIN
             : $t > PUNYCODE_TMAX ? PUNYCODE_TMAX
             :                      $t;
-
           last if $q < $t;
 
           # Code point for digit "t"
@@ -540,7 +540,6 @@ sub punycode_encode {
 
         # Bias
         $bias = _adapt($delta, $h + 1, $h == $b);
-
         $delta = 0;
         $h++;
       }
@@ -549,6 +548,7 @@ sub punycode_encode {
     $delta++;
     $n++;
   }
+
   $_[0] = $output;
 }
 
@@ -616,8 +616,6 @@ sub url_escape {
 
 sub url_unescape {
   return if index($_[0], '%') == -1;
-
-  # Unescape
   $_[0] =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/ge;
 }
 
@@ -638,11 +636,8 @@ sub _adapt {
   my ($delta, $numpoints, $firsttime) = @_;
 
   use integer;
-
-  # Delta
   $delta = $firsttime ? $delta / PUNYCODE_DAMP : $delta / 2;
   $delta += $delta / $numpoints;
-
   my $k = 0;
   while ($delta > ((PUNYCODE_BASE - PUNYCODE_TMIN) * PUNYCODE_TMAX) / 2) {
     $delta /= PUNYCODE_BASE - PUNYCODE_TMIN;
@@ -681,19 +676,11 @@ EOF
 
 # Helper for html_unescape
 sub _unescape {
-  my ($num, $entitie, $hex) = @_;
-
-  # Named to number
-  if (defined $entitie) { $num = $ENTITIES{$entitie} }
-
-  # Hex to number
-  elsif (defined $hex) { $num = hex $hex }
-
-  # Number
-  return pack 'U', $num if $num;
-
-  # Unknown entitie
-  return "&$entitie;";
+  if ($_[0]) {
+    return chr hex $_[0] if substr($_[0], 0, 1) eq 'x';
+    return chr $_[0];
+  }
+  return exists $ENTITIES{$_[1]} ? chr $ENTITIES{$_[1]} : "&$_[1];";
 }
 
 1;

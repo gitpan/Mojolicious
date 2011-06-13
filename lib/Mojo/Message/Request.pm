@@ -84,14 +84,10 @@ sub fix_headers {
 }
 
 sub is_secure {
-  my $self = shift;
-
-  # Secure
-  my $url = $self->url;
+  my $self   = shift;
+  my $url    = $self->url;
   my $scheme = $url->scheme || $url->base->scheme || '';
   return 1 if $scheme eq 'https';
-
-  # Not secure
   return;
 }
 
@@ -247,11 +243,10 @@ sub _parse_env {
   # Make environment accessible
   $self->env($env);
 
+  # Extract headers from environment
   my $headers = $self->headers;
   my $url     = $self->url;
   my $base    = $url->base;
-
-  # Extract headers from environment
   for my $name (keys %$env) {
 
     # Header

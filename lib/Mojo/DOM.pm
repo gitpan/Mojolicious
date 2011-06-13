@@ -186,6 +186,7 @@ sub all_text {
   while (my $e = shift @stack) {
     my $type = $e->[0];
 
+    # Add children of nested tag to stack
     unshift @stack, @$e[4 .. $#$e] and next if $type eq 'tag';
 
     # Text
@@ -255,7 +256,7 @@ sub children {
   my $start = $tree->[0] eq 'root' ? 1 : 4;
   for my $e (@$tree[$start .. $#$tree]) {
 
-    # Tag
+    # Make sure child is a tag
     next unless $e->[0] eq 'tag';
     next if defined $type && $e->[1] ne $type;
 
@@ -264,7 +265,6 @@ sub children {
       $self->new(charset => $self->charset, tree => $e, xml => $self->xml);
   }
 
-  # Collection
   return bless \@children, 'Mojo::DOM::_Collection';
 }
 
@@ -272,12 +272,10 @@ sub content_xml {
   my $self = shift;
 
   # Walk tree
-  my $tree   = $self->tree;
   my $result = '';
+  my $tree   = $self->tree;
   my $start  = $tree->[0] eq 'root' ? 1 : 4;
   for my $e (@$tree[$start .. $#$tree]) {
-
-    # Render
     $result .= $self->_render($e);
   }
 
@@ -290,12 +288,7 @@ sub content_xml {
 
 sub find {
   my ($self, $css) = @_;
-
-  # Parse CSS selectors
-  my $pattern = $self->_parse_css($css);
-
-  # Filter tree
-  return $self->_match_tree($self->tree, $pattern);
+  return $self->_match_tree($self->tree, $self->_parse_css($css));
 }
 
 # DEPRECATED in Smiling Face With Sunglasses!
@@ -309,17 +302,15 @@ EOF
 sub namespace {
   my $self = shift;
 
+  # Prefix
   my $current = $self->tree;
   return if $current->[0] eq 'root';
-
-  # Prefix
   my $prefix = '';
   if ($current->[1] =~ /^(.*?)\:/) { $prefix = $1 }
 
   # Walk tree
   while ($current) {
     return if $current->[0] eq 'root';
-
     my $attrs = $current->[2];
 
     # Namespace for prefix
@@ -355,11 +346,7 @@ sub parent {
 
 sub parse {
   my ($self, $xml) = @_;
-
-  # Detect Perl characters
   $self->charset(undef) if utf8::is_utf8 $xml;
-
-  # Parse
   $self->tree($self->_parse_xml($xml));
 }
 
@@ -446,14 +433,10 @@ sub root {
 sub text {
   my $self = shift;
 
-  my $text = '';
-
   # Walk stack
+  my $text = '';
   for my $e (@{$self->tree}) {
-
-    # Meta data
     next unless ref $e eq 'ARRAY';
-
     my $type = $e->[0];
 
     # Text
@@ -473,15 +456,10 @@ sub text {
 }
 
 sub to_xml {
-  my $self = shift;
-
-  # Render
-  my $result = $self->_render($self->tree);
-
-  # Encode
+  my $self    = shift;
+  my $result  = $self->_render($self->tree);
   my $charset = $self->charset;
   encode $charset, $result if $charset;
-
   return $result;
 }
 
@@ -548,22 +526,18 @@ sub _cdata {
 
 sub _close {
   my ($self, $current, $tags, $stop) = @_;
-
-  # Default to table tags
   $tags ||= \%HTML_TABLE;
-
-  # Default to table tag
   $stop ||= 'table';
 
-  # Check parents
+  # Check if parents need to be closed
   my $parent = $$current;
   while ($parent) {
     last if $parent->[0] eq 'root' || $parent->[1] eq $stop;
 
-    # Match
+    # Close
     $tags->{$parent->[1]} and $self->_end($parent->[1], $current);
 
-    # Next
+    # Try next
     $parent = $parent->[3];
   }
 }
@@ -575,9 +549,9 @@ sub _comment {
 
 sub _css_equation {
   my ($self, $equation) = @_;
-  my $num = [1, 1];
 
   # "even"
+  my $num = [1, 1];
   if ($equation =~ /^even$/i) { $num = [2, 2] }
 
   # "odd"
@@ -597,13 +571,11 @@ sub _css_equation {
 
 sub _css_regex {
   my ($self, $op, $value) = @_;
-
   return unless $value;
   $value = quotemeta $self->_css_unescape($value);
 
-  my $regex;
-
   # "~=" (word)
+  my $regex;
   if ($op eq '~') { $regex = qr/(?:^|.*\s+)$value(?:\s+.*|$)/ }
 
   # "*=" (contains)
@@ -643,7 +615,6 @@ sub _doctype {
 
 sub _end {
   my ($self, $end, $current) = @_;
-
   warn "END $end\n" if DEBUG;
 
   # Not a tag
@@ -655,7 +626,7 @@ sub _end {
   while ($next) {
     last if $next->[0] eq 'root';
 
-    # Found
+    # Right tag
     ++$found and last if $next->[1] eq $end;
 
     # Don't cross block tags that are not optional tags
@@ -664,6 +635,7 @@ sub _end {
         && $HTML_BLOCK{$next->[1]}
         && !$HTML_OPTIONAL{$next->[1]};
 
+    # Parent
     $next = $next->[3];
   }
 
@@ -695,21 +667,18 @@ sub _end {
 sub _match_element {
   my ($self, $candidate, $selectors) = @_;
 
+  # Match
   my @selectors  = reverse @$selectors;
   my $first      = 2;
   my $parentonly = 0;
   my $tree       = $self->tree;
   my ($current, $marker, $snapback, $siblings);
-
-  # Match
   for (my $i = 0; $i <= $#selectors; $i++) {
     my $selector = $selectors[$i];
 
     # Combinator
     $parentonly-- if $parentonly > 0;
     if ($selector->[0] eq 'combinator') {
-
-      # Combinator
       my $c = $selector->[1];
 
       # Parent only ">"
@@ -882,10 +851,8 @@ sub _match_selector {
         $args = $c->[2] = $self->_css_equation($args)
           unless ref $args;
 
-        # Parent
-        my $parent = $current->[3];
-
         # Siblings
+        my $parent = $current->[3];
         my $start = $parent->[0] eq 'root' ? 1 : 4;
         my @siblings;
         my $type = $class =~ /of-type$/ ? $current->[1] : undef;
@@ -917,10 +884,8 @@ sub _match_selector {
       elsif ($class =~ /^only-(?:child|(of-type))$/) {
         my $type = $1 ? $current->[1] : undef;
 
-        # Parent
-        my $parent = $current->[3];
-
         # Siblings
+        my $parent = $current->[3];
         my $start = $parent->[0] eq 'root' ? 1 : 4;
         for my $j ($start .. $#$parent) {
           my $sibling = $parent->[$j];
@@ -966,8 +931,6 @@ sub _match_tree {
 
       # Parts
       for my $part (@$pattern) {
-
-        # Match
         push(@results, $current) and last
           if $self->_match_element($current, $part);
       }
@@ -979,7 +942,6 @@ sub _match_tree {
     $self->new(charset => $self->charset, tree => $_, xml => $self->xml)
   } @results;
 
-  # Collection
   return bless \@results, 'Mojo::DOM::_Collection';
 }
 
@@ -1070,16 +1032,13 @@ sub _parse_css {
 sub _parse_xml {
   my ($self, $xml) = @_;
 
-  # State
-  my $tree    = ['root'];
-  my $current = $tree;
-
   # Decode
   my $charset = $self->charset;
   decode $charset, $xml if $charset && !utf8::is_utf8 $xml;
-  return $tree unless $xml;
 
   # Tokenize
+  my $tree    = ['root'];
+  my $current = $tree;
   while ($xml =~ m/\G$XML_TOKEN_RE/gcs) {
     my $text    = $1;
     my $pi      = $2;
@@ -1090,10 +1049,7 @@ sub _parse_xml {
 
     # Text
     if (length $text) {
-
-      # Unescape
       html_unescape $text if (index $text, '&') >= 0;
-
       $self->_text($text, \$current);
     }
 
@@ -1132,13 +1088,11 @@ sub _parse_xml {
         $value = $3 unless defined $value;
         $value = $4 unless defined $value;
 
-        # End
+        # Empty tag
         next if $key eq '/';
 
-        # Unescape
+        # Add unescaped value
         html_unescape $value if $value && (index $value, '&') >= 0;
-
-        # Merge
         $attrs->{$key} = $value;
       }
 
@@ -1162,12 +1116,10 @@ sub _parse_xml {
   return $tree;
 }
 
+# Try to detect XML from processing instructions
 sub _pi {
   my ($self, $pi, $current) = @_;
-
-  # Try to detect XML
   $self->xml(1) if !defined $self->xml && $pi =~ /xml/i;
-
   push @$$current, ['pi', $pi];
 }
 
@@ -1179,9 +1131,8 @@ sub _raw {
 sub _render {
   my ($self, $tree) = @_;
 
-  my $e = $tree->[0];
-
   # Text (escaped)
+  my $e = $tree->[0];
   if ($e eq 'text') {
     my $escaped = $tree->[1];
     xml_escape $escaped;
@@ -1206,9 +1157,8 @@ sub _render {
   # Offset
   my $start = $e eq 'root' ? 1 : 2;
 
-  my $content = '';
-
   # Start tag
+  my $content = '';
   if ($e eq 'tag') {
 
     # Offset
@@ -1225,10 +1175,8 @@ sub _render {
       # No value
       push @attrs, $key and next unless defined $value;
 
-      # Escape
-      xml_escape $value;
-
       # Key and value
+      xml_escape $value;
       push @attrs, qq/$key="$value"/;
     }
     my $attrs = join ' ', @attrs;
@@ -1242,11 +1190,7 @@ sub _render {
   }
 
   # Walk tree
-  for my $i ($start .. $#$tree) {
-
-    # Render next element
-    $content .= $self->_render($tree->[$i]);
-  }
+  $content .= $self->_render($tree->[$_]) for $start .. $#$tree;
 
   # End tag
   $content .= '</' . $tree->[1] . '>' if $e eq 'tag';
@@ -1258,7 +1202,6 @@ sub _render {
 #  or who got exposed to tainted what..."
 sub _start {
   my ($self, $start, $attrs, $current) = @_;
-
   warn "START $start\n" if DEBUG;
 
   # Autoclose optional HTML tags

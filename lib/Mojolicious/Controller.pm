@@ -224,10 +224,9 @@ sub render {
     return '';
   }
 
-  # Template as single argument
+  # Template may be first argument
   my $template;
   $template = shift if @_ % 2 && !ref $_[0];
-
   my $args = ref $_[0] ? $_[0] : {@_};
 
   # Template
@@ -328,6 +327,7 @@ sub render_exception {
     $snapshot->{$key} = $value;
   }
 
+  # Mode specific template
   my $mode    = $self->app->mode;
   my $options = {
     template         => "exception.$mode",
@@ -338,8 +338,6 @@ sub render_exception {
     exception        => $e,
     'mojo.exception' => 1
   };
-
-  # Mode specific template
   unless ($self->render($options)) {
 
     # Template
@@ -396,6 +394,7 @@ sub render_not_found {
     ? $self->url_for('/perldoc')
     : 'http://mojolicio.us/perldoc';
 
+  # Mode specific template
   my $mode    = $self->app->mode;
   my $options = {
     template         => "not_found.$mode",
@@ -404,8 +403,6 @@ sub render_not_found {
     guide            => $guide,
     'mojo.not_found' => 1
   };
-
-  # Mode specific template
   unless ($self->render($options)) {
 
     # Template
@@ -466,8 +463,8 @@ sub rendered {
   unless ($stash->{'mojo.finished'}) {
     $res->code(200) unless $res->code;
     my $app = $self->app;
-    $app->sessions->store($self);
     $app->plugins->run_hook_reverse(after_dispatch => $self);
+    $app->sessions->store($self);
     $stash->{'mojo.finished'} = 1;
   }
   $self->tx->resume;
