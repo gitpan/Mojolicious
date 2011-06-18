@@ -103,18 +103,12 @@ sub get_all_data {
   my ($self, $class) = @_;
   $class ||= ref $self;
 
-  # Handle
+  # Refresh or use cached data
   my $d = do { no strict 'refs'; \*{"$class\::DATA"} };
-
-  # Refresh
-  if (fileno $d) {
-    seek $d, 0, 0;
-    $CACHE->{$class} = join '', <$d>;
-    close $d;
-  }
-
-  # Content
-  return unless defined(my $content = $CACHE->{$class});
+  return $CACHE->{$class} unless fileno $d;
+  seek $d, 0, 0;
+  my $content = join '', <$d>;
+  close $d;
 
   # Ignore everything before __DATA__ (windows will seek to start of file)
   $content =~ s/^.*\n__DATA__\r?\n/\n/s;
@@ -127,7 +121,7 @@ sub get_all_data {
   shift @data;
 
   # Find data
-  my $all = {};
+  my $all = $CACHE->{$class} = {};
   while (@data) {
     my ($name, $content) = splice @data, 0, 2;
     b64_decode $content if $name =~ s/\s*\(\s*base64\s*\)$//;
@@ -199,6 +193,7 @@ sub run {
     # Help
     my $help = $name eq 'help' ? 1 : 0;
     $name = shift @args if $help;
+    $help = 1           if $ENV{MOJO_HELP};
 
     # Try all namespaces
     my $module;
@@ -293,10 +288,6 @@ sub run {
 
 sub start {
   my $self = shift;
-
-  # Don't run commands if we are reloading
-  return $self if $ENV{MOJO_COMMANDS_DONE};
-  $ENV{MOJO_COMMANDS_DONE} ||= 1;
 
   # Executable
   $ENV{MOJO_EXE} ||= (caller)[1] if $ENV{MOJO_APP};

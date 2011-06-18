@@ -4,7 +4,8 @@ use Mojo::Base -base;
 use Carp 'croak';
 use Mojo::Asset::Memory;
 use Mojo::Content::Single;
-use Mojo::Loader;
+use Mojo::DOM;
+use Mojo::JSON;
 use Mojo::Parameters;
 use Mojo::Upload;
 use Mojo::Util qw/decode url_unescape/;
@@ -191,21 +192,13 @@ sub dom {
   # Multipart
   return if $self->is_multipart;
 
-  # Load DOM class
-  my $class = $self->dom_class;
-  if (my $e = Mojo::Loader->load($class)) {
-    croak ref $e
-      ? qq/Can't load DOM class "$class": $e/
-      : qq/DOM class "$class" doesn't exist./;
-  }
-
   # Charset
   my $charset;
   ($self->headers->content_type || '') =~ /charset=\"?([^\"\s;]+)\"?/
     and $charset = $1;
 
   # Parse
-  my $dom = $class->new(charset => $charset)->parse($self->body);
+  my $dom = $self->dom_class->new(charset => $charset)->parse($self->body);
 
   # Find right away
   return $dom->find(@_) if @_;
@@ -327,20 +320,8 @@ sub is_multipart { shift->content->is_multipart }
 
 sub json {
   my $self = shift;
-
-  # Multipart
   return if $self->is_multipart;
-
-  # Load JSON class
-  my $class = $self->json_class;
-  if (my $e = Mojo::Loader->load($class)) {
-    croak ref $e
-      ? qq/Can't load JSON class "$class": $e/
-      : qq/JSON class "$class" doesn't exist./;
-  }
-
-  # Decode
-  return $class->new->decode($self->body);
+  return $self->json_class->new->decode($self->body);
 }
 
 sub leftovers { shift->content->leftovers }
@@ -610,22 +591,23 @@ Content container, defaults to a L<Mojo::Content::Single> object.
   my $charset = $message->default_charset;
   $message    = $message->default_charset('UTF-8');
 
-Default charset used for form data parsing.
+Default charset used for form data parsing, defaults to C<UTF-8>.
 
 =head2 C<dom_class>
 
   my $class = $message->dom_class;
   $message  = $message->dom_class('Mojo::DOM');
 
-Class to be used for DOM manipulation, defaults to L<Mojo::DOM>.
+Class to be used for DOM manipulation with the C<dom> method, defaults to
+L<Mojo::DOM>.
 
 =head2 C<json_class>
 
   my $class = $message->json_class;
   $message  = $message->json_class('Mojo::JSON');
 
-Class to be used for JSON deserialization with C<json>, defaults to
-L<Mojo::JSON>.
+Class to be used for JSON deserialization with the C<json> method, defaults
+to L<Mojo::JSON>.
 
 =head2 C<max_message_size>
 
@@ -641,7 +623,7 @@ Maximum message size in bytes, defaults to C<5242880>.
     my $self = shift;
   });
 
-Callback called after message building or parsing is finished.
+Callback to be invoked after message building or parsing is finished.
 
 =head2 C<on_progress>
 
@@ -651,7 +633,7 @@ Callback called after message building or parsing is finished.
     print '+';
   });
 
-Progress callback.
+Callback to be invoked on progress.
 
 =head1 METHODS
 
@@ -670,13 +652,13 @@ Check if message is at least a specific version.
   $message   = $message->body('Hello!');
   $message   = $message->body(sub {...});
 
-Helper for simplified content access.
+Simple C<content> access.
 
 =head2 C<body_params>
 
   my $params = $message->body_params;
 
-C<POST> parameters.
+C<POST> parameters, usually a L<Mojo::Parameters> object.
 
 =head2 C<body_size>
 
@@ -707,7 +689,8 @@ Render start line.
   my $cookie  = $message->cookie('foo');
   my @cookies = $message->cookie('foo');
 
-Access message cookies.
+Access message cookies, usually L<Mojo::Cookie::Request> or
+L<Mojo::Cookie::Response> objects.
 
 =head2 C<dom>
 
@@ -767,7 +750,7 @@ Size of headers in bytes.
   my $headers = $message->headers;
   $message    = $message->headers(Mojo::Headers->new);
 
-Header container, defaults to a L<Mojo::Headers> object.
+Message headers, defaults to a L<Mojo::Headers> object.
 
 =head2 C<is_chunked>
 
@@ -813,7 +796,7 @@ C<undef> otherwise.
 
   my $bytes = $message->leftovers;
 
-Remove leftover data.
+Remove leftover data from message parser.
 
 =head2 C<max_line_size>
 
@@ -827,7 +810,7 @@ Note that this method is EXPERIMENTAL and might change without warning!
   my $param  = $message->param('foo');
   my @params = $message->param('foo');
 
-Access C<GET> and C<POST> parameters.
+Access C<GET> and C<POST> parameters>.
 
 =head2 C<parse>
 
@@ -858,13 +841,13 @@ Render whole message.
   my $upload  = $message->upload('foo');
   my @uploads = $message->upload('foo');
 
-Access file uploads.
+Access file uploads, usually L<Mojo::Upload> objects.
 
 =head2 C<uploads>
 
   my $uploads = $message->uploads;
 
-All file uploads.
+All file uploads, usually L<Mojo::Upload> objects.
 
 =head2 C<version>
 

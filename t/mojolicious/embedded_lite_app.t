@@ -3,10 +3,15 @@
 use strict;
 use warnings;
 
-# Disable IPv6, epoll and kqueue
-BEGIN { $ENV{MOJO_NO_IPV6} = $ENV{MOJO_POLL} = 1 }
+use utf8;
 
-use Test::More tests => 41;
+# Disable IPv6, epoll and kqueue
+BEGIN {
+  $ENV{MOJO_NO_IPV6} = $ENV{MOJO_POLL} = 1;
+  $ENV{MOJO_MODE} = 'testing';
+}
+
+use Test::More tests => 71;
 
 use FindBin;
 use lib "$FindBin::Bin/lib";
@@ -31,8 +36,6 @@ get '/hello' => sub {
 #  Belligerent and numerous."
 package MyTestApp::Test1;
 use Mojolicious::Lite;
-
-use Mojo::IOLoop;
 
 # GET /yada (embedded)
 get '/yada' => sub {
@@ -84,6 +87,12 @@ package main;
 plugin 'PluginWithEmbeddedApp';
 
 app->routes->namespace('MyTestApp');
+
+# Mount full external application twice
+use FindBin;
+my $external = "$FindBin::Bin/external/myapp.pl";
+plugin mount => {'/x/1' => $external};
+plugin(mount => ('/x/♥' => $external))->to(message => 'works 2!');
 
 # GET /hello
 get '/hello' => 'works';
@@ -170,6 +179,42 @@ $t->get_ok('/third')->status_is(200)
 # GET /just/works (from external embedded app)
 $t->get_ok('/just/works')->status_is(200)->content_is("It is working!\n");
 
+# GET /x/1/ (full external application)
+$t->get_ok('/x/1/')->status_is(200)->content_is("works!\n\ntoo!works!!!\n");
+
+# GET /x/1/index.html (full external application)
+$t->get_ok('/x/1/index.html')->status_is(200)
+  ->content_is('External static file!');
+
+# GET /x/1/echo (full external application)
+$t->get_ok('/x/1/echo')->status_is(200)->content_is('echo: nothing!');
+
+# GET /x/1/stream (full external application)
+$t->get_ok('/x/1/stream')->status_is(200)->content_is('hello!');
+
+# GET /x/1/url/☃ (full external application)
+$t->get_ok('/x/1/url/☃')->status_is(200)
+  ->content_is('/x/1/url/%E2%98%83 -> /x/1/%E2%98%83/stream!');
+
+# GET /x/♥/ (full external application)
+$t->get_ok('/x/♥/')->status_is(200)->content_is("works!\n\ntoo!works!!!\n");
+
+# GET /x/♥/index.html (full external application)
+$t->get_ok('/x/♥/index.html')->status_is(200)
+  ->content_is('External static file!');
+
+# GET /x/♥/echo (full external application)
+$t->get_ok('/x/♥/echo')->status_is(200)->content_is('echo: works 2!');
+
+# GET /x/♥/stream (full external application)
+$t->get_ok('/x/♥/stream')->status_is(200)->content_is('hello!');
+
+# GET /x/♥/url/☃ (full external application)
+$t->get_ok('/x/♥/url/☃')->status_is(200)
+  ->content_is(
+  '/x/%E2%99%A5/url/%E2%98%83 -> /x/%E2%99%A5/%E2%98%83/stream!');
+
 __DATA__
+
 @@ works.html.ep
 Hello from the main app!

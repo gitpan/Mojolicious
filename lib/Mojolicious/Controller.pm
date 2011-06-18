@@ -608,7 +608,18 @@ sub url_for {
 
   # Relative URL
   my $path = $url->path;
-  if ($target =~ /^\//) { $url->parse($target) }
+  if ($target =~ /^\//) {
+    if (my $e = $self->stash->{path}) {
+      my $real = $req->url->path->to_abs_string;
+      Mojo::Util::url_unescape($real);
+      my $backup = $real;
+      Mojo::Util::decode('UTF-8', $real);
+      $real = $backup unless defined $real;
+      $real =~ s/\/?$e$/$target/;
+      $target = $real;
+    }
+    $url->parse($target);
+  }
 
   # Route
   else {
@@ -738,21 +749,20 @@ Data storage persistent for the next request, stored in the session.
 
   $c->on_finish(sub {...});
 
-Callback signaling that the transaction has been finished.
+Callback to be invoked when the transaction has been finished.
 
   $c->on_finish(sub {
-    my $self = shift;
+    my $c = shift;
   });
 
 =head2 C<on_message>
 
   $c = $c->on_message(sub {...});
 
-Receive messages via WebSocket, only works if there is currently a WebSocket
-connection in progress.
+Callback to be invoked when new WebSocket messages arrive.
 
   $c->on_message(sub {
-    my ($self, $message) = @_;
+    my ($c, $message) = @_;
   });
 
 =head2 C<param>
@@ -987,12 +997,19 @@ once all data has been written to the kernel send buffer or equivalent.
 
   # Keep connection alive (with Content-Length header)
   $c->res->headers->content_length(6);
-  $c->write('Hel', sub { shift->write('lo!') });
+  $c->write('Hel', sub {
+    my $c = shift;
+    $c->write('lo!')
+  });
 
   # Close connection when done (without Content-Length header)
-  $c->write('Hel');
-  $c->write('lo!');
-  $c->finish;
+  $c->write('Hel', sub {
+    my $c = shift;
+    $c->write('lo!', sub {
+      my $c = shift;
+      $c->finish;
+    });
+  });
 
 =head2 C<write_chunk>
 
@@ -1006,9 +1023,13 @@ which doesn't require a C<Content-Length> header, the optional drain callback
 will be invoked once all data has been written to the kernel send buffer or
 equivalent.
 
-  $c->write_chunk('He');
-  $c->write_chunk('ll');
-  $c->finish('o!');
+  $c->write_chunk('He', sub {
+    my $c = shift;
+    $c->write_chunk('ll', sub {
+      my $c = shift;
+      $c->finish('o!');
+    });
+  });
 
 You can call C<finish> at any time to end the stream.
 

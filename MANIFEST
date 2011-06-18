@@ -38,6 +38,7 @@ lib/Mojo/Server/CGI.pm
 lib/Mojo/Server/Daemon.pm
 lib/Mojo/Server/FastCGI.pm
 lib/Mojo/Server/Hypnotoad.pm
+lib/Mojo/Server/Morbo.pm
 lib/Mojo/Server/PSGI.pm
 lib/Mojo/Template.pm
 lib/Mojo/Transaction.pm
@@ -85,6 +86,7 @@ lib/Mojolicious/Plugin/EpRenderer.pm
 lib/Mojolicious/Plugin/HeaderCondition.pm
 lib/Mojolicious/Plugin/I18n.pm
 lib/Mojolicious/Plugin/JsonConfig.pm
+lib/Mojolicious/Plugin/Mount.pm
 lib/Mojolicious/Plugin/PodRenderer.pm
 lib/Mojolicious/Plugin/PoweredBy.pm
 lib/Mojolicious/Plugin/RequestTimer.pm
@@ -97,17 +99,22 @@ lib/Mojolicious/public/failraptor.png
 lib/Mojolicious/public/favicon.ico
 lib/Mojolicious/public/js/jquery.js
 lib/Mojolicious/public/js/lang-apollo.js
+lib/Mojolicious/public/js/lang-clj.js
 lib/Mojolicious/public/js/lang-css.js
+lib/Mojolicious/public/js/lang-go.js
 lib/Mojolicious/public/js/lang-hs.js
 lib/Mojolicious/public/js/lang-lisp.js
 lib/Mojolicious/public/js/lang-lua.js
 lib/Mojolicious/public/js/lang-ml.js
+lib/Mojolicious/public/js/lang-n.js
 lib/Mojolicious/public/js/lang-proto.js
 lib/Mojolicious/public/js/lang-scala.js
 lib/Mojolicious/public/js/lang-sql.js
+lib/Mojolicious/public/js/lang-tex.js
 lib/Mojolicious/public/js/lang-vb.js
 lib/Mojolicious/public/js/lang-vhdl.js
 lib/Mojolicious/public/js/lang-wiki.js
+lib/Mojolicious/public/js/lang-xq.js
 lib/Mojolicious/public/js/lang-yaml.js
 lib/Mojolicious/public/js/prettify.js
 lib/Mojolicious/public/mojolicious-arrow.png
@@ -141,6 +148,7 @@ MYMETA.yml
 README.pod
 script/hypnotoad
 script/mojo
+script/morbo
 t/mojo/apache_cgi.t
 t/mojo/apache_fastcgi.t
 t/mojo/app.t
@@ -184,6 +192,7 @@ t/mojo/lib/test.mt
 t/mojo/lib/utf8_exception.mt
 t/mojo/loader.t
 t/mojo/message.t
+t/mojo/morbo.t
 t/mojo/parameters.t
 t/mojo/path.t
 t/mojo/psgi.t
@@ -203,6 +212,7 @@ t/mojolicious/external/myapp.conf
 t/mojolicious/external/myapp.pl
 t/mojolicious/external/myapp.testing.conf
 t/mojolicious/external/public/index.html
+t/mojolicious/external/templates/index.html.ep
 t/mojolicious/external_lite_app.t
 t/mojolicious/i18n_lite_app.t
 t/mojolicious/i18n_shortcut_lite_app.t

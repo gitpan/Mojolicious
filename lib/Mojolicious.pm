@@ -3,6 +3,7 @@ use Mojo::Base 'Mojo';
 
 use Carp 'croak';
 use Mojolicious::Commands;
+use Mojolicious::Controller;
 use Mojolicious::Plugins;
 use Mojolicious::Renderer;
 use Mojolicious::Routes;
@@ -32,7 +33,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Smiling Face With Sunglasses';
-our $VERSION  = '1.43';
+our $VERSION  = '1.44';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -46,18 +47,8 @@ sub AUTOLOAD {
   croak qq/Can't locate object method "$method" via package "$package"/
     unless my $helper = $self->renderer->helpers->{$method};
 
-  # Load controller class
-  my $class = $self->controller_class;
-  if (my $e = Mojo::Loader->load($class)) {
-    $self->log->error(
-      ref $e
-      ? qq/Can't load controller class "$class": $e/
-      : qq/Controller class "$class" doesn't exist./
-    );
-  }
-
   # Call helper with fresh controller
-  return $class->new(app => $self)->$helper(@_);
+  return $self->controller_class->new(app => $self)->$helper(@_);
 }
 
 sub DESTROY { }
@@ -162,22 +153,15 @@ sub dispatch {
   return if $res->code;
   if (my $code = ($tx->req->error)[1]) { $res->code($code) }
   elsif ($tx->is_websocket) { $res->code(426) }
-  if ($self->routes->dispatch($c)) { $c->render_not_found unless $res->code }
+  if ($self->routes->dispatch($c)) {
+    $c->render_not_found
+      unless $res->code;
+  }
 }
 
 # "Bite my shiny metal ass!"
 sub handler {
   my ($self, $tx) = @_;
-
-  # Load controller class
-  my $class = $self->controller_class;
-  if (my $e = Mojo::Loader->load($class)) {
-    $self->log->error(
-      ref $e
-      ? qq/Can't load controller class "$class": $e/
-      : qq/Controller class "$class" doesn't exist./
-    );
-  }
 
   # Embedded application
   my $stash = {};
@@ -189,7 +173,8 @@ sub handler {
   # Build default controller and process
   my $defaults = $self->defaults;
   @{$stash}{keys %$defaults} = values %$defaults;
-  my $c = $class->new(app => $self, stash => $stash, tx => $tx);
+  my $c =
+    $self->controller_class->new(app => $self, stash => $stash, tx => $tx);
   unless (eval { $self->on_process->($self, $c); 1 }) {
     $self->log->fatal("Processing request failed: $@");
     $tx->res->code(500);
@@ -816,6 +801,10 @@ Internationalization helpers.
 
 JSON configuration files.
 
+=item L<Mojolicious::Plugin::Mount>
+
+Mount whole L<Mojolicious> applications.
+
 =item L<Mojolicious::Plugin::PodRenderer>
 
 Renderer for POD files and documentation browser.
@@ -897,9 +886,9 @@ development. jQuery is designed to change the way that you write JavaScript.
 
 Licensed under the MIT License, L<http://creativecommons.org/licenses/MIT>.
 
-=head2 Prettify.js
+=head2 prettify.js
 
-  Version 21-Jul-2010
+  Version 1-Jun-2011
 
 A Javascript module and CSS file that allows syntax highlighting of source
 code snippets in an html page.

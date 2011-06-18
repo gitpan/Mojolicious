@@ -97,7 +97,7 @@ sub del { shift->_generate_route('delete', @_) }
 
 sub detour {
   my $self = shift;
-  $self->partial('path');
+  $self->partial(1);
   $self->to(@_);
   return $self;
 }
@@ -256,8 +256,6 @@ sub render {
   return $path;
 }
 
-# "Morbo forget how you spell that letter that looks like a man wearing a hat.
-#  Hello, tiny man. I will destroy you!"
 sub route {
   my $self  = shift;
   my $route = $self->new(@_);
@@ -730,10 +728,9 @@ The parent of this route, used for nesting routes.
 =head2 C<partial>
 
   my $partial = $r->partial;
-  $r          = $r->partial('path');
+  $r          = $r->partial(1);
 
-Route has no specific end, remaining characters will be captured with the
-partial name.
+Route has no specific end, remaining characters will be captured in C<path>.
 
 =head2 C<pattern>
 
