@@ -390,12 +390,19 @@ Mojo::Server::Hypnotoad - ALL GLORY TO THE HYPNOTOAD!
 
   use Mojo::Server::Hypnotoad;
 
+  my $toad = Mojo::Server::Hypnotoad->new;
+  $toad->run('./myapp.pl', './hypnotoad.conf');
+
 =head1 DESCRIPTION
 
 L<Mojo::Server::Hypnotoad> is a full featured UNIX optimized preforking async
 io HTTP 1.1 and WebSocket server built around the very well tested and
 reliable L<Mojo::Server::Daemon> with C<IPv6>, C<TLS>, C<Bonjour>, C<epoll>,
 C<kqueue> and hot deployment support that just works.
+
+To start applications with it you can use the L<hypnotoad> script.
+
+  % hypnotoad myapp.pl
 
 Optional modules L<IO::KQueue>, L<IO::Epoll>, L<IO::Socket::IP>,
 L<IO::Socket::SSL> and L<Net::Rendezvous::Publish> are supported
