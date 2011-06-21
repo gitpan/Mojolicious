@@ -40,7 +40,7 @@ our $IPV6_RE = qr/(?:
 sub new {
   my $self = shift->SUPER::new();
   $self->parse(@_);
-  return $self;
+  $self;
 }
 
 sub authority {
@@ -87,7 +87,7 @@ sub authority {
   $authority .= lc($host || '');
   $authority .= ":$port" if $port;
 
-  return $authority;
+  $authority;
 }
 
 sub clone {
@@ -101,7 +101,7 @@ sub clone {
   $clone->fragment($self->fragment);
   $clone->base($self->base->clone) if $self->{base};
 
-  return $clone;
+  $clone;
 }
 
 sub ihost {
@@ -138,23 +138,23 @@ sub ihost {
     push @encoded, $part;
   }
 
-  return join '.', @encoded;
+  join '.', @encoded;
 }
 
 sub is_abs {
   my $self = shift;
   return 1 if $self->scheme && $self->authority;
-  return;
+  undef;
 }
 
 sub is_ipv4 {
   return 1 if shift->host =~ $IPV4_RE;
-  return;
+  undef;
 }
 
 sub is_ipv6 {
   return 1 if shift->host =~ $IPV6_RE;
-  return;
+  undef;
 }
 
 sub parse {
@@ -167,10 +167,10 @@ sub parse {
   $self->scheme($scheme);
   $self->authority($authority);
   $self->path->parse($path);
-  $self->query->parse($query);
+  $self->query($query);
   $self->fragment($fragment);
 
-  return $self;
+  $self;
 }
 
 sub path {
@@ -202,7 +202,7 @@ sub path {
 
   # Get
   $self->{path} ||= Mojo::Path->new;
-  return $self->{path};
+  $self->{path};
 }
 
 sub query {
@@ -231,18 +231,15 @@ sub query {
       $q->append(%{$_[0]});
     }
 
-    # Replace with string or object
-    else {
-      $self->{query} =
-        !ref $_[0] ? Mojo::Parameters->new->append($_[0]) : $_[0];
-    }
+    # Replace with string
+    else { $self->{query} = Mojo::Parameters->new($_[0]) }
 
     return $self;
   }
 
   # Get
   $self->{query} ||= Mojo::Parameters->new;
-  return $self->{query};
+  $self->{query};
 }
 
 sub to_abs {
@@ -279,7 +276,7 @@ sub to_abs {
   $new->trailing_slash($old->trailing_slash);
   $abs->path($new);
 
-  return $abs;
+  $abs;
 }
 
 sub to_rel {
@@ -308,7 +305,7 @@ sub to_rel {
   $rel->path($path);
   $rel->path->leading_slash(0);
 
-  return $rel;
+  $rel;
 }
 
 # "Dad, what's a Muppet?
@@ -334,8 +331,8 @@ sub to_string {
   $path->leading_slash($slash);
 
   # Query
-  my $query = $self->query;
-  $url .= "?$query" if @{$query->params};
+  my $query = join '', $self->query;
+  $url .= "?$query" if length $query;
 
   # Fragment
   if (my $fragment = $self->fragment) {
@@ -345,7 +342,7 @@ sub to_string {
     $url .= "#$fragment";
   }
 
-  return $url;
+  $url;
 }
 
 1;

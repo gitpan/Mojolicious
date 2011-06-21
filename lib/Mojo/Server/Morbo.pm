@@ -23,17 +23,16 @@ sub run {
   my ($self, $app) = @_;
   warn "MANAGER STARTED $$\n" if DEBUG;
 
-  # Manager signals
-  $SIG{INT} = $SIG{TERM} = $SIG{QUIT} = sub { $self->{_done} = 1 };
-  $SIG{CHLD} = sub {
-    while ((waitpid -1, WNOHANG) > 0) { $self->{_running} = 0 }
+  # Watch files and manage worker
+  $SIG{CHLD} = sub { $self->_reap };
+  $SIG{INT} = $SIG{TERM} = $SIG{QUIT} = sub {
+    $self->{_done} = 1;
+    kill 'TERM', $self->{_running} if $self->{_running};
   };
-
-  # Watch application
   unshift @{$self->watch}, $app;
-
-  # Manage
-  $self->_manage while 1;
+  $self->{_modified} = 1;
+  $self->_manage while !$self->{_done} || $self->{_running};
+  exit 0;
 }
 
 # "And so with two weeks left in the campaign, the question on everyone’s
@@ -67,17 +66,24 @@ sub _manage {
     if ($mtime > $STATS->{$file}) {
       warn "MODIFIED $file\n" if DEBUG;
       kill 'TERM', $self->{_running} if $self->{_running};
+      $self->{_modified} = 1;
       $STATS->{$file} = $mtime;
     }
   }
 
   # Housekeeping
-  exit 0 if !$self->{_running} && $self->{_done};
-  unless ($self->{_done}) {
-    $self->_spawn if !$self->{_running};
-    sleep 1;
+  $self->_reap;
+  delete $self->{_running} if $self->{_running} && !kill 0, $self->{_running};
+  $self->_spawn if !$self->{_running} && delete $self->{_modified};
+  sleep 1;
+}
+
+sub _reap {
+  my $self = shift;
+  while ((my $pid = waitpid -1, WNOHANG) > 0) {
+    warn "WORKER STOPPED $pid\n" if DEBUG;
+    delete $self->{_running};
   }
-  kill 'TERM', $self->{_running} if $self->{_done};
 }
 
 # "Morbo cannot read his teleprompter.
@@ -97,16 +103,17 @@ sub _spawn {
 
   # Worker
   warn "WORKER STARTED $$\n" if DEBUG;
-  $SIG{INT} = $SIG{TERM} = $SIG{CHLD} = 'DEFAULT';
+  $SIG{CHLD} = 'DEFAULT';
+  $SIG{INT} = $SIG{TERM} = $SIG{QUIT} = sub { $self->{_done} = 1 };
   my $daemon = Mojo::Server::Daemon->new;
   $daemon->load_app($self->watch->[0]);
   $daemon->silent(1) if $ENV{MORBO_REV} > 1;
   $daemon->listen($self->listen) if @{$self->listen};
   $daemon->prepare_ioloop;
   my $loop = $daemon->ioloop;
-  $loop->recurring(1 => sub { shift->stop unless kill 0, $manager });
+  $loop->recurring(
+    1 => sub { shift->stop if !kill(0, $manager) || $self->{_done} });
   $loop->start;
-
   exit 0;
 }
 
