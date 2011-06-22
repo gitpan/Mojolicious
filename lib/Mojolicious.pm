@@ -33,7 +33,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Smiling Face With Sunglasses';
-our $VERSION  = '1.46';
+our $VERSION  = '1.47';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -64,7 +64,7 @@ sub new {
       my $self = shift;
       my $tx   = Mojo::Transaction::HTTP->new;
       $self->plugins->run_hook(after_build_tx => ($tx, $self));
-      return $tx;
+      $tx;
     }
   );
 
@@ -91,7 +91,8 @@ sub new {
     if -w $home->rel_file('log');
 
   # Load default plugins
-  $self->plugin('agent_condition');
+  $self->plugin('callback_condition');
+  $self->plugin('header_condition');
   $self->plugin('default_helpers');
   $self->plugin('tag_helpers');
   $self->plugin('epl_renderer');
@@ -153,7 +154,7 @@ sub dispatch {
   return if $res->code;
   if (my $code = ($tx->req->error)[1]) { $res->code($code) }
   elsif ($tx->is_websocket) { $res->code(426) }
-  if ($self->routes->dispatch($c)) {
+  unless ($self->routes->dispatch($c)) {
     $c->render_not_found
       unless $res->code;
   }
@@ -765,9 +766,9 @@ examples.
 
 =over 2
 
-=item L<Mojolicious::Plugin::AgentCondition>
+=item L<Mojolicious::Plugin::CallbackCondition>
 
-Route condition for C<User-Agent> headers.
+Very versatile route condition for arbitrary callbacks.
 
 =item L<Mojolicious::Plugin::Charset>
 
@@ -942,6 +943,8 @@ Abhijit Menon-Sen
 Adam Kennedy
 
 Adriano Ferreira
+
+Al Newkirk
 
 Alex Salimon
 

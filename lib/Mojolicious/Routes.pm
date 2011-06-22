@@ -88,7 +88,7 @@ sub auto_render {
     1;
   } or $c->render_exception($@);
 
-  undef;
+  1;
 }
 
 sub bridge { shift->route(@_)->inline(1) }
@@ -119,7 +119,7 @@ sub dispatch {
 
   # Cached
   my $cache = $self->cache;
-  if (my $cached = $cache->get("$method:$path:$websocket")) {
+  if ($cache && (my $cached = $cache->get("$method:$path:$websocket"))) {
     $m->root($self);
     $m->stack($cached->{stack});
     $m->captures($cached->{captures});
@@ -131,7 +131,7 @@ sub dispatch {
     $m->match($self, $c);
 
     # Endpoint found
-    if (my $endpoint = $m->endpoint) {
+    if ($cache && (my $endpoint = $m->endpoint)) {
 
       # Cache routes without conditions
       $cache->set(
@@ -145,10 +145,10 @@ sub dispatch {
   }
 
   # No match
-  return 1 unless $m && @{$m->stack};
+  return unless $m && @{$m->stack};
 
   # Walk the stack
-  return 1 if $self->_walk_stack($c);
+  return if $self->_walk_stack($c);
 
   # Render
   $self->auto_render($c);
@@ -675,6 +675,10 @@ The children of this routes object, used for nesting routes.
 Routing cache, by default a L<Mojo::Cache> object.
 Note that this attribute is EXPERIMENTAL and might change without warning!
 
+  $r->cache(0);
+
+Route caching can also be disabled with a false value.
+
 =head2 C<conditions>
 
   my $conditions  = $r->conditions;
@@ -824,7 +828,7 @@ application embedding.
 
 =head2 C<dispatch>
 
-  my $e = $r->dispatch(Mojolicious::Controller->new);
+  my $success = $r->dispatch(Mojolicious::Controller->new);
 
 Match routes and dispatch.
 

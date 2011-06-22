@@ -77,7 +77,7 @@ lib/Mojolicious/Guides/Rendering.pod
 lib/Mojolicious/Guides/Routing.pod
 lib/Mojolicious/Lite.pm
 lib/Mojolicious/Plugin.pm
-lib/Mojolicious/Plugin/AgentCondition.pm
+lib/Mojolicious/Plugin/CallbackCondition.pm
 lib/Mojolicious/Plugin/Charset.pm
 lib/Mojolicious/Plugin/Config.pm
 lib/Mojolicious/Plugin/DefaultHelpers.pm

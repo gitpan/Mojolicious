@@ -154,9 +154,6 @@ sub on_finish {
   $self->tx->on_finish(sub { shift and $self->$cb(@_) });
 }
 
-# "Stop being such a spineless jellyfish!
-#  You know full well I'm more closely related to the sea cucumber.
-#  Not where it counts."
 sub on_message {
   my $self = shift;
 
@@ -255,11 +252,7 @@ sub render {
     $app->plugins->run_hook_reverse(before_render => $self, $args);
   }
   my ($output, $type) = $app->renderer->render($self, $args);
-
-  # Failed
   return unless defined $output;
-
-  # Partial
   return $output if $args->{partial};
 
   # Prepare response
@@ -269,7 +262,6 @@ sub render {
   $headers->content_type($type) unless $headers->content_type;
   $self->rendered($stash->{status});
 
-  # Success
   1;
 }
 
@@ -436,11 +428,16 @@ sub render_partial {
 
 sub render_static {
   my ($self, $file) = @_;
+
   my $app = $self->app;
-  $app->static->serve($self, $file)
-    and $app->log->debug(
-    qq/Static file "$file" not found, public directory missing?/);
+  unless ($app->static->serve($self, $file)) {
+    $app->log->debug(
+      qq/Static file "$file" not found, public directory missing?/);
+    return;
+  }
   $self->rendered;
+
+  1;
 }
 
 sub render_text { shift->render(text => shift, @_) }
@@ -875,8 +872,8 @@ Same as C<render> but returns the rendered result.
 
 =head2 C<render_static>
 
-  $c->render_static('images/logo.png');
-  $c->render_static('../lib/MyApp.pm');
+  my $success = $c->render_static('images/logo.png');
+  my $success = $c->render_static('../lib/MyApp.pm');
 
 Render a static file using L<Mojolicious::Static> relative to the
 C<public> directory of your application.
@@ -895,8 +892,8 @@ C<text/html;charset=UTF-8> by default.
 
 =head2 C<rendered>
 
-  $c->rendered;
-  $c->rendered(302);
+  $c = $c->rendered;
+  $c = $c->rendered(302);
 
 Finalize response and run C<after_dispatch> plugin hook.
 
