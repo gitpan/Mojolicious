@@ -33,7 +33,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Smiling Face With Sunglasses';
-our $VERSION  = '1.47';
+our $VERSION  = '1.48';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -183,8 +183,7 @@ sub handler {
   }
 
   # Delayed
-  $self->log->debug(
-    'Waiting for delayed response, forgot to render or resume?')
+  $self->log->debug('Nothing has been rendered, assuming delayed response.')
     unless $stash->{'mojo.rendered'} || $tx->is_writing;
 }
 
