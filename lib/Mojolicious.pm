@@ -33,7 +33,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Smiling Face With Sunglasses';
-our $VERSION  = '1.48';
+our $VERSION  = '1.49';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -323,7 +323,7 @@ Fresh code based upon years of experience developing L<Catalyst>.
 
 =head2 Installation
 
-All you need is a oneliner.
+All you need is a oneliner, it takes less than a minute.
 
   sudo sh -c "curl -L cpanmin.us | perl - Mojolicious"
 
@@ -333,7 +333,7 @@ These three lines are a whole web application.
 
   use Mojolicious::Lite;
 
-  get '/' => sub { shift->render_text('Hello World!') };
+  get '/' => {text => 'Hello World!'};
 
   app->start;
 
@@ -353,7 +353,10 @@ Web development for humans, making hard things possible and everything fun.
   use Mojolicious::Lite;
 
   # Simple plain text response
-  get '/' => sub { shift->render_text('Hello World!') };
+  get '/' => sub {
+    my $self = shift;
+    $self->render_text('Hello World!');
+  };
 
   # Route associating the "/time" URL to template in DATA section
   get '/time' => 'clock';
@@ -399,10 +402,13 @@ A controller collects several actions together.
   use Mojo::Base 'Mojolicious::Controller';
 
   # Plain text response
-  sub hello { shift->render_text('Hello World!') }
+  sub hello {
+    my $self = shift;
+    $self->render_text('Hello World!');
+  }
 
   # Render external template "templates/example/clock.html.ep"
-  sub clock { shift->render }
+  sub clock { }
 
   # RESTful web service sending JSON responses
   sub restful {
@@ -841,6 +847,15 @@ startup.
   sub startup {
     my $self = shift;
   }
+
+=head1 HELPERS
+
+In addition to the attributes and methods above you can also call helpers on
+instances of L<Mojolicious>.
+This includes all helpers from L<Mojolicious::Plugin::DefaultHelpers> and
+L<Mojolicious::Plugin::TagHelpers>.
+
+  $app->log->debug($app->dumper({foo => 'bar'}));
 
 =head1 SUPPORT
 

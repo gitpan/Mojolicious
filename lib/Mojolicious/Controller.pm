@@ -154,6 +154,8 @@ sub on_finish {
   $self->tx->on_finish(sub { shift and $self->$cb(@_) });
 }
 
+# "I like being a women.
+#  Now when I say something stupid, everyone laughs and buys me things."
 sub on_message {
   my $self = shift;
 
@@ -265,6 +267,7 @@ sub render {
   1;
 }
 
+# "She's built like a steakhouse, but she handles like a bistro!"
 sub render_content {
   my $self    = shift;
   my $name    = shift;
@@ -469,6 +472,7 @@ sub rendered {
   $self;
 }
 
+# "A three month calendar? What is this, Mercury?"
 sub req { shift->tx->req }
 sub res { shift->tx->res }
 
@@ -622,6 +626,11 @@ sub url_for {
   else {
     my ($p, $ws) = $match->path_for($target, @_);
     $path->parse($p) if $p;
+
+    # Fix trailing slash
+    $path->trailing_slash(1)
+      if (!$target || $target eq 'current')
+      && $req->url->path->trailing_slash;
 
     # Fix scheme for WebSockets
     $base->scheme(($base->scheme || '') eq 'https' ? 'wss' : 'ws') if $ws;
@@ -982,6 +991,12 @@ A L<Mojo::UserAgent> prepared for the current environment.
 
 Generate a portable L<Mojo::URL> object with base for a route, path or URL.
 
+  # "/perldoc" if application is deployed under "/"
+  print $c->url_for('/perldoc');
+
+  # "/myapp/perldoc" if application is deployed under "/myapp"
+  print $c->url_for('/perldoc');
+
 =head2 C<write>
 
   $c->write;
@@ -1037,6 +1052,16 @@ You can call C<finish> at any time to end the stream.
   2
   o!
   0
+
+=head1 HELPERS
+
+In addition to the attributes and methods above you can also call helpers on
+instances of L<Mojolicious::Controller>.
+This includes all helpers from L<Mojolicious::Plugin::DefaultHelpers> and
+L<Mojolicious::Plugin::TagHelpers>.
+
+  $c->layout('green');
+  $c->title('Welcome!');
 
 =head1 SEE ALSO
 

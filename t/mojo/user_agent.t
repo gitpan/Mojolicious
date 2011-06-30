@@ -9,7 +9,7 @@ BEGIN { $ENV{MOJO_NO_IPV6} = $ENV{MOJO_POLL} = 1 }
 use Test::More;
 plan skip_all => 'Windows is too fragile for this test!'
   if $^O eq 'MSWin32' || $^O =~ /cygwin/;
-plan tests => 68;
+plan tests => 70;
 
 use_ok 'Mojo::UserAgent';
 
@@ -184,7 +184,7 @@ is $tx->res->code, 200,      'right status';
 is $tx->res->body, 'works!', 'right content';
 
 # Close connection (bypassing safety net)
-Mojo::IOLoop->singleton->_drop_immediately($last);
+Mojo::IOLoop->singleton->_drop($last);
 
 # GET / (mock server closed connection)
 $tx = $ua->get("http://localhost:$port/mock");
@@ -201,7 +201,7 @@ is $tx->res->code, 200,      'right status';
 is $tx->res->body, 'works!', 'right content';
 
 # Close connection (bypassing safety net)
-Mojo::IOLoop->singleton->_drop_immediately($last);
+Mojo::IOLoop->singleton->_drop($last);
 
 # GET / (mock server closed connection)
 $tx = $ua->get("http://localhost:$port/mock");
@@ -294,3 +294,13 @@ $ua->get(
 );
 Mojo::IOLoop->start;
 is_deeply \@kept_alive, [1, 1], 'connections kept alive';
+
+# Premature connection close
+$port = Mojo::IOLoop->generate_port;
+$id   = Mojo::IOLoop->listen(
+  port      => $port,
+  on_accept => sub { shift->drop(shift) }
+);
+$tx = $ua->get("http://localhost:$port/");
+ok !$tx->success, 'not successful';
+is $tx->error, 'Premature connection close.', 'right error';

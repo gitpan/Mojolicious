@@ -6,17 +6,27 @@ use warnings;
 # Disable IPv6, epoll and kqueue
 BEGIN { $ENV{MOJO_NO_IPV6} = $ENV{MOJO_POLL} = 1 }
 
-use Test::More tests => 11;
-
-use_ok 'Mojo::IOLoop';
-
-use IO::Handle;
+use Test::More tests => 14;
 
 # "Marge, you being a cop makes you the man!
 #  Which makes me the woman, and I have no interest in that,
 #  besides occasionally wearing the underwear,
 #  which as we discussed, is strictly a comfort thing."
+use_ok 'Mojo::IOLoop';
+
+use IO::Handle;
+
+# Custom watcher
+package MyWatcher;
+use Mojo::Base 'Mojo::IOWatcher';
+
+package main;
+Mojo::IOLoop->singleton->iowatcher(MyWatcher->new);
+
+# Watcher inheritance
 my $loop = Mojo::IOLoop->new;
+Mojo::IOLoop->iowatcher(MyWatcher->new);
+is ref $loop->iowatcher, 'MyWatcher', 'right class';
 
 # Readonly handle
 my $ro = IO::Handle->new;
@@ -122,5 +132,33 @@ $idle = 0;
 Mojo::IOLoop->idle(sub { Mojo::IOLoop->stop if $idle++ });
 Mojo::IOLoop->start;
 is $idle, 2, 'two idle ticks';
+
+# Dropped listen socket
+$port = Mojo::IOLoop->generate_port;
+$id = $loop->listen(port => $port);
+$loop->connect(
+  address    => 'localhost',
+  port       => $port,
+  on_connect => sub {
+    my $loop = shift;
+    $loop->drop($id);
+    $loop->stop;
+  }
+);
+$loop->start;
+$error = undef;
+my $connected;
+$loop->connect(
+  address    => 'localhost',
+  port       => $port,
+  on_connect => sub { $connected = 1 },
+  on_error   => sub {
+    shift->stop;
+    $error = pop;
+  }
+);
+$loop->start;
+ok $error, 'has error';
+ok !$connected, 'not connected';
 
 __DATA__

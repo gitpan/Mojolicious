@@ -11,7 +11,7 @@ BEGIN {
   $ENV{MOJO_MODE} = 'development';
 }
 
-use Test::More tests => 823;
+use Test::More tests => 886;
 
 # Pollution
 123 =~ m/(\d+)/;
@@ -62,7 +62,7 @@ app->renderer->add_handler(dead => sub { die 'renderer works!' });
 # GET /☃
 get '/☃' => sub {
   my $self = shift;
-  $self->render_text($self->url_for);
+  $self->render_text($self->url_for . $self->url_for('current'));
 };
 
 # GET /unicode/a%E4b
@@ -89,6 +89,26 @@ get '/conditional' => (
 
 # GET /
 get '/' => 'root';
+
+# GET /alternatives/☃
+# GET /alternatives/♥
+get '/alternatives/:char' => [char => [qw/☃ ♥/]] => sub {
+  my $self = shift;
+  $self->render_text($self->url_for);
+};
+
+# GET /alterformat
+# GET /alterformat.json
+get '/alterformat' => [format => ['json']] => {format => 'json'} => sub {
+  my $self = shift;
+  $self->render_text($self->stash('format'));
+};
+
+# GET /noformat
+get '/noformat' => [format => undef] => {format => 'xml'} => sub {
+  my $self = shift;
+  $self->render_text($self->stash('format') . $self->url_for);
+};
 
 # DELETE /
 del sub { shift->render(text => 'Hello!') };
@@ -234,8 +254,11 @@ get '/finished' => sub {
 get '/привет/мир' =>
   sub { shift->render(text => 'привет мир') };
 
-# GET /root
+# GET /root.html
 get '/root.html' => 'root_path';
+
+# GET /root
+get '/root' => sub { shift->render_text('root fallback!') };
 
 # GET /template.txt
 get '/template.txt' => 'template';
@@ -743,7 +766,10 @@ $tua->ioloop->timer(
 );
 
 # GET /☃
-$t->get_ok('/☃')->status_is(200)->content_is('/%E2%98%83');
+$t->get_ok('/☃')->status_is(200)->content_is('/%E2%98%83/%E2%98%83');
+
+# GET /☃ (with trailing slash)
+$t->get_ok('/☃/')->status_is(200)->content_is('/%E2%98%83//%E2%98%83/');
 
 # GET /unicode/a%E4b
 $t->get_ok('/unicode/a%E4b')->status_is(200)->content_is('/unicode/a%E4b');
@@ -788,6 +814,59 @@ $t->delete_ok('/')->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
 # POST /
 $t->post_ok('/')->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is('Bye!');
+
+# GET /alternatives/☃
+$t->get_ok('/alternatives/☃')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is('/alternatives/%E2%98%83');
+
+# GET /alternatives/♥
+$t->get_ok('/alternatives/♥')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is('/alternatives/%E2%99%A5');
+
+# GET /alternatives/☃23 (invalid alternative)
+$t->get_ok('/alternatives/☃23')->status_is(404)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is("Oops!\n");
+
+# GET /alternatives (invalid alternative)
+$t->get_ok('/alternatives')->status_is(404)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is("Oops!\n");
+
+# GET /alternatives/test (invalid alternative)
+$t->get_ok('/alternatives/test')->status_is(404)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is("Oops!\n");
+
+# GET /alterformat
+$t->get_ok('/alterformat')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is('json');
+
+# GET /alterformat.json
+$t->get_ok('/alterformat.json')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is('json');
+
+# GET /alterformat.html (invalid format)
+$t->get_ok('/alterformat.html')->status_is(404)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is("Oops!\n");
+
+# GET /noformat
+$t->get_ok('/noformat')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is('xml/noformat');
+
+# GET /noformat.xml
+$t->get_ok('/noformat.xml')->status_is(404)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is("Oops!\n");
 
 # POST /multipart/form ("application/x-www-form-urlencoded")
 $t->post_form_ok('/multipart/form', {test => [1 .. 5]})->status_is(200)
@@ -1005,10 +1084,21 @@ $t->get_ok('/привет/мир')->status_is(200)
   ->content_type_is('text/html;charset=UTF-8')
   ->content_is('привет мир');
 
-# GET /root
+# GET /root.html
 $t->get_ok('/root.html')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is("/\n");
+
+# GET /root (fallback route without format)
+$t->get_ok('/root')->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is('root fallback!');
+
+# GET /root.txt (fallback route without format)
+$t->get_ok('/root.txt')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is('root fallback!');
 
 # GET /.html
 $t->get_ok('/.html')->status_is(200)

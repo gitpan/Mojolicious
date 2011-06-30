@@ -2,19 +2,12 @@ package Mojo::UserAgent;
 use Mojo::Base -base;
 
 use Carp 'croak';
-use Mojo::Asset::File;
-use Mojo::Asset::Memory;
-use Mojo::Content::MultiPart;
-use Mojo::Content::Single;
 use Mojo::CookieJar;
 use Mojo::IOLoop;
 use Mojo::Log;
-use Mojo::Parameters;
 use Mojo::Server::Daemon;
-use Mojo::Transaction::HTTP;
 use Mojo::Transaction::WebSocket;
-use Mojo::Util qw/encode url_escape/;
-use Mojo::URL;
+use Mojo::Transactor;
 use Scalar::Util 'weaken';
 
 use constant DEBUG => $ENV{MOJO_USERAGENT_DEBUG} || 0;
@@ -30,186 +23,16 @@ has log                => sub { Mojo::Log->new };
 has max_connections    => 5;
 has max_redirects      => sub { $ENV{MOJO_MAX_REDIRECTS} || 0 };
 has name               => 'Mojolicious (Perl)';
-has websocket_timeout  => 300;
+has transactor => sub { Mojo::Transactor->new };
+has websocket_timeout => 300;
 
 # Make sure we leave a clean ioloop behind
 sub DESTROY { shift->_cleanup }
 
 # "Ah, alcohol and night-swimming. It's a winning combination."
-sub build_form_tx {
-  my $self = shift;
-  my $url  = shift;
-
-  # Callback
-  my $cb = pop @_ if ref $_[-1] && ref $_[-1] eq 'CODE';
-
-  # Form
-  my $encoding = shift;
-  my $form = ref $encoding ? $encoding : shift;
-  $encoding = undef if ref $encoding;
-
-  # Parameters
-  my $params = Mojo::Parameters->new;
-  $params->charset($encoding) if defined $encoding;
-  my $multipart;
-  for my $name (sort keys %$form) {
-
-    # Array
-    if (ref $form->{$name} eq 'ARRAY') {
-      $params->append($name, $_) for @{$form->{$name}};
-    }
-
-    # Hash
-    elsif (ref $form->{$name} eq 'HASH') {
-      my $hash = $form->{$name};
-
-      # Enforce "multipart/form-data"
-      $multipart = 1;
-
-      # File
-      if (my $file = $hash->{file}) {
-
-        # Upgrade
-        $file = $hash->{file} = Mojo::Asset::File->new(path => $file)
-          unless ref $file;
-
-        # Filename
-        $hash->{filename} ||= $file->path if $file->can('path');
-      }
-
-      # Memory
-      elsif (defined(my $content = delete $hash->{content})) {
-        $hash->{file} = Mojo::Asset::Memory->new->add_chunk($content);
-      }
-
-      $hash->{'Content-Type'} ||= 'application/octet-stream';
-      push @{$params->params}, $name, $hash;
-    }
-
-    # Single value
-    else { $params->append($name, $form->{$name}) }
-  }
-
-  # New transaction
-  my $tx      = $self->build_tx(POST => $url);
-  my $req     = $tx->req;
-  my $headers = $req->headers;
-  $headers->from_hash(ref $_[0] eq 'HASH' ? $_[0] : {@_});
-
-  # Multipart
-  $headers->content_type('multipart/form-data') if $multipart;
-  my $type = $headers->content_type || '';
-  if ($type eq 'multipart/form-data') {
-    my $form = $params->to_hash;
-
-    # Parts
-    my @parts;
-    foreach my $name (sort keys %$form) {
-      my $part = Mojo::Content::Single->new;
-      my $h    = $part->headers;
-      my $f    = $form->{$name};
-
-      # File
-      my $filename;
-      if (ref $f eq 'HASH') {
-        $filename = delete $f->{filename} || $name;
-        encode $encoding, $filename if $encoding;
-        url_escape $filename, $Mojo::URL::UNRESERVED;
-        $part->asset(delete $f->{file});
-        $h->from_hash($f);
-        push @parts, $part;
-      }
-
-      # Fields
-      else {
-        my $type = 'text/plain';
-        $type .= qq/;charset=$encoding/ if $encoding;
-        $h->content_type($type);
-
-        # Values
-        for my $value (ref $f ? @$f : ($f)) {
-          $part = Mojo::Content::Single->new(headers => $h);
-          encode $encoding, $value if $encoding;
-          $part->asset->add_chunk($value);
-          push @parts, $part;
-        }
-      }
-
-      # Content-Disposition
-      encode $encoding, $name if $encoding;
-      url_escape $name, $Mojo::URL::UNRESERVED;
-      my $disposition = qq/form-data; name="$name"/;
-      $disposition .= qq/; filename="$filename"/ if $filename;
-      $h->content_disposition($disposition);
-    }
-
-    # Multipart content
-    my $content = Mojo::Content::MultiPart->new;
-    $headers->content_type('multipart/form-data');
-    $content->headers($headers);
-    $content->parts(\@parts);
-
-    # Add content to transaction
-    $req->content($content);
-  }
-
-  # Urlencoded
-  else {
-    $headers->content_type('application/x-www-form-urlencoded');
-    $req->body($params->to_string);
-  }
-
-  return $tx unless wantarray;
-  $tx, $cb;
-}
-
-# "Homer, it's easy to criticize.
-#  Fun, too."
-sub build_tx {
-  my $self = shift;
-
-  # New transaction
-  my $tx  = Mojo::Transaction::HTTP->new;
-  my $req = $tx->req;
-  $req->method(shift);
-  my $url = shift;
-  $url = "http://$url" unless $url =~ /^\/|\:\/\//;
-  $req->url->parse($url);
-
-  # Callback
-  my $cb = pop @_ if ref $_[-1] && ref $_[-1] eq 'CODE';
-
-  # Body
-  $req->body(pop @_)
-    if @_ & 1 == 1 && ref $_[0] ne 'HASH' || ref $_[-2] eq 'HASH';
-
-  # Headers
-  $req->headers->from_hash(ref $_[0] eq 'HASH' ? $_[0] : {@_});
-
-  return $tx unless wantarray;
-  $tx, $cb;
-}
-
-sub build_websocket_tx {
-  my $self = shift;
-
-  # New WebSocket
-  my ($tx, $cb) = $self->build_tx(GET => @_);
-  my $req = $tx->req;
-  my $url = $req->url;
-  my $abs = $url->to_abs;
-  if (my $scheme = $abs->scheme) {
-    $scheme = $scheme eq 'wss' ? 'https' : 'http';
-    $req->url($abs->scheme($scheme));
-  }
-
-  # Handshake
-  Mojo::Transaction::WebSocket->new(handshake => $tx, masked => 1)
-    ->client_handshake;
-
-  return $tx unless wantarray;
-  $tx, $cb;
-}
+sub build_form_tx      { shift->transactor->form(@_) }
+sub build_tx           { shift->transactor->tx(@_) }
+sub build_websocket_tx { shift->transactor->websocket(@_) }
 
 # "The only thing I asked you to do for this party was put on clothes,
 #  and you didn't do it."
@@ -274,8 +97,6 @@ sub put {
   $self->start($self->build_tx('PUT', @_));
 }
 
-# "Wow, Barney. You brought a whole beer keg.
-#  Yeah... where do I fill it up?"
 sub start {
   my ($self, $tx, $cb) = @_;
 
@@ -290,7 +111,7 @@ sub start {
     $self->_switch_non_blocking unless $self->{_nb};
 
     # Start
-    return $self->_start_tx($tx, $cb);
+    return $self->_start($tx, $cb);
   }
 
   # Switch to blocking
@@ -298,7 +119,7 @@ sub start {
   $self->_switch_blocking if $self->{_nb};
 
   # Quick start
-  $self->_start_tx($tx, sub { $tx = $_[1] });
+  $self->_start($tx, sub { $tx = $_[1] });
 
   # Start loop
   $loop->start;
@@ -347,6 +168,8 @@ sub websocket {
   $self->start($self->build_websocket_tx(@_));
 }
 
+# "Homer, it's easy to criticize.
+#  Fun, too."
 sub _cache {
   my ($self, $name, $id) = @_;
 
@@ -421,7 +244,7 @@ sub _connect {
   weaken $self;
   my $loop = $self->{_loop};
   my $id   = $tx->connection;
-  my ($scheme, $address, $port) = $self->_tx_info($tx);
+  my ($scheme, $address, $port) = $self->_info($tx);
   $id ||= $self->_cache("$scheme:$address:$port");
   if ($id && !ref $id) {
     warn "KEEP ALIVE CONNECTION ($scheme:$address:$port)\n" if DEBUG;
@@ -437,7 +260,7 @@ sub _connect {
     unless (($tx->req->method || '') eq 'CONNECT') {
 
       # CONNECT request to proxy required
-      return if $self->_connect_proxy($tx, $cb);
+      return if $self->_proxy_connect($tx, $cb);
     }
 
     # Connect
@@ -460,62 +283,6 @@ sub _connect {
   $loop->on_read($id => sub { $self->_read(@_) });
 
   $id;
-}
-
-# "Hey, Weener Boy... where do you think you're going?"
-sub _connect_proxy {
-  my ($self, $old, $cb) = @_;
-
-  # No proxy
-  my $req = $old->req;
-  return unless my $proxy = $req->proxy;
-
-  # WebSocket and/or HTTPS
-  my $url = $req->url;
-  return
-    unless ($req->headers->upgrade || '') eq 'websocket'
-    || ($url->scheme || '') eq 'https';
-
-  # CONNECT request
-  my $new = $self->build_tx(CONNECT => $url->clone);
-  $new->req->proxy($proxy);
-
-  # Start CONNECT request
-  $self->_start_tx(
-    $new => sub {
-      my ($self, $tx) = @_;
-
-      # CONNECT failed
-      unless (($tx->res->code || '') eq '200') {
-        $old->req->error('Proxy connection failed.');
-        $self->_finish_tx($old, $cb);
-        return;
-      }
-
-      # TLS upgrade
-      if ($tx->req->url->scheme eq 'https') {
-
-        # Connection from keep alive cache
-        return unless my $old_id = $tx->connection;
-
-        # Start TLS
-        my $new_id = $self->{_loop}->start_tls($old_id);
-
-        # Cleanup
-        $old->req->proxy(undef);
-        delete $self->{_cs}->{$old_id};
-        $tx->connection($new_id);
-      }
-
-      # Share connection
-      $old->connection($tx->connection);
-
-      # Start real transaction
-      $self->_start_tx($old, $cb);
-    }
-  );
-
-  1;
 }
 
 # "I don't mind being called a liar when I'm lying, or about to lie,
@@ -554,7 +321,7 @@ sub _drop {
   if (!$close && $tx && $tx->keep_alive && !$tx->error) {
 
     # Keep non-CONNECTed connection alive
-    $self->_cache(join(':', $self->_tx_info($tx)), $id)
+    $self->_cache(join(':', $self->_info($tx)), $id)
       unless (($tx->req->method || '') =~ /^connect$/i
       && ($tx->res->code || '') eq '200');
 
@@ -582,13 +349,21 @@ sub _error {
 
 # "Oh, I'm in no condition to drive. Wait a minute.
 #  I don't have to listen to myself. I'm drunk."
-sub _finish_tx {
-  my ($self, $tx, $cb) = @_;
+sub _finish {
+  my ($self, $tx, $cb, $close) = @_;
 
-  # 400/500
+  # Common errors
   my $res = $tx->res;
-  $res->error($res->message, $res->code)
-    if $res->is_status_class(400) || $res->is_status_class(500);
+  unless ($res->error) {
+
+    # Premature connection close
+    if ($close && !$res->code) { $res->error('Premature connection close.') }
+
+    # 400/500
+    elsif ($res->is_status_class(400) || $res->is_status_class(500)) {
+      $res->error($res->message, $res->code);
+    }
+  }
 
   # Callback
   return unless $cb;
@@ -616,7 +391,7 @@ sub _handle {
   elsif ($old && (my $new = $self->_upgrade($id))) {
 
     # Finish transaction
-    $self->_finish_tx($new, $c->{cb});
+    $self->_finish($new, $c->{cb});
 
     # Parse leftovers
     $new->client_read($old->res->leftovers);
@@ -638,12 +413,78 @@ sub _handle {
     $self->{_processing} -= 1;
 
     # Redirect or callback
-    $self->_finish_tx($new || $old, $c->{cb})
+    $self->_finish($new || $old, $c->{cb}, $close)
       unless $self->_redirect($c, $old);
   }
 
   # Stop loop
   $self->{_loop}->stop if !$self->{_nb} && !$self->{_processing};
+}
+
+sub _info {
+  my ($self, $tx) = @_;
+
+  # Proxy info
+  my $req    = $tx->req;
+  my $url    = $req->url;
+  my $scheme = $url->scheme || 'http';
+  my $host   = $url->ihost;
+  my $port   = $url->port;
+  if (my $proxy = $req->proxy) {
+    $scheme = $proxy->scheme;
+    $host   = $proxy->ihost;
+    $port   = $proxy->port;
+  }
+
+  # Default port
+  $port ||= $scheme eq 'https' ? 443 : 80;
+
+  ($scheme, $host, $port);
+}
+
+# "Hey, Weener Boy... where do you think you're going?"
+sub _proxy_connect {
+  my ($self, $old, $cb) = @_;
+
+  # CONNECT request
+  return unless my $new = $self->transactor->proxy_connect($old);
+
+  # Start CONNECT request
+  $self->_start(
+    $new => sub {
+      my ($self, $tx) = @_;
+
+      # CONNECT failed
+      unless (($tx->res->code || '') eq '200') {
+        $old->req->error('Proxy connection failed.');
+        $self->_finish($old, $cb);
+        return;
+      }
+
+      # TLS upgrade
+      if ($tx->req->url->scheme eq 'https') {
+
+        # Connection from keep alive cache
+        return unless my $old_id = $tx->connection;
+
+        # Start TLS
+        my $new_id = $self->{_loop}->start_tls($old_id);
+
+        # Cleanup
+        $old->req->proxy(undef);
+        delete $self->{_cs}->{$old_id};
+        $tx->connection($new_id);
+      }
+
+      # Share connection
+      $old->connection($tx->connection);
+
+      # Start real transaction
+      $self->_start($old, $cb);
+    }
+  );
+
+  1;
 }
 
 # "Have you ever seen that Blue Man Group? Total ripoff of the Smurfs.
@@ -675,47 +516,26 @@ sub _read {
 sub _redirect {
   my ($self, $c, $old) = @_;
 
-  # Code
-  my $res = $old->res;
-  return unless $res->is_status_class('300');
-  return if $res->code == 305;
-
-  # Location
-  return unless my $location = $res->headers->location;
-  $location = Mojo::URL->new($location);
-
-  # Fix broken location without authority and/or scheme
-  my $req = $old->req;
-  my $url = $req->url;
-  $location->authority($url->authority) unless $location->authority;
-  $location->scheme($url->scheme)       unless $location->scheme;
-
-  # Method
-  my $method = $req->method;
-  $method = 'GET' unless $method =~ /^GET|HEAD$/i;
+  # Build followup transaction
+  return unless my $new = $self->transactor->redirect($old);
 
   # Max redirects
-  my $r = $c->{redirects} || 0;
+  my $redirects = $c->{redirects} || 0;
   my $max = $self->max_redirects;
-  return unless $r < $max;
-
-  # New transaction
-  my $new = Mojo::Transaction::HTTP->new;
-  $new->req->method($method)->url($location);
-  $new->previous($old);
+  return unless $redirects < $max;
 
   # Start redirected request
-  return 1 unless my $new_id = $self->_start_tx($new, $c->{cb});
+  return 1 unless my $new_id = $self->_start($new, $c->{cb});
 
   # Create new connection
-  $self->{_cs}->{$new_id}->{redirects} = $r + 1;
+  $self->{_cs}->{$new_id}->{redirects} = $redirects + 1;
 
   # Redirecting
   1;
 }
 
 # "It's great! We can do *anything* now that Science has invented Magic."
-sub _start_tx {
+sub _start {
   my ($self, $tx, $cb) = @_;
 
   # Embedded server
@@ -800,27 +620,6 @@ sub _switch_non_blocking {
   $self->_cleanup;
   $self->{_loop} = Mojo::IOLoop->singleton;
   $self->{_nb}   = 1;
-}
-
-sub _tx_info {
-  my ($self, $tx) = @_;
-
-  # Proxy info
-  my $req    = $tx->req;
-  my $url    = $req->url;
-  my $scheme = $url->scheme || 'http';
-  my $host   = $url->ihost;
-  my $port   = $url->port;
-  if (my $proxy = $req->proxy) {
-    $scheme = $proxy->scheme;
-    $host   = $proxy->ihost;
-    $port   = $proxy->port;
-  }
-
-  # Default port
-  $port ||= $scheme eq 'https' ? 443 : 80;
-
-  ($scheme, $host, $port);
 }
 
 # "Once the government approves something, it's no longer immoral!"
@@ -1065,6 +864,14 @@ redirects.
     $tx->req->headers->header('X-Bender', 'Bite my shiny metal ass!');
   });
 
+=head2 C<transactor>
+
+  my $t = $ua->transactor;
+  $ua   = $ua->transactor(Mojo::Transactor->new);
+
+Transaction builder, by default a L<Mojo::Transactor> object.
+Note that this attribute is EXPERIMENTAL and might change without warning!
+
 =head2 C<websocket_timeout>
 
   my $websocket_timeout = $ua->websocket_timeout;
@@ -1081,69 +888,20 @@ following new ones.
 =head2 C<build_form_tx>
 
   my $tx = $ua->build_form_tx('http://kraih.com/foo' => {test => 123});
-  my $tx = $ua->build_form_tx(
-    'http://kraih.com/foo',
-    'UTF-8',
-    {test => 123}
-  );
-  my $tx = $ua->build_form_tx(
-    'http://kraih.com/foo',
-    {test => 123},
-    {Accept => '*/*'}
-  );
-  my $tx = $ua->build_form_tx(
-    'http://kraih.com/foo',
-    'UTF-8',
-    {test => 123},
-    {Accept => '*/*'}
-  );
-  my $tx = $ua->build_form_tx(
-    'http://kraih.com/foo',
-    {file => {file => '/foo/bar.txt'}}
-  );
-  my $tx = $ua->build_form_tx(
-    'http://kraih.com/foo',
-    {file => {content => 'lalala'}}
-  );
-  my $tx = $ua->build_form_tx(
-    'http://kraih.com/foo',
-    {myzip => {file => $asset, filename => 'foo.zip'}}
-  );
 
-Versatile L<Mojo::Transaction::HTTP> builder for forms.
-
-  my $tx = $ua->build_form_tx('http://kraih.com/foo' => {test => 123});
-  $tx->res->body(sub { print $_[1] });
-  $ua->start($tx);
+Alias for the C<form> method in L<Mojo::Transactor>.
 
 =head2 C<build_tx>
 
   my $tx = $ua->build_tx(GET => 'mojolicio.us');
-  my $tx = $ua->build_tx(POST => 'http://mojolicio.us');
-  my $tx = $ua->build_tx(GET => 'http://kraih.com' => {Accept => '*/*'});
-  my $tx = $ua->build_tx(
-    POST => 'http://kraih.com' => {{Accept => '*/*'} => 'Hi!'
-  );
 
-Versatile general purpose L<Mojo::Transaction::HTTP> builder.
-
-  # Streaming response
-  my $tx = $ua->build_tx(GET => 'http://mojolicio.us');
-  $tx->res->body(sub { print $_[1] });
-  $ua->start($tx);
-
-  # Custom socket
-  my $tx = $ua->build_tx(GET => 'http://mojolicio.us');
-  $tx->connection($socket);
-  $ua->start($tx);
+Alias for the C<tx> method in L<Mojo::Transactor>.
 
 =head2 C<build_websocket_tx>
 
   my $tx = $ua->build_websocket_tx('ws://localhost:3000');
 
-Versatile L<Mojo::Transaction::HTTP> builder for WebSocket handshakes.
-An upgrade to L<Mojo::Transaction::WebSocket> will happen automatically after
-a successful handshake is performed.
+Alias for the C<websocket> method in L<Mojo::Transactor>.
 
 =head2 C<delete>
 
