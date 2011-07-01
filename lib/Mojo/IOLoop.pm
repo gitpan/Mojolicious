@@ -122,8 +122,8 @@ our $LOOP;
 
 sub DESTROY {
   my $self = shift;
-  if (my $cert = $self->{_cert}) { unlink $cert if -w $cert }
-  if (my $key  = $self->{_key})  { unlink $key  if -w $key }
+  if (my $cert = $self->{cert}) { unlink $cert if -w $cert }
+  if (my $key  = $self->{key})  { unlink $key  if -w $key }
 }
 
 sub new {
@@ -163,7 +163,7 @@ sub connect {
     tls_key    => $args->{tls_key}
   };
   (my $id) = "$c" =~ /0x([\da-f]+)/;
-  $self->{_cs}->{$id} = $c;
+  $self->{cs}->{$id} = $c;
 
   # Register callbacks
   for my $name (qw/close error read/) {
@@ -192,7 +192,7 @@ sub connect {
 
 sub connection_timeout {
   my ($self, $id, $timeout) = @_;
-  return unless my $c = $self->{_cs}->{$id};
+  return unless my $c = $self->{cs}->{$id};
   $c->{timeout} = $timeout and return $self if $timeout;
   $c->{timeout};
 }
@@ -202,7 +202,7 @@ sub drop {
   $self = $self->singleton unless ref $self;
 
   # Drop connections gracefully
-  if (my $c = $self->{_cs}->{$id}) { return $c->{finish} = 1 }
+  if (my $c = $self->{cs}->{$id}) { return $c->{finish} = 1 }
 
   # Drop everything else right away
   $self->_drop($id);
@@ -225,17 +225,10 @@ sub generate_port {
   undef;
 }
 
-sub idle {
-  my ($self, $cb) = @_;
-  $self = $self->singleton unless ref $self;
-  weaken $self;
-  $self->iowatcher->idle(sub { $self->$cb(pop) });
-}
-
 sub is_running {
   my $self = shift;
   $self = $self->singleton unless ref $self;
-  $self->{_running};
+  $self->{running};
 }
 
 # "Fat Tony is a cancer on this fair city!
@@ -312,9 +305,9 @@ sub listen {
     on_read   => $args->{on_read},
   };
   (my $id) = "$c" =~ /0x([\da-f]+)/;
-  $self->{_listen}->{$id}      = $c;
-  $c->{handle}                 = $handle;
-  $self->{_reverse}->{$handle} = $id;
+  $self->{listen}->{$id}      = $c;
+  $c->{handle}                = $handle;
+  $self->{reverse}->{$handle} = $id;
 
   # TLS
   if ($args->{tls}) {
@@ -334,7 +327,7 @@ sub listen {
   }
 
   # Accept limit
-  $self->{_accepts} = $self->max_accepts if $self->max_accepts;
+  $self->{accepts} = $self->max_accepts if $self->max_accepts;
 
   $id;
 }
@@ -343,7 +336,7 @@ sub local_info {
   my ($self, $id) = @_;
 
   # UNIX domain socket info
-  return {} unless my $c      = $self->{_cs}->{$id};
+  return {} unless my $c      = $self->{cs}->{$id};
   return {} unless my $handle = $c->{handle};
   return {path => $handle->hostpath} if $handle->can('hostpath');
 
@@ -368,7 +361,7 @@ sub one_tick {
 
   # Housekeeping
   $self->_listening;
-  my $connections = $self->{_cs} ||= {};
+  my $connections = $self->{cs} ||= {};
   while (my ($id, $c) = each %$connections) {
 
     # Connection needs to be finished
@@ -394,7 +387,7 @@ sub one_tick {
 
 sub handle {
   my ($self, $id) = @_;
-  return unless my $c = $self->{_cs}->{$id};
+  return unless my $c = $self->{cs}->{$id};
   $c->{handle};
 }
 
@@ -402,7 +395,7 @@ sub remote_info {
   my ($self, $id) = @_;
 
   # UNIX domain socket info
-  return {} unless my $c      = $self->{_cs}->{$id};
+  return {} unless my $c      = $self->{cs}->{$id};
   return {} unless my $handle = $c->{handle};
   return {path => $handle->peerpath} if $handle->can('peerpath');
 
@@ -417,11 +410,11 @@ sub start {
   $self = $self->singleton unless ref $self;
 
   # Check if we are already running
-  return if $self->{_running};
-  $self->{_running} = 1;
+  return if $self->{running};
+  $self->{running} = 1;
 
   # Mainloop
-  $self->one_tick while $self->{_running};
+  $self->one_tick while $self->{running};
 
   $self;
 }
@@ -438,9 +431,9 @@ sub start_tls {
   }
 
   # Cleanup
-  $self->drop($id) and return unless my $c      = $self->{_cs}->{$id};
+  $self->drop($id) and return unless my $c      = $self->{cs}->{$id};
   $self->drop($id) and return unless my $handle = $c->{handle};
-  delete $self->{_reverse}->{$handle};
+  delete $self->{reverse}->{$handle};
   my $watcher = $self->iowatcher->remove($handle);
 
   # TLS upgrade
@@ -459,7 +452,7 @@ sub start_tls {
   $self->drop($id) and return
     unless my $new = IO::Socket::SSL->start_SSL($handle, %options);
   $c->{handle} = $new;
-  $self->{_reverse}->{$new} = $id;
+  $self->{reverse}->{$new} = $id;
   $c->{tls_connect} = 1;
   $watcher->add(
     $new,
@@ -473,12 +466,12 @@ sub start_tls {
 sub stop {
   my $self = shift;
   $self = $self->singleton unless ref $self;
-  delete $self->{_running};
+  delete $self->{running};
 }
 
 sub test {
   my ($self, $id) = @_;
-  return unless my $c      = $self->{_cs}->{$id};
+  return unless my $c      = $self->{cs}->{$id};
   return unless my $handle = $c->{handle};
   $self->iowatcher->is_readable($handle);
 }
@@ -494,7 +487,7 @@ sub write {
   my ($self, $id, $chunk, $cb) = @_;
 
   # Prepare chunk for writing
-  my $c = $self->{_cs}->{$id};
+  my $c = $self->{cs}->{$id};
   $c->{buffer} .= $chunk;
 
   # UNIX only quick write
@@ -513,13 +506,13 @@ sub _accept {
 
   # Accept
   my $handle = $listen->accept or return;
-  my $r      = $self->{_reverse};
-  my $l      = $self->{_listen}->{$r->{$listen}};
+  my $r      = $self->{reverse};
+  my $l      = $self->{listen}->{$r->{$listen}};
 
   # New connection
   my $c = {buffer => ''};
   (my $id) = "$c" =~ /0x([\da-f]+)/;
-  $self->{_cs}->{$id} = $c;
+  $self->{cs}->{$id} = $c;
 
   # TLS handshake
   weaken $self;
@@ -529,7 +522,7 @@ sub _accept {
     $c->{tls_accept} = 1;
   }
 
-  # Watch
+  # Start watching for events
   $self->iowatcher->add(
     $handle,
     on_readable => sub { $self->_read($id) },
@@ -552,12 +545,13 @@ sub _accept {
 
   # Accept limit
   $self->max_connections(0)
-    if defined $self->{_accepts} && --$self->{_accepts} == 0;
+    if defined $self->{accepts} && --$self->{accepts} == 0;
 
   # Accept callback
   warn "ACCEPTED $id\n" if DEBUG;
-  my $cb = $c->{on_accept} = $l->{on_accept};
-  $self->_sandbox('accept', $cb, $id) if $cb && !$l->{tls};
+  if ((my $cb = $c->{on_accept} = $l->{on_accept}) && !$l->{tls}) {
+    $self->_sandbox('accept', $cb, $id);
+  }
 
   # Stop listening
   $self->_not_listening;
@@ -566,9 +560,9 @@ sub _accept {
 sub _connect {
   my ($self, $id, $args) = @_;
 
-  # Handle
+  # New handle
   my $handle;
-  return unless my $c = $self->{_cs}->{$id};
+  return unless my $c = $self->{cs}->{$id};
   unless ($handle = $args->{handle}) {
 
     # New socket
@@ -594,7 +588,7 @@ sub _connect {
     $handle->connect if IPV6;
   }
   $c->{handle} = $handle;
-  $self->{_reverse}->{$handle} = $id;
+  $self->{reverse}->{$handle} = $id;
 
   # Non-blocking
   $handle->blocking(0);
@@ -613,20 +607,16 @@ sub _connect {
 sub _drop {
   my ($self, $id) = @_;
 
-  # Cancel watcher events
-  return unless my $watcher = $self->iowatcher;
+  # Cancel timer
+  return $self unless my $watcher = $self->iowatcher;
   return $self if $watcher->cancel($id);
 
   # Drop listen socket
-  my $c = $self->{_cs}->{$id};
+  my $c = $self->{cs}->{$id};
   if ($c) { return if $c->{drop}++ }
-  elsif ($c = delete $self->{_listen}->{$id}) {
-
-    # Not listening
-    return $self unless $self->{_listening};
-
-    # Not listening anymore
-    delete $self->{_listening};
+  elsif ($c = delete $self->{listen}->{$id}) {
+    return $self unless $self->{listening};
+    delete $self->{listening};
   }
 
   # Delete associated timers
@@ -637,11 +627,11 @@ sub _drop {
     warn "DISCONNECTED $id\n" if DEBUG;
 
     # Handle close
-    if (my $event = $c->{close}) { $self->_sandbox('close', $event, $id) }
+    if (my $cb = $c->{close}) { $self->_sandbox('close', $cb, $id) }
 
-    # Delete connection
-    delete $self->{_cs}->{$id};
-    delete $self->{_reverse}->{$id};
+    # Cleanup
+    delete $self->{cs}->{$id};
+    delete $self->{reverse}->{$id};
     $watcher->remove($handle);
     close $handle;
   }
@@ -655,16 +645,15 @@ sub _error {
   warn qq/ERROR $id "$error"\n/ if DEBUG;
 
   # Handle error
-  return unless my $c = $self->{_cs}->{$id};
-  my $event = $c->{error};
-  warn "Unhandled event error: $error" and return unless $event;
-  $self->_sandbox('error', $event, $id, $error);
+  return unless my $c = $self->{cs}->{$id};
+  if (my $cb = $c->{error}) { $self->_sandbox('error', $cb, $id, $error) }
+  else { warn "Unhandled event error: $error" and return }
   $self->_drop($id);
 }
 
 sub _event {
   my ($self, $event, $id, $cb) = @_;
-  return unless my $c = $self->{_cs}->{$id};
+  return unless my $c = $self->{cs}->{$id};
   $c->{$event} = $cb if $cb;
   $self;
 }
@@ -673,12 +662,12 @@ sub _listening {
   my $self = shift;
 
   # Already listening or no listen sockets
-  return if $self->{_listening};
-  my $listen = $self->{_listen} ||= {};
+  return if $self->{listening};
+  my $listen = $self->{listen} ||= {};
   return unless keys %$listen;
 
   # Check if we are allowed to listen and lock
-  my $i = keys %{$self->{_cs}};
+  my $i = keys %{$self->{cs}};
   return unless $i < $self->max_connections;
   return unless $self->on_lock->($self, !$i);
 
@@ -689,7 +678,7 @@ sub _listening {
     $watcher->add($listen->{$lid}->{handle},
       on_readable => sub { $self->_accept(pop) });
   }
-  $self->{_listening} = 1;
+  $self->{listening} = 1;
 }
 
 sub _not_listening {
@@ -699,14 +688,14 @@ sub _not_listening {
   $self->on_unlock->($self);
 
   # Stop listening
-  my $listen = $self->{_listen} || {};
+  my $listen = $self->{listen} || {};
   $self->iowatcher->remove($listen->{$_}->{handle}) for keys %$listen;
-  delete $self->{_listening};
+  delete $self->{listening};
 }
 
 sub _not_writing {
   my ($self, $id) = @_;
-  return unless my $c = $self->{_cs}->{$id};
+  return unless my $c = $self->{cs}->{$id};
   return $c->{read_only} = 1 if length $c->{buffer} || $c->{drain};
   return unless my $handle = $c->{handle};
   $self->iowatcher->not_writing($handle);
@@ -716,7 +705,7 @@ sub _prepare_cert {
   my $self = shift;
 
   # Check if temporary TLS cert file already exists
-  my $cert = $self->{_cert};
+  my $cert = $self->{cert};
   return $cert if $cert && -r $cert;
 
   # Create temporary TLS cert file
@@ -727,14 +716,14 @@ sub _prepare_cert {
     or croak qq/Can't create temporary TLS cert file "$cert"/;
   print $file CERT;
 
-  $self->{_cert} = $cert;
+  $self->{cert} = $cert;
 }
 
 sub _prepare_key {
   my $self = shift;
 
   # Check if temporary TLS key file already exists
-  my $key = $self->{_key};
+  my $key = $self->{key};
   return $key if $key && -r $key;
 
   # Create temporary TLS key file
@@ -745,14 +734,14 @@ sub _prepare_key {
     or croak qq/Can't create temporary TLS key file "$key"/;
   print $file KEY;
 
-  $self->{_key} = $key;
+  $self->{key} = $key;
 }
 
 sub _read {
   my ($self, $id) = @_;
 
   # Check if everything is ready to read
-  my $c = $self->{_cs}->{$id};
+  my $c = $self->{cs}->{$id};
   return $self->_tls_accept($id)  if $c->{tls_accept};
   return $self->_tls_connect($id) if $c->{tls_connect};
   return unless defined(my $handle = $c->{handle});
@@ -777,9 +766,7 @@ sub _read {
   return $self->_drop($id) if $read == 0;
 
   # Handle read
-  if (my $event = $c->{read}) {
-    $self->_sandbox('read', $event, $id, $buffer);
-  }
+  if (my $cb = $c->{read}) { $self->_sandbox('read', $cb, $id, $buffer) }
 
   # Active
   $c->{active} = time;
@@ -792,28 +779,24 @@ sub _sandbox {
   my $id    = shift;
 
   # Sandbox event
-  my $value = eval { $self->$cb($id, @_) };
-  if ($@) {
+  unless (eval { $self->$cb($id, @_); 1 }) {
     my $message = qq/Event "$event" failed for connection "$id": $@/;
     $event eq 'error'
       ? ($self->_drop($id) and warn $message)
       : $self->_error($id, $message);
   }
-
-  $value;
 }
 
 sub _tls_accept {
   my ($self, $id) = @_;
 
   # Accepted
-  my $c = $self->{_cs}->{$id};
+  my $c = $self->{cs}->{$id};
   if ($c->{handle}->accept_SSL) {
 
     # Handle TLS accept
     delete $c->{tls_accept};
-    my $cb = $c->{on_accept};
-    $self->_sandbox('accept', $cb, $id) if $cb;
+    if (my $cb = $c->{on_accept}) { $self->_sandbox('accept', $cb, $id) }
     return;
   }
 
@@ -825,13 +808,12 @@ sub _tls_connect {
   my ($self, $id) = @_;
 
   # Connected
-  my $c = $self->{_cs}->{$id};
+  my $c = $self->{cs}->{$id};
   if ($c->{handle}->connect_SSL) {
 
     # Handle TLS connect
     delete $c->{tls_connect};
-    my $cb = $c->{on_connect};
-    $self->_sandbox('connect', $cb, $id) if $cb;
+    if (my $cb = $c->{on_connect}) { $self->_sandbox('connect', $cb, $id) }
     return;
   }
 
@@ -850,7 +832,7 @@ sub _write {
   my ($self, $id) = @_;
 
   # Check if we are ready for writing
-  my $c = $self->{_cs}->{$id};
+  my $c = $self->{cs}->{$id};
   return $self->_tls_accept($id)  if $c->{tls_accept};
   return $self->_tls_connect($id) if $c->{tls_connect};
   return unless my $handle = $c->{handle};
@@ -866,13 +848,15 @@ sub _write {
 
     # Handle connect
     warn "CONNECTED $id\n" if DEBUG;
-    my $cb = $c->{on_connect};
-    $self->_sandbox('connect', $cb, $id) if $cb && !$c->{tls};
+    if (!$c->{tls} && (my $cb = $c->{on_connect})) {
+      $self->_sandbox('connect', $cb, $id);
+    }
   }
 
   # Handle drain
-  $self->_sandbox('drain', delete $c->{drain}, $id)
-    if !length $c->{buffer} && $c->{drain};
+  if (!length $c->{buffer} && (my $cb = delete $c->{drain})) {
+    $self->_sandbox('drain', $cb, $id);
+  }
 
   # Write as much as possible
   if (length $c->{buffer}) {
@@ -888,11 +872,11 @@ sub _write {
       return $self->_error($id, $!);
     }
 
-    # Active
-    else { $c->{active} = time }
-
     # Remove written chunk from buffer
     substr $c->{buffer}, 0, $written, '';
+
+    # Active
+    $c->{active} = time;
   }
 
   # Not writing
@@ -901,7 +885,7 @@ sub _write {
 
 sub _writing {
   my ($self, $id) = @_;
-  my $c = $self->{_cs}->{$id};
+  my $c = $self->{cs}->{$id};
   delete $c->{read_only};
   return unless my $handle = $c->{handle};
   $self->iowatcher->writing($handle);
@@ -999,7 +983,7 @@ dropped, defaults to C<3>.
   $loop       = $loop->iowatcher(Mojo::IOWatcher->new);
 
 Low level event watcher, usually a L<Mojo::IOWatcher>,
-L<Mojo::IOWatcher::KQueue> or L<Mojo::IOLoop->Epoll> object.
+L<Mojo::IOWatcher::KQueue> or L<Mojo::IOLoop::Epoll> object.
 Replacing the event watcher of the singleton loop makes all new loops use the
 same type of event watcher.
 Note that this attribute is EXPERIMENTAL and might change without warning!
@@ -1178,14 +1162,6 @@ Find a free TCP port, this is a utility function primarily used for tests.
   my $handle = $loop->handle($id);
 
 Get handle for id.
-Note that this method is EXPERIMENTAL and might change without warning!
-
-=head2 C<idle>
-
-  my $id = Mojo::IOLoop->idle(sub {...});
-  my $id = $loop->idle(sub {...});
-
-Callback to be invoked on every reactor tick if no other events occurred.
 Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<is_running>

@@ -42,7 +42,7 @@ sub parse {
   if ($pattern =~ s/\.([^\/\)]+)$//) {
     $reqs->{format}           = quotemeta $1;
     $self->defaults->{format} = $1;
-    $self->{_strict}          = 1;
+    $self->{strict}           = 1;
   }
 
   # Tokenize
@@ -117,11 +117,9 @@ sub shape_match {
 
     # Format
     my $format = $self->format;
-    if (defined $format && $$pathref =~ s/$format//) {
-      $result->{format} ||= $1;
-    }
+    if ($format && $$pathref =~ s/$format//) { $result->{format} ||= $1 }
     elsif ($self->reqs->{format}) {
-      return if !$result->{format} || $self->{_strict};
+      return if !$result->{format} || $self->{strict};
     }
 
     return $result;
@@ -135,7 +133,7 @@ sub _compile {
 
   # Compile format regular expression
   my $reqs = $self->reqs;
-  if (!exists $reqs->{format} || defined $reqs->{format}) {
+  if (!exists $reqs->{format} || $reqs->{format}) {
     my $format =
       defined $reqs->{format} ? _compile_req($reqs->{format}) : '([^\/]+)';
     $self->format(qr/^\/?\.$format$/);

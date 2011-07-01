@@ -16,7 +16,7 @@ sub add {
   my $handle = shift;
   my $args   = {@_, handle => $handle};
 
-  $self->{_handles}->{fileno $handle} = $args;
+  $self->{handles}->{fileno $handle} = $args;
   $args->{on_writable}
     ? $self->writing($handle)
     : $self->not_writing($handle);
@@ -26,17 +26,15 @@ sub add {
 
 sub cancel {
   my ($self, $id) = @_;
-  delete $self->{$_}->{$id} and return 1 for qw/_timers _idle/;
+  return 1 if delete $self->{timers}->{$id};
   undef;
 }
-
-sub idle { shift->_event(_idle => shift) }
 
 sub is_readable {
   my ($self, $handle) = @_;
 
   # Make sure we watch for readable and writable events
-  my $test = $self->{_test} ||= IO::Poll->new;
+  my $test = $self->{test} ||= IO::Poll->new;
   $test->mask($handle, POLLIN);
   $test->poll(0);
   my $result = $test->handles(POLLIN | POLLERR | POLLHUP);
@@ -51,21 +49,9 @@ sub not_writing {
   # Make sure we only watch for readable events
   my $poll = $self->_poll;
   $poll->remove($handle)
-    if delete $self->{_handles}->{fileno $handle}->{writing};
+    if delete $self->{handles}->{fileno $handle}->{writing};
   $poll->mask($handle, $self->POLLIN);
 
-  $self;
-}
-
-sub on_readable {
-  my ($self, $handle, $cb) = @_;
-  $self->{_handles}->{fileno $handle}->{on_readable} = $cb;
-  $self;
-}
-
-sub on_writable {
-  my ($self, $handle, $cb) = @_;
-  $self->{_handles}->{fileno $handle}->{on_writable} = $cb;
   $self;
 }
 
@@ -73,11 +59,11 @@ sub on_writable {
 sub one_tick {
   my ($self, $timeout) = @_;
 
-  # IO events
-  my $activity = $self->watch($timeout);
+  # IO
+  $self->watch($timeout);
 
   # Timers
-  my $timers = $self->{_timers} || {};
+  my $timers = $self->{timers} || {};
   for my $id (keys %$timers) {
     my $t = $timers->{$id};
     my $after = $t->{after} || 0;
@@ -91,30 +77,19 @@ sub one_tick {
       elsif ($after && $t->{recurring}) { $t->{recurring} += $after }
 
       # Handle timer
-      if (my $cb = $t->{cb}) {
-        $self->_sandbox("Timer $id", $cb, $id);
-        $activity++ if $t->{started};
-      }
-    }
-  }
-
-  # Idle
-  unless ($activity) {
-    for my $id (keys %{$self->{_idle} || {}}) {
-      warn "IDLE $id\n" if DEBUG;
-      $self->_sandbox("Idle $id", $self->{_idle}->{$id}->{cb}, $id);
+      if (my $cb = $t->{cb}) { $self->_sandbox("Timer $id", $cb, $id) }
     }
   }
 }
 
 sub recurring {
   my $self = shift;
-  $self->_event(_timers => pop, after => pop, recurring => time);
+  $self->_event(timers => pop, after => pop, recurring => time);
 }
 
 sub remove {
   my ($self, $handle) = @_;
-  delete $self->{_handles}->{fileno $handle};
+  delete $self->{handles}->{fileno $handle};
   $self->_poll->remove($handle);
   $self;
 }
@@ -123,7 +98,7 @@ sub remove {
 #  The same way you got me, by accident on a golf course."
 sub timer {
   my $self = shift;
-  $self->_event(_timers => pop, after => pop, started => time);
+  $self->_event(timers => pop, after => pop, started => time);
 }
 
 sub watch {
@@ -132,21 +107,14 @@ sub watch {
   # Check for IO events
   my $poll = $self->_poll;
   $poll->poll($timeout);
-  my $activity;
-  my $handles = $self->{_handles};
-  for ($poll->handles($self->POLLIN | $self->POLLHUP | $self->POLLERR)) {
-    $self->_sandbox('Read', $handles->{fileno $_}->{on_readable}, $_);
-    $activity++;
-  }
-  for ($poll->handles($self->POLLOUT)) {
-    $self->_sandbox('Write', $handles->{fileno $_}->{on_writable}, $_);
-    $activity++;
-  }
+  my $handles = $self->{handles};
+  $self->_sandbox('Read', $handles->{fileno $_}->{on_readable}, $_)
+    for $poll->handles($self->POLLIN | $self->POLLHUP | $self->POLLERR);
+  $self->_sandbox('Write', $handles->{fileno $_}->{on_writable}, $_)
+    for $poll->handles($self->POLLOUT);
 
   # Wait for timeout
-  usleep 1000000 * $timeout unless keys %{$self->{_handles}};
-
-  $activity;
+  usleep 1000000 * $timeout unless keys %{$self->{handles}};
 }
 
 sub writing {
@@ -155,7 +123,7 @@ sub writing {
   my $poll = $self->_poll;
   $poll->remove($handle);
   $poll->mask($handle, $self->POLLIN | $self->POLLOUT);
-  $self->{_handles}->{fileno $handle}->{writing} = 1;
+  $self->{handles}->{fileno $handle}->{writing} = 1;
 
   $self;
 }
@@ -173,7 +141,7 @@ sub _event {
   $id;
 }
 
-sub _poll { shift->{_poll} ||= IO::Poll->new }
+sub _poll { shift->{poll} ||= IO::Poll->new }
 
 sub _sandbox {
   my $self = shift;
@@ -247,13 +215,7 @@ Callback to be invoked once the handle becomes writable.
 
   my $success = $watcher->cancel($id);
 
-Cancel timer or idle event.
-
-=head2 C<idle>
-
-  my $id = $watcher->idle(sub {...});
-
-Callback to be invoked on every tick if no other events occurred.
+Cancel timer.
 
 =head2 C<is_readable>
 
@@ -268,23 +230,11 @@ sockets.
 
 Only watch handle for readable events.
 
-=head2 C<on_readable>
-
-  $watcher = $watcher->on_readable($handle, sub {...});
-
-Callback to be invoked once the handle becomes readable.
-
-=head2 C<on_writable>
-
-  $watcher = $watcher->on_writable($handle, sub {...});
-
-Callback to be invoked once the handle becomes writable.
-
 =head2 C<one_tick>
 
   $watcher->one_tick('0.25');
 
-Run for exactly one tick and watch for io, timer and idle events.
+Run for exactly one tick and watch for io and timer events.
 
 =head2 C<recurring>
 
@@ -307,7 +257,7 @@ Create a new timer, invoking the callback after a given amount of seconds.
 
 =head2 C<watch>
 
-  my $activity = $watcher->watch('0.25');
+  $watcher->watch('0.25');
 
 Run for exactly one tick and watch only for io events.
 
