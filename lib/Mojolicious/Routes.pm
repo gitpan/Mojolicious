@@ -573,11 +573,8 @@ sub _walk_stack {
     $staging--;
 
     # Merge in captures
-    if (my @keys = keys %$field) {
-      my @values = values %$field;
-      @{$stash->{'mojo.captures'}}{@keys} = @values;
-      @{$c->stash}{@keys} = @values;
-    }
+    my @keys = keys %$field;
+    @{$stash}{@keys} = @{$stash->{'mojo.captures'}}{@keys} = values %$field;
 
     # Dispatch
     my $e =
