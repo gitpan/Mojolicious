@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Mojolicious
-version:            1.53
+version:            1.54
 abstract:           The Web In A Box!
 author:
     - Sebastian Riedel <sri@cpan.org>
@@ -18,18 +18,21 @@ requires:
     Errno:                0
     Exporter:             0
     ExtUtils::MakeMaker:  0
+    Fcntl:                0
     File::Basename:       0
     File::Copy:           0
     File::Path:           0
     File::Spec:           0
-    File::Spec::Functions:  0
     File::Temp:           0
     FindBin:              0
     Getopt::Long:         0
     I18N::LangTags:       0
+    I18N::LangTags::Detect:  0
     IO::File:             0
     IO::Poll:             0
     IO::Socket:           0
+    IO::Socket::INET:     0
+    IO::Socket::UNIX:     0
     List::Util:           0
     Locale::Maketext:     0
     MIME::Base64:         0
@@ -37,8 +40,8 @@ requires:
     perl:                 5.008007
     POSIX:                0
     Scalar::Util:         0
+    Socket:               0
     Sys::Hostname:        0
-    Test::Builder:        0
     Test::Harness:        0
     Test::More:           0
     Time::HiRes:          0
