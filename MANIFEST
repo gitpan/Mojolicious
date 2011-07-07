@@ -182,6 +182,9 @@ t/mojo/home.t
 t/mojo/hypnotoad.t
 t/mojo/ioloop.t
 t/mojo/ioloop_tls.t
+t/mojo/iowatcher.t
+t/mojo/iowatcher_epoll.t
+t/mojo/iowatcher_kqueue.t
 t/mojo/json.t
 t/mojo/lib/BaseTest/Base1.pm
 t/mojo/lib/BaseTest/Base2.pm

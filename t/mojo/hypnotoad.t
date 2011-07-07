@@ -19,7 +19,7 @@ use Mojo::UserAgent;
 
 plan skip_all => 'set TEST_HYPNOTOAD to enable this test (developer only!)'
   unless $ENV{TEST_HYPNOTOAD};
-plan tests => 26;
+plan tests => 51;
 
 # "I ate the blue ones... they taste like burning."
 use_ok 'Mojo::Server::Hypnotoad';
@@ -41,9 +41,10 @@ app->start;
 EOF
 
 # Prepare config
-my $port = Mojo::IOLoop->generate_port;
+my $port1 = Mojo::IOLoop->generate_port;
+my $port2 = Mojo::IOLoop->generate_port;
 $command->write_rel_file('hypnotoad.conf', <<EOF);
-{listen => "http://*:$port", workers => 1};
+{listen => ['http://*:$port1', 'http://*:$port2'], workers => 1};
 EOF
 
 # Start
@@ -53,14 +54,22 @@ sleep 1
   while !IO::Socket::INET->new(
   Proto    => 'tcp',
   PeerAddr => 'localhost',
-  PeerPort => $port
+  PeerPort => $port2
   );
 my $old = _pid();
 
 my $ua = Mojo::UserAgent->new;
 
 # Application is alive
-my $tx = $ua->get("http://127.0.0.1:$port/hello");
+my $tx = $ua->get("http://127.0.0.1:$port1/hello");
+ok $tx->is_done,    'transaction is done';
+is $tx->keep_alive, 1, 'connection will be kept alive';
+is $tx->kept_alive, undef, 'connection was not kept alive';
+is $tx->res->code, 200, 'right status';
+is $tx->res->body, 'Hello Hypnotoad!', 'right content';
+
+# Application is alive (second port)
+$tx = $ua->get("http://127.0.0.1:$port2/hello");
 ok $tx->is_done,    'transaction is done';
 is $tx->keep_alive, 1, 'connection will be kept alive';
 is $tx->kept_alive, undef, 'connection was not kept alive';
@@ -68,7 +77,15 @@ is $tx->res->code, 200, 'right status';
 is $tx->res->body, 'Hello Hypnotoad!', 'right content';
 
 # Same result
-$tx = $ua->get("http://127.0.0.1:$port/hello");
+$tx = $ua->get("http://127.0.0.1:$port1/hello");
+ok $tx->is_done,    'transaction is done';
+is $tx->keep_alive, 1, 'connection will be kept alive';
+is $tx->kept_alive, 1, 'connection was not kept alive';
+is $tx->res->code, 200, 'right status';
+is $tx->res->body, 'Hello Hypnotoad!', 'right content';
+
+# Same result (second port)
+$tx = $ua->get("http://127.0.0.1:$port2/hello");
 ok $tx->is_done,    'transaction is done';
 is $tx->keep_alive, 1, 'connection will be kept alive';
 is $tx->kept_alive, 1, 'connection was not kept alive';
@@ -88,7 +105,15 @@ EOF
 open my $hot_deploy, '-|', $^X, "$prefix/hypnotoad", $script;
 
 # Connection did not get lost
-$tx = $ua->get("http://127.0.0.1:$port/hello");
+$tx = $ua->get("http://127.0.0.1:$port1/hello");
+ok $tx->is_done,    'transaction is done';
+is $tx->keep_alive, 1, 'connection will be kept alive';
+is $tx->kept_alive, 1, 'connection was kept alive';
+is $tx->res->code, 200, 'right status';
+is $tx->res->body, 'Hello Hypnotoad!', 'right content';
+
+# Connection did not get lost (second port)
+$tx = $ua->get("http://127.0.0.1:$port2/hello");
 ok $tx->is_done,    'transaction is done';
 is $tx->keep_alive, 1, 'connection will be kept alive';
 is $tx->kept_alive, 1, 'connection was kept alive';
@@ -106,7 +131,15 @@ while (1) {
 }
 
 # Application has been reloaded
-$tx = $ua->get("http://127.0.0.1:$port/hello");
+$tx = $ua->get("http://127.0.0.1:$port1/hello");
+ok $tx->is_done,    'transaction is done';
+is $tx->keep_alive, 1, 'connection will be kept alive';
+is $tx->kept_alive, undef, 'connection was not kept alive';
+is $tx->res->code, 200,            'right status';
+is $tx->res->body, 'Hello World!', 'right content';
+
+# Application has been reloaded (second port)
+$tx = $ua->get("http://127.0.0.1:$port2/hello");
 ok $tx->is_done,    'transaction is done';
 is $tx->keep_alive, 1, 'connection will be kept alive';
 is $tx->kept_alive, undef, 'connection was not kept alive';
@@ -114,7 +147,15 @@ is $tx->res->code, 200,            'right status';
 is $tx->res->body, 'Hello World!', 'right content';
 
 # Same result
-$tx = $ua->get("http://127.0.0.1:$port/hello");
+$tx = $ua->get("http://127.0.0.1:$port1/hello");
+ok $tx->is_done,    'transaction is done';
+is $tx->keep_alive, 1, 'connection will be kept alive';
+is $tx->kept_alive, 1, 'connection was kept alive';
+is $tx->res->code, 200,            'right status';
+is $tx->res->body, 'Hello World!', 'right content';
+
+# Same result (second port)
+$tx = $ua->get("http://127.0.0.1:$port2/hello");
 ok $tx->is_done,    'transaction is done';
 is $tx->keep_alive, 1, 'connection will be kept alive';
 is $tx->kept_alive, 1, 'connection was kept alive';
@@ -127,7 +168,7 @@ sleep 1
   while IO::Socket::INET->new(
   Proto    => 'tcp',
   PeerAddr => 'localhost',
-  PeerPort => $port
+  PeerPort => $port2
   );
 
 # Cleanup
