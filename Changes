@@ -1,5 +1,10 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+1.57    2011-07-07 00:00:00
+        - Added --stop option to Hypnotoad.
+        - Made hot deployment with Hypnotoad even easier.
+        - Improved documentation.
+
 1.56    2011-07-04 00:00:00
         - Fixed small memory leaks in Hypnotoad and Mojo::IOLoop.
 

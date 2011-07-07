@@ -33,7 +33,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Smiling Face With Sunglasses';
-our $VERSION  = '1.56';
+our $VERSION  = '1.57';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -295,7 +295,7 @@ I18N, first class unicode support and much more for you to discover.
 =item *
 
 Very clean, portable and Object Oriented pure Perl API without any hidden
-magic and no requirements besides Perl 5.8.7 (although 5.10+ is recommended).
+magic and no requirements besides Perl 5.8.7 (although 5.12+ is recommended).
 
 =item *
 

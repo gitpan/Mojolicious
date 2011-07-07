@@ -21,12 +21,12 @@ use constant DEBUG => $ENV{HYPNOTOAD_DEBUG} || 0;
 sub DESTROY {
   my $self = shift;
 
-  # Worker
-  return if $ENV{HYPNOTOAD_WORKER};
+  # Worker or command
+  return if $ENV{HYPNOTOAD_WORKER} || !$self->{done};
 
   # Manager
   return unless my $file = $self->{config}->{pid_file};
-  unlink $file if -f $file;
+  unlink $file if -w $file;
 }
 
 # "Marge? Since I'm not talking to Lisa,
@@ -47,7 +47,7 @@ sub run {
   my ($self, $app, $config) = @_;
 
   # No windows support
-  die "Hypnotoad not available for Windows.\n"
+  _exit('Hypnotoad not available for Windows.')
     if $^O eq 'MSWin32' || $^O =~ /cygwin/;
 
   # Application
@@ -75,7 +75,13 @@ sub run {
   $self->_config;
 
   # Testing
-  die "Everything looks good!\n" if $ENV{HYPNOTOAD_TEST};
+  _exit('Everything looks good!') if $ENV{HYPNOTOAD_TEST};
+
+  # Stop running server
+  $self->_stop if $ENV{HYPNOTOAD_STOP};
+
+  # Initiate hot deployment
+  $self->_hot_deploy unless $ENV{HYPNOTOAD_PID};
 
   # Prepare loop
   $daemon->prepare_ioloop;
@@ -100,7 +106,7 @@ sub run {
     open STDERR, '>&STDOUT';
   }
 
-  # Manager signals
+  # Manager environment
   my $c = $self->{config};
   $SIG{INT} = $SIG{TERM} = sub { $self->{done} = 1 };
   $SIG{CHLD} = sub {
@@ -165,6 +171,8 @@ sub _config {
   $daemon->listen($listen);
 }
 
+sub _exit { print shift, "\n" and exit 0 }
+
 sub _heartbeat {
   my $self = shift;
 
@@ -174,11 +182,23 @@ sub _heartbeat {
   return unless $poll->handles(POLLIN);
   return unless $self->{reader}->sysread(my $chunk, 4194304);
 
-  # Heartbeats
+  # Update heartbeats
   while ($chunk =~ /(\d+)\n/g) {
     my $pid = $1;
     $self->{workers}->{$pid}->{time} = time if $self->{workers}->{$pid};
   }
+}
+
+sub _hot_deploy {
+  my $self = shift;
+
+  # Make sure server is running
+  return unless my $pid = $self->_pid;
+  return unless kill 0, $pid;
+
+  # Start hot deployment
+  kill 'USR2', $pid;
+  _exit("Starting hot deployment for Hypnotoad server $pid.");
 }
 
 sub _manage {
@@ -192,7 +212,7 @@ sub _manage {
     $self->_spawn while keys %{$self->{workers}} < $c->{workers};
 
     # Check PID file
-    $self->_pid;
+    $self->_pid_file;
   }
 
   # Shutdown
@@ -211,15 +231,11 @@ sub _manage {
   # Upgrade
   if ($self->{upgrade} && !$self->{done}) {
 
-    # Start
+    # Fresh start
     unless ($self->{new}) {
-
-      # Fork
       warn "UPGRADING\n" if DEBUG;
       croak "Can't fork: $!" unless defined(my $pid = fork);
       $self->{new} = $pid if $pid;
-
-      # Fresh start
       exec $ENV{HYPNOTOAD_EXE} unless $pid;
     }
 
@@ -244,8 +260,6 @@ sub _manage {
     # Graceful stop
     $w->{graceful} ||= time if $self->{graceful};
     if ($w->{graceful}) {
-
-      # Kill
       warn "QUIT $pid\n" if DEBUG;
       kill 'QUIT', $pid;
 
@@ -266,15 +280,26 @@ sub _manage {
 
 sub _pid {
   my $self = shift;
+  return unless my $file = IO::File->new($self->{config}->{pid_file}, '<');
+  my $pid = <$file>;
+  chomp $pid;
+  return $pid;
+}
 
-  # Check PID file
+sub _pid_file {
+  my $self = shift;
+
+  # Don't need a PID file anymore
+  return if $self->{done};
+
+  # Check if PID file already exists
   my $file = $self->{config}->{pid_file};
   return if -e $file;
-  warn "PID $file\n" if DEBUG;
 
-  # Create one if it doesn't exist
-  my $pid = IO::File->new($file, O_WRONLY | O_CREAT | O_EXCL, 0644)
-    or croak qq/Can't create PID file "$file": $!/;
+  # Create PID file
+  warn "PID $file\n" if DEBUG;
+  croak qq/Can't create PID file "$file": $!/
+    unless my $pid = IO::File->new($file, '>', 0644);
   print $pid $$;
 }
 
@@ -355,24 +380,24 @@ sub _spawn {
     }
   );
 
-  # Worker signals
+  # Clean worker environment
   $SIG{INT} = $SIG{TERM} = $SIG{CHLD} = $SIG{USR2} = $SIG{TTIN} = $SIG{TTOU} =
     'DEFAULT';
   $SIG{QUIT} = sub { $loop->max_connections(0) };
-
-  # Cleanup
   delete $self->{reader};
   delete $self->{poll};
-
-  # User and group
   $daemon->setuidgid;
 
   # Start
   warn "WORKER STARTED $$\n" if DEBUG;
   $loop->start;
-
-  # Shutdown
   exit 0;
+}
+
+sub _stop {
+  _exit('Hypnotoad server not running.') unless my $pid = shift->_pid;
+  kill 'QUIT', $pid;
+  _exit("Stopping Hypnotoad server $pid gracefully.");
 }
 
 1;
@@ -399,6 +424,12 @@ C<kqueue> and hot deployment support that just works.
 To start applications with it you can use the L<hypnotoad> script.
 
   % hypnotoad myapp.pl
+  Server available at http://127.0.0.1:8080.
+
+You can run the exact same command again for automatic hot deployment.
+
+  % hypnotoad myapp.pl
+  Starting hot deployment for Hypnotoad server 31841.
 
 For L<Mojolicious> and L<Mojolicious::Lite> applications it will default to
 C<production> mode.
