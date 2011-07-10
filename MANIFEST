@@ -24,7 +24,6 @@ lib/Mojo/Exception.pm
 lib/Mojo/Headers.pm
 lib/Mojo/HelloWorld.pm
 lib/Mojo/Home.pm
-lib/Mojo/HTML.pm
 lib/Mojo/IOLoop.pm
 lib/Mojo/IOWatcher.pm
 lib/Mojo/IOWatcher/Epoll.pm
@@ -180,7 +179,6 @@ t/mojo/dom.t
 t/mojo/fastcgi.t
 t/mojo/headers.t
 t/mojo/home.t
-t/mojo/html.t
 t/mojo/hypnotoad.t
 t/mojo/ioloop.t
 t/mojo/ioloop_tls.t
