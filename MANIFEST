@@ -20,6 +20,8 @@ lib/Mojo/Cookie/Response.pm
 lib/Mojo/CookieJar.pm
 lib/Mojo/Date.pm
 lib/Mojo/DOM.pm
+lib/Mojo/DOM/Collection.pm
+lib/Mojo/DOM/CSS.pm
 lib/Mojo/Exception.pm
 lib/Mojo/Headers.pm
 lib/Mojo/HelloWorld.pm
@@ -48,10 +50,10 @@ lib/Mojo/Template.pm
 lib/Mojo/Transaction.pm
 lib/Mojo/Transaction/HTTP.pm
 lib/Mojo/Transaction/WebSocket.pm
-lib/Mojo/Transactor.pm
 lib/Mojo/Upload.pm
 lib/Mojo/URL.pm
 lib/Mojo/UserAgent.pm
+lib/Mojo/UserAgent/Transactor.pm
 lib/Mojo/Util.pm
 lib/Mojolicious.pm
 lib/Mojolicious/Command/Cgi.pm
