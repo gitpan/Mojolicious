@@ -33,7 +33,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Smiling Face With Sunglasses';
-our $VERSION  = '1.64';
+our $VERSION  = '1.65';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -304,8 +304,8 @@ TLS, Bonjour, IDNA, Comet (long polling), chunking and multipart support.
 
 =item *
 
-Built-in async IO web server supporting epoll, kqueue, UNIX domain sockets
-and hot deployment, perfect for embedding.
+Built-in async IO web server supporting libev and hot deployment, perfect for
+embedding.
 
 =item *
 
@@ -388,9 +388,10 @@ Web development for humans, making hard things possible and everything fun.
   __DATA__
 
   @@ clock.html.ep
-  % my ($second, $minute, $hour) = (localtime(time))[0, 1, 2];
+  % use Time::Piece;
+  % my $now = localtime;
   <%= link_to clock => begin %>
-    The time is <%= $hour %>:<%= $minute %>:<%= $second %>.
+    The time is <%= $now->hms %>.
   <% end %>
 
 =head2 Growing
@@ -466,7 +467,7 @@ especially when working in a team.
     # All common HTTP verbs are supported
     $example->post('/title')->to('#title');
 
-    # ... and much, much more
+    # ...and much, much more
     # (including multiple, auto-discovered controllers)
     $r->websocket('/echo')->to('realtime#echo');
   }
@@ -476,9 +477,10 @@ especially when working in a team.
 Through all of these changes, your action code and templates can stay almost
 exactly the same.
 
-  % my ($second, $minute, $hour) = (localtime(time))[0, 1, 2];
+  % use Time::Piece;
+  % my $now = localtime;
   <%= link_to clock => begin %>
-    The time is <%= $hour %>:<%= $minute %>:<%= $second %>.
+    The time is <%= $now->hms %>.
   <% end %>
 
 Mojolicious has been designed from the ground up for a fun and unique
@@ -1048,6 +1050,8 @@ KITAMURA Akatsuki
 Lars Balker Rasmussen
 
 Leon Brocard
+
+Magnus Holm
 
 Maik Fischer
 

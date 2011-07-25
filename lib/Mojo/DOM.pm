@@ -175,6 +175,7 @@ sub content_xml {
   return $result;
 }
 
+# "But I was going to loot you a present."
 sub find {
   my ($self, $selector) = @_;
 
@@ -378,6 +379,7 @@ sub type {
   return $self;
 }
 
+# "I want to set the record straight, I thought the cop was a prostitute."
 sub xml {
   my $self = shift;
   return $self->[0]->xml if @_ == 0;
