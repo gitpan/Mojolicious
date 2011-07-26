@@ -11,24 +11,12 @@ use Time::HiRes 'time';
 
 use constant DEBUG => $ENV{MOJO_IOLOOP_DEBUG} || 0;
 
-# libev support requires EV
-use constant EV => $ENV{MOJO_POLL}
-  ? 0
-  : eval 'use Mojo::IOWatcher::EV; 1';
-
 has client_class    => 'Mojo::IOLoop::Client';
 has connect_timeout => 3;
 has iowatcher       => sub {
-
-  # libev
-  if (EV) {
-    warn "EV MAINLOOP\n" if DEBUG;
-    return Mojo::IOWatcher::EV->new;
-  }
-
-  # poll
-  warn "POLL MAINLOOP\n" if DEBUG;
-  Mojo::IOWatcher->new;
+  my $class = Mojo::IOWatcher->detect;
+  warn "MAINLOOP ($class)\n" if DEBUG;
+  $class->new;
 };
 has max_accepts     => 0;
 has max_connections => 1000;
@@ -144,7 +132,7 @@ sub connect {
 sub connection_timeout {
   my ($self, $id, $timeout) = @_;
   return unless my $c = $self->{connections}->{$id};
-  $c->{timeout} = $timeout and return $self if $timeout;
+  $c->{timeout} = $timeout and return $self if defined $timeout;
   $c->{timeout};
 }
 
@@ -270,7 +258,9 @@ sub one_tick {
 
     # Connection timeout
     my $time = $c->{active} ||= time;
-    $self->_drop($id) if (time - $time) >= ($c->{timeout} || 15);
+    $c->{timeout} = 15 unless defined $c->{timeout};
+    next unless my $timeout = $c->{timeout};
+    $self->_drop($id) if (time - $time) >= $timeout;
   }
 
   # Graceful shutdown
@@ -554,9 +544,9 @@ Note that exceptions in this callback are not captured.
 =head2 C<resolver>
 
   my $resolver = $loop->resolver;
-  $loop        = $loop->resolver(Mojo::Resolver->new);
+  $loop        = $loop->resolver(Mojo::IOLoop::Resolver->new);
 
-DNS stub resolver, usually a L<Mojo::Resolver> object.
+DNS stub resolver, usually a L<Mojo::IOLoop::Resolver> object.
 Note that this attribute is EXPERIMENTAL and might change without warning!
 
 =head2 C<server_class>
@@ -573,7 +563,7 @@ Note that this attribute is EXPERIMENTAL and might change without warning!
   my $class = $loop->stream_class;
   $loop     = $loop->stream_class('Mojo::IOLoop::Stream');
 
-Class to be used for streaming io, defaults to L<Mojo::IOLoop::Stream>.
+Class to be used for streaming handles, defaults to L<Mojo::IOLoop::Stream>.
 Note that this attribute is EXPERIMENTAL and might change without warning!
 
 =head2 C<timeout>

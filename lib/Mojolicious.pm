@@ -33,7 +33,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Smiling Face With Sunglasses';
-our $VERSION  = '1.65';
+our $VERSION  = '1.66';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -304,8 +304,8 @@ TLS, Bonjour, IDNA, Comet (long polling), chunking and multipart support.
 
 =item *
 
-Built-in async IO web server supporting libev and hot deployment, perfect for
-embedding.
+Built-in async I/O web server supporting libev and hot deployment, perfect
+for embedding.
 
 =item *
 
@@ -534,15 +534,18 @@ C<development>.
 Mojo will name the log file after the current mode and modes other than
 C<development> will result in limited log output.
 
-If you want to add per mode logic to your application, you can add a sub
-to your application named C<$mode_mode>.
+If you want to add per mode logic to your application, you can define methods
+named C<$mode_mode> in the application class, which will be called right
+before C<startup>.
 
   sub development_mode {
     my $self = shift;
+    ...
   }
 
   sub production_mode {
     my $self = shift;
+    ...
   }
 
 =head2 C<on_process>

@@ -25,8 +25,9 @@ has resolver => sub {
 sub DESTROY {
   my $self = shift;
   return if $self->{connected};
-  return unless my $loop    = $self->resolver->ioloop;
-  return unless my $watcher = $loop->iowatcher;
+  return unless my $resolver = $self->resolver;
+  return unless my $loop     = $resolver->ioloop;
+  return unless my $watcher  = $loop->iowatcher;
   $watcher->cancel($self->{timer})  if $self->{timer};
   $watcher->remove($self->{handle}) if $self->{handle};
 }
@@ -47,8 +48,6 @@ sub connect {
 
   # Connect
   else { $self->_connect($args) }
-
-  return $self;
 }
 
 sub _connect {
@@ -157,7 +156,7 @@ __END__
 
 =head1 NAME
 
-Mojo::IOLoop::Client - IOLoop TCP Client
+Mojo::IOLoop::Client - IOLoop Socket Client
 
 =head1 SYNOPSIS
 
@@ -190,7 +189,7 @@ L<Mojo::IOLoop::Client> implements the following attributes.
   my $resolver = $client->resolver;
   $client      = $client->resolver(Mojo::IOLoop::Resolver->new);
 
-DNS stub resolver, usually a L<Mojo::Resolver> object.
+DNS stub resolver, usually a L<Mojo::IOLoop::Resolver> object.
 
 =head1 METHODS
 
