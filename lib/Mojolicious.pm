@@ -33,7 +33,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Smiling Face With Sunglasses';
-our $VERSION  = '1.67';
+our $VERSION  = '1.68';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -325,7 +325,7 @@ Fresh code based upon years of experience developing L<Catalyst>.
 
 All you need is a oneliner, it takes less than a minute.
 
-  sudo sh -c "curl -L cpanmin.us | perl - Mojolicious"
+  $ sudo sh -c "curl -L cpanmin.us | perl - Mojolicious"
 
 =head2 Getting Started
 
@@ -338,12 +338,12 @@ These three lines are a whole web application.
   app->start;
 
 To run this example with the built-in development web server just put the
-code into a file and execute it with C<perl>.
+code into a file and start it with C<morbo>.
 
-  % perl hello.pl daemon
+  $ morbo hello.pl
   Server available at http://127.0.0.1:3000.
 
-  % curl http://127.0.0.1:3000/
+  $ curl http://127.0.0.1:3000/
   Hello World!
 
 =head2 Duct Tape For The HTML5 Web
@@ -528,15 +528,11 @@ L<Mojolicious::Controller>.
   my $mode = $app->mode;
   $app     = $app->mode('production');
 
-The operating mode for your application.
-It defaults to the value of the environment variable C<MOJO_MODE> or
-C<development>.
-Mojo will name the log file after the current mode and modes other than
-C<development> will result in limited log output.
-
-If you want to add per mode logic to your application, you can define methods
-named C<$mode_mode> in the application class, which will be called right
-before C<startup>.
+The operating mode for your application, defaults to the value of the
+C<MOJO_MODE> environment variable or C<development>.
+You can also add per mode logic to your application by defining methods named
+C<$mode_mode> in the application class, which will be called right before
+C<startup>.
 
   sub development_mode {
     my $self = shift;
@@ -547,6 +543,10 @@ before C<startup>.
     my $self = shift;
     ...
   }
+
+Right before calling C<startup> and mode specific methods, L<Mojolicious>
+will pick up the current mode, name the log file after it and raise the log
+level from C<debug> to C<info> if it has a value other than C<development>.
 
 =head2 C<on_process>
 
@@ -567,7 +567,7 @@ the sledgehammer in your toolbox.
   my $plugins = $app->plugins;
   $app        = $app->plugins(Mojolicious::Plugins->new);
 
-The plugin loader, by default a L<Mojolicious::Plugins> object.
+The plugin loader, defaults to a L<Mojolicious::Plugins> object.
 You can usually leave this alone, see L<Mojolicious::Plugin> if you want to
 write a plugin.
 
@@ -576,7 +576,7 @@ write a plugin.
   my $renderer = $app->renderer;
   $app         = $app->renderer(Mojolicious::Renderer->new);
 
-Used in your application to render content, by default a
+Used in your application to render content, defaults to a
 L<Mojolicious::Renderer> object.
 The two main renderer plugins L<Mojolicious::Plugin::EpRenderer> and
 L<Mojolicious::Plugin::EplRenderer> contain more specific information.
@@ -586,7 +586,7 @@ L<Mojolicious::Plugin::EplRenderer> contain more specific information.
   my $routes = $app->routes;
   $app       = $app->routes(Mojolicious::Routes->new);
 
-The routes dispatcher, by default a L<Mojolicious::Routes> object.
+The routes dispatcher, defaults to a L<Mojolicious::Routes> object.
 You use this in your startup method to define the url endpoints for your
 application.
 
@@ -612,7 +612,7 @@ the log file reminding you to change your passphrase.
   my $sessions = $app->sessions;
   $app         = $app->sessions(Mojolicious::Sessions->new);
 
-Simple signed cookie based sessions, by default a L<Mojolicious::Sessions>
+Simple signed cookie based sessions, defaults to a L<Mojolicious::Sessions>
 object.
 
 =head2 C<static>
@@ -620,7 +620,7 @@ object.
   my $static = $app->static;
   $app       = $app->static(Mojolicious::Static->new);
 
-For serving static assets from your C<public> directory, by default a
+For serving static assets from your C<public> directory, defaults to a
 L<Mojolicious::Static> object.
 
 =head2 C<types>
@@ -629,7 +629,7 @@ L<Mojolicious::Static> object.
   $app      = $app->types(Mojolicious::Types->new);
 
 Responsible for tracking the types of content you want to serve in your
-application, by default a L<Mojolicious::Types> object.
+application, defaults to a L<Mojolicious::Types> object.
 You can easily register new types.
 
   $app->types->type(twitter => 'text/tweet');

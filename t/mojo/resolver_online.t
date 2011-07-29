@@ -3,22 +3,21 @@
 use strict;
 use warnings;
 
-# Disable Bonjour, IPv6 and libev
+# Disable Bonjour and libev
 BEGIN {
-  $ENV{MOJO_NO_BONJOUR} = $ENV{MOJO_NO_IPV6} = 1;
-  $ENV{MOJO_IOWATCHER} = 'Mojo::IOWatcher';
+  $ENV{MOJO_NO_BONJOUR} = 1;
+  $ENV{MOJO_IOWATCHER}  = 'Mojo::IOWatcher';
 }
 
 use Test::More;
 plan skip_all => 'set TEST_ONLINE to enable this test (developer only!)'
   unless $ENV{TEST_ONLINE};
+plan skip_all => 'Perl 5.12 required for this test!' unless $] >= 5.012;
 plan tests => 18;
 
 use_ok 'Mojo::IOLoop';
 
 use List::Util 'first';
-use Mojo::IOLoop;
-use Mojo::URL;
 
 # "Your guilty consciences may make you vote Democratic, but secretly you all
 #  yearn for a Republican president to lower taxes, brutalize criminals, and
@@ -94,7 +93,7 @@ $r->resolve(
   }
 );
 Mojo::IOLoop->start;
-like $result, $Mojo::URL::IPV6_RE, 'valid IPv6 record';
+is $r->is_ipv6($result), 1, 'valid IPv6 record';
 ok $ttl, 'got a TTL value';
 
 # Resolve CNAME record
@@ -152,7 +151,7 @@ $r->resolve(
   }
 );
 Mojo::IOLoop->start;
-like $a1, $Mojo::URL::IPV4_RE, 'valid IPv4 record';
+is $r->is_ipv4($a1), 1, 'valid IPv4 record';
 is $a1, $a2, 'PTR roundtrip succeeded';
 
 # Resolve PTR record (IPv6)

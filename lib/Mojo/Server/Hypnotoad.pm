@@ -422,12 +422,12 @@ and hot deployment support that just works.
 
 To start applications with it you can use the L<hypnotoad> script.
 
-  % hypnotoad myapp.pl
+  $ hypnotoad myapp.pl
   Server available at http://127.0.0.1:8080.
 
 You can run the exact same command again for automatic hot deployment.
 
-  % hypnotoad myapp.pl
+  $ hypnotoad myapp.pl
   Starting hot deployment for Hypnotoad server 31841.
 
 For L<Mojolicious> and L<Mojolicious::Lite> applications it will default to
@@ -592,7 +592,7 @@ the application.
   proxy => 1
 
 Activate reverse proxy support, defaults to the value of
-C<MOJO_REVERSE_PROXY>.
+the C<MOJO_REVERSE_PROXY> environment variable.
 
 =head2 C<upgrade_timeout>
 

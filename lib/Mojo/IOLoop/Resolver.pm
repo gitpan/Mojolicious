@@ -2,37 +2,40 @@ package Mojo::IOLoop::Resolver;
 use Mojo::Base -base;
 
 use IO::File;
-use IO::Socket::INET;
 use List::Util 'first';
-use Mojo::URL;
 use Scalar::Util 'weaken';
+use Socket;
 
 use constant DEBUG => $ENV{MOJO_RESOLVER_DEBUG} || 0;
 
-# "AF_INET6" requires Socket6 or Perl 5.12
-use constant IPV6_AF_INET6 => eval { Socket::AF_INET6() }
-  || eval { require Socket6 and Socket6::AF_INET6() };
-
-# "inet_pton" requires Socket6 or Perl 5.12
-BEGIN {
-
-  # Socket
-  if (defined &Socket::inet_pton) { *inet_pton = \&Socket::inet_pton }
-
-  # Socket6
-  elsif (eval { require Socket6 and defined &Socket6::inet_pton }) {
-    *inet_pton = \&Socket6::inet_pton;
-  }
-}
-
 # IPv6 DNS support requires "AF_INET6" and "inet_pton"
-use constant IPV6 => defined IPV6_AF_INET6 && defined &inet_pton;
+use constant IPV6 => defined &Socket::AF_INET6 && defined &Socket::inet_pton;
 
 has ioloop => sub {
   require Mojo::IOLoop;
   Mojo::IOLoop->singleton;
 };
 has timeout => 3;
+
+# IPv4 regex (RFC 3986)
+my $DEC_OCTET_RE = qr/(?:[0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])/;
+our $IPV4_RE =
+  qr/^$DEC_OCTET_RE\.$DEC_OCTET_RE\.$DEC_OCTET_RE\.$DEC_OCTET_RE$/;
+
+# IPv6 regex (RFC 3986)
+my $H16_RE  = qr/[0-9A-Fa-f]{1,4}/;
+my $LS32_RE = qr/(?:$H16_RE:$H16_RE|$IPV4_RE)/;
+our $IPV6_RE = qr/(?:
+                                           (?: $H16_RE : ){6} $LS32_RE
+  |                                     :: (?: $H16_RE : ){5} $LS32_RE
+  | (?:                      $H16_RE )? :: (?: $H16_RE : ){4} $LS32_RE
+  | (?: (?: $H16_RE : ){0,1} $H16_RE )? :: (?: $H16_RE : ){3} $LS32_RE
+  | (?: (?: $H16_RE : ){0,2} $H16_RE )? :: (?: $H16_RE : ){2} $LS32_RE
+  | (?: (?: $H16_RE : ){0,3} $H16_RE )? ::     $H16_RE :      $LS32_RE
+  | (?: (?: $H16_RE : ){0,4} $H16_RE )? ::                    $LS32_RE
+  | (?: (?: $H16_RE : ){0,5} $H16_RE )? ::                    $H16_RE
+  | (?: (?: $H16_RE : ){0,6} $H16_RE )? ::
+)/x;
 
 # DNS server (default to Google Public DNS)
 my $SERVERS = ['8.8.8.8', '8.8.4.4'];
@@ -75,6 +78,16 @@ our $LOCALHOST = '127.0.0.1';
 
 sub DESTROY { shift->_cleanup }
 
+sub is_ipv4 {
+  return 1 if $_[1] =~ $IPV4_RE;
+  return;
+}
+
+sub is_ipv6 {
+  return 1 if $_[1] =~ $IPV6_RE;
+  return;
+}
+
 sub lookup {
   my ($self, $name, $cb) = @_;
 
@@ -116,14 +129,14 @@ sub resolve {
   my ($self, $name, $type, $cb) = @_;
 
   # No lookup required or record type not supported
-  my $server = $self->servers;
   my $t      = $DNS_TYPES->{$type};
-  my $ipv4   = $name =~ $Mojo::URL::IPV4_RE ? 1 : 0;
-  my $ipv6   = IPV6 && $name =~ $Mojo::URL::IPV6_RE ? 1 : 0;
+  my $v4     = $self->is_ipv4($name);
+  my $v6     = IPV6 ? $self->is_ipv6($name) : 0;
+  my $server = $self->servers;
   my $loop   = $self->ioloop;
   weaken $self;
   return $loop->timer(0 => sub { $self->$cb([]) })
-    if !$server || !$t || ($t ne $DNS_TYPES->{PTR} && ($ipv4 || $ipv6));
+    if !$server || !$t || ($t ne $DNS_TYPES->{PTR} && ($v4 || $v6));
 
   # Build request
   warn "RESOLVE $type $name ($server)\n" if DEBUG;
@@ -138,12 +151,12 @@ sub resolve {
   if ($t eq $DNS_TYPES->{PTR}) {
 
     # IPv4
-    if ($ipv4) { @parts = reverse 'arpa', 'in-addr', @parts }
+    if ($v4) { @parts = reverse 'arpa', 'in-addr', @parts }
 
     # IPv6
-    elsif ($ipv6) {
+    elsif ($v6) {
       @parts = reverse 'arpa', 'ip6', split //, unpack 'H32',
-        inet_pton(IPV6_AF_INET6, $name);
+        Socket::inet_pton(Socket::AF_INET6(), $name);
     }
   }
 
@@ -194,12 +207,12 @@ sub _bind {
   # New socket
   my $loop = $self->ioloop;
   weaken $self;
-  my $id = $self->{id} = $loop->connect(
+  $self->{id} = $loop->connect(
     address  => $server,
     port     => 53,
     on_close => sub { $self->_cleanup },
     on_error => sub {
-      my ($loop, $id) = @_;
+      my $loop = shift;
       warn "RESOLVE FAILURE ($server)\n" if DEBUG;
       $CURRENT_SERVER++;
       $self->_cleanup;
@@ -211,7 +224,6 @@ sub _bind {
       my @packet = unpack 'nnnnnna*', $chunk;
       warn "ANSWERS $packet[3] ($server)\n" if DEBUG;
       return unless my $r = delete $self->{requests}->{$packet[0]};
-      $loop->drop($r->{timer});
 
       # Questions
       my $content = $packet[6];
@@ -237,11 +249,11 @@ sub _bind {
         push @answers, [@answer, $ttl];
         warn "ANSWER $answer[0] $answer[1]\n" if DEBUG;
       }
+      $loop->drop($r->{timer});
       $r->{cb}->($self, \@answers);
     },
     args => {Proto => 'udp', Type => SOCK_DGRAM}
   );
-  $loop->connection_timeout($id => 0);
 }
 
 sub _cleanup {
@@ -348,8 +360,7 @@ L<Mojo::IOLoop::Resolver> implements the following attributes.
   my $ioloop = $resolver->ioloop;
   $resolver  = $resolver->ioloop(Mojo::IOLoop->new);
 
-Loop object to use for I/O operations, by default a L<Mojo::IOLoop> object
-will be used.
+Loop object to use for I/O operations, defaults to a L<Mojo::IOLoop> object.
 
 =head2 C<timeout>
 
@@ -363,14 +374,17 @@ Maximum time in seconds a C<DNS> lookup can take, defaults to C<3>.
 L<Mojo::IOLoop::Resolver> inherits all methods from L<Mojo::Base> and
 implements the following new ones.
 
-=head2 C<servers>
+=head2 C<is_ipv4>
 
-  my @all     = $resolver->servers;
-  my $current = $resolver->servers;
-  $resolver->servers('8.8.8.8', '8.8.4.4');
+  my $is_ipv4 = $resolver->is_ipv4('127.0.0.1');
 
-IP addresses of C<DNS> servers used for lookups, defaults to the value of
-C<MOJO_DNS_SERVER>, auto detection, C<8.8.8.8> or C<8.8.4.4>.
+Check if value is a valid C<IPv4> address.
+
+=head2 C<is_ipv6>
+
+  my $is_ipv6 = $resolver->is_ipv6('::1');
+
+Check if value is a valid C<IPv6> address.
 
 =head2 C<lookup>
 
@@ -393,6 +407,16 @@ Resolve domain into C<A>, C<AAAA>, C<CNAME>, C<MX>, C<NS>, C<PTR> or C<TXT>
 records, C<*> will query for all at once.
 Since this is a "stub resolver" it depends on a recursive name server for DNS
 resolution.
+
+=head2 C<servers>
+
+  my @all     = $resolver->servers;
+  my $current = $resolver->servers;
+  $resolver->servers('8.8.8.8', '8.8.4.4');
+
+IP addresses of C<DNS> servers used for lookups, defaults to the value of
+the C<MOJO_DNS_SERVER> environment variable, auto detection, C<8.8.8.8> or
+C<8.8.4.4>.
 
 =head1 DEBUGGING
 

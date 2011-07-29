@@ -319,8 +319,6 @@ sub _error {
   $self->_handle($id, $error);
 }
 
-# "Oh, I'm in no condition to drive. Wait a minute.
-#  I don't have to listen to myself. I'm drunk."
 sub _finish {
   my ($self, $tx, $cb, $close) = @_;
 
@@ -616,7 +614,7 @@ Mojo::UserAgent - Async I/O HTTP 1.1 And WebSocket User Agent
   # Scrape the latest headlines from a news site
   my $news = 'http://digg.com';
   $ua->max_redirects(3);
-  $ua->get($news)->res->dom('h3.story-item-title > a[href]')->each(
+  $ua->get($news)->res->dom('h3.story-item-title > a[href]')->each(sub {
     my $e = shift;
     print "$e->{href}:\n";
     print $e->text, "\n";
@@ -665,14 +663,15 @@ L<Mojo::UserAgent> implements the following attributes.
   my $cert = $ua->cert;
   $ua      = $ua->cert('tls.crt');
 
-Path to TLS certificate file, defaults to the value of C<MOJO_CERT_FILE>.
+Path to TLS certificate file, defaults to the value of the C<MOJO_CERT_FILE>
+environment variable.
 
 =head2 C<cookie_jar>
 
   my $cookie_jar = $ua->cookie_jar;
   $ua            = $ua->cookie_jar(Mojo::CookieJar->new);
 
-Cookie jar to use for this user agents requests, by default a
+Cookie jar to use for this user agents requests, defaults to a
 L<Mojo::CookieJar> object.
 
 =head2 C<http_proxy>
@@ -694,8 +693,8 @@ Proxy server to use for HTTPS and WebSocket requests.
   my $loop = $ua->ioloop;
   $ua      = $ua->ioloop(Mojo::IOLoop->new);
 
-Loop object to use for blocking I/O operations, by default a L<Mojo::IOLoop>
-object will be used.
+Loop object to use for blocking I/O operations, defaults to a L<Mojo::IOLoop>
+object.
 
 =head2 C<keep_alive_timeout>
 
@@ -710,15 +709,16 @@ dropped, defaults to C<15>.
   my $key = $ua->key;
   $ua     = $ua->key('tls.crt');
 
-Path to TLS key file, defaults to the value of C<MOJO_KEY_FILE>.
+Path to TLS key file, defaults to the value of the C<MOJO_KEY_FILE>
+environment variable.
 
 =head2 C<log>
 
   my $log = $ua->log;
   $ua     = $ua->log(Mojo::Log->new);
 
-A L<Mojo::Log> object used for logging, by default the application log will
-be used.
+A L<Mojo::Log> object used for logging, defaults to the application log or a
+L<Mojo::Log> object.
 
 =head2 C<max_connections>
 
@@ -734,7 +734,8 @@ before it starts closing the oldest cached ones, defaults to C<5>.
   $ua               = $ua->max_redirects(3);
 
 Maximum number of redirects the user agent will follow before it fails,
-defaults to the value of C<MOJO_MAX_REDIRECTS> or C<0>.
+defaults to the value of the C<MOJO_MAX_REDIRECTS> environment variable or
+C<0>.
 
 =head2 C<name>
 
@@ -770,7 +771,7 @@ redirects.
   my $t = $ua->transactor;
   $ua   = $ua->transactor(Mojo::UserAgent::Transactor->new);
 
-Transaction builder, by default a L<Mojo::UserAgent::Transactor> object.
+Transaction builder, defaults to a L<Mojo::UserAgent::Transactor> object.
 Note that this attribute is EXPERIMENTAL and might change without warning!
 
 =head2 C<websocket_timeout>
@@ -793,7 +794,7 @@ following new ones.
   $ua     = $ua->app(MyApp->new);
 
 Application relative URLs will be processed with, defaults to the value of
-C<MOJO_APP>.
+the C<MOJO_APP> environment variable.
 
   print $ua->app->secret;
   $ua->app->log->level('fatal');
