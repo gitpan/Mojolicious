@@ -256,6 +256,8 @@ sub _bind {
   );
 }
 
+# "Mrs. Simpson, bathroom is not for customers.
+#  Please use the crack house across the street."
 sub _cleanup {
   my $self = shift;
   return unless my $loop = $self->ioloop;
@@ -347,8 +349,8 @@ Mojo::IOLoop::Resolver - IOLoop DNS Stub Resolver
 
 =head1 DESCRIPTION
 
-L<Mojo::IOLoop::Resolver> is a minimalistic async I/O DNS stub resolver used
-by L<Mojo:IOLoop>.
+L<Mojo::IOLoop::Resolver> is a minimalistic non-blocking I/O DNS stub
+resolver used by L<Mojo:IOLoop>.
 Note that this module is EXPERIMENTAL and might change without warning!
 
 =head1 ATTRIBUTES

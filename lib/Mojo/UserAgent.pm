@@ -27,7 +27,6 @@ has name               => 'Mojolicious (Perl)';
 has transactor => sub { Mojo::UserAgent::Transactor->new };
 has websocket_timeout => 300;
 
-# Make sure we leave a clean ioloop behind
 sub DESTROY { shift->_cleanup }
 
 sub app {
@@ -44,13 +43,10 @@ sub app {
   return $self->{app};
 }
 
-# "Ah, alcohol and night-swimming. It's a winning combination."
 sub build_form_tx      { shift->transactor->form(@_) }
 sub build_tx           { shift->transactor->tx(@_) }
 sub build_websocket_tx { shift->transactor->websocket(@_) }
 
-# "The only thing I asked you to do for this party was put on clothes,
-#  and you didn't do it."
 sub delete {
   my $self = shift;
   $self->start($self->build_tx('DELETE', @_));
@@ -69,7 +65,6 @@ sub detect_proxy {
   return $self;
 }
 
-# "'What are you lookin at?' - the innocent words of a drunken child."
 sub get {
   my $self = shift;
   $self->start($self->build_tx('GET', @_));
@@ -87,8 +82,7 @@ sub need_proxy {
   return 1;
 }
 
-# "Olive oil? Asparagus? If your mother wasn't so fancy,
-#  we could just shop at the gas station like normal people."
+# "'What are you lookin at?' - the innocent words of a drunken child."
 sub post {
   my $self = shift;
   $self->start($self->build_tx('POST', @_));
@@ -99,8 +93,6 @@ sub post_form {
   $self->start($self->build_form_tx(@_));
 }
 
-# "And I gave that man directions, even though I didn't know the way,
-#  because that's the kind of guy I am this week."
 sub put {
   my $self = shift;
   $self->start($self->build_tx('PUT', @_));
@@ -133,7 +125,6 @@ sub start {
   return $tx;
 }
 
-# "It's like my dad always said: eventually, everybody gets shot."
 sub test_server {
   my $self = shift;
 
@@ -148,20 +139,11 @@ sub test_server {
     ->port($self->{port})->path('/');
 }
 
-# "Are we there yet?
-#  No
-#  Are we there yet?
-#  No
-#  Are we there yet?
-#  No
-#  ...Where are we going?"
 sub websocket {
   my $self = shift;
   $self->start($self->build_websocket_tx(@_));
 }
 
-# "Homer, it's easy to criticize.
-#  Fun, too."
 sub _cache {
   my ($self, $name, $id) = @_;
 
@@ -213,7 +195,7 @@ sub _cleanup {
 
   # Clean up active connections
   warn "DROPPING ALL CONNECTIONS\n" if DEBUG;
-  my $cs = $self->{cs} || {};
+  my $cs = $self->{connections} || {};
   $loop->drop($_) for keys %$cs;
 
   # Clean up keep alive connections
@@ -223,10 +205,6 @@ sub _cleanup {
   }
 }
 
-sub _close { shift->_handle(pop, 1) }
-
-# "Where on my badge does it say anything about protecting people?
-#  Uh, second word, chief."
 sub _connect {
   my ($self, $tx, $cb) = @_;
 
@@ -238,7 +216,7 @@ sub _connect {
   $id ||= $self->_cache("$scheme:$host:$port");
   if ($id && !ref $id) {
     warn "KEEP ALIVE CONNECTION ($scheme:$host:$port)\n" if DEBUG;
-    $self->{cs}->{$id} = {cb => $cb, tx => $tx};
+    $self->{connections}->{$id} = {cb => $cb, transaction => $tx};
     $tx->kept_alive(1);
     $self->_connected($id);
   }
@@ -262,11 +240,11 @@ sub _connect {
       tls_key  => $self->key,
       on_connect => sub { $self->_connected($_[1]) }
     );
-    $self->{cs}->{$id} = {cb => $cb, tx => $tx};
+    $self->{connections}->{$id} = {cb => $cb, transaction => $tx};
   }
 
   # Callbacks
-  $loop->on_close($id => sub { $self->_close(@_) });
+  $loop->on_close($id => sub { $self->_handle(pop, 1) });
   $loop->on_error($id => sub { $self->_error(@_) });
   $loop->on_read($id => sub { $self->_read(@_) });
 
@@ -278,7 +256,7 @@ sub _connected {
 
   # Store connection information in transaction
   my $loop = $self->{loop};
-  my $tx   = $self->{cs}->{$id}->{tx};
+  my $tx   = $self->{connections}->{$id}->{transaction};
   $tx->connection($id);
   my $local = $loop->local_info($id);
   $tx->local_address($local->{address});
@@ -292,14 +270,12 @@ sub _connected {
   $self->_write($id);
 }
 
-# "Mrs. Simpson, bathroom is not for customers.
-#  Please use the crack house across the street."
 sub _drop {
   my ($self, $id, $close) = @_;
 
   # Keep non-CONNECTed connection alive
-  my $c  = delete $self->{cs}->{$id};
-  my $tx = $c->{tx};
+  my $c  = delete $self->{connections}->{$id};
+  my $tx = $c->{transaction};
   if (!$close && $tx && $tx->keep_alive && !$tx->error) {
     $self->_cache(join(':', $self->transactor->peer($tx)), $id)
       unless (($tx->req->method || '') =~ /^connect$/i
@@ -314,7 +290,9 @@ sub _drop {
 
 sub _error {
   my ($self, $loop, $id, $error) = @_;
-  if (my $tx = $self->{cs}->{$id}->{tx}) { $tx->res->error($error) }
+  if (my $tx = $self->{connections}->{$id}->{transaction}) {
+    $tx->res->error($error);
+  }
   $self->log->error($error);
   $self->_handle($id, $error);
 }
@@ -340,18 +318,16 @@ sub _finish {
   $self->$cb($tx);
 }
 
-# "No children have ever meddled with the Republican Party and lived to tell
-#  about it."
 sub _handle {
   my ($self, $id, $close) = @_;
 
   # Finish WebSocket
-  my $c   = $self->{cs}->{$id};
-  my $old = $c->{tx};
+  my $c   = $self->{connections}->{$id};
+  my $old = $c->{transaction};
   if ($old && $old->is_websocket) {
     $old->client_close;
     $self->{processing} -= 1;
-    delete $self->{cs}->{$id};
+    delete $self->{connections}->{$id};
     $self->_drop($id, $close);
   }
 
@@ -416,13 +392,13 @@ sub _read {
   warn "< $chunk\n" if DEBUG;
 
   # Corrupted connection
-  return                   unless my $c  = $self->{cs}->{$id};
-  return $self->_drop($id) unless my $tx = $c->{tx};
+  return                   unless my $c  = $self->{connections}->{$id};
+  return $self->_drop($id) unless my $tx = $c->{transaction};
 
   # Process incoming data
   $tx->client_read($chunk);
-  if    ($tx->is_done)         { $self->_handle($id) }
-  elsif ($c->{tx}->is_writing) { $self->_write($id) }
+  if ($tx->is_done) { $self->_handle($id) }
+  elsif ($c->{transaction}->is_writing) { $self->_write($id) }
 }
 
 sub _redirect {
@@ -438,11 +414,10 @@ sub _redirect {
 
   # Start redirected request
   return 1 unless my $id = $self->_start($new, $c->{cb});
-  $self->{cs}->{$id}->{redirects} = $redirects + 1;
+  $self->{connections}->{$id}->{redirects} = $redirects + 1;
   return 1;
 }
 
-# "It's great! We can do *anything* now that Science has invented Magic."
 sub _start {
   my ($self, $tx, $cb) = @_;
 
@@ -545,8 +520,8 @@ sub _upgrade {
   my ($self, $id) = @_;
 
   # No upgrade request
-  my $c   = $self->{cs}->{$id};
-  my $old = $c->{tx};
+  my $c   = $self->{connections}->{$id};
+  my $old = $c->{transaction};
   return unless $old->req->headers->upgrade;
 
   # Handshake failed
@@ -558,7 +533,7 @@ sub _upgrade {
   $new->kept_alive($old->kept_alive);
   $res->error('WebSocket challenge failed.') and return
     unless $new->client_challenge;
-  $c->{tx} = $new;
+  $c->{transaction} = $new;
   $self->{loop}->connection_timeout($id, $self->websocket_timeout);
   weaken $self;
   $new->on_resume(sub { $self->_write($id) });
@@ -570,8 +545,8 @@ sub _write {
   my ($self, $id) = @_;
 
   # Prepare outgoing data
-  return unless my $c  = $self->{cs}->{$id};
-  return unless my $tx = $c->{tx};
+  return unless my $c  = $self->{connections}->{$id};
+  return unless my $tx = $c->{transaction};
   return unless $tx->is_writing;
   my $chunk = $tx->client_write;
 
@@ -593,7 +568,7 @@ __END__
 
 =head1 NAME
 
-Mojo::UserAgent - Async I/O HTTP 1.1 And WebSocket User Agent
+Mojo::UserAgent - Non-Blocking I/O HTTP 1.1 And WebSocket User Agent
 
 =head1 SYNOPSIS
 
@@ -633,6 +608,17 @@ Mojo::UserAgent - Async I/O HTTP 1.1 And WebSocket User Agent
   # TLS certificate authentication
   $ua->cert('tls.crt')->key('tls.key')->get('https://mojolicio.us');
 
+  # Parallel requests
+  my $t = Mojo::IOLoop->trigger(sub { print "Have a nice day!\n" });
+  for my $url ('mojolicio.us', 'cpan.org') {
+    $t->begin;
+    $ua->get($url => sub {
+      print pop->res->dom->html->head->title->text, "\n";
+      $t->end;
+    });
+  }
+  $t->start;
+
   # Websocket request
   $ua->websocket('ws://websockets.org:8787' => sub {
     my $tx = pop;
@@ -648,8 +634,8 @@ Mojo::UserAgent - Async I/O HTTP 1.1 And WebSocket User Agent
 
 =head1 DESCRIPTION
 
-L<Mojo::UserAgent> is a full featured async I/O HTTP 1.1 and WebSocket user
-agent with C<IPv6>, C<TLS> and C<libev> support.
+L<Mojo::UserAgent> is a full featured non-blocking I/O HTTP 1.1 and WebSocket
+user agent with C<IPv6>, C<TLS> and C<libev> support.
 
 Optional modules L<EV>, L<IO::Socket::IP> and L<IO::Socket::SSL> are
 supported transparently and used if installed.

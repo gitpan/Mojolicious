@@ -33,6 +33,7 @@ lib/Mojo/IOLoop/EventEmitter.pm
 lib/Mojo/IOLoop/Resolver.pm
 lib/Mojo/IOLoop/Server.pm
 lib/Mojo/IOLoop/Stream.pm
+lib/Mojo/IOLoop/Trigger.pm
 lib/Mojo/IOWatcher.pm
 lib/Mojo/IOWatcher/EV.pm
 lib/Mojo/JSON.pm
@@ -214,6 +215,7 @@ t/mojo/resolver.t
 t/mojo/resolver_online.t
 t/mojo/server.t
 t/mojo/template.t
+t/mojo/trigger.t
 t/mojo/url.t
 t/mojo/user_agent.t
 t/mojo/user_agent_online.t

@@ -714,8 +714,8 @@ current request.
 
   my $tx = $c->tx;
 
-The transaction that is currently being processed, defaults to a
-L<Mojo::Transaction::HTTP> object.
+The transaction that is currently being processed, usually a
+L<Mojo::Transaction::HTTP> or L<Mojo::Transaction::WebSocket> object.
 
 =head1 METHODS
 
@@ -980,6 +980,18 @@ A L<Mojo::UserAgent> prepared for the current environment.
     my $tx = pop;
     $c->render_data($tx->res->body);
   });
+
+  # Parallel non-blocking
+  my $t = Mojo::IOLoop->trigger(sub {
+    my ($t, @titles) = @_;
+    $c->render_json(\@titles);
+  });
+  for my $url ('http://mojolicio.us', 'https://metacpan.org') {
+    $t->begin;
+    $c->ua->get($url => sub {
+      $t->end(pop->res->dom->html->head->title->text);
+    });
+  }
 
 =head2 C<url_for>
 

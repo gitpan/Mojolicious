@@ -20,6 +20,7 @@ no_index:
 requires:
   B: 0
   Carp: 0
+  Config: 0
   Cwd: 0
   Data::Dumper: 0
   Digest::MD5: 0
@@ -59,4 +60,4 @@ resources:
   license: http://dev.perl.org/licenses/
   repository: http://github.com/kraih/mojo
   x_MailingList: http://groups.google.com/group/mojolicious
-version: 1.68
+version: 1.69
