@@ -1,5 +1,13 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+1.72    2011-08-05 00:00:00
+        - Changed default keep alive timeout in Mojo::Server::Daemon from 5
+          to 15 seconds.
+        - Improved documentation.
+        - Fixed small alternative placeholder value bug in routes.
+        - Fixed small bug in Mojo::IOWatcher.
+        - Fixed small bug in Mojo::IOLoop::Client.
+
 1.71    2011-08-05 00:00:00
         - Improved Mojo::IOWatcher to use higher resolution timers.
 
