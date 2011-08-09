@@ -263,6 +263,7 @@ t/mojolicious/public/hello2.txt
 t/mojolicious/public_dev/hello.txt
 t/mojolicious/rebased_lite_app.t
 t/mojolicious/renderer.t
+t/mojolicious/restful_lite_app.t
 t/mojolicious/routes.t
 t/mojolicious/secret.txt
 t/mojolicious/tag_helper_lite_app.t

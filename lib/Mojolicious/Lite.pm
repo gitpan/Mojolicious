@@ -478,6 +478,24 @@ Restrictive placeholders can also be used for format detection.
     $self->render_text('hello world!');
   };
 
+=head2 Content Negotiation
+
+For resources with different representations that require truly C<RESTful>
+content negotiation you can also use C<respond_to>.
+
+  # /hello (Accept: application/json)
+  # /hello (Accept: text/xml)
+  # /hello.json
+  # /hello.xml
+  get '/hello' => sub {
+    my $self = shift;
+    $self->respond_to(
+      json => {json => {hello => 'world'}},
+      xml  => {text => '<hello>world</hello>'},
+      any  => {data => '', status => 204}
+    );
+  };
+
 =head2 Under
 
 Authentication and code shared between multiple routes can be realized easily
