@@ -16,7 +16,7 @@ my ($mm) = $ExtUtils::MakeMaker::VERSION =~ /^([^_]+)/;
 WriteMakefile(
   NAME         => 'Mojolicious',
   VERSION_FROM => 'lib/Mojolicious.pm',
-  ABSTRACT     => 'The Web In A Box!',
+  ABSTRACT     => 'Duct Tape For The Web!',
   AUTHOR       => 'Sebastian Riedel <sri@cpan.org>',
 
   ($mm < 6.3002 ? () : ('LICENSE' => 'artistic_2')),

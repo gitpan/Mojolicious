@@ -34,7 +34,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Smiling Face With Sunglasses';
-our $VERSION  = '1.73';
+our $VERSION  = '1.74';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -236,7 +236,7 @@ __END__
 
 =head1 NAME
 
-Mojolicious - The Web In A Box!
+Mojolicious - Duct Tape For The Web!
 
 =head1 SYNOPSIS
 

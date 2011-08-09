@@ -1,5 +1,5 @@
 {
-   "abstract" : "The Web In A Box!",
+   "abstract" : "Duct Tape For The Web!",
    "author" : [
       "Sebastian Riedel <sri@cpan.org>"
    ],
@@ -84,5 +84,5 @@
       },
       "x_MailingList" : "http://groups.google.com/group/mojolicious"
    },
-   "version" : "1.73"
+   "version" : "1.74"
 }

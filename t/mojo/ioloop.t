@@ -7,7 +7,7 @@ BEGIN {
   $ENV{MOJO_IOWATCHER} = 'Mojo::IOWatcher';
 }
 
-use Test::More tests => 11;
+use Test::More tests => 13;
 
 # "Marge, you being a cop makes you the man!
 #  Which makes me the woman, and I have no interest in that,
@@ -110,6 +110,7 @@ isa_ok $handle, 'IO::Socket', 'right reference';
 # Dropped listen socket
 $port = Mojo::IOLoop->generate_port;
 $id = $loop->listen(port => $port);
+my ($connected, $error);
 $loop->connect(
   address    => 'localhost',
   port       => $port,
@@ -117,20 +118,29 @@ $loop->connect(
     my $loop = shift;
     $loop->drop($id);
     $loop->stop;
-  }
-);
-$loop->start;
-my $error;
-my $connected;
-$loop->connect(
-  address    => 'localhost',
-  port       => $port,
-  on_connect => sub { $connected = 1 },
-  on_error   => sub {
+    $connected = 1;
+  },
+  on_error => sub {
     shift->stop;
     $error = pop;
   }
 );
 $loop->start;
-ok $error, 'has error';
+ok $connected, 'connected';
+ok !$error, 'no error';
+$connected = $error = undef;
+$loop->connect(
+  address    => 'localhost',
+  port       => $port,
+  on_connect => sub {
+    shift->stop;
+    $connected = 1;
+  },
+  on_error => sub {
+    shift->stop;
+    $error = pop;
+  }
+);
+$loop->start;
 ok !$connected, 'not connected';
+ok $error, 'has error';
