@@ -14,13 +14,6 @@ use File::Spec;
 sub import {
   my $class = shift;
 
-  # Lite apps are strict!
-  strict->import;
-  warnings->import;
-
-  # Lite apps are modern!
-  feature->import(':5.10') if $] >= 5.010;
-
   # Executable
   $ENV{MOJO_EXE} ||= (caller)[1];
 
@@ -65,6 +58,9 @@ sub import {
 
   # Shagadelic!
   *{"${caller}::shagadelic"} = sub { $app->start(@_) };
+
+  # Lite apps are strict!
+  Mojo::Base->import(-strict);
 }
 
 1;
@@ -479,8 +475,8 @@ Restrictive placeholders can also be used for format detection.
 
 =head2 Content Negotiation
 
-For resources with different representations that require truly C<RESTful>
-content negotiation you can also use C<respond_to>.
+For resources with different representations and that require truly
+C<RESTful> content negotiation you can also use C<respond_to>.
 
   # /hello (Accept: application/json)
   # /hello (Accept: text/xml)

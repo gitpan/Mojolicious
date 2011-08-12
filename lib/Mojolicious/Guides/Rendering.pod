@@ -255,6 +255,45 @@ Since everything is just Perl normal control structures just work.
     <%= $app %> is a <%= $description %>.
   <% } %>
 
+=head2 Content Negotiation
+
+For resources with different representations and that require truly
+C<RESTful> content negotiation you can also use C<respond_to> instead of
+C<render>.
+
+  # "Accept: application/json" -> "json"
+  # "Accept: text/xml"         -> "xml"
+  $self->respond_to(
+    json => {json => {hello => 'world'}},
+    xml  => {text => '<hello>world</hello>'}
+  );
+
+The best possible representation will be automatically selected from the
+C<Accept> request header and route C<format>.
+
+  $self->respond_to(
+    json => {json => {hello => 'world'}},
+    html => sub {
+      $self->content_for(head => '<meta name="author" content="sri" />');
+      $self->render(template => 'hello', message => 'world')
+    }
+  );
+
+Callbacks can be used for representations that are too complex to fit into a
+single C<render> call.
+
+  # "Accept: application/json" -> "json"
+  # "Accept: text/html"        -> "html"
+  # "Accept: image/png"        -> "any"
+  $self->respond_to(
+    json => {json => {hello => 'world'}},
+    html => {template => 'hello', message => 'world'},
+    any  => {text => '', status => 204}
+  );
+
+And if no viable representation could be found, the C<any> fallback will be
+used.
+
 =head2 Helpers
 
 Helpers are little functions you can use in templates and controller code.
@@ -307,6 +346,26 @@ You can also pass along normal stash values to the C<layout> helper.
     <head><title><%= $title %></title></head>
     <body><%= content %></body>
   </html>
+
+Instead of the C<layout> helper you could also just use the C<layout> stash
+value, or call C<render> with the C<layout> argument.
+
+  $self->render(template => 'mytemplate', layout => 'mylayout');
+
+To set a C<layout> stash value application wide you can use C<defaults>.
+
+  # Application
+  package MyApp;
+  use Mojo::Base 'Mojolicious';
+
+  sub startup {
+    my $self = shift;
+
+    # Default layout
+    $self->defaults(layout => 'mylayout');
+  }
+
+  1;
 
 =head2 Including Partial Templates
 
@@ -409,7 +468,7 @@ of the template to the layout.
 Inheritance takes the layout concept above one step further.
 Unlike C<content_for> the C<content> helper does not allow appending to
 existing values, this makes it possible to overload whole template sections.
-The only difference between C<layout> and the C<extends> is that extended
+The only difference between C<layout> and C<extends> is that extended
 templates don't get prefixed with C<layouts/>.
 
   @@ first.html.ep
