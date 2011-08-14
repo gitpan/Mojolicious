@@ -142,6 +142,7 @@ sub run {
 
   # Error
   my ($message, $code) = $tx->error;
+  utf8::encode $url if utf8::is_utf8 $url;
   warn qq/Problem loading URL "$url". ($message)\n/ if $message && !$code;
 
   # Charset
@@ -155,10 +156,16 @@ sub run {
   return $self;
 }
 
+sub _say {
+  return unless length(my $value = shift);
+  utf8::encode $value;
+  print "$value\n";
+}
+
 sub _select {
   my ($self, $buffer, $charset, $selector) = @_;
 
-  # DOM
+  # Find
   my $dom     = Mojo::DOM->new->charset($charset)->parse($buffer);
   my $results = $dom->find($selector);
 
@@ -168,36 +175,20 @@ sub _select {
 
     # Number
     if ($command =~ /^\d+$/) {
-      $results = [$results->[$command]];
+      return unless ($results = [$results->[$command]])->[0];
       next;
     }
 
     # Text
-    elsif ($command eq 'text') {
-      for my $e (@$results) {
-        next unless defined(my $text = $e->text);
-        utf8::encode $text;
-        print "$text\n";
-      }
-    }
+    elsif ($command eq 'text') { _say($_->text) for @$results }
 
     # All text
-    elsif ($command eq 'all') {
-      for my $e (@$results) {
-        next unless defined(my $text = $e->all_text);
-        utf8::encode $text;
-        print "$text\n";
-      }
-    }
+    elsif ($command eq 'all') { _say($_->all_text) for @$results }
 
     # Attribute
     elsif ($command eq 'attr') {
       next unless my $name = shift @ARGV;
-      for my $e (@$results) {
-        next unless defined(my $value = $e->attrs->{$name});
-        utf8::encode $value;
-        print "$value\n";
-      }
+      _say($_->attrs->{$name}) for @$results;
     }
 
     # Unknown
@@ -207,11 +198,8 @@ sub _select {
     $done++;
   }
 
-  # Raw
-  unless ($done) {
-    print "$_\n" for @$results;
-    return;
-  }
+  # Render
+  unless ($done) { _say($_) for @$results }
 }
 
 1;

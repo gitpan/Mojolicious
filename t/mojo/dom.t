@@ -3,7 +3,7 @@ use Mojo::Base -strict;
 
 use utf8;
 
-use Test::More tests => 629;
+use Test::More tests => 656;
 
 # "Homer gave me a kidney: it wasn't his, I didn't need it,
 #  and it came postage due- but I appreciated the gesture!"
@@ -1874,3 +1874,79 @@ is $dom->find('div div $a')->[1]->text, 'Mojolicious', 'right text';
 is $dom->find('div div $a')->[2], undef, 'no result';
 is $dom->find('$[class] > div')->[0]->{id}, 'a', 'right attribute';
 is $dom->find('$[class] > div')->[2], undef, 'no result';
+
+# Preformatted text
+$dom = Mojo::DOM->new(<<EOF);
+<div>
+  looks
+  <pre><code>like
+  it
+    really</code>
+  </pre>
+  works
+</div>
+EOF
+is $dom->text, '', 'right text';
+is $dom->text(0), "\n", 'right text';
+is $dom->all_text, "looks like\n  it\n    really\n  works", 'right text';
+is $dom->all_text(0), "\n  looks\n  like\n  it\n    really\n  \n  works\n\n",
+  'right text';
+is $dom->div->text, 'looks works', 'right text';
+is $dom->div->text(0), "\n  looks\n  \n  works\n", 'right text';
+is $dom->div->all_text, "looks like\n  it\n    really\n  works", 'right text';
+is $dom->div->all_text(0),
+  "\n  looks\n  like\n  it\n    really\n  \n  works\n", 'right text';
+is $dom->div->pre->text, "\n  ", 'right text';
+is $dom->div->pre->text(0), "\n  ", 'right text';
+is $dom->div->pre->all_text, "like\n  it\n    really\n  ", 'right text';
+is $dom->div->pre->all_text(0), "like\n  it\n    really\n  ", 'right text';
+is $dom->div->pre->code->text, "like\n  it\n    really", 'right text';
+is $dom->div->pre->code->text(0), "like\n  it\n    really", 'right text';
+is $dom->div->pre->code->all_text, "like\n  it\n    really", 'right text';
+is $dom->div->pre->code->all_text(0), "like\n  it\n    really", 'right text';
+
+# PoCo example with whitespace sensitive text
+$dom = Mojo::DOM->new(<<EOF);
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+  <entry>
+    <id>1286823</id>
+    <displayName>Homer Simpson</displayName>
+    <addresses>
+      <type>home</type>
+      <formatted><![CDATA[742 Evergreen Terrace
+Springfield, VT 12345 USA]]></formatted>
+    </addresses>
+  </entry>
+  <entry>
+    <id>1286822</id>
+    <displayName>Marge Simpson</displayName>
+    <addresses>
+      <type>home</type>
+      <formatted>742 Evergreen Terrace
+Springfield, VT 12345 USA</formatted>
+    </addresses>
+  </entry>
+</response>
+EOF
+is $dom->find('entry')->[0]->displayName->text, 'Homer Simpson', 'right text';
+is $dom->find('entry')->[0]->id->text,          '1286823',       'right text';
+is $dom->find('entry')->[0]->addresses->children('type')->[0]->text, 'home',
+  'right text';
+is $dom->find('entry')->[0]->addresses->formatted->text,
+  "742 Evergreen Terrace\nSpringfield, VT 12345 USA",
+  'right text';
+is $dom->find('entry')->[0]->addresses->formatted->text(0),
+  "742 Evergreen Terrace\nSpringfield, VT 12345 USA",
+  'right text';
+is $dom->find('entry')->[1]->displayName->text, 'Marge Simpson', 'right text';
+is $dom->find('entry')->[1]->id->text,          '1286822',       'right text';
+is $dom->find('entry')->[1]->addresses->children('type')->[0]->text, 'home',
+  'right text';
+is $dom->find('entry')->[1]->addresses->formatted->text,
+  '742 Evergreen Terrace Springfield, VT 12345 USA',
+  'right text';
+is $dom->find('entry')->[1]->addresses->formatted->text(0),
+  "742 Evergreen Terrace\nSpringfield, VT 12345 USA",
+  'right text';
+is $dom->find('entry')->[2], undef, 'no result';
