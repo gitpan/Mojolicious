@@ -41,7 +41,7 @@ sub run {
   my $self = shift;
 
   # Options
-  local @ARGV = @_ if @_;
+  local @ARGV = @_;
   my $method = 'GET';
   my @headers;
   my $content = '';
@@ -70,18 +70,14 @@ sub run {
 
   # Fresh user agent
   my $ua = Mojo::UserAgent->new(ioloop => Mojo::IOLoop->singleton);
-
-  # Silence
   $ua->log->level('fatal');
+  $ua->max_redirects(5) if $redirect;
 
   # Absolute URL
   if ($url =~ /^\w+:\/\//) { $ua->detect_proxy }
 
   # Application
   else { $ua->app($ENV{MOJO_APP} || 'Mojo::HelloWorld') }
-
-  # Follow redirects
-  $ua->max_redirects(5) if $redirect;
 
   # Start
   my $v;
@@ -152,8 +148,6 @@ sub run {
 
   # Select
   $self->_select($buffer, $charset, $selector) if $selector;
-
-  return $self;
 }
 
 sub _say {
@@ -193,8 +187,6 @@ sub _select {
 
     # Unknown
     else { die qq/Unknown command "$command".\n/ }
-
-    # Done
     $done++;
   }
 
@@ -246,7 +238,7 @@ implements the following new ones.
 
 =head2 C<run>
 
-  $get = $get->run(@ARGV);
+  $get->run(@ARGV);
 
 Run this command.
 
