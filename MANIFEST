@@ -248,6 +248,7 @@ t/mojolicious/lib/MojoliciousTest/Exceptional.pm
 t/mojolicious/lib/MojoliciousTest/Foo.pm
 t/mojolicious/lib/MojoliciousTest/Foo/Bar.pm
 t/mojolicious/lib/MojoliciousTest/Plugin/TestPlugin.pm
+t/mojolicious/lib/MojoliciousTest/Plugin/UPPERCASETestPlugin.pm
 t/mojolicious/lib/MojoliciousTest/SyntaxError.pm
 t/mojolicious/lib/MojoliciousTest2/Foo.pm
 t/mojolicious/lib/MojoliciousTestController.pm

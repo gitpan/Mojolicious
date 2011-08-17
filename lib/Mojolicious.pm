@@ -34,7 +34,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Smiling Face With Sunglasses';
-our $VERSION  = '1.78';
+our $VERSION  = '1.79';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -92,14 +92,14 @@ sub new {
     if -w $home->rel_file('log');
 
   # Load default plugins
-  $self->plugin('callback_condition');
-  $self->plugin('header_condition');
-  $self->plugin('default_helpers');
-  $self->plugin('tag_helpers');
-  $self->plugin('epl_renderer');
-  $self->plugin('ep_renderer');
-  $self->plugin('request_timer');
-  $self->plugin('powered_by');
+  $self->plugin('CallbackCondition');
+  $self->plugin('HeaderCondition');
+  $self->plugin('DefaultHelpers');
+  $self->plugin('TagHelpers');
+  $self->plugin('EplRenderer');
+  $self->plugin('EpRenderer');
+  $self->plugin('RequestTimer');
+  $self->plugin('PoweredBy');
 
   # Reduced log output outside of development mode
   $self->log->level('info') unless $mode eq 'development';
@@ -768,14 +768,17 @@ Useful for all kinds of postprocessing tasks.
 
 =head2 C<plugin>
 
-  $app->plugin('something');
-  $app->plugin('something', foo => 23);
-  $app->plugin('something', {foo => 23});
-  $app->plugin('Foo::Bar');
-  $app->plugin('Foo::Bar', foo => 23);
-  $app->plugin('Foo::Bar', {foo => 23});
+  $app->plugin('some_thing');
+  $app->plugin('some_thing', foo => 23);
+  $app->plugin('some_thing', {foo => 23});
+  $app->plugin('SomeThing');
+  $app->plugin('SomeThing', foo => 23);
+  $app->plugin('SomeThing', {foo => 23});
+  $app->plugin('MyApp::Plugin::SomeThing');
+  $app->plugin('MyApp::Plugin::SomeThing', foo => 23);
+  $app->plugin('MyApp::Plugin::SomeThing', {foo => 23});
 
-Load a plugin.
+Load a plugin with L<Mojolicious::Plugins/"register_plugin">.
 
 The following plugins are included in the L<Mojolicious> distribution as
 examples.

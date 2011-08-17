@@ -313,7 +313,7 @@ sub camelize {
   for my $part (split /-/, $_[0]) {
     next unless $part;
 
-    # Camelcase words
+    # Camel case words
     my @words = split /_/, $part;
     @words = map { ucfirst lc } @words;
     push @parts, join '', @words;
@@ -328,7 +328,7 @@ sub decamelize {
   my @parts;
   for my $part (split /\:\:/, $_[0]) {
 
-    # Camelcase words
+    # Camel case words
     my @words;
     push @words, $1 while ($part =~ s/([A-Z]{1}[^A-Z]*)//);
     @words = map {lc} @words;
@@ -733,17 +733,19 @@ Base64 encode in-place.
 
   camelize $string;
 
-Camelize string in-place.
+Convert snake case string to camel case and replace C<-> with C<::> in-place.
 
-  foo_bar -> FooBar
+  foo_bar     -> FooBar
+  foo_bar-baz -> FooBar::Baz
 
 =head2 C<decamelize>
 
   decamelize $string;
 
-Decamelize string in-place.
+Convert camel case string to snake case and replace C<::> with C<-> in-place.
 
-  FooBar -> foo_bar
+  FooBar      -> foo_bar
+  FooBar::Baz -> foo_bar-baz
 
 =head2 C<decode>
 
