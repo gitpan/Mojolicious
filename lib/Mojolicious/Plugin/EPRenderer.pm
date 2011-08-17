@@ -1,4 +1,4 @@
-package Mojolicious::Plugin::EpRenderer;
+package Mojolicious::Plugin::EPRenderer;
 use Mojo::Base 'Mojolicious::Plugin';
 
 use Mojo::Loader;
@@ -88,23 +88,23 @@ __END__
 
 =head1 NAME
 
-Mojolicious::Plugin::EpRenderer - Embedded Perl Renderer Plugin
+Mojolicious::Plugin::EPRenderer - Embedded Perl Renderer Plugin
 
 =head1 SYNOPSIS
 
   # Mojolicious
-  $self->plugin('EpRenderer');
-  $self->plugin(EpRenderer => {name => 'foo'});
-  $self->plugin(EpRenderer => {template => {line_start => '.'}});
+  $self->plugin('EPRenderer');
+  $self->plugin(EPRenderer => {name => 'foo'});
+  $self->plugin(EPRenderer => {template => {line_start => '.'}});
 
   # Mojolicious::Lite
-  plugin 'EpRenderer';
-  plugin EpRenderer => {name => 'foo'};
-  plugin EpRenderer => {template => {line_start => '.'}};
+  plugin 'EPRenderer';
+  plugin EPRenderer => {name => 'foo'};
+  plugin EPRenderer => {template => {line_start => '.'}};
 
 =head1 DESCRIPTION
 
-L<Mojolicious::Plugin::EpRenderer> is a renderer for C<ep> templates.
+L<Mojolicious::Plugin::EPRenderer> is a renderer for C<ep> templates.
 
 =head1 TEMPLATES
 
@@ -122,20 +122,20 @@ example for learning to build new plugins.
 =head2 C<name>
 
   # Mojolicious::Lite
-  plugin EpRenderer => {name => 'foo'};
+  plugin EPRenderer => {name => 'foo'};
 
 Handler name.
 
 =head2 C<template>
 
   # Mojolicious::Lite
-  plugin EpRenderer => {template => {line_start => '.'}};
+  plugin EPRenderer => {template => {line_start => '.'}};
 
 Template options.
 
 =head1 METHODS
 
-L<Mojolicious::Plugin::EpRenderer> inherits all methods from
+L<Mojolicious::Plugin::EPRenderer> inherits all methods from
 L<Mojolicious::Plugin> and implements the following new ones.
 
 =head2 C<register>

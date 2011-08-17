@@ -1,4 +1,4 @@
-package Mojolicious::Plugin::EplRenderer;
+package Mojolicious::Plugin::EPLRenderer;
 use Mojo::Base 'Mojolicious::Plugin';
 
 use Mojo::Template;
@@ -88,26 +88,26 @@ __END__
 
 =head1 NAME
 
-Mojolicious::Plugin::EplRenderer - Embedded Perl Lite Renderer Plugin
+Mojolicious::Plugin::EPLRenderer - Embedded Perl Lite Renderer Plugin
 
 =head1 SYNOPSIS
 
   # Mojolicious
-  $self->plugin('EplRenderer');
+  $self->plugin('EPLRenderer');
 
   # Mojolicious::Lite
-  plugin 'EplRenderer';
+  plugin 'EPLRenderer';
 
 =head1 DESCRIPTION
 
-L<Mojolicious::Plugin::EplRenderer> is a renderer for C<epl> templates.
+L<Mojolicious::Plugin::EPLRenderer> is a renderer for C<epl> templates.
 C<epl> templates are pretty much just raw L<Mojo::Template>.
 This is a core plugin, that means it is always enabled and its code a good
 example for learning to build new plugins.
 
 =head1 METHODS
 
-L<Mojolicious::Plugin::EplRenderer> inherits all methods from
+L<Mojolicious::Plugin::EPLRenderer> inherits all methods from
 L<Mojolicious::Plugin> and implements the following new ones.
 
 =head2 C<register>

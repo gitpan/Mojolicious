@@ -1,4 +1,4 @@
-package Mojolicious::Plugin::PodRenderer;
+package Mojolicious::Plugin::PODRenderer;
 use Mojo::Base 'Mojolicious::Plugin';
 
 use File::Basename 'dirname';
@@ -173,27 +173,27 @@ __END__
 
 =head1 NAME
 
-Mojolicious::Plugin::PodRenderer - POD Renderer Plugin
+Mojolicious::Plugin::PODRenderer - POD Renderer Plugin
 
 =head1 SYNOPSIS
 
   # Mojolicious
-  $self->plugin('PodRenderer');
-  $self->plugin(PodRenderer => {name => 'foo'});
-  $self->plugin(PodRenderer => {preprocess => 'epl'});
+  $self->plugin('PODRenderer');
+  $self->plugin(PODRenderer => {name => 'foo'});
+  $self->plugin(PODRenderer => {preprocess => 'epl'});
   $self->render('some_template', handler => 'pod');
   <%= pod_to_html "=head1 TEST\n\nC<123>" %>
 
   # Mojolicious::Lite
-  plugin 'PodRenderer';
-  plugin PodRenderer => {name => 'foo'};
-  plugin PodRenderer => {preprocess => 'epl'};
+  plugin 'PODRenderer';
+  plugin PODRenderer => {name => 'foo'};
+  plugin PODRenderer => {preprocess => 'epl'};
   $self->render('some_template', handler => 'pod');
   <%= pod_to_html "=head1 TEST\n\nC<123>" %>
 
 =head1 DESCRIPTION
 
-L<Mojolicious::Plugin::PodRenderer> is a renderer for true Perl hackers,
+L<Mojolicious::Plugin::PODRenderer> is a renderer for true Perl hackers,
 rawr!
 
 =head1 OPTIONS
@@ -201,14 +201,14 @@ rawr!
 =head2 C<name>
 
   # Mojolicious::Lite
-  plugin PodRenderer => {name => 'foo'};
+  plugin PODRenderer => {name => 'foo'};
 
 Handler name.
 
 =head2 C<no_perldoc>
 
   # Mojolicious::Lite
-  plugin PodRenderer => {no_perldoc => 1};
+  plugin PODRenderer => {no_perldoc => 1};
 
 Disable perldoc browser.
 Note that this option is EXPERIMENTAL and might change without warning!
@@ -216,7 +216,7 @@ Note that this option is EXPERIMENTAL and might change without warning!
 =head2 C<preprocess>
 
   # Mojolicious::Lite
-  plugin PodRenderer => {preprocess => 'epl'};
+  plugin PODRenderer => {preprocess => 'epl'};
 
 Handler name of preprocessor.
 
@@ -231,7 +231,7 @@ Render POD to HTML.
 
 =head1 METHODS
 
-L<Mojolicious::Plugin::PodRenderer> inherits all methods from
+L<Mojolicious::Plugin::PODRenderer> inherits all methods from
 L<Mojolicious::Plugin> and implements the following new ones.
 
 =head2 C<register>

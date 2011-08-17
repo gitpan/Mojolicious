@@ -1,4 +1,4 @@
-package Mojolicious::Plugin::I18n;
+package Mojolicious::Plugin::I18N;
 use Mojo::Base 'Mojolicious::Plugin';
 
 use I18N::LangTags;
@@ -35,7 +35,7 @@ sub register {
 
       # Handler
       $self->stash->{i18n} =
-        Mojolicious::Plugin::I18n::_Handler->new(namespace => $namespace);
+        Mojolicious::Plugin::I18N::_Handler->new(namespace => $namespace);
 
       # Languages
       $self->stash->{i18n}->languages(@languages, $default);
@@ -49,7 +49,7 @@ sub register {
   $app->helper(l => sub { shift->stash->{i18n}->localize(@_) });
 }
 
-package Mojolicious::Plugin::I18n::_Handler;
+package Mojolicious::Plugin::I18N::_Handler;
 use Mojo::Base -base;
 
 # "Robot 1-X, save my friends! And Zoidberg!"
@@ -80,17 +80,17 @@ __END__
 
 =head1 NAME
 
-Mojolicious::Plugin::I18n - Intenationalization Plugin
+Mojolicious::Plugin::I18N - Intenationalization Plugin
 
 =head1 SYNOPSIS
 
   # Mojolicious
-  $self->plugin('I18n');
+  $self->plugin('I18N');
   % languages 'de';
   <%=l 'hello' %>
 
   # Mojolicious::Lite
-  plugin I18n => {namespace => 'MyApp::I18N'};
+  plugin I18N => {namespace => 'MyApp::I18N'};
   <%=l 'hello' %>
 
   # Lexicon
@@ -103,7 +103,7 @@ Mojolicious::Plugin::I18n - Intenationalization Plugin
 
 =head1 DESCRIPTION
 
-L<Mojolicious::Plugin::I18n> adds L<Locale::Maketext> support to
+L<Mojolicious::Plugin::I18N> adds L<Locale::Maketext> support to
 L<Mojolicious>.
 All you have to do besides using this plugin is to add as many lexicon
 classes as you need.
@@ -113,7 +113,7 @@ request header.
 This plugin can save a lot of typing, since it will generate the following
 code by default.
 
-  # $self->plugin('I18n');
+  # $self->plugin('I18N');
   package MyApp::I18N;
   use base 'Locale::Maketext';
   package MyApp::I18N::en;
@@ -130,14 +130,14 @@ The default lexicon class will only be generated if it doesn't already exist.
 =head2 C<default>
 
   # Mojolicious::Lite
-  plugin I18n => {default => 'en'};
+  plugin I18N => {default => 'en'};
 
 Default language, defaults to C<en>.
 
 =head2 C<namespace>
 
   # Mojolicious::Lite
-  plugin I18n => {namespace => 'MyApp::I18N'};
+  plugin I18N => {namespace => 'MyApp::I18N'};
 
 Lexicon namespace, defaults to the application class followed by C<::I18N>.
 
@@ -159,7 +159,7 @@ Change languages.
 
 =head1 METHODS
 
-L<Mojolicious::Plugin::I18n> inherits all methods from L<Mojolicious::Plugin>
+L<Mojolicious::Plugin::I18N> inherits all methods from L<Mojolicious::Plugin>
 and implements the following new ones.
 
 =head2 C<register>

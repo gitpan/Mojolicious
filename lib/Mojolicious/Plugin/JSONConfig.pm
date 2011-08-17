@@ -1,4 +1,4 @@
-package Mojolicious::Plugin::JsonConfig;
+package Mojolicious::Plugin::JSONConfig;
 use Mojo::Base 'Mojolicious::Plugin::Config';
 
 use Mojo::JSON;
@@ -57,7 +57,7 @@ __END__
 
 =head1 NAME
 
-Mojolicious::Plugin::JsonConfig - JSON Configuration Plugin
+Mojolicious::Plugin::JSONConfig - JSON Configuration Plugin
 
 =head1 SYNOPSIS
 
@@ -68,23 +68,23 @@ Mojolicious::Plugin::JsonConfig - JSON Configuration Plugin
   }
 
   # Mojolicious
-  my $config = $self->plugin('JsonConfig');
+  my $config = $self->plugin('JSONConfig');
 
   # Mojolicious::Lite
-  my $config = plugin 'JsonConfig';
+  my $config = plugin 'JSONConfig';
 
   # Reads myapp.json by default and puts the parsed version into the stash
   my $config = $self->stash('config');
 
   # Everything can be customized with options
-  my $config = plugin JsonConfig => {
+  my $config = plugin JSONConfig => {
     file      => '/etc/myapp.conf',
     stash_key => 'conf'
   };
 
 =head1 DESCRIPTION
 
-L<Mojolicious::Plugin::JsonConfig> is a JSON configuration plugin that
+L<Mojolicious::Plugin::JSONConfig> is a JSON configuration plugin that
 preprocesses it's input with L<Mojo::Template>.
 The application object can be accessed via C<$app> or the C<app> helper.
 You can extend the normal config file C<myapp.json> with C<mode> specific
@@ -92,24 +92,24 @@ ones like C<myapp.$mode.json>.
 
 =head1 OPTIONS
 
-L<Mojolicious::Plugin::JsonConfig> accepts the same options as
+L<Mojolicious::Plugin::JSONConfig> accepts the same options as
 L<Mojolicious::Plugin::Config> and the following new ones.
 
 =head2 C<template>
 
   # Mojolicious::Lite
-  plugin JsonConfig => {template => {line_start => '.'}};
+  plugin JSONConfig => {template => {line_start => '.'}};
 
 Template options.
 
 =head1 HELPERS
 
-L<Mojolicious::Plugin::JsonConfig> defines the same helpers as
+L<Mojolicious::Plugin::JSONConfig> defines the same helpers as
 L<Mojolicious::Plugin::Config>.
 
 =head1 METHODS
 
-L<Mojolicious::Plugin::JsonConfig> inherits all methods from
+L<Mojolicious::Plugin::JSONConfig> inherits all methods from
 L<Mojolicious::Plugin::Config> and implements the following new ones.
 
 =head2 C<parse>
