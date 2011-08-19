@@ -21,7 +21,23 @@ sub new {
   bless [@_], ref $class || $class;
 }
 
-sub each { shift->_iterate(@_) }
+sub each {
+  my ($self, $cb) = @_;
+  return @$self unless $cb;
+  my $i = 1;
+  $_->$cb($i++) for @$self;
+  return $self;
+}
+
+# "All right, let's not panic.
+#  I'll make the money by selling one of my livers.
+#  I can get by with one."
+sub filter {
+  my ($self, $cb) = @_;
+  my $new = $self->new;
+  $cb->($_) and push(@$new, $_) for @$self;
+  return $new;
+}
 
 sub join {
   my ($self, $chunk) = @_;
@@ -33,26 +49,7 @@ sub map {
   return $self->new(map { $cb->($_) } @$self);
 }
 
-sub size  { scalar @{$_[0]} }
-sub until { shift->_iterate(@_, 1) }
-sub while { shift->_iterate(@_, 0) }
-
-# "All right, let's not panic.
-#  I'll make the money by selling one of my livers.
-#  I can get by with one."
-sub _iterate {
-  my ($self, $cb, $cond) = @_;
-  return @$self unless $cb;
-
-  # Iterate until condition is true
-  my $i = 1;
-  if (defined $cond) { !!$_->$cb($i++) == $cond && last for @$self }
-
-  # Iterate over all elements
-  else { $_->$cb($i++) for @$self }
-
-  return $self;
-}
+sub size { scalar @{$_[0]} }
 
 1;
 __END__
@@ -65,16 +62,15 @@ Mojo::Collection - Collection
 
   # Manipulate collections
   use Mojo::Collection;
-  my $collection = Mojo::Collection->new(1, 2, 3);
-  my $doubled    = $collection->map(sub { $_ * 2 });
-  $doubled->each(sub {
-    my ($num, $count) = @_;
-    print "$count: $num\n";
+  my $collection = Mojo::Collection->new(qw/just works/);
+  $collection->map(sub { ucfirst })->each(sub {
+    my ($word, $count) = @_;
+    print "$count: $word\n";
   });
 
   # Use the alternative constructor
   use Mojo::Collection 'c';
-  c(1, 2, 3)->join("\n")->say;
+  c(qw/a b c/)->join('/')->url_escape->say;
 
 =head1 DESCRIPTION
 
@@ -95,13 +91,23 @@ Construct a new L<Mojo::Collection> object.
 =head2 C<each>
 
   my @elements = $collection->each;
-  $collection  = $collection->each(sub { print shift->text });
+  $collection  = $collection->each(sub {...});
+
+Iterate over whole collection.
+
   $collection  = $collection->each(sub {
     my ($e, $count) = @_;
     print "$count: $e\n";
   });
 
-Iterate over whole collection.
+=head2 C<filter>
+
+  my $new = $collection->filter(sub {...});
+
+Evaluate closure for each element in collection and create a new collection
+with all elements that passed.
+
+  my $fiveplus = $collection->filter(sub { $_ > 5 });
 
 =head2 C<join>
 
@@ -125,26 +131,6 @@ from the results.
   my $size = $collection->size;
 
 Number of elements in collection.
-
-=head2 C<until>
-
-  $collection = $collection->until(sub { $_ =~ /x/ && print $_ });
-  $collection = $collection->until(sub {
-    my ($e, $count) = @_;
-    $e =~ /x/ && print "$count: $e\n";
-  });
-
-Iterate over collection until closure returns true.
-
-=head2 C<while>
-
-  $collection = $collection->while(sub { print($_) && $_ =~ /x/});
-  $collection = $collection->while(sub {
-    my ($e, $count) = @_;
-    print("$count: $e\n") && $e =~ /x/;
-  });
-
-Iterate over collection while closure returns true.
 
 =head1 SEE ALSO
 
