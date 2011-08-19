@@ -10,6 +10,7 @@ lib/Mojo/Asset/Memory.pm
 lib/Mojo/Base.pm
 lib/Mojo/ByteStream.pm
 lib/Mojo/Cache.pm
+lib/Mojo/Collection.pm
 lib/Mojo/Command.pm
 lib/Mojo/Content.pm
 lib/Mojo/Content/MultiPart.pm
@@ -20,7 +21,6 @@ lib/Mojo/Cookie/Response.pm
 lib/Mojo/CookieJar.pm
 lib/Mojo/Date.pm
 lib/Mojo/DOM.pm
-lib/Mojo/DOM/Collection.pm
 lib/Mojo/DOM/CSS.pm
 lib/Mojo/DOM/HTML.pm
 lib/Mojo/Exception.pm
@@ -180,6 +180,7 @@ t/mojo/certs/client.key
 t/mojo/certs/server.crt
 t/mojo/certs/server.key
 t/mojo/cgi.t
+t/mojo/collection.t
 t/mojo/command.t
 t/mojo/content.t
 t/mojo/cookie.t
