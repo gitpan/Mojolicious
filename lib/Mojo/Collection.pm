@@ -5,6 +5,7 @@ use overload
   '""'     => sub { shift->join("\n") },
   fallback => 1;
 
+use List::Util;
 use Mojo::ByteStream;
 
 sub import {
@@ -29,25 +30,47 @@ sub each {
   return $self;
 }
 
+sub first {
+  my ($self, $cb) = @_;
+  return $self->[0] unless $cb;
+  return List::Util::first { $_->$cb } @$self;
+}
+
 # "All right, let's not panic.
 #  I'll make the money by selling one of my livers.
 #  I can get by with one."
 sub grep {
   my ($self, $cb) = @_;
-  return $self->new(grep { $_->$cb } @$self);
+  $self->new(grep { $_->$cb } @$self);
 }
 
 sub join {
   my ($self, $chunk) = @_;
-  return Mojo::ByteStream->new(join $chunk, map({"$_"} @$self));
+  Mojo::ByteStream->new(join $chunk, map({"$_"} @$self));
 }
 
 sub map {
   my ($self, $cb) = @_;
-  return $self->new(map { $_->$cb } @$self);
+  $self->new(map { $_->$cb } @$self);
+}
+
+sub reverse {
+  my $self = shift;
+  $self->new(reverse @$self);
+}
+
+sub shuffle {
+  my $self = shift;
+  $self->new(List::Util::shuffle @$self);
 }
 
 sub size { scalar @{$_[0]} }
+
+sub sort {
+  my ($self, $cb) = @_;
+  return $self->new(sort @$self) unless $cb;
+  return $self->new(sort { $a->$cb($b) } @$self);
+}
 
 1;
 __END__
@@ -91,21 +114,31 @@ Construct a new L<Mojo::Collection> object.
   my @elements = $collection->each;
   $collection  = $collection->each(sub {...});
 
-Iterate over whole collection.
+Evaluate closure for each element in collection.
 
   $collection->each(sub {
     my ($e, $count) = @_;
     print "$count: $e\n";
   });
 
+=head2 C<first>
+
+  my $first = $collection->first;
+  my $first = $collection->first(sub {...});
+
+Evaluate closure for each element in collection and return the first one for
+which the closure returns true.
+
+  my $five = $collection->first(sub { $_ == 5 });
+
 =head2 C<grep>
 
   my $new = $collection->grep(sub {...});
 
 Evaluate closure for each element in collection and create a new collection
-with all elements that passed.
+with all elements for which the closure returned true.
 
-  my $fiveplus = $collection->grep(sub { $_ >= 5 });
+  my $interesting = $collection->grep(sub { /mojo/i });
 
 =head2 C<join>
 
@@ -124,11 +157,33 @@ from the results.
 
   my $doubled = $collection->map(sub { $_ * 2 });
 
+=head2 C<reverse>
+
+  my $new = $collection->reverse;
+
+Create a new collection with all elements in reverse order.
+
+=head2 C<shuffle>
+
+  my $new = $collection->shuffle;
+
+Create a new collection with all elements in random order.
+
 =head2 C<size>
 
   my $size = $collection->size;
 
 Number of elements in collection.
+
+=head2 C<sort>
+
+  my $new = $collection->sort;
+  my $new = $collection->sort(sub {...});
+
+Sort elements based on return value of closure and create a new collection
+from the results.
+
+  my $insensitive = $collection->sort(sub { uc(shift) cmp uc(shift) });
 
 =head1 SEE ALSO
 

@@ -1,5 +1,11 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+1.84    2011-08-19 00:00:00
+        - Added EXPERIMENTAL first, reverse, shuffle and sort methods to
+          Mojo::Collection.
+        - Improved documentation.
+        - Fixed small test portablity bug.
+
 1.83    2011-08-19 00:00:00
         - Renamed filter method in Mojo::Collection to grep.
         - Improved documentation.
