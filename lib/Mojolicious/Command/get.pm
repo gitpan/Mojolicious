@@ -1,4 +1,4 @@
-package Mojolicious::Command::Get;
+package Mojolicious::Command::get;
 use Mojo::Base 'Mojo::Command';
 
 use Getopt::Long 'GetOptions';
@@ -200,22 +200,22 @@ __END__
 
 =head1 NAME
 
-Mojolicious::Command::Get - Get Command
+Mojolicious::Command::get - Get Command
 
 =head1 SYNOPSIS
 
-  use Mojolicious::Command::Get;
+  use Mojolicious::Command::get;
 
-  my $get = Mojolicious::Command::Get->new;
+  my $get = Mojolicious::Command::get->new;
   $get->run(@ARGV);
 
 =head1 DESCRIPTION
 
-L<Mojolicious::Command::Get> is a command interface to L<Mojo::UserAgent>.
+L<Mojolicious::Command::get> is a command interface to L<Mojo::UserAgent>.
 
 =head1 ATTRIBUTES
 
-L<Mojolicious::Command::Get> inherits all attributes from L<Mojo::Command>
+L<Mojolicious::Command::get> inherits all attributes from L<Mojo::Command>
 and implements the following new ones.
 
 =head2 C<description>
@@ -234,7 +234,7 @@ Usage information for this command, used for the help screen.
 
 =head1 METHODS
 
-L<Mojolicious::Command::Get> inherits all methods from L<Mojo::Command> and
+L<Mojolicious::Command::get> inherits all methods from L<Mojo::Command> and
 implements the following new ones.
 
 =head2 C<run>

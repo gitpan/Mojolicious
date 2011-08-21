@@ -186,8 +186,8 @@ Short hint shown after listing available commands.
   my $namespaces = $commands->namespaces;
   $commands      = $commands->namespaces(['Mojolicious::Commands']);
 
-Namespaces to search for available commands, defaults to L<Mojo::Command> and
-L<Mojolicious::Command>.
+Namespaces to search for available commands, defaults to
+L<Mojolicious::Command> and L<Mojo::Command>.
 
 =head1 METHODS
 

@@ -49,6 +49,7 @@ sub chmod_rel_file {
 sub class_to_file {
   my ($self, $class) = @_;
   $class =~ s/:://g;
+  $class =~ s/([A-Z])([A-Z]*)/$1.lc($2)/gex;
   decamelize $class;
   return $class;
 }
@@ -204,23 +205,13 @@ sub run {
 
     # Try all namespaces
     my $module;
-    my $camelized = $name;
-    camelize $camelized;
+    my $class = $name;
+    camelize $class;
     for my $namespace (@{$self->namespaces}) {
-      my $try = "$namespace\::$camelized";
-      if (my $e = Mojo::Loader->load($try)) {
+      last if $module = _command("${namespace}::$name");
 
-        # Module missing
-        next unless ref $e;
-
-        # Real error
-        die $e;
-      }
-
-      # Found a command
-      next unless $try->can('new') && $try->can('run');
-      $module = $try;
-      last;
+      # DEPRECATED in Smiling Face With Sunglasses!
+      last if $module = _command("${namespace}::$class");
     }
 
     # Command missing
@@ -239,13 +230,8 @@ sub run {
   my $commands = [];
   my $seen     = {};
   for my $namespace (@{$self->namespaces}) {
-
-    # Search
     for my $module (@{Mojo::Loader->search($namespace)}) {
-      if (my $e = Mojo::Loader->load($module)) { die $e }
-
-      # Seen
-      my $command = $module;
+      next unless my $command = _command($module);
       $command =~ s/^$namespace\:://;
       push @$commands, [$command => $module]
         unless $seen->{$command};
@@ -261,8 +247,7 @@ sub run {
   my $len  = 0;
   foreach my $command (@$commands) {
     my $name = $command->[0];
-    decamelize $name;
-    my $l = length $name;
+    my $l    = length $name;
     $len = $l if $l > $len;
     push @$list, [$name, $command->[1]->new->description];
   }
@@ -312,6 +297,18 @@ sub write_rel_file {
   $self->write_file($self->rel_file($path), $data);
 }
 
+sub _command {
+  my $module = shift;
+
+  if (my $e = Mojo::Loader->load($module)) {
+    return unless ref $e;
+    die $e;
+  }
+  return unless $module->can('new') && $module->isa('Mojo::Command');
+
+  return $module;
+}
+
 1;
 __END__
 
@@ -321,8 +318,8 @@ Mojo::Command - Command Base Class
 
 =head1 SYNOPSIS
 
-  # Camel case command name
-  package Mojo::Command::Mycommand;
+  # Lower case command name
+  package Mojolicious::Command::mycommand;
 
   # Subclass
   use Mojo::Base 'Mojo::Command';
@@ -430,7 +427,10 @@ Portably change mode of a relative file.
 
 Convert a class name to a file.
 
-  FooBar -> foo_bar
+  Foo::Bar -> foo_bar
+  FOO::Bar -> foobar
+  FooBar   -> foo_bar
+  FOOBar   -> foobar
 
 =head2 C<class_to_path>
 

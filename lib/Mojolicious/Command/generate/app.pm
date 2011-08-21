@@ -1,4 +1,4 @@
-package Mojolicious::Command::Generate::App;
+package Mojolicious::Command::generate::app;
 use Mojo::Base 'Mojo::Command';
 
 has description => <<'EOF';
@@ -160,22 +160,22 @@ to move forward to a static page.
 __END__
 =head1 NAME
 
-Mojolicious::Command::Generate::App - App Generator Command
+Mojolicious::Command::generate::app - App Generator Command
 
 =head1 SYNOPSIS
 
-  use Mojolicious::Command::Generate::App;
+  use Mojolicious::Command::generate::app;
 
-  my $app = Mojolicious::Command::Generate::App->new;
+  my $app = Mojolicious::Command::generate::app->new;
   $app->run(@ARGV);
 
 =head1 DESCRIPTION
 
-L<Mojolicious::Command::Generate::App> is an application generator.
+L<Mojolicious::Command::generate::app> is an application generator.
 
 =head1 ATTRIBUTES
 
-L<Mojolicious::Command::Generate::App> inherits all attributes from
+L<Mojolicious::Command::generate::app> inherits all attributes from
 L<Mojo::Command> and implements the following new ones.
 
 =head2 C<description>
@@ -194,7 +194,7 @@ Usage information for this command, used for the help screen.
 
 =head1 METHODS
 
-L<Mojolicious::Command::Generate::App> inherits all methods from
+L<Mojolicious::Command::generate::app> inherits all methods from
 L<Mojo::Command> and implements the following new ones.
 
 =head2 C<run>

@@ -1,4 +1,4 @@
-package Mojolicious::Command::Daemon;
+package Mojolicious::Command::daemon;
 use Mojo::Base 'Mojo::Command';
 
 use Getopt::Long 'GetOptions';
@@ -58,23 +58,23 @@ __END__
 
 =head1 NAME
 
-Mojolicious::Command::Daemon - Daemon Command
+Mojolicious::Command::daemon - Daemon Command
 
 =head1 SYNOPSIS
 
-  use Mojolicious::Command::Daemon;
+  use Mojolicious::Command::daemon;
 
-  my $daemon = Mojolicious::Command::Daemon->new;
+  my $daemon = Mojolicious::Command::daemon->new;
   $daemon->run(@ARGV);
 
 =head1 DESCRIPTION
 
-L<Mojolicious::Command::Daemon> is a command interface to
+L<Mojolicious::Command::daemon> is a command interface to
 L<Mojo::Server::Daemon>.
 
 =head1 ATTRIBUTES
 
-L<Mojolicious::Command::Daemon> inherits all attributes from L<Mojo::Command>
+L<Mojolicious::Command::daemon> inherits all attributes from L<Mojo::Command>
 and implements the following new ones.
 
 =head2 C<description>
@@ -93,7 +93,7 @@ Usage information for this command, used for the help screen.
 
 =head1 METHODS
 
-L<Mojolicious::Command::Daemon> inherits all methods from L<Mojo::Command>
+L<Mojolicious::Command::daemon> inherits all methods from L<Mojo::Command>
 and implements the following new ones.
 
 =head2 C<run>

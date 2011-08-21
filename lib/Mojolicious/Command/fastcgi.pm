@@ -1,4 +1,4 @@
-package Mojolicious::Command::Fastcgi;
+package Mojolicious::Command::fastcgi;
 use Mojo::Base 'Mojo::Command';
 
 use Mojo::Server::FastCGI;
@@ -18,18 +18,18 @@ __END__
 
 =head1 NAME
 
-Mojolicious::Command::Fastcgi - FastCGI Command
+Mojolicious::Command::fastcgi - FastCGI Command
 
 =head1 SYNOPSIS
 
-  use Mojolicious::Command::Fastcgi;
+  use Mojolicious::Command::fastcgi;
 
-  my $fastcgi = Mojolicious::Command::Fastcgi->new;
+  my $fastcgi = Mojolicious::Command::fastcgi->new;
   $fastcgi->run;
 
 =head1 DESCRIPTION
 
-L<Mojolicious::Command::Fastcgi> is a command interface to
+L<Mojolicious::Command::fastcgi> is a command interface to
 L<Mojo::Server::FastCGI>.
 
 =head1 ATTRIBUTES
@@ -53,7 +53,7 @@ Usage information for this command, used for the help screen.
 
 =head1 METHODS
 
-L<Mojolicious::Command::Fastcgi> inherits all methods from L<Mojo::Command>
+L<Mojolicious::Command::fastcgi> inherits all methods from L<Mojo::Command>
 and implements the following new ones.
 
 =head2 C<run>
