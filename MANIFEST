@@ -218,6 +218,7 @@ t/mojo/resolver.t
 t/mojo/resolver_online.t
 t/mojo/server.t
 t/mojo/template.t
+t/mojo/transactor.t
 t/mojo/trigger.t
 t/mojo/url.t
 t/mojo/user_agent.t
