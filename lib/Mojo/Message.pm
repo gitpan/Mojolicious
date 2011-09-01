@@ -733,7 +733,7 @@ Get a chunk of start line data starting from a specific position.
 
   my $leftovers = $message->has_leftovers;
 
-CHeck if message parser has leftover data.
+Check if message parser has leftover data.
 
 =head2 C<header_size>
 
@@ -806,7 +806,7 @@ Note that this method is EXPERIMENTAL and might change without warning!
   my $param  = $message->param('foo');
   my @params = $message->param('foo');
 
-Access C<GET> and C<POST> parameters>.
+Access C<GET> and C<POST> parameters.
 
 =head2 C<parse>
 
@@ -837,13 +837,13 @@ Render whole message.
   my $upload  = $message->upload('foo');
   my @uploads = $message->upload('foo');
 
-Access file uploads, usually L<Mojo::Upload> objects.
+Access C<multipart/form-data> file uploads, usually L<Mojo::Upload> objects.
 
 =head2 C<uploads>
 
   my $uploads = $message->uploads;
 
-All file uploads, usually L<Mojo::Upload> objects.
+All C<multipart/form-data> file uploads, usually L<Mojo::Upload> objects.
 
 =head2 C<version>
 
