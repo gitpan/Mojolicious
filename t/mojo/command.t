@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 use Mojo::Base -strict;
 
-use Test::More tests => 24;
+use Test::More tests => 27;
 
 use Cwd 'cwd';
 use File::Spec;
@@ -42,6 +42,21 @@ is_deeply [sort keys %{$command->get_all_data('Example::Package::Windows')}],
   [qw/template3 template4/], 'right DATA files';
 close $data;
 
+# Mixed whitespace
+my $mixed = "@\@template5\n5\n\n@@  template6\n6\n@@     template7\n7";
+open $data, '<', \$mixed;
+no strict 'refs';
+*{"Example::Package::Mixed::DATA"} = $data;
+is $command->get_data('template5', 'Example::Package::Mixed'), "5\n\n",
+  'right template';
+is $command->get_data('template6', 'Example::Package::Mixed'), "6\n",
+  'right template';
+is $command->get_data('template7', 'Example::Package::Mixed'), '7',
+  'right template';
+is_deeply [sort keys %{$command->get_all_data('Example::Package::Mixed')}],
+  [qw/template5 template6 template7/], 'right DATA files';
+close $data;
+
 # Class to file
 is $command->class_to_file('Foo::Bar'), 'foo_bar', 'right file';
 is $command->class_to_file('FooBar'),   'foo_bar', 'right file';
@@ -66,10 +81,6 @@ is $command->class_to_path('Foo::Bar'), 'Foo/Bar.pm', 'right path';
 {
   local $ENV{GATEWAY_INTERFACE} = 'CGI/1.1';
   is $command->detect, 'cgi', 'right environment';
-}
-{
-  local %ENV = ();
-  is $command->detect, 'fastcgi', 'right environment';
 }
 
 # Generating files

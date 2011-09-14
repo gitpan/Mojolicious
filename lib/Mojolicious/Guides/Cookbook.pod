@@ -67,6 +67,14 @@ connection, just by running the command above again.
   $ hypnotoad script/myapp
   Starting hot deployment for Hypnotoad server 31841.
 
+You might also want to enable proxy support if you're using Hypnotoad behind
+a reverse proxy.
+This allows L<Mojolicious> to automatically pick up the C<X-Forwarded-For>,
+C<X-Forwarded-Host> and C<X-Forwarded-HTTPS> headers.
+
+  # hypnotoad.conf
+  {proxy => 1};
+
 =head2 Nginx
 
 One of the most popular setups these days is the built-in web server behind a
@@ -87,12 +95,23 @@ Nginx reverse proxy.
     }
   }
 
-You might also want to enable reverse proxy support in C<hypnotoad>.
-This allows L<Mojolicious> to automatically pick up the C<X-Forwarded-For>,
-C<X-Forwarded-Host> and C<X-Forwarded-HTTPS> headers.
+=head2 Apache/mod_proxy
 
-  # hypnotoad.conf
-  {proxy => 1};
+Another good reverse proxy is Apache with C<mod_proxy>, the configuration
+looks very similar to the Nginx one above.
+
+  <VirtualHost *:80>
+    ServerName localhost
+    <Proxy *>
+      Order deny,allow
+      Allow from all
+    </Proxy>
+    ProxyRequests Off
+    ProxyPreserveHost On
+    ProxyPass / http://localhost:8080 keepalive=On
+    ProxyPassReverse / http://localhost:8080/
+    RequestHeader set X-Forwarded-HTTPS "0"
+  </VirtualHost>
 
 =head2 Apache/CGI
 
@@ -100,16 +119,6 @@ C<CGI> is supported out of the box and your L<Mojolicious> application will
 automatically detect that it is executed as a C<CGI> script.
 
   ScriptAlias / /home/sri/myapp/script/myapp/
-
-=head2 Apache/FastCGI
-
-C<FastCGI> is also supported out of the box and your L<Mojolicious>
-application will automatically detect that it is executed as a C<FastCGI>
-script.
-
-  FastCgiIpcDir /home/sri/myapp
-  FastCgiServer /home/sri/myapp/script/myapp -processes 1
-  Alias / /home/sri/myapp/script/myapp/
 
 =head2 PSGI/Plack
 
@@ -145,43 +154,31 @@ variable.
 
 =head2 Plack Middleware
 
-You can even use middleware right in your application.
+Wrapper scripts like C<myapp.fcgi> are a great way to separate deployment and
+application logic.
+
+  #!/usr/bin/env plackup -s FCGI
+  use Plack::Builder;
+
+  builder {
+    enable 'Deflater';
+    require 'myapp.pl';
+  };
+
+But you could even use middleware right in your application.
 
   use Mojolicious::Lite;
   use Plack::Builder;
 
   get '/welcome' => sub {
-      my $self = shift;
-      $self->render(text => 'Hello Mojo!');
+    my $self = shift;
+    $self->render(text => 'Hello Mojo!');
   };
 
   builder {
-      enable 'Deflater';
-      app->start;
+    enable 'Deflater';
+    app->start;
   };
-
-=head2 Apache/mod_perl (PSGI/Plack)
-
-C<mod_perl> is a good example for a L<PSGI> adapter that is used without
-C<plackup>, note that setting the C<PLACK_ENV> environment variable is
-required for L<Mojolicious> L<PSGI> detection.
-
-  <VirtualHost *:80>
-    ServerName localhost
-    DocumentRoot /home/sri/myapp/public
-
-    <Perl>
-      $ENV{PLACK_ENV} = 'production';
-      $ENV{MOJO_HOME} = '/home/sri/myapp';
-      $ENV{MOJO_MODE} = 'deployment';
-    </Perl>
-
-    <Location /myapp>
-      SetHandler perl-script
-      PerlHandler Plack::Handler::Apache2
-      PerlSetVar psgi_app /home/sri/myapp/script/myapp
-    </Location>
-  </VirtualHost>
 
 =head2 Rewriting
 

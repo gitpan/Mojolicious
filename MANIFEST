@@ -47,7 +47,6 @@ lib/Mojo/Path.pm
 lib/Mojo/Server.pm
 lib/Mojo/Server/CGI.pm
 lib/Mojo/Server/Daemon.pm
-lib/Mojo/Server/FastCGI.pm
 lib/Mojo/Server/Hypnotoad.pm
 lib/Mojo/Server/Morbo.pm
 lib/Mojo/Server/PSGI.pm
@@ -65,7 +64,6 @@ lib/Mojolicious/Command/cgi.pm
 lib/Mojolicious/Command/cpanify.pm
 lib/Mojolicious/Command/daemon.pm
 lib/Mojolicious/Command/eval.pm
-lib/Mojolicious/Command/fastcgi.pm
 lib/Mojolicious/Command/generate.pm
 lib/Mojolicious/Command/generate/app.pm
 lib/Mojolicious/Command/generate/gitignore.pm
@@ -164,8 +162,6 @@ README.pod
 script/hypnotoad
 script/mojo
 script/morbo
-t/mojo/apache_cgi.t
-t/mojo/apache_fastcgi.t
 t/mojo/app.t
 t/mojo/asset.t
 t/mojo/base.t
@@ -188,7 +184,6 @@ t/mojo/cookiejar.t
 t/mojo/date.t
 t/mojo/dom.t
 t/mojo/eventemitter.t
-t/mojo/fastcgi.t
 t/mojo/headers.t
 t/mojo/home.t
 t/mojo/hypnotoad.t
@@ -233,11 +228,15 @@ t/mojolicious/dispatch.t
 t/mojolicious/dispatcher_lite_app.t
 t/mojolicious/embedded_lite_app.t
 t/mojolicious/exception_lite_app.t
+t/mojolicious/external/lib/MyApp.pm
+t/mojolicious/external/my_app.conf
+t/mojolicious/external/my_app.testing.conf
 t/mojolicious/external/myapp.conf
 t/mojolicious/external/myapp.pl
 t/mojolicious/external/myapp.testing.conf
 t/mojolicious/external/public/index.html
 t/mojolicious/external/templates/index.html.ep
+t/mojolicious/external_app.t
 t/mojolicious/external_lite_app.t
 t/mojolicious/i18n_lite_app.t
 t/mojolicious/i18n_shortcut_lite_app.t
@@ -252,7 +251,7 @@ t/mojolicious/lib/MojoliciousTest.pm
 t/mojolicious/lib/MojoliciousTest/Exceptional.pm
 t/mojolicious/lib/MojoliciousTest/Foo.pm
 t/mojolicious/lib/MojoliciousTest/Foo/Bar.pm
-t/mojolicious/lib/MojoliciousTest/Plugin/TestPlugin.pm
+t/mojolicious/lib/MojoliciousTest/Plugin/Test/SomePlugin2.pm
 t/mojolicious/lib/MojoliciousTest/Plugin/UPPERCASETestPlugin.pm
 t/mojolicious/lib/MojoliciousTest/SyntaxError.pm
 t/mojolicious/lib/MojoliciousTest2/Foo.pm

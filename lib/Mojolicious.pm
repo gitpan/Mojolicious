@@ -12,6 +12,7 @@ use Mojolicious::Static;
 use Mojolicious::Types;
 use Scalar::Util 'weaken';
 
+# "Robots don't have any emotions, and sometimes that makes me very sad."
 has controller_class => 'Mojolicious::Controller';
 has mode             => sub { ($ENV{MOJO_MODE} || 'development') };
 has on_process       => sub {
@@ -34,7 +35,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Smiling Face With Sunglasses';
-our $VERSION  = '1.97';
+our $VERSION  = '1.98';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -401,26 +402,6 @@ workflow.
 =head2 Want To Know More?
 
 Take a look at our excellent documentation in L<Mojolicious::Guides>!
-
-=head1 ARCHITECTURE
-
-Loosely coupled building blocks, use what you like and just ignore the rest.
-
-  .---------------------------------------------------------------.
-  |                                                               |
-  |                .----------------------------------------------'
-  |                | .--------------------------------------------.
-  |   Application  | |              Mojolicious::Lite             |
-  |                | '--------------------------------------------'
-  |                | .--------------------------------------------.
-  |                | |                 Mojolicious                |
-  '----------------' '--------------------------------------------'
-  .---------------------------------------------------------------.
-  |                             Mojo                              |
-  '---------------------------------------------------------------'
-  .-------. .-----------. .--------. .------------. .-------------.
-  |  CGI  | |  FastCGI  | |  PSGI  | |  HTTP 1.1  | |  WebSocket  |
-  '-------' '-----------' '--------' '------------' '-------------'
 
 =head1 ATTRIBUTES
 
@@ -1041,6 +1022,8 @@ Uwe Voelker
 Viacheslav Tykhanovskyi
 
 Victor Engmark
+
+Viliam Pucik
 
 Yaroslav Korshak
 

@@ -10,7 +10,7 @@ BEGIN {
   $ENV{MOJO_MODE}       = 'development';
 }
 
-use Test::More tests => 893;
+use Test::More tests => 896;
 
 # Pollution
 123 =~ m/(\d+)/;
@@ -36,7 +36,7 @@ use Test::Mojo;
 my $ua = Mojo::UserAgent->new(ioloop => Mojo::IOLoop->singleton)->app(app);
 
 # Missing plugin
-eval { plugin 'does_not_exist'; };
+eval { plugin 'does_not_exist' };
 is $@, "Plugin \"does_not_exist\" missing, maybe you need to install it?\n",
   'right error';
 
@@ -688,7 +688,7 @@ under sub {
 
 # GET /bridge2stash
 get '/bridge2stash' =>
-  sub { shift->render(template => 'bridge2stash', handler => 'ep'); };
+  sub { shift->render(template => 'bridge2stash', handler => 'ep') };
 
 # Make sure after_dispatch can make session changes
 hook after_dispatch => sub {
@@ -778,6 +778,9 @@ $t->get_ok('/uni/aäb')->status_is(200)->content_is('/uni/a%C3%A4b');
 
 # GET /uni/a%E4b
 $t->get_ok('/uni/a%E4b')->status_is(200)->content_is('/uni/a%C3%A4b');
+
+# GET /uni/a%C3%A4b
+$t->get_ok('/uni/a%C3%A4b')->status_is(200)->content_is('/uni/a%C3%A4b');
 
 # GET /unicode/☃
 $t->get_ok('/unicode/☃')->status_is(200)

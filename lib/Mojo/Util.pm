@@ -299,7 +299,7 @@ push @EXPORT_OK, qw/punycode_encode qp_decode qp_encode quote/;
 push @EXPORT_OK, qw/secure_compare sha1_bytes sha1_sum trim unquote/;
 push @EXPORT_OK, qw/url_escape url_unescape xml_escape/;
 
-sub b64_decode { $_[0] = MIME::Base64::decode_base64($_[0]); }
+sub b64_decode { $_[0] = MIME::Base64::decode_base64($_[0]) }
 
 sub b64_encode { $_[0] = MIME::Base64::encode_base64($_[0], $_[1]) }
 
@@ -385,7 +385,7 @@ sub html_escape {
   my $escaped = '';
   for (1 .. length $_[0]) {
 
-    # Escape
+    # Escape entities
     my $char = substr $_[0], 0, 1, '';
     my $num = unpack 'U', $char;
     my $named = $REVERSE_ENTITIES{$num};
@@ -604,6 +604,7 @@ sub url_escape {
   $_[0] =~ s/([^$pattern])/sprintf('%%%02X',ord($1))/ge;
 }
 
+# "I've gone back in time to when dinosaurs weren't just confined to zoos."
 sub url_unescape {
   return if index($_[0], '%') == -1;
   $_[0] =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/ge;

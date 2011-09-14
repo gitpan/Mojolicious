@@ -1,5 +1,24 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+1.98    2011-09-14 00:00:00
+        - Removed Mojo::Server::FastCGI so it can be maintained as a separate
+          distribution.
+        - Added EXPERIMENTAL mojo_lib_dir and slurp_rel_file methods to
+          Mojo::Home.
+        - Improved host condition to work in more environments.
+        - Improved CSS of all built in templates.
+        - Improved documentation. (rhaen, sri)
+        - Improved test command to run tests in alphabetical order.
+          (viliampucik)
+        - Improved non-blocking resolver by allowing it to be disabled.
+        - Improved DATA templates by removing a whitespace requirement.
+        - Improved tests.
+        - Fixed small name generation bug in Mojolicious::Plugin::Config.
+        - Fixed small bug in cookie jar.
+        - Fixed small plugin loader bug.
+        - Fixed Hypnotoad to clean up lock files.
+        - Fixed small bug that caused exceptions to be logged twice.
+
 1.97    2011-09-03 00:00:00
         - Improved unicode handling to be more correct and less forgiving.
         - Fixed typos.

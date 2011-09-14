@@ -1,44 +1,29 @@
 package Mojolicious::Controller;
 use Mojo::Base -base;
 
-use Mojo::Asset::File;
 use Mojo::ByteStream;
 use Mojo::Cookie::Response;
 use Mojo::Exception;
+use Mojo::Home;
 use Mojo::Transaction::HTTP;
 use Mojo::URL;
 use Mojo::Util;
 
 require Carp;
-require File::Basename;
-require File::Spec;
 
 # "Scalpel... blood bucket... priest."
 has [qw/app match/];
 has tx => sub { Mojo::Transaction::HTTP->new };
 
-# Template directory
-my $T = File::Spec->catdir(File::Basename::dirname(__FILE__), 'templates');
-
-# Exception template
-our $EXCEPTION =
-  Mojo::Asset::File->new(path => File::Spec->catfile($T, 'exception.html.ep'))
-  ->slurp;
-
-# Exception template (development)
+# Bundled files
+my $H = Mojo::Home->new;
+$H->parse($H->parse($H->mojo_lib_dir)->rel_dir('Mojolicious/templates'));
+our $EXCEPTION = $H->slurp_rel_file('exception.html.ep');
 our $DEVELOPMENT_EXCEPTION =
-  Mojo::Asset::File->new(
-  path => File::Spec->catfile($T, 'exception.development.html.ep'))->slurp;
-
-# Not found template
-our $NOT_FOUND =
-  Mojo::Asset::File->new(path => File::Spec->catfile($T, 'not_found.html.ep'))
-  ->slurp;
-
-# Not found template (development)
+  $H->slurp_rel_file('exception.development.html.ep');
+our $NOT_FOUND = $H->slurp_rel_file('not_found.html.ep');
 our $DEVELOPMENT_NOT_FOUND =
-  Mojo::Asset::File->new(
-  path => File::Spec->catfile($T, 'not_found.development.html.ep'))->slurp;
+  $H->slurp_rel_file('not_found.development.html.ep');
 
 # Reserved stash values
 my @RESERVED = (
@@ -308,7 +293,8 @@ sub render_data { shift->render(data => shift, @_) }
 sub render_exception {
   my ($self, $e) = @_;
   $e = Mojo::Exception->new($e);
-  $self->app->log->error($e);
+  my $app = $self->app;
+  $app->log->error($e);
 
   # Recursion
   return if $self->stash->{'mojo.exception'};
@@ -323,7 +309,7 @@ sub render_exception {
   }
 
   # Render with fallbacks
-  my $mode    = $self->app->mode;
+  my $mode    = $app->mode;
   my $options = {
     template         => "exception.$mode",
     format           => $stash->{format} || 'html',

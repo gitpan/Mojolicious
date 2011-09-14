@@ -120,8 +120,8 @@ There is also a helper command to generate a small example application.
 =head2 Commands
 
 All the normal L<Mojolicious::Commands> are available from the command line.
-Note that CGI, FastCGI and PSGI environments can usually be auto detected and
-will just work without commands.
+Note that CGI and PSGI environments can usually be auto detected and will
+just work without commands.
 
   $ ./myapp.pl daemon
   Server available at http://127.0.0.1:3000.
@@ -131,9 +131,6 @@ will just work without commands.
 
   $ ./myapp.pl cgi
   ...CGI output...
-
-  $ ./myapp.pl fastcgi
-  ...Blocking FastCGI main loop...
 
   $ ./myapp.pl
   ...List of available commands (or automatically detected environment)...
@@ -178,7 +175,7 @@ All C<GET> and C<POST> parameters are accessible via C<param>.
     $self->render(text => "Hello $user!");
   };
 
-=head2 Stash
+=head2 Stash And Templates
 
 The C<stash> is used to pass data to templates, which can be inlined in the
 C<DATA> section.
@@ -194,6 +191,9 @@ C<DATA> section.
 
   @@ baz.html.ep
   The magic numbers are <%= $one %> and <%= $two %>.
+
+For more information about templates see also
+L<Mojolicious::Guides::Rendering/"Embedded Perl">.
 
 =head2 HTTP
 
@@ -245,7 +245,7 @@ Templates can have layouts.
   @@ with_layout.html.ep
   % title 'Green!';
   % layout 'green';
-  We've got content!
+  Hello World!
 
   @@ layouts/green.html.ep
   <!doctype html><html>
@@ -294,7 +294,7 @@ content.
   <% content_for header => begin %>
     <meta http-equiv="Pragma" content="no-cache">
   <% end %>
-  We've got content!
+  Hello World!
   <% content_for header => begin %>
     <meta http-equiv="Expires" content="-1">
   <% end %>
@@ -310,8 +310,8 @@ content.
 
 =head2 Helpers
 
-You can also extend L<Mojolicious> with your own helpers, a list of all built
-in ones can be found in L<Mojolicious::Plugin::DefaultHelpers> and
+You can also extend L<Mojolicious> with your own helpers, a list of all
+built-in ones can be found in L<Mojolicious::Plugin::DefaultHelpers> and
 L<Mojolicious::Plugin::TagHelpers>.
 
   # "whois" helper
@@ -492,6 +492,11 @@ C<RESTful> content negotiation you can also use C<respond_to>.
     );
   };
 
+MIME type mappings can be extended or changed easily with
+L<Mojolicious/"types">.
+
+  app->types->type(rdf => 'application/rdf+xml');
+
 =head2 Under
 
 Authentication and code shared between multiple routes can be realized easily
@@ -547,17 +552,17 @@ Conditions such as C<agent> and C<host> from
 L<Mojolicious::Plugin::HeaderCondition> allow even more powerful route
 constructs.
 
-  # /foo
+  # /foo (Firefox)
   get '/foo' => (agent => qr/Firefox/) => sub {
     shift->render(text => 'Congratulations, you are using a cool browser!');
   };
 
-  # /foo
+  # /foo (Internet Explorer)
   get '/foo' => (agent => qr/Internet Explorer/) => sub {
     shift->render(text => 'Dude, you really need to upgrade to Firefox!');
   };
 
-  # /bar
+  # http://mojolicio.us/bar
   get '/bar' => (host => 'mojolicio.us') => sub {
     shift->render(text => 'Hello Mojolicious!');
   };
@@ -566,68 +571,19 @@ constructs.
 
 Signed cookie based sessions just work out of the box as soon as you start
 using them.
-The C<flash> can be used to store values that will only be available for the
-next request (unlike C<stash>, which is only available for the current
-request), this is very useful in combination with C<redirect_to>.
 
   use Mojolicious::Lite;
 
-  get '/login' => sub {
+  get '/counter' => sub {
     my $self = shift;
-
-    my $name = $self->param('name') || '';
-    my $pass = $self->param('pass') || '';
-    return $self->render unless $name eq 'sebastian' && $pass eq '1234';
-
-    $self->session(name => $name);
-    $self->flash(message => 'Thanks for logging in!');
-    $self->redirect_to('index');
-  };
-
-  get '/' => sub {
-    my $self = shift;
-    $self->redirect_to('login') unless $self->session('name');
-  } => 'index';
-
-  get '/logout' => sub {
-    my $self = shift;
-    $self->session(expires => 1);
-    $self->redirect_to('index');
+    $self->render(counter => ++$self->session->{counter});
   };
 
   app->start;
   __DATA__
 
-  @@ layouts/default.html.ep
-  <!doctype html><html>
-    <head><title><%= title %></title></head>
-    <body><%= content %></body>
-  </html>
-
-  @@ login.html.ep
-  % layout 'default';
-  % title 'Login';
-  <%= form_for login => begin %>
-    <% if (param 'name') { %>
-      <b>Wrong name or password, please try again.</b><br>
-    <% } %>
-    Name:<br>
-    <%= text_field 'name' %><br>
-    Password:<br>
-    <%= password_field 'pass' %><br>
-    <%= submit_button 'Login' %>
-  <% end %>
-
-  @@ index.html.ep
-  % layout 'default';
-  % title 'Welcome';
-  <% if (my $message = flash 'message' ) { %>
-    <b><%= $message %></b><br>
-  <% } %>
-  Welcome <%= session 'name' %>!<br>
-  <%= link_to logout => begin %>
-    Logout
-  <% end %>
+  @@ counter.html.ep
+  Counter: <%= $counter %>
 
 =head2 Secret
 

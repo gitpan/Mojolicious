@@ -43,7 +43,7 @@ usage: $0 [OPTIONS] [APPLICATION]
 These options are available:
   --help                     Show this message.
   --listen <location>        Set one or more locations you want to listen on,
-                             defaults to http://*:3000.
+                             defaults to "http://*:3000".
   --verbose                  Print details about what files changed to
                              STDOUT.
   --watch <directory/file>   Set one or more directories and files to watch

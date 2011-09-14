@@ -20,8 +20,8 @@ has description => 'No description.';
 has message     => <<"EOF";
 usage: $0 COMMAND [OPTIONS]
 
-Tip: CGI, FastCGI and PSGI environments can be automatically detected very
-     often and work without commands.
+Tip: CGI and PSGI environments can be automatically detected very often and
+     work without commands.
 
 These commands are currently available:
 EOF
@@ -94,17 +94,8 @@ sub detect {
   return 'cgi'
     if defined $ENV{PATH_INFO} || defined $ENV{GATEWAY_INTERFACE};
 
-  # No further detection if we have a guess
-  return $guess if $guess;
-
-  # FastCGI (detect absence of WINDIR for Windows and USER for UNIX)
-  return 'fastcgi'
-    if !defined $ENV{WINDIR}
-      && !defined $ENV{USER}
-      && !defined $ENV{HARNESS_ACTIVE};
-
   # Nothing
-  return;
+  return $guess;
 }
 
 sub get_all_data {
@@ -125,7 +116,7 @@ sub get_all_data {
   $content =~ s/\n__END__\r?\n.*$/\n/s;
 
   # Split
-  my @data = split /^@@\s+(.+?)\s*\r?\n/m, $content;
+  my @data = split /^@@\s*(.+?)\s*\r?\n/m, $content;
   shift @data;
 
   # Find data
@@ -207,12 +198,12 @@ sub run {
 
     # Try all namespaces
     my $module;
-    my $class = $name;
-    camelize $class;
     for my $namespace (@{$self->namespaces}) {
       last if $module = _command("${namespace}::$name");
 
       # DEPRECATED in Smiling Face With Sunglasses!
+      my $class = $name;
+      camelize $class;
       last if $module = _command("${namespace}::$class");
     }
 
