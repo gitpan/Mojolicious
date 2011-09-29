@@ -66,6 +66,7 @@ AnqxHi90n/p912ynLg2SjBq+03GaECeGzC/QqKK2gtA=
 -----END RSA PRIVATE KEY-----
 EOF
 
+has accepts   => 10;
 has iowatcher => sub {
   require Mojo::IOLoop;
   Mojo::IOLoop->singleton->iowatcher;
@@ -122,29 +123,27 @@ sub listen {
     $reuse = ",$reuse" if length $ENV{MOJO_REUSE};
     $ENV{MOJO_REUSE} .= "$reuse:$fd";
   }
+  $handle->blocking(0);
   $self->{handle} = $handle;
 
   # TLS
-  if ($args->{tls}) {
+  return unless $args->{tls};
+  croak "IO::Socket::SSL 1.43 required for TLS support" unless TLS;
 
-    # No TLS support
-    croak "IO::Socket::SSL 1.43 required for TLS support" unless TLS;
-
-    # Options
-    my %options = (
-      SSL_startHandshake => 0,
-      SSL_cert_file      => $args->{tls_cert} || $self->_cert_file,
-      SSL_key_file       => $args->{tls_key} || $self->_key_file,
-    );
-    %options = (
-      SSL_verify_callback => $args->{tls_verify},
-      SSL_ca_file         => -T $args->{tls_ca} ? $args->{tls_ca} : undef,
-      SSL_ca_path         => -d $args->{tls_ca} ? $args->{tls_ca} : undef,
-      SSL_verify_mode     => $args->{tls_ca} ? 0x03 : undef,
-      %options
-    ) if $args->{tls_ca};
-    $self->{tls} = {%options, %{$args->{tls_args} || {}}};
-  }
+  # Options
+  my %options = (
+    SSL_startHandshake => 0,
+    SSL_cert_file      => $args->{tls_cert} || $self->_cert_file,
+    SSL_key_file       => $args->{tls_key} || $self->_key_file,
+  );
+  %options = (
+    SSL_verify_callback => $args->{tls_verify},
+    SSL_ca_file         => -T $args->{tls_ca} ? $args->{tls_ca} : undef,
+    SSL_ca_path         => -d $args->{tls_ca} ? $args->{tls_ca} : undef,
+    SSL_verify_mode     => $args->{tls_ca} ? 0x03 : undef,
+    %options
+  ) if $args->{tls_ca};
+  $self->{tls} = {%options, %{$args->{tls_args} || {}}};
 }
 
 sub generate_port {
@@ -173,16 +172,14 @@ sub resume {
   my $self = shift;
   weaken $self;
   $self->iowatcher->add($self->{handle},
-    on_readable => sub { $self->_accept });
+    on_readable => sub { $self->_accept for 1 .. $self->accepts });
 }
 
 sub _accept {
   my $self = shift;
 
   # Accept
-  my $handle = $self->{handle}->accept;
-
-  # Non-blocking
+  return unless my $handle = $self->{handle}->accept;
   $handle->blocking(0);
 
   # Disable Nagle's algorithm
@@ -262,7 +259,7 @@ __END__
 
 =head1 NAME
 
-Mojo::IOLoop::Server - IOLoop Socket Server
+Mojo::IOLoop::Server - IOLoop socket server
 
 =head1 SYNOPSIS
 
@@ -297,6 +294,13 @@ Emitted for each accepted connection.
 =head1 ATTRIBUTES
 
 L<Mojo::IOLoop::Server> implements the following attributes.
+
+=head2 C<accepts>
+
+  my $accepts = $server->accepts;
+  $server     = $server->accepts(10);
+
+Number of connections to accept at once, defaults to C<10>.
 
 =head2 C<iowatcher>
 

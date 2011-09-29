@@ -343,7 +343,7 @@ sub waypoint { shift->route(@_)->block(1) }
 
 sub websocket {
   my $self  = shift;
-  my $route = $self->any(@_);
+  my $route = $self->get(@_);
   $route->{websocket} = 1;
   return $route;
 }
@@ -590,7 +590,7 @@ __END__
 
 =head1 NAME
 
-Mojolicious::Routes - Always Find Your Destination With Routes
+Mojolicious::Routes - Always find your destination with routes
 
 =head1 SYNOPSIS
 

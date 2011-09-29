@@ -27,7 +27,6 @@ sub DESTROY {
 sub new {
   my $self = shift->SUPER::new;
   $self->{handle} = shift;
-  $self->{handle}->blocking(0);
   $self->{buffer} = '';
   return $self;
 }
@@ -153,7 +152,7 @@ __END__
 
 =head1 NAME
 
-Mojo::IOLoop::Stream - IOLoop Stream
+Mojo::IOLoop::Stream - IOLoop stream
 
 =head1 SYNOPSIS
 

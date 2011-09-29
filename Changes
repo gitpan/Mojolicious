@@ -1,12 +1,39 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+1.99    2011-09-29 00:00:00
+        - Deprecated direct hash access to the flash in
+          Mojolicious::Controller.
+        - Added EXPERIMENTAL group function to Mojolicious::Lite.
+        - Added EXPERIMENTAL build_frame and parse_frame methods to
+          Mojo::Transaction::WebSocket.
+        - Added EXPERIMENTAL accepts attribute to Mojo::IOLoop::Server.
+        - Added EXPERIMENTAL profile helper.
+        - Added EXPERIMENTAL binary support to Mojo::Transaction::WebSocket.
+        - Updated WebSocket implementation to ietf-16.
+        - Changed default upgrade timeout of Hypnotoad from 30 to 60 seconds.
+        - Improved accept performance of all built-in servers by up to 1000%
+          with the EV backend.
+        - Improved connection_timeout method in Mojo::IOLoop by allowing it
+          to be called as a class method.
+        - Improved documentation.
+        - Improved CSS of some built-in templates.
+        - Improved resilience of HTTP parser.
+        - Fixed CSS of built-in exception template.
+        - Fixed close event bug in Mojo::IOLoop.
+        - Fixed small redirect_to bug. (judofyr, sri)
+        - Fixed small attribute selector bug in Mojo::DOM::CSS.
+        - Fixed small unicode bug in Mojolicious::Plugin::EPRenderer.
+        - Fixed a few small route bugs.
+        - Fixed Perl 5.8.7 compatibility.
+        - Fixed typos.
+
 1.98    2011-09-14 00:00:00
         - Removed Mojo::Server::FastCGI so it can be maintained as a separate
           distribution.
         - Added EXPERIMENTAL mojo_lib_dir and slurp_rel_file methods to
           Mojo::Home.
         - Improved host condition to work in more environments.
-        - Improved CSS of all built in templates.
+        - Improved CSS of all built-in templates.
         - Improved documentation. (rhaen, sri)
         - Improved test command to run tests in alphabetical order.
           (viliampucik)
@@ -1845,7 +1872,7 @@ This file documents the revision history for Perl extension Mojolicious.
         - Fixed some typos.
 
 0.7     2008-10-11 00:00:00
-        - Added the Mojolicious Web Framework example.
+        - Added the Mojolicious web framework example.
         - Added upload and GET/POST parameter helpers to Mojo::Message.
         - Hooks for upload progress and stuff added.
         - Refactored transfer encoding code into Mojo::Filter and

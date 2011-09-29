@@ -33,7 +33,7 @@ __END__
 
 =head1 NAME
 
-Mojolicious::Plugin::Charset - Charset Plugin
+Mojolicious::Plugin::Charset - Charset plugin
 
 =head1 SYNOPSIS
 
@@ -49,6 +49,8 @@ L<Mojolicious::Plugin::Charset> is a plugin to easily set the default charset
 and encoding on all layers of L<Mojolicious>.
 
 =head1 OPTIONS
+
+L<Mojolicious::Plugin::Charset> supports the following options.
 
 =head2 C<charset>
 

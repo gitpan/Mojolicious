@@ -21,9 +21,7 @@ has iowatcher       => sub {
 };
 has max_accepts     => 0;
 has max_connections => 1000;
-has [qw/on_lock on_unlock/] => sub {
-  sub {1}
-};
+has [qw/on_lock on_unlock/];
 has resolver => sub {
   my $resolver = Mojo::IOLoop::Resolver->new(ioloop => shift);
   weaken $resolver->{ioloop};
@@ -91,14 +89,16 @@ sub connect {
       # Events
       $stream->on(
         close => sub {
+          my $c = $self->{connections}->{$id};
+          $c->{finish} = 1;
           $c->{close}->($self, $id) if $c->{close};
           $self->drop($id);
         }
       );
-      weaken $c;
       $stream->on(
         error => sub {
-          my $c = delete $self->{connections}->{$id};
+          my $c = $self->{connections}->{$id};
+          $c->{finish} = 1;
           $c->{error}->($self, $id, pop) if $c->{error};
         }
       );
@@ -132,9 +132,11 @@ sub connect {
 
 sub connection_timeout {
   my ($self, $id, $timeout) = @_;
+  $self = $self->singleton unless ref $self;
   return unless my $c = $self->{connections}->{$id};
-  $c->{timeout} = $timeout and return $self if defined $timeout;
-  $c->{timeout};
+  return $c->{timeout} unless defined $timeout;
+  $c->{timeout} = $timeout;
+  return $self;
 }
 
 sub defer { shift->timer(0 => @_) }
@@ -199,13 +201,15 @@ sub listen {
       $c->{read}  = $read;
       $stream->on(
         close => sub {
-          my $c = delete $self->{connections}->{$id};
+          my $c = $self->{connections}->{$id};
+          $c->{finish} = 1;
           $c->{close}->($self, $id) if $c->{close};
         }
       );
       $stream->on(
         error => sub {
-          my $c = delete $self->{connections}->{$id};
+          my $c = $self->{connections}->{$id};
+          $c->{finish} = 1;
           $c->{error}->($self, $id, pop) if $c->{error};
         }
       );
@@ -336,10 +340,12 @@ sub timer {
 sub trigger {
   my ($self, $cb) = @_;
   $self = $self->singleton unless ref $self;
+
   my $t = Mojo::IOLoop::Trigger->new;
   $t->ioloop($self);
   weaken $t->{ioloop};
   $t->once(done => $cb) if $cb;
+
   return $t;
 }
 
@@ -362,10 +368,20 @@ sub write {
 
 sub _drop {
   my ($self, $id) = @_;
+
+  # Timer
   return $self unless my $watcher = $self->iowatcher;
   return $self if $watcher->cancel($id);
+
+  # Listen socket
   if (delete $self->{servers}->{$id}) { delete $self->{listening} }
-  else { delete((delete($self->{connections}->{$id}) || {})->{stream}) }
+
+  # Connection
+  else {
+    delete(($self->{connections}->{$id} || {})->{stream});
+    delete $self->{connections}->{$id};
+  }
+
   return $self;
 }
 
@@ -383,12 +399,13 @@ sub _listening {
   return if $self->{listening};
   my $servers = $self->{servers} ||= {};
   return unless keys %$servers;
-  my $i = keys %{$self->{connections}};
-  return unless $i < $self->max_connections;
-  return unless $self->on_lock->($self, !$i);
+  my $i   = keys %{$self->{connections}};
+  my $max = $self->max_connections;
+  return unless $i < $max;
+  if (my $cb = $self->on_lock) { return unless $self->$cb(!$i) }
 
-  # Start listening
-  $_->resume for values %$servers;
+  # Check if multi-accept is desirable and start listening
+  $_->accepts($max > 1 ? 10 : 1)->resume for values %$servers;
   $self->{listening} = 1;
 }
 
@@ -397,11 +414,11 @@ sub _not_listening {
 
   # Check if we are listening
   return unless delete $self->{listening};
-  $self->on_unlock->($self);
+  return unless my $cb = $self->on_unlock;
+  $self->$cb();
 
   # Stop listening
   $_->pause for values %{$self->{servers} || {}};
-  delete $self->{listening};
 }
 
 1;
@@ -409,7 +426,7 @@ __END__
 
 =head1 NAME
 
-Mojo::IOLoop - Minimalistic Reactor For Non-Blocking TCP Clients And Servers
+Mojo::IOLoop - Minimalistic reactor for non-blocking TCP clients and servers
 
 =head1 SYNOPSIS
 
@@ -662,6 +679,8 @@ Path to the TLS key file.
 
 =head2 C<connection_timeout>
 
+  my $timeout = Mojo::IOLoop->connection_timeout($id);
+  $loop       = Mojo::IOLoop->connection_timeout($id => 45);
   my $timeout = $loop->connection_timeout($id);
   $loop       = $loop->connection_timeout($id => 45);
 

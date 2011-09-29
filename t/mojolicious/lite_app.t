@@ -10,7 +10,7 @@ BEGIN {
   $ENV{MOJO_MODE}       = 'development';
 }
 
-use Test::More tests => 896;
+use Test::More tests => 934;
 
 # Pollution
 123 =~ m/(\d+)/;
@@ -578,6 +578,18 @@ get '/redirect_no_render' => sub {
   shift->redirect_to('index', format => 'txt');
 };
 
+# GET /redirect_callback
+get '/redirect_callback' => sub {
+  my $self = shift;
+  Mojo::IOLoop->defer(
+    sub {
+      $self->res->code(301);
+      $self->res->body('Whatever!');
+      $self->redirect_to('http://127.0.0.1/foo');
+    }
+  );
+};
+
 # GET /static_render
 get '/static_render' => sub {
   shift->render_static('hello.txt');
@@ -732,17 +744,73 @@ under sub {
 # GET /impossible
 get '/impossible' => 'impossible';
 
-# Prefix
+# /prefix (prefix)
 under '/prefix';
 
-# GET
+# GET /prefix
 get sub { shift->render(text => 'prefixed GET works!') };
 
-# POST
+# POST /prefix
 post sub { shift->render(text => 'prefixed POST works!') };
 
 # GET /prefix/works
 get '/works' => sub { shift->render(text => 'prefix works!') };
+
+# /prefix2 (another prefix)
+under '/prefix2' => {message => 'prefixed'};
+
+# GET /prefix2/foo
+get '/foo' => {inline => '<%= $message %>!'};
+
+# GET /prefix2/bar
+get '/bar' => {inline => 'also <%= $message %>!'};
+
+# Reset
+under '/' => {foo => 'one'};
+
+# GET /reset
+get '/reset' => {text => 'reset works!'};
+
+# Group
+group {
+
+  # /group
+  under '/group' => {bar => 'two'};
+
+  # GET /group
+  get {inline => '<%= $foo %><%= $bar %>!'};
+
+  # Nested group
+  group {
+
+    # /group/nested
+    under '/nested' => {baz => 'three'};
+
+    # GET /group/nested
+    get {inline => '<%= $baz %><%= $bar %><%= $foo %>!'};
+
+    # GET /group/nested/whatever
+    get '/whatever' => {inline => '<%= $foo %><%= $bar %><%= $baz %>!'};
+  };
+};
+
+# Authentication group
+group {
+
+  # Check "ok" parameter
+  under sub {
+    my $self = shift;
+    return 1 if $self->req->param('ok');
+    $self->render(text => "You're not ok.");
+    return;
+  };
+
+  # GET /authgroup
+  get '/authgroup' => {text => "You're ok."};
+};
+
+# GET /noauthgroup
+get '/noauthgroup' => {inline => 'Whatever <%= $foo %>.'};
 
 # Oh Fry, I love you more than the moon, and the stars,
 # and the POETIC IMAGE NUMBER 137 NOT FOUND
@@ -992,13 +1060,13 @@ $t->get_ok('/static.txt', {'Range' => 'bytes=2-5'})->status_is(206)
   ->header_is('Accept-Ranges' => 'bytes')->header_is('Content-Length' => 4)
   ->content_is('st s');
 
-# GET /static.txt (base 64 static inline file)
+# GET /static.txt (base64 static inline file)
 $t->get_ok('/static2.txt')->status_is(200)
   ->header_is(Server          => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By'  => 'Mojolicious (Perl)')
   ->header_is('Accept-Ranges' => 'bytes')->content_is("test 123\nlalala");
 
-# GET /static.txt (base 64 static inline file, If-Modified-Since)
+# GET /static.txt (base64 static inline file, If-Modified-Since)
 $modified = Mojo::Date->new->epoch(time - 3600);
 $t->get_ok('/static2.txt', {'If-Modified-Since' => $modified})->status_is(200)
   ->header_is(Server          => 'Mojolicious (Perl)')
@@ -1009,7 +1077,7 @@ $t->get_ok('/static2.txt', {'If-Modified-Since' => $modified})->status_is(304)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is('');
 
-# GET /static.txt (base 64 partial inline file)
+# GET /static.txt (base64 partial inline file)
 $t->get_ok('/static2.txt', {'Range' => 'bytes=2-5'})->status_is(206)
   ->header_is(Server          => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By'  => 'Mojolicious (Perl)')
@@ -1552,6 +1620,13 @@ $t->get_ok('/redirect_no_render')->status_is(302)
   ->header_is('Content-Length' => 0)
   ->header_like(Location => qr/\/template.txt$/)->content_is('');
 
+# GET /redirect_callback
+$t->get_ok('/redirect_callback')->status_is(301)
+  ->header_is(Server           => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By'   => 'Mojolicious (Perl)')
+  ->header_is('Content-Length' => 9)
+  ->header_is(Location => 'http://127.0.0.1/foo')->content_is('Whatever!');
+
 # GET /static_render
 $t->get_ok('/static_render')->status_is(200)
   ->header_is(Server           => 'Mojolicious (Perl)')
@@ -1799,6 +1874,40 @@ $t->get_ok('/prefix/works')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_is('prefix works!');
+
+# GET /prefix2/foo
+$t->get_ok('/prefix2/foo')->status_is(200)->content_is("prefixed!\n");
+
+# GET /prefix2/bar
+$t->get_ok('/prefix2/bar')->status_is(200)->content_is("also prefixed!\n");
+
+# GET /reset
+$t->get_ok('/reset')->status_is(200)->content_is('reset works!');
+
+# GET /prefix/reset
+$t->get_ok('/prefix/reset')->status_is(404);
+
+# GET /group
+$t->get_ok('/group')->status_is(200)->content_is("onetwo!\n");
+
+# GET /group/nested
+$t->get_ok('/group/nested')->status_is(200)->content_is("threetwoone!\n");
+
+# GET /group/nested/whatever
+$t->get_ok('/group/nested/whatever')->status_is(200)
+  ->content_is("onetwothree!\n");
+
+# GET /group/nested/something
+$t->get_ok('/group/nested/something')->status_is(404);
+
+# GET /authgroup?ok=1
+$t->get_ok('/authgroup?ok=1')->status_is(200)->content_is("You're ok.");
+
+# GET /authgroup
+$t->get_ok('/authgroup')->status_is(200)->content_is("You're not ok.");
+
+# GET /noauthgroup
+$t->get_ok('/noauthgroup')->status_is(200)->content_is("Whatever one.\n");
 
 # GET /captures/foo/bar
 $t->get_ok('/captures/foo/bar')->status_is(200)

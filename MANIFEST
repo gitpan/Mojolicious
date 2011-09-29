@@ -220,12 +220,14 @@ t/mojo/user_agent.t
 t/mojo/user_agent_online.t
 t/mojo/user_agent_tls.t
 t/mojo/websocket.t
+t/mojo/websocket_frames.t
 t/mojo/websocket_proxy.t
 t/mojo/websocket_proxy_tls.t
 t/mojolicious/app.t
 t/mojolicious/charset_lite_app.t
 t/mojolicious/dispatch.t
 t/mojolicious/dispatcher_lite_app.t
+t/mojolicious/embedded_app.t
 t/mojolicious/embedded_lite_app.t
 t/mojolicious/exception_lite_app.t
 t/mojolicious/external/lib/MyApp.pm
@@ -235,6 +237,7 @@ t/mojolicious/external/myapp.conf
 t/mojolicious/external/myapp.pl
 t/mojolicious/external/myapp.testing.conf
 t/mojolicious/external/public/index.html
+t/mojolicious/external/script/my_app
 t/mojolicious/external/templates/index.html.ep
 t/mojolicious/external_app.t
 t/mojolicious/external_lite_app.t

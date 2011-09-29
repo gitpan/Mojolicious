@@ -81,8 +81,6 @@ sub _connect {
     # IPv6 needs an early start
     $handle->connect if IPV6;
   }
-
-  # Non-blocking
   $handle->blocking(0);
 
   # Disable Nagle's algorithm
@@ -161,7 +159,7 @@ __END__
 
 =head1 NAME
 
-Mojo::IOLoop::Client - IOLoop Socket Client
+Mojo::IOLoop::Client - IOLoop socket client
 
 =head1 SYNOPSIS
 

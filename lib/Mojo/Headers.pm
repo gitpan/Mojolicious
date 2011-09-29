@@ -641,7 +641,7 @@ Shortcut for the C<Sec-WebSocket-Protocol> header.
 =head2 C<sec_websocket_version>
 
   my $version = $headers->sec_websocket_version;
-  $headers    = $headers->sec_websocket_version(8);
+  $headers    = $headers->sec_websocket_version(13);
 
 Shortcut for the C<Sec-WebSocket-Version> header.
 
@@ -718,7 +718,7 @@ Shortcut for the C<User-Agent> header.
 =head2 C<www_authenticate>
 
   my $authenticate = $headers->www_authenticate;
-  $headers         = $headers->www_authenticate('Basic "realm"');
+  $headers         = $headers->www_authenticate('Basic realm="realm"');
 
 Shortcut for the C<WWW-Authenticate> header.
 

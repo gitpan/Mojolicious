@@ -1,10 +1,10 @@
 {
-   "abstract" : "Duct Tape For The Web!",
+   "abstract" : "Duct Tape For The HTML5 Web!",
    "author" : [
       "Sebastian Riedel <sri@cpan.org>"
    ],
    "dynamic_config" : 0,
-   "generated_by" : "ExtUtils::MakeMaker version 6.59, CPAN::Meta::Converter version 2.112150",
+   "generated_by" : "ExtUtils::MakeMaker version 6.59, CPAN::Meta::Converter version 2.112621",
    "license" : [
       "artistic_2"
    ],
@@ -84,5 +84,5 @@
       },
       "x_MailingList" : "http://groups.google.com/group/mojolicious"
    },
-   "version" : "1.98"
+   "version" : "1.99"
 }

@@ -32,8 +32,9 @@ sub register {
       # Generate name
       my $path = $r->template_path($options) || $options->{inline};
       return unless defined $path;
-      my $list = join ', ', sort keys %{$c->stash};
-      my $key = $options->{cache} = md5_sum "$path($list)";
+      my $id = join ', ', $path, sort keys %{$c->stash};
+      utf8::encode $id;
+      my $key = $options->{cache} = md5_sum $id;
 
       # Cache
       my $cache = $r->cache;
@@ -88,7 +89,7 @@ __END__
 
 =head1 NAME
 
-Mojolicious::Plugin::EPRenderer - Embedded Perl Renderer Plugin
+Mojolicious::Plugin::EPRenderer - Embedded Perl renderer plugin
 
 =head1 SYNOPSIS
 
@@ -118,6 +119,8 @@ This is a core plugin, that means it is always enabled and its code a good
 example for learning to build new plugins.
 
 =head1 OPTIONS
+
+L<Mojolicious::Plugin::EPRenderer> supports the following options.
 
 =head2 C<name>
 

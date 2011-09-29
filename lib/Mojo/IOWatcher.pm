@@ -51,13 +51,9 @@ sub is_readable {
 
 sub not_writing {
   my ($self, $handle) = @_;
-
-  # Make sure we only watch for readable events
   my $poll = $self->_poll;
-  $poll->remove($handle)
-    if delete $self->{handles}->{fileno $handle}->{writing};
+  $poll->remove($handle);
   $poll->mask($handle, POLLIN);
-
   return $self;
 }
 
@@ -112,12 +108,9 @@ sub timer { shift->_timer(pop, after => pop, started => time) }
 
 sub writing {
   my ($self, $handle) = @_;
-
   my $poll = $self->_poll;
   $poll->remove($handle);
   $poll->mask($handle, POLLIN | POLLOUT);
-  $self->{handles}->{fileno $handle}->{writing} = 1;
-
   return $self;
 }
 
@@ -144,7 +137,7 @@ __END__
 
 =head1 NAME
 
-Mojo::IOWatcher - Non-Blocking I/O Watcher
+Mojo::IOWatcher - Non-blocking I/O watcher
 
 =head1 SYNOPSIS
 

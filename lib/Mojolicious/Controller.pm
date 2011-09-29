@@ -123,8 +123,9 @@ sub flash {
   $flash = {} unless $flash && ref $flash eq 'HASH';
   $session->{new_flash} = $flash;
 
-  # Hash
-  return $flash unless @_;
+  # DEPRECATED in Smiling Face With Sunglasses!
+  warn "Direct hash access to the flash is DEPRECATED!!!\n" and return $flash
+    unless @_;
 
   # Set
   my $values = @_ > 1 ? {@_} : $_[0];
@@ -188,10 +189,11 @@ sub param {
 sub redirect_to {
   my $self = shift;
 
-  my $headers = $self->res->headers;
+  # Don't override 3xx status
+  my $res     = $self->res;
+  my $headers = $res->headers;
   $headers->location($self->url_for(@_)->to_abs);
-  $headers->content_length(0);
-  $self->rendered(302);
+  $self->rendered($res->is_status_class(300) ? undef : 302);
 
   return $self;
 }
@@ -577,12 +579,6 @@ sub stash {
 
 sub ua { shift->app->ua }
 
-# "Behold, a time traveling machine.
-#  Time? I can't go back there!
-#  Ah, but this machine only goes forward in time.
-#  That way you can't accidentally change history or do something disgusting
-#  like sleep with your own grandmother.
-#  I wouldn't want to do that again."
 sub url_for {
   my $self = shift;
   my $target = shift || '';
@@ -641,7 +637,6 @@ sub url_for {
   return $url;
 }
 
-# "I wax my rocket every day!"
 sub write {
   my ($self, $chunk, $cb) = @_;
 
@@ -696,7 +691,7 @@ __END__
 
 =head1 NAME
 
-Mojolicious::Controller - Controller Base Class
+Mojolicious::Controller - Controller base class
 
 =head1 SYNOPSIS
 
@@ -759,16 +754,11 @@ Gracefully end WebSocket connection or long poll stream.
 
 =head2 C<flash>
 
-  my $flash = $c->flash;
   my $foo   = $c->flash('foo');
   $c        = $c->flash({foo => 'bar'});
   $c        = $c->flash(foo => 'bar');
 
-Data storage persistent for the next request, stored in the session.
-
-  $c->flash->{foo} = 'bar';
-  my $foo = $c->flash->{foo};
-  delete $c->flash->{foo};
+Data storage persistent only for the next request, stored in the session.
 
 =head2 C<on_finish>
 
@@ -785,6 +775,7 @@ Callback to be invoked when the transaction has been finished.
   $c = $c->on_message(sub {...});
 
 Callback to be invoked when new WebSocket messages arrive.
+Note that this method is EXPERIMENTAL and might change without warning!
 
   $c->on_message(sub {
     my ($c, $message) = @_;
@@ -962,9 +953,12 @@ Note that this method is EXPERIMENTAL and might change without warning!
 
   $c = $c->send_message('Hi there!');
   $c = $c->send_message('Hi there!', sub {...});
+  $c = $c->send_message([$bytes]);
+  $c = $c->send_message([$bytes], sub {...});
 
 Send a message via WebSocket, only works if there is currently a WebSocket
 connection in progress.
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<session>
 
@@ -1035,8 +1029,8 @@ A L<Mojo::UserAgent> prepared for the current environment.
 =head2 C<url_for>
 
   my $url = $c->url_for;
-  my $url = $c->url_for(controller => 'bar', action => 'baz');
-  my $url = $c->url_for('named', controller => 'bar', action => 'baz');
+  my $url = $c->url_for(name => 'sebastian');
+  my $url = $c->url_for('test', name => 'sebastian');
   my $url = $c->url_for('/perldoc');
   my $url = $c->url_for('http://mojolicio.us/perldoc');
 
@@ -1073,6 +1067,12 @@ once all data has been written to the kernel send buffer or equivalent.
       $c->finish;
     });
   });
+
+For Comet (C<long polling>) you might also want to increase the connection
+timeout, which usually defaults to C<15> seconds.
+
+  # Increase timeout for current connection to 300 seconds
+  Mojo::IOLoop->connection_timeout($c->tx->connection => 300);
 
 =head2 C<write_chunk>
 

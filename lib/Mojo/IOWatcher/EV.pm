@@ -16,8 +16,7 @@ sub not_writing {
 
   my $fd = fileno $handle;
   my $h  = $self->{handles}->{$fd};
-  my $w  = $h->{watcher};
-  if ($w) { $w->set($fd, EV::READ) if delete $h->{writing} }
+  if (my $w = $h->{watcher}) { $w->set($fd, EV::READ) }
   else {
     weaken $self;
     $h->{watcher} = EV::io($fd, EV::READ, sub { $self->_io($fd, @_) });
@@ -32,7 +31,6 @@ sub one_tick {
   my ($self, $timeout) = @_;
   my $w = EV::timer($timeout, 0, sub { EV::unloop(EV::BREAK_ONE) });
   EV::loop;
-  undef $w;
 }
 
 sub recurring { shift->_timer(shift, 1, @_) }
@@ -50,14 +48,12 @@ sub writing {
 
   my $fd = fileno $handle;
   my $h  = $self->{handles}->{$fd};
-  my $w  = $h->{watcher};
-  if ($w) { $w->set($fd, EV::WRITE | EV::READ) }
+  if (my $w = $h->{watcher}) { $w->set($fd, EV::WRITE | EV::READ) }
   else {
     weaken $self;
     $h->{watcher} =
       EV::io($fd, EV::WRITE | EV::READ, sub { $self->_io($fd, @_) });
   }
-  $h->{writing} = 1;
 
   return $self;
 }
@@ -99,7 +95,7 @@ __END__
 
 =head1 NAME
 
-Mojo::IOWatcher::EV - EV Non-Blocking I/O Watcher
+Mojo::IOWatcher::EV - EV non-blocking I/O watcher
 
 =head1 SYNOPSIS
 
