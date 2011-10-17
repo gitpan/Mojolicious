@@ -10,6 +10,7 @@ use Mojo::URL;
 use Mojo::Util;
 
 require Carp;
+require Scalar::Util;
 
 # "Scalpel... blood bucket... priest."
 has [qw/app match/];
@@ -40,6 +41,8 @@ sub AUTOLOAD {
 
   # Method
   my ($package, $method) = our $AUTOLOAD =~ /^([\w\:]+)\:\:(\w+)$/;
+  Carp::croak(qq/Undefined subroutine &${package}::$method called/)
+    unless Scalar::Util::blessed($self) && $self->isa(__PACKAGE__);
 
   # Call helper
   Carp::croak(qq/Can't locate object method "$method" via package "$package"/)
@@ -64,11 +67,10 @@ sub cookie {
       if length $value > 4096;
 
     # Create new cookie
-    $options ||= {};
     my $cookie = Mojo::Cookie::Response->new(
       name  => $name,
       value => $value,
-      %$options
+      %{$options || {}}
     );
     $self->res->cookies($cookie);
     return $self;
@@ -137,22 +139,18 @@ sub flash {
 # "My parents may be evil, but at least they're stupid."
 sub on_finish {
   my ($self, $cb) = @_;
-  $self->tx->on_finish(sub { shift and $self->$cb(@_) });
+  return $self->tx->on(finish => sub { shift and $self->$cb(@_) });
 }
 
 # "I like being a women.
 #  Now when I say something stupid, everyone laughs and buys me things."
 sub on_message {
-  my $self = shift;
-
+  my ($self, $cb) = @_;
   my $tx = $self->tx;
   Carp::croak('No WebSocket connection to receive messages from')
     unless $tx->is_websocket;
-  my $cb = shift;
-  $tx->on_message(sub { shift and $self->$cb(@_) });
   $self->rendered(101);
-
-  return $self;
+  return $tx->on(message => sub { shift and $self->$cb(@_) });
 }
 
 # "Just make a simple cake. And this time, if someone's going to jump out of
@@ -257,15 +255,12 @@ sub render {
 # "She's built like a steakhouse, but she handles like a bistro!"
 sub render_content {
   my $self    = shift;
-  my $name    = shift;
+  my $name    = shift || 'content';
   my $content = pop;
 
-  # Initialize
+  # Set
   my $stash = $self->stash;
   my $c = $stash->{'mojo.content'} ||= {};
-  $name ||= 'content';
-
-  # Set
   if (defined $content) {
 
     # Reset with multiple values
@@ -277,14 +272,11 @@ sub render_content {
     }
 
     # First come
-    else {
-      $c->{$name} ||= ref $content eq 'CODE' ? $content->() : $content;
-    }
+    else { $c->{$name} ||= ref $content eq 'CODE' ? $content->() : $content }
   }
 
   # Get
-  $content = $c->{$name};
-  $content = '' unless defined $content;
+  $content = $c->{$name} // '';
   return Mojo::ByteStream->new("$content");
 }
 
@@ -409,9 +401,6 @@ sub render_static {
 
 sub render_text { shift->render(text => shift, @_) }
 
-# "On the count of three, you will awaken feeling refreshed,
-#  as if Futurama had never been canceled by idiots,
-#  then brought back by bigger idiots. One. Two."
 sub rendered {
   my ($self, $status) = @_;
 
@@ -608,7 +597,7 @@ sub url_for {
       Mojo::Util::url_unescape($real);
       my $backup = $real;
       Mojo::Util::decode('UTF-8', $real);
-      $real = $backup unless defined $real;
+      $real //= $backup;
       $real =~ s/\/?$e$/$target/;
       $target = $real;
     }
@@ -762,9 +751,10 @@ Data storage persistent only for the next request, stored in the session.
 
 =head2 C<on_finish>
 
-  $c->on_finish(sub {...});
+  my $cb = $c->on_finish(sub {...});
 
-Callback to be invoked when the transaction has been finished.
+Register C<finish> event with transaction, which will be emitted when the
+transaction has been finished.
 
   $c->on_finish(sub {
     my $c = shift;
@@ -772,9 +762,10 @@ Callback to be invoked when the transaction has been finished.
 
 =head2 C<on_message>
 
-  $c = $c->on_message(sub {...});
+  my $cb = $c->on_message(sub {...});
 
-Callback to be invoked when new WebSocket messages arrive.
+Register C<message> event with transaction, which will be emitted when new
+WebSocket messages arrive.
 Note that this method is EXPERIMENTAL and might change without warning!
 
   $c->on_message(sub {
@@ -956,8 +947,8 @@ Note that this method is EXPERIMENTAL and might change without warning!
   $c = $c->send_message([$bytes]);
   $c = $c->send_message([$bytes], sub {...});
 
-Send a message via WebSocket, only works if there is currently a WebSocket
-connection in progress.
+Send a message non-blocking via WebSocket, the optional drain callback will
+be invoked once all data has been written.
 Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<session>
@@ -1037,10 +1028,10 @@ A L<Mojo::UserAgent> prepared for the current environment.
 Generate a portable L<Mojo::URL> object with base for a route, path or URL.
 
   # "/perldoc" if application is deployed under "/"
-  print $c->url_for('/perldoc');
+  say $c->url_for('/perldoc');
 
   # "/myapp/perldoc" if application is deployed under "/myapp"
-  print $c->url_for('/perldoc');
+  say $c->url_for('/perldoc');
 
 =head2 C<write>
 
@@ -1049,8 +1040,8 @@ Generate a portable L<Mojo::URL> object with base for a route, path or URL.
   $c->write(sub {...});
   $c->write('Hello!', sub {...});
 
-Write dynamic content chunk wise, the optional drain callback will be invoked
-once all data has been written to the kernel send buffer or equivalent.
+Write dynamic content non-blocking, the optional drain callback will be
+invoked once all data has been written.
 
   # Keep connection alive (with Content-Length header)
   $c->res->headers->content_length(6);
@@ -1081,10 +1072,8 @@ timeout, which usually defaults to C<15> seconds.
   $c->write_chunk(sub {...});
   $c->write_chunk('Hello!', sub {...});
 
-Write dynamic content chunk wise with the C<chunked> C<Transfer-Encoding>
-which doesn't require a C<Content-Length> header, the optional drain callback
-will be invoked once all data has been written to the kernel send buffer or
-equivalent.
+Write dynamic content non-blocking with the C<chunked> transfer encoding, the
+optional drain callback will be invoked once all data has been written.
 
   $c->write_chunk('He', sub {
     my $c = shift;

@@ -10,7 +10,7 @@ use Mojolicious::Routes;
 use Mojolicious::Sessions;
 use Mojolicious::Static;
 use Mojolicious::Types;
-use Scalar::Util 'weaken';
+use Scalar::Util qw/blessed weaken/;
 
 # "Robots don't have any emotions, and sometimes that makes me very sad."
 has controller_class => 'Mojolicious::Controller';
@@ -34,8 +34,8 @@ has sessions => sub { Mojolicious::Sessions->new };
 has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
-our $CODENAME = 'Smiling Face With Sunglasses';
-our $VERSION  = '1.99';
+our $CODENAME = 'Leaf Fluttering In Wind';
+our $VERSION  = '2.0';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -44,6 +44,8 @@ sub AUTOLOAD {
 
   # Method
   my ($package, $method) = our $AUTOLOAD =~ /^([\w\:]+)\:\:(\w+)$/;
+  croak qq/Undefined subroutine &${package}::$method called/
+    unless blessed $self && $self->isa(__PACKAGE__);
 
   # Check for helper
   croak qq/Can't locate object method "$method" via package "$package"/
@@ -59,16 +61,6 @@ sub DESTROY { }
 #  For example, Amy: you're cute, so I baked you a pony."
 sub new {
   my $self = shift->SUPER::new(@_);
-
-  # Transaction builder
-  $self->on_transaction(
-    sub {
-      my $self = shift;
-      my $tx   = Mojo::Transaction::HTTP->new;
-      $self->plugins->run_hook(after_build_tx => ($tx, $self));
-      return $tx;
-    }
-  );
 
   # Root directories
   my $home = $self->home;
@@ -113,6 +105,13 @@ sub new {
   $self->startup(@_);
 
   return $self;
+}
+
+sub build_tx {
+  my $self = shift;
+  my $tx   = Mojo::Transaction::HTTP->new;
+  $self->plugins->run_hook(after_build_tx => $tx, $self);
+  return $tx;
 }
 
 # "Amy, technology isn't intrinsically good or evil. It's how it's used.
@@ -179,6 +178,7 @@ sub handler {
   my $c =
     $self->controller_class->new(app => $self, stash => $stash, tx => $tx);
   weaken $c->{app};
+  weaken $c->{tx};
   unless (eval { $self->on_process->($self, $c); 1 }) {
     $self->log->fatal("Processing request failed: $@");
     $tx->res->code(500);
@@ -403,6 +403,13 @@ Construct a new L<Mojolicious> application.
 Will automatically detect your home directory and set up logging based on
 your current operating mode.
 Also sets up the renderer, static dispatcher and a default set of plugins.
+
+=head2 C<build_tx>
+
+  my $tx = $app->build_tx;
+
+Transaction builder, defaults to building a L<Mojo::Transaction::HTTP>
+object.
 
 =head2 C<defaults>
 
@@ -687,6 +694,8 @@ L<http://www.apache.org/licenses/LICENSE-2.0>.
 
 Every major release of L<Mojolicious> has a code name, these are the ones
 that have been used in the past.
+
+2.0, C<Leaf Fluttering In Wind> (u1F343)
 
 1.4, C<Smiling Face With Sunglasses> (u1F60E)
 

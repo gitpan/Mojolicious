@@ -1,5 +1,5 @@
 ---
-abstract: 'Duct Tape For The HTML5 Web!'
+abstract: 'Real-time web framework'
 author:
   - 'Sebastian Riedel <sri@cpan.org>'
 build_requires: {}
@@ -23,6 +23,7 @@ requires:
   Cwd: 0
   Data::Dumper: 0
   Digest::MD5: 0
+  Digest::SHA: 0
   Encode: 0
   Errno: 0
   Exporter: 0
@@ -47,17 +48,19 @@ requires:
   MIME::Base64: 0
   MIME::QuotedPrint: 0
   POSIX: 0
+  Pod::Simple::HTML: 0
+  Pod::Simple::Search: 0
   Scalar::Util: 0
   Socket: 0
   Sys::Hostname: 0
   Test::Harness: 0
   Test::More: 0
   Time::HiRes: 0
-  perl: 5.008007
+  perl: 5.010001
 resources:
-  bugtracker: http://github.com/kraih/mojo/issues
+  bugtracker: http://groups.google.com/group/mojolicious
   homepage: http://mojolicio.us
   license: http://dev.perl.org/licenses/
   repository: http://github.com/kraih/mojo
   x_MailingList: http://groups.google.com/group/mojolicious
-version: 1.99
+version: 2.0

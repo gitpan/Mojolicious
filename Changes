@@ -1,5 +1,40 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+2.0     2011-10-17 00:00:00
+        - Code name "Leaf Fluttering In Wind", this is a major release.
+        - Increased Perl version requirement to 5.10.1.
+        - Renamed Mojo::IOLoop::EventEmitter to Mojo::EventEmitter.
+        - Replaced one_tick method in Mojo::IOWatcher with start and stop
+          methods.
+        - Added EXPERIMENTAL contains method to Mojo::Path.
+        - Added EXPERIMENTAL auto_upgrade attribute to Mojo::Content::Single.
+        - Added EXPERIMENTAL boundary method to Mojo::Content.
+        - Added EXPERIMENTAL slice method to Mojo::Collection.
+        - Added EXPERIMENTAL build and parse methods to
+          Mojo::IOLoop::Resolver.
+        - Updated WebSocket implementation to ietf-17.
+        - Improved many modules to use events instead of callbacks.
+        - Improved message parser performance slightly.
+        - Improved Mojo::IOLoop to die if started twice.
+        - Improved setuidgid in Mojo::Server::Daemon.
+        - Improved Mojo::IOWatcher backend detection.
+        - Improved Mojo::IOLoop::Stream to handle unexpected connection close
+          more gracefully.
+        - Improved documentation.
+        - Improved tests.
+        - Fixed many portability issues.
+        - Fixed on_finish callback to work consistently with all servers.
+        - Fixed on_finish callback to work consistently with the user agent.
+        - Fixed big memory and file descriptor leak in the TLS code of
+          Mojo::IOLoop::Server.
+        - Fixed small memory leak in Mojolicious.
+        - Fixed small memory leak in Mojo::DOM.
+        - Fixed small memory leak in Mojo::Message.
+        - Fixed small boundary bug in Mojo::Content::MultiPart.
+        - Fixed small formatting bug in Mojo::Headers.
+        - Fixed small proxy message generation bug.
+        - Fixed small detection bug in Mojolicious::Types.
+
 1.99    2011-09-29 00:00:00
         - Deprecated direct hash access to the flash in
           Mojolicious::Controller.

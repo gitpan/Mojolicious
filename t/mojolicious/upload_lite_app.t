@@ -9,10 +9,7 @@ BEGIN {
   $ENV{MOJO_IOWATCHER} = 'Mojo::IOWatcher';
 }
 
-use Test::More;
-plan skip_all => 'Windows is too fragile for this test!'
-  if $^O eq 'MSWin32' || $^O =~ /cygwin/;
-plan tests => 31;
+use Test::More tests => 31;
 
 # "Um, Leela,
 #  Armondo and I are going to the back seat of his car for coffee."
@@ -25,34 +22,27 @@ use Test::Mojo;
 my $cache = {};
 app->hook(
   after_build_tx => sub {
-    my $tx = shift;
-    $tx->req->on_progress(
-      sub {
+    shift->req->on(
+      progress => sub {
         my $req = shift;
 
-        # Upload id parameter
+        # Check for id
         return unless my $id = $req->url->query->param('upload_id');
 
-        # Cache
-        my $c = $cache->{$id} ||= [0];
-
-        # Expected content length
+        # Check for content length
         return
           unless my $len = $req->headers->content_length;
 
-        # Current progress
+        # Update cache with current progress
         my $progress = $req->content->progress;
-
-        # Update cache
-        push @$c, $progress == $len
-          ? 100
-          : int($progress / ($len / 100));
+        push @{$cache->{$id} ||= [0]},
+          $progress == $len ? 100 : int($progress / ($len / 100));
       }
     );
   }
 );
 
-# GET /upload
+# POST /upload
 post '/upload' => sub {
   my $self = shift;
   my $file = $self->req->upload('file');
@@ -150,14 +140,14 @@ my $ua = $t->ua;
 
 # POST /uploadlimit (huge upload without appropriate max message size)
 my $backup = $ENV{MOJO_MAX_MESSAGE_SIZE} || '';
-$ENV{MOJO_MAX_MESSAGE_SIZE} = 2048;
+$ENV{MOJO_MAX_MESSAGE_SIZE} = 655360;
 my $tx   = Mojo::Transaction::HTTP->new;
 my $part = Mojo::Content::Single->new;
 my $name = b('Вячеслав')->url_escape;
 $part->headers->content_disposition(
   qq/form-data; name="$name"; filename="$name.jpg"/);
 $part->headers->content_type('image/jpeg');
-$part->asset->add_chunk('1234' x 1024);
+$part->asset->add_chunk('1234' x 1310720);
 my $content = Mojo::Content::MultiPart->new;
 $content->headers($tx->req->headers);
 $content->headers->content_type('multipart/form-data');
@@ -179,7 +169,7 @@ $name                       = b('Вячеслав')->encode->url_escape;
 $part->headers->content_disposition(
   qq/form-data; name="$name"; filename="$name.jpg"/);
 $part->headers->content_type('image/jpeg');
-$part->asset->add_chunk('1234' x 1024);
+$part->asset->add_chunk('1234' x 1310720);
 $content = Mojo::Content::MultiPart->new;
 $content->headers($tx->req->headers);
 $content->headers->content_type('multipart/form-data');
@@ -191,5 +181,5 @@ $ua->start($tx);
 ok $tx->is_done, 'transaction is done';
 is $tx->res->code, 200, 'right status';
 is b($tx->res->body)->decode('UTF-8')->to_string,
-  'called, Вячеслав.jpg4096', 'right content';
+  'called, Вячеслав.jpg5242880', 'right content';
 $ENV{MOJO_MAX_MESSAGE_SIZE} = $backup;

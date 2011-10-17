@@ -52,14 +52,19 @@ get '/shortpoll/nolength' => sub {
 my $longpoll;
 get '/longpoll' => sub {
   my $self = shift;
-  $self->on_finish(sub { $longpoll = 'finished!' });
   $self->res->code(200);
   $self->res->headers->content_type('text/plain');
   $self->write_chunk('hi ');
-  Mojo::IOLoop->timer(
+  my $id = Mojo::IOLoop->timer(
     '0.5' => sub {
       $self->write_chunk('there,', sub { shift->write_chunk(' whats up?') });
       shift->timer('0.5' => sub { $self->finish });
+    }
+  );
+  $self->on_finish(
+    sub {
+      Mojo::IOLoop->drop($id);
+      $longpoll = 'finished!';
     }
   );
 };
@@ -238,7 +243,7 @@ $t->get_ok('/shortpoll')->status_is(200)
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_type_is('text/plain')->content_is('this was short.');
 is $t->tx->kept_alive, undef, 'connection was not kept alive';
-is $t->tx->keep_alive, 0,     'connection will not be kept alive';
+is $t->tx->keep_alive, undef, 'connection will not be kept alive';
 is $shortpoll, 1, 'finished';
 
 # GET /shortpoll/plain
@@ -256,8 +261,8 @@ $t->get_ok('/shortpoll/nolength')->status_is(200)
   ->header_is('X-Powered-By'   => 'Mojolicious (Perl)')
   ->header_is('Content-Length' => undef)->content_type_is('text/plain')
   ->content_is('this was short and had no length.');
-is $t->tx->kept_alive, 1, 'connection was not kept alive';
-is $t->tx->keep_alive, 0, 'connection will be kept alive';
+is $t->tx->kept_alive, 1,     'connection was not kept alive';
+is $t->tx->keep_alive, undef, 'connection will be kept alive';
 is $shortpoll_nolength, 'finished!', 'finished';
 
 # GET /longpoll
@@ -309,7 +314,7 @@ $t->get_ok('/longpoll/nolength')->status_is(200)
   ->header_is('X-Powered-By'   => 'Mojolicious (Perl)')
   ->header_is('Content-Length' => undef)->content_type_is('text/plain')
   ->content_is('hi there, what length?');
-is $t->tx->keep_alive, 0, 'connection will not be kept alive';
+is $t->tx->keep_alive, undef, 'connection will not be kept alive';
 is $longpoll_nolength, 'finished!', 'finished';
 
 # GET /longpoll/nested

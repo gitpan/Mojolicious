@@ -1,5 +1,5 @@
 {
-   "abstract" : "Duct Tape For The HTML5 Web!",
+   "abstract" : "Real-time web framework",
    "author" : [
       "Sebastian Riedel <sri@cpan.org>"
    ],
@@ -35,6 +35,7 @@
             "Cwd" : 0,
             "Data::Dumper" : 0,
             "Digest::MD5" : 0,
+            "Digest::SHA" : 0,
             "Encode" : 0,
             "Errno" : 0,
             "Exporter" : 0,
@@ -59,20 +60,22 @@
             "MIME::Base64" : 0,
             "MIME::QuotedPrint" : 0,
             "POSIX" : 0,
+            "Pod::Simple::HTML" : 0,
+            "Pod::Simple::Search" : 0,
             "Scalar::Util" : 0,
             "Socket" : 0,
             "Sys::Hostname" : 0,
             "Test::Harness" : 0,
             "Test::More" : 0,
             "Time::HiRes" : 0,
-            "perl" : "5.008007"
+            "perl" : "5.010001"
          }
       }
    },
    "release_status" : "stable",
    "resources" : {
       "bugtracker" : {
-         "web" : "http://github.com/kraih/mojo/issues"
+         "web" : "http://groups.google.com/group/mojolicious"
       },
       "homepage" : "http://mojolicio.us",
       "license" : [
@@ -83,5 +86,5 @@
       },
       "x_MailingList" : "http://groups.google.com/group/mojolicious"
    },
-   "version" : "1.99"
+   "version" : "2.0"
 }

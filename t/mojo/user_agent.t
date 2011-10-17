@@ -7,10 +7,7 @@ BEGIN {
   $ENV{MOJO_IOWATCHER} = 'Mojo::IOWatcher';
 }
 
-use Test::More;
-plan skip_all => 'Windows is too fragile for this test!'
-  if $^O eq 'MSWin32' || $^O =~ /cygwin/;
-plan tests => 76;
+use Test::More tests => 68;
 
 use_ok 'Mojo::UserAgent';
 
@@ -141,6 +138,22 @@ ok $tx->success, 'successful';
 is $tx->res->code, 200,     'right status';
 is $tx->res->body, 'works', 'right content';
 
+# GET / (callbacks)
+my $finished;
+$tx = $ua->build_tx(GET => '/');
+$ua->on(
+  start => sub {
+    my ($self, $tx) = @_;
+    $tx->on(finish => sub { $finished++ });
+  }
+);
+$tx = $ua->start($tx);
+$ua->unsubscribe_all('start');
+ok $tx->success, 'successful';
+is $finished, 1, 'finish event has been emitted';
+is $tx->res->code, 200,     'right status';
+is $tx->res->body, 'works', 'right content';
+
 # GET / (custom connection)
 my ($success, $code, $body);
 Mojo::IOLoop->connect(
@@ -224,35 +237,6 @@ is $tx->res->body, 'works!', 'right content';
 $tx = $ua->get("http://localhost:$port/mock");
 ok $tx->success, 'successful';
 is $tx->kept_alive, 1, 'kept connection alive';
-is $tx->res->code, 200,      'right status';
-is $tx->res->body, 'works!', 'right content';
-
-# Taint connection
-Mojo::IOLoop->singleton->write($last => 'broken!');
-sleep 1;
-
-# GET / (mock server tainted connection)
-$tx = $ua->get("http://localhost:$port/mock");
-ok $tx->success, 'successful';
-is $tx->kept_alive, undef, 'kept connection not alive';
-is $tx->res->code, 200,      'right status';
-is $tx->res->body, 'works!', 'right content';
-
-# GET / (mock server again)
-$tx = $ua->get("http://localhost:$port/mock");
-ok $tx->success, 'successful';
-is $tx->kept_alive, 1, 'kept connection alive';
-is $tx->res->code, 200,      'right status';
-is $tx->res->body, 'works!', 'right content';
-
-# Taint connection
-Mojo::IOLoop->singleton->write($last => 'broken!');
-sleep 1;
-
-# GET / (mock server tainted connection)
-$tx = $ua->get("http://localhost:$port/mock");
-ok $tx->success, 'successful';
-is $tx->kept_alive, undef, 'kept connection not alive';
 is $tx->res->code, 200,      'right status';
 is $tx->res->body, 'works!', 'right content';
 

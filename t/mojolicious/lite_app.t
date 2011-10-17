@@ -705,7 +705,7 @@ get '/bridge2stash' =>
 # Make sure after_dispatch can make session changes
 hook after_dispatch => sub {
   my $self = shift;
-  return unless $self->req->url->path =~ /^\/late\/session/;
+  return unless $self->req->url->path->contains('/late/session');
   $self->session(late => 'works!');
 };
 
@@ -1148,7 +1148,7 @@ $t->get_ok('/maybe/ajax', {'X-Requested-With' => 'XMLHttpRequest'})
   ->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is('is ajax');
 
-# GET /finished (with on_finish callback)
+# GET /finished (with finish event)
 $t->get_ok('/finished')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')

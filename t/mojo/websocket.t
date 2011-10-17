@@ -7,12 +7,7 @@ BEGIN {
   $ENV{MOJO_IOWATCHER} = 'Mojo::IOWatcher';
 }
 
-# FreeBSD 8.0 and 8.1 are known to cause problems
-use Test::More;
-plan skip_all => 'Perl 5.10 required for this test!' unless $] >= 5.010;
-plan skip_all => 'This test does not work on some older versions of FreeBSD!'
-  if $^O =~ /freebsd/;
-plan tests => 42;
+use Test::More tests => 44;
 
 # "I can't believe it! Reading and writing actually paid off!"
 use IO::Socket::INET;
@@ -92,8 +87,8 @@ websocket '/early_start' => sub {
 my ($handshake, $denied) = 0;
 websocket '/denied' => sub {
   my $self = shift;
-  $self->tx->handshake->on_finish(sub { $handshake += 2 });
-  $self->on_finish(sub                { $denied    += 1 });
+  $self->tx->handshake->on(finish => sub { $handshake += 2 });
+  $self->on_finish(sub { $denied += 1 });
   $self->render(text => 'denied', status => 403);
 };
 
@@ -104,8 +99,8 @@ websocket '/subreq' => sub {
   $self->ua->websocket(
     '/echo' => sub {
       my $tx = pop;
-      $tx->on_message(
-        sub {
+      $tx->on(
+        message => sub {
           my ($tx, $message) = @_;
           $self->send_message($message);
           $tx->finish;
@@ -170,9 +165,9 @@ my $result;
 $ua->websocket(
   '/' => sub {
     my $tx = pop;
-    $tx->on_finish(sub { $loop->stop });
-    $tx->on_message(
-      sub {
+    $tx->on(finish => sub { $loop->stop });
+    $tx->on(
+      message => sub {
         my ($tx, $message) = @_;
         $result = $message;
         $tx->finish;
@@ -196,26 +191,29 @@ $ua->websocket(
   }
 );
 $loop->start;
-is $ws,   0,   'not a websocket';
-is $code, 426, 'right code';
+is $ws,   undef, 'not a websocket';
+is $code, 426,   'right code';
 ok $body =~ /^(\d+)failed!$/, 'right content';
 ok $1 < 100, 'right timeout';
 
 # WebSocket /socket (using an already prepared socket)
-my $port = $ua->test_server->port;
-$result = '';
-my $tx = $ua->build_websocket_tx('ws://lalala/socket');
+my $port     = $ua->test_server->port;
+my $tx       = $ua->build_websocket_tx('ws://lalala/socket');
+my $finished = 0;
+$tx->on(finish => sub { $finished++ });
 my $socket =
   IO::Socket::INET->new(PeerAddr => '127.0.0.1', PeerPort => $port);
 $socket->blocking(0);
 $tx->connection($socket);
-my $local;
+$result = '';
+my ($local, $early);
 $ua->start(
   $tx => sub {
     my $tx = pop;
-    $tx->on_finish(sub { $loop->stop });
-    $tx->on_message(
-      sub {
+    $early = $finished;
+    $tx->on(finish => sub { $loop->stop });
+    $tx->on(
+      message => sub {
         my ($tx, $message) = @_;
         $tx->finish if length $result;
         $result .= $message;
@@ -225,6 +223,8 @@ $ua->start(
   }
 );
 $loop->start;
+is $finished, 1, 'finish event has been emitted';
+is $early,    1, 'finish event has been emitted at the right time';
 ok $result =~ /^lalala(\d+)$/, 'right result';
 ok $1 > 100, 'right timeout';
 ok $local, 'local port';
@@ -236,14 +236,14 @@ $result = undef;
 $ua->websocket(
   '/early_start' => sub {
     my $tx = pop;
-    $tx->on_finish(
-      sub {
+    $tx->on(
+      finish => sub {
         $flag2 += 5;
         $loop->stop;
       }
     );
-    $tx->on_message(
-      sub {
+    $tx->on(
+      message => sub {
         my ($tx, $message) = @_;
         $result = $message;
         $tx->send_message('test3');
@@ -254,7 +254,7 @@ $ua->websocket(
 );
 $loop->start;
 is $result, 'test3test2', 'right result';
-is $flag2,  23,           'finished callback';
+is $flag2,  23,           'finish event has been emitted';
 
 # WebSocket /denied (connection denied)
 $code = undef;
@@ -270,24 +270,24 @@ is $handshake, 2,   'finished handshake';
 is $denied,    1,   'finished websocket';
 
 # WebSocket /subreq
-my $finished = 0;
+$finished = 0;
 ($code, $result) = undef;
 $ua->websocket(
   '/subreq' => sub {
     my $tx = pop;
     $code   = $tx->res->code;
     $result = '';
-    $tx->on_message(
-      sub {
+    $tx->on(
+      message => sub {
         my ($tx, $message) = @_;
         $result .= $message;
         $tx->finish if $message eq 'test1';
       }
     );
-    $tx->on_finish(
-      sub {
+    $tx->on(
+      finish => sub {
         $finished += 4;
-        $loop->stop;
+        $loop->timer('0.5' => sub { shift->stop });
       }
     );
   }
@@ -307,15 +307,15 @@ $ua->websocket(
     my $tx = pop;
     $code   = $tx->res->code;
     $result = '';
-    $tx->on_message(
-      sub {
+    $tx->on(
+      message => sub {
         my ($tx, $message) = @_;
         $result .= $message;
         $tx->finish and $running-- if $message eq 'test1';
         $loop->timer('0.5' => sub { $loop->stop }) unless $running;
       }
     );
-    $tx->on_finish(sub { $finished += 1 });
+    $tx->on(finish => sub { $finished += 1 });
   }
 );
 $ua->websocket(
@@ -323,15 +323,15 @@ $ua->websocket(
     my $tx = pop;
     $code2   = $tx->res->code;
     $result2 = '';
-    $tx->on_message(
-      sub {
+    $tx->on(
+      message => sub {
         my ($tx, $message) = @_;
         $result2 .= $message;
         $tx->finish and $running-- if $message eq 'test1';
         $loop->timer('0.5' => sub { $loop->stop }) unless $running;
       }
     );
-    $tx->on_finish(sub { $finished += 2 });
+    $tx->on(finish => sub { $finished += 2 });
   }
 );
 $loop->start;
@@ -349,14 +349,14 @@ my $counter = 0;
 $ua->websocket(
   '/echo' => sub {
     my $tx = pop;
-    $tx->on_finish(
-      sub {
+    $tx->on(
+      finish => sub {
         $flag2 += 5;
         $loop->stop;
       }
     );
-    $tx->on_message(
-      sub {
+    $tx->on(
+      message => sub {
         my ($tx, $message) = @_;
         $result .= $message;
         $tx->finish if ++$counter == 2;
@@ -368,7 +368,7 @@ $ua->websocket(
 );
 $loop->start;
 is $result, 'hi!there!', 'right result';
-is $flag2,  25,          'finished callback';
+is $flag2,  25,          'finish event has been emitted';
 
 # WebSocket /double_echo (server side drain callback)
 $flag2   = undef;
@@ -377,14 +377,14 @@ $counter = 0;
 $ua->websocket(
   '/double_echo' => sub {
     my $tx = pop;
-    $tx->on_finish(
-      sub {
+    $tx->on(
+      finish => sub {
         $flag2 += 5;
         $loop->stop;
       }
     );
-    $tx->on_message(
-      sub {
+    $tx->on(
+      message => sub {
         my ($tx, $message) = @_;
         $result .= $message;
         $tx->finish if ++$counter == 2;
@@ -396,7 +396,7 @@ $ua->websocket(
 );
 $loop->start;
 is $result, 'hi!hi!', 'right result';
-is $flag2,  24,       'finished callback';
+is $flag2,  24,       'finish event has been emitted';
 
 # WebSocket /dead (dies)
 $code = undef;
@@ -413,7 +413,7 @@ $ua->websocket(
 );
 $loop->start;
 is $done,      1,                       'transaction is done';
-is $websocket, 0,                       'no websocket';
+is $websocket, undef,                   'no websocket';
 is $code,      500,                     'right status';
 is $message,   'Internal Server Error', 'right message';
 
@@ -429,7 +429,7 @@ $ua->websocket(
   }
 );
 $loop->start;
-is $websocket, 0,              'no websocket';
+is $websocket, undef,          'no websocket';
 is $code,      403,            'right status';
 is $message,   "i'm a teapot", 'right message';
 
@@ -443,16 +443,16 @@ $ua->websocket(
 $loop->start;
 
 # Server side "finished" callback
-is $flag, 24, 'finished callback';
+is $flag, 24, 'finish event has been emitted';
 
 # WebSocket /echo (16bit length)
 $result = undef;
 $ua->websocket(
   '/echo' => sub {
     my $tx = pop;
-    $tx->on_finish(sub { $loop->stop });
-    $tx->on_message(
-      sub {
+    $tx->on(finish => sub { $loop->stop });
+    $tx->on(
+      message => sub {
         my ($tx, $message) = @_;
         $result = $message;
         $tx->finish;
@@ -470,9 +470,9 @@ $ua->websocket(
   '/echo' => sub {
     my $tx = pop;
     $tx->max_websocket_size(500000);
-    $tx->on_finish(sub { $loop->stop });
-    $tx->on_message(
-      sub {
+    $tx->on(finish => sub { $loop->stop });
+    $tx->on(
+      message => sub {
         my ($tx, $message) = @_;
         $result = $message;
         $tx->finish;

@@ -23,13 +23,13 @@ lib/Mojo/Date.pm
 lib/Mojo/DOM.pm
 lib/Mojo/DOM/CSS.pm
 lib/Mojo/DOM/HTML.pm
+lib/Mojo/EventEmitter.pm
 lib/Mojo/Exception.pm
 lib/Mojo/Headers.pm
 lib/Mojo/HelloWorld.pm
 lib/Mojo/Home.pm
 lib/Mojo/IOLoop.pm
 lib/Mojo/IOLoop/Client.pm
-lib/Mojo/IOLoop/EventEmitter.pm
 lib/Mojo/IOLoop/Resolver.pm
 lib/Mojo/IOLoop/Server.pm
 lib/Mojo/IOLoop/Stream.pm
@@ -297,7 +297,9 @@ t/mojolicious/testing_app.t
 t/mojolicious/tls_lite_app.t
 t/mojolicious/twinkle_lite_app.conf
 t/mojolicious/twinkle_lite_app.t
+t/mojolicious/types.t
 t/mojolicious/upload_lite_app.t
+t/mojolicious/upload_stream_lite_app.t
 t/mojolicious/websocket_lite_app.t
 t/pod.t
 t/pod_coverage.t

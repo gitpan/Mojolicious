@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 
-use 5.008007;
+use 5.010001;
 
 use strict;
 use warnings;
@@ -11,12 +11,10 @@ use ExtUtils::MakeMaker;
 
 my ($mm) = $ExtUtils::MakeMaker::VERSION =~ /^([^_]+)/;
 
-# We only use core modules, so you shouldn't have to install anything besides
-# Perl 5.8.7!
 WriteMakefile(
   NAME         => 'Mojolicious',
   VERSION_FROM => 'lib/Mojolicious.pm',
-  ABSTRACT     => 'Duct Tape For The HTML5 Web!',
+  ABSTRACT     => 'Real-time web framework',
   AUTHOR       => 'Sebastian Riedel <sri@cpan.org>',
 
   ($mm < 6.3002 ? () : ('LICENSE' => 'artistic_2')),
@@ -25,13 +23,13 @@ WriteMakefile(
     ? ()
     : (
       META_MERGE => {
-        requires  => {perl => '5.008007'},
+        requires  => {perl => '5.010001'},
         resources => {
           homepage    => 'http://mojolicio.us',
           license     => 'http://dev.perl.org/licenses/',
           MailingList => 'http://groups.google.com/group/mojolicious',
           repository  => 'http://github.com/kraih/mojo',
-          bugtracker  => 'http://github.com/kraih/mojo/issues'
+          bugtracker  => 'http://groups.google.com/group/mojolicious'
         },
         no_index => {directory => [qw/t/]}
       },
@@ -50,6 +48,7 @@ WriteMakefile(
     'Cwd'                    => 0,
     'Data::Dumper'           => 0,
     'Digest::MD5'            => 0,
+    'Digest::SHA'            => 0,
     'Encode'                 => 0,
     'Errno'                  => 0,
     'Exporter'               => 0,
@@ -73,6 +72,8 @@ WriteMakefile(
     'Locale::Maketext'       => 0,
     'MIME::Base64'           => 0,
     'MIME::QuotedPrint'      => 0,
+    'Pod::Simple::HTML'      => 0,
+    'Pod::Simple::Search'    => 0,
     'POSIX'                  => 0,
     'Scalar::Util'           => 0,
     'Socket'                 => 0,
@@ -83,20 +84,3 @@ WriteMakefile(
   },
   test => {TESTS => 't/*.t t/*/*.t'}
 );
-
-# Using Perl 5.8.x is a bad idea though
-warn <<'EOF' unless $] >= 5.010;
-
-*******************************************************************************
-You are using Perl 5.8, a version that has reached the end of its life a few
-years ago and which is no longer getting updated by the community.
-It contains very serious flaws, especially around the regular expression
-engine, that will never get fixed and are likely to put your applications at
-risk.
-While your operating system vendor might keep it compiling on their platform,
-they will not fix these issues.
-
-Therefore we highly recommend that you upgrade as soon as possible!
-*******************************************************************************
-
-EOF

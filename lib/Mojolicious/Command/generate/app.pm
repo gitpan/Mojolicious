@@ -63,9 +63,8 @@ use File::Spec;
 use lib join '/', File::Spec->splitdir(dirname(__FILE__)), 'lib';
 use lib join '/', File::Spec->splitdir(dirname(__FILE__)), '..', 'lib';
 
-# Check if Mojolicious is installed
-eval 'use Mojolicious::Commands';
-die <<EOF if $@;
+# Check if Mojolicious is installed;
+die <<EOF unless eval 'use Mojolicious::Commands; 1';
 It looks like you don't have the Mojolicious framework installed.
 Please visit http://mojolicio.us for detailed installation instructions.
 
@@ -86,7 +85,7 @@ use Mojo::Base 'Mojolicious';
 sub startup {
   my $self = shift;
 
-  # Documentation browser under "/perldoc" (this plugin requires Perl 5.10)
+  # Documentation browser under "/perldoc"
   $self->plugin('PODRenderer');
 
   # Routes

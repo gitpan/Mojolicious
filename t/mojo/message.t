@@ -3,7 +3,7 @@ use Mojo::Base -strict;
 
 use utf8;
 
-use Test::More tests => 1176;
+use Test::More tests => 1236;
 
 use File::Spec;
 use File::Temp;
@@ -162,7 +162,7 @@ $req->parse("Host: example.com\x0d\x0a");
 $req->parse("Connection: Upgrade\x0d\x0a");
 $req->parse("Sec-WebSocket-Key: abcdef=\x0d\x0a");
 $req->parse("Sec-WebSocket-Protocol: sample\x0d\x0a");
-$req->parse("Upgrade: WebSocket\x0d\x0a\x0d\x0a");
+$req->parse("Upgrade: websocket\x0d\x0a\x0d\x0a");
 ok $req->is_done, 'request is done';
 is $req->method,  'GET', 'right method';
 is $req->version, '1.1', 'right version';
@@ -173,7 +173,7 @@ is $req->headers->host,       'example.com', 'right "Host" value';
 is $req->headers->connection, 'Upgrade',     'right "Connection" value';
 is $req->headers->sec_websocket_protocol, 'sample',
   'right "Sec-WebSocket-Protocol" value';
-is $req->headers->upgrade, 'WebSocket', 'right "Upgrade" value';
+is $req->headers->upgrade, 'websocket', 'right "Upgrade" value';
 is $req->headers->sec_websocket_key, 'abcdef=',
   'right "Sec-WebSocket-Key" value';
 is $req->body, '', 'no content';
@@ -241,7 +241,7 @@ is $req->url, '/foo/bar/baz.html', 'right URL';
 is $req->headers->content_type,   'text/plain', 'right "Content-Type" value';
 is $req->headers->content_length, undef,        'no "Content-Length" value';
 
-# Parse HTTP 1.0 start line and headers, no body (with line size limit)
+# Parse HTTP 1.0 start line (with line size limit)
 $req                     = Mojo::Message::Request->new;
 $backup                  = $ENV{MOJO_MAX_LINE_SIZE} || '';
 $ENV{MOJO_MAX_LINE_SIZE} = 5;
@@ -251,12 +251,48 @@ is(($req->error)[0], 'Maximum line size exceeded.', 'right error');
 is(($req->error)[1], 413, 'right status');
 $ENV{MOJO_MAX_LINE_SIZE} = $backup;
 
-# Parse HTTP 1.0 start line and headers, no body (with message size limit)
+# Parse HTTP 1.0 start line and headers (with line size limit)
+$req                     = Mojo::Message::Request->new;
+$backup                  = $ENV{MOJO_MAX_LINE_SIZE} || '';
+$ENV{MOJO_MAX_LINE_SIZE} = 20;
+$req->parse("GET / HTTP/1.0\x0d\x0a");
+$req->parse("Content-Type: text/plain\x0d\x0a");
+ok $req->is_done, 'request is done';
+is(($req->error)[0], 'Maximum line size exceeded.', 'right error');
+is(($req->error)[1], 413, 'right status');
+$ENV{MOJO_MAX_LINE_SIZE} = $backup;
+
+# Parse HTTP 1.0 start line (with message size limit)
 $req                        = Mojo::Message::Request->new;
 $backup                     = $ENV{MOJO_MAX_MESSAGE_SIZE} || '';
 $ENV{MOJO_MAX_MESSAGE_SIZE} = 5;
 $req->parse('GET /foo/bar/baz.html HTTP/1');
 ok $req->is_done, 'request is done';
+is(($req->error)[0], 'Maximum message size exceeded.', 'right error');
+is(($req->error)[1], 413, 'right status');
+$ENV{MOJO_MAX_MESSAGE_SIZE} = $backup;
+
+# Parse HTTP 1.0 start line and headers (with message size limit)
+$req                        = Mojo::Message::Request->new;
+$backup                     = $ENV{MOJO_MAX_MESSAGE_SIZE} || '';
+$ENV{MOJO_MAX_MESSAGE_SIZE} = 20;
+$req->parse("GET / HTTP/1.0\x0d\x0a");
+$req->parse("Content-Type: text/plain\x0d\x0a");
+ok $req->is_done, 'request is done';
+is(($req->error)[0], 'Maximum message size exceeded.', 'right error');
+is(($req->error)[1], 413, 'right status');
+$ENV{MOJO_MAX_MESSAGE_SIZE} = $backup;
+
+# Parse HTTP 1.0 start line, headers and body (with message size limit)
+$req                        = Mojo::Message::Request->new;
+$backup                     = $ENV{MOJO_MAX_MESSAGE_SIZE} || '';
+$ENV{MOJO_MAX_MESSAGE_SIZE} = 50;
+$req->parse("GET / HTTP/1.0\x0d\x0a");
+$req->parse("Content-Length: 24\x0d\x0a\x0d\x0a");
+$req->parse('Hello World!');
+$req->parse('Hello World!');
+ok $req->is_done, 'request is done';
+is(($req->error)[0], 'Maximum message size exceeded.', 'right error');
 is(($req->error)[1], 413, 'right status');
 $ENV{MOJO_MAX_MESSAGE_SIZE} = $backup;
 
@@ -299,7 +335,7 @@ is $req->headers->content_length, 27, 'right "Content-Length" value';
 # Parse full HTTP 1.0 request with zero chunk
 $req = Mojo::Message::Request->new;
 my $finished;
-$req->on_finish(sub { $finished = shift->is_done });
+$req->on(finish => sub { $finished = shift->is_done });
 $req->parse('GET /foo/bar/baz.html?fo');
 $req->parse("o=13#23 HTTP/1.0\x0d\x0aContent");
 $req->parse('-Type: text/');
@@ -307,7 +343,7 @@ $req->parse("plain\x0d\x0aContent-Length: 27\x0d\x0a\x0d\x0aHell");
 $req->parse("o World!\n123");
 $req->parse('0');
 $req->parse("\nlalalala\n");
-ok $finished, 'finish callback was called';
+ok $finished, 'finish event has been emitted';
 ok $req->is_done, 'request is done';
 is $req->method,  'GET', 'right method';
 is $req->version, '1.0', 'right version';
@@ -367,18 +403,31 @@ is $req->headers->content_type, 'text/plain', 'right "Content-Type" value';
 is $req->content->asset->size, 13, 'right size';
 is $req->content->asset->slurp, 'abcdabcdefghi', 'right content';
 
-# Parse HTTP 1.1 chunked request with callback
+# Parse HTTP 1.1 chunked request with callbacks
 $req = Mojo::Message::Request->new;
-my $buffer = '';
-$req->body(sub { $buffer .= pop });
+my $progress = my $buffer = my $finish = '';
+$req->on(
+  progress => sub {
+    my $self = shift;
+    $progress ||= $self->url->path if $self->content->is_parsing_body;
+  }
+);
+$req->body(sub { $buffer .= shift->url->query->param('foo') . shift });
+$req->on(finish => sub { $finish .= shift->url->fragment });
 $req->parse("POST /foo/bar/baz.html?foo=13#23 HTTP/1.1\x0d\x0a");
+is $progress, '', 'no progress';
 $req->parse("Content-Type: text/plain\x0d\x0a");
+is $progress, '', 'no progress';
 $req->parse("Transfer-Encoding: chunked\x0d\x0a\x0d\x0a");
+is $progress, '/foo/bar/baz.html', 'made progress';
 $req->parse("4\x0d\x0a");
 $req->parse("abcd\x0d\x0a");
 $req->parse("9\x0d\x0a");
 $req->parse("abcdefghi\x0d\x0a");
+is $finish, '', 'not finished yet';
 $req->parse("0\x0d\x0a\x0d\x0a");
+is $finish, '23', 'finished';
+is $progress, '/foo/bar/baz.html', 'made progress';
 ok $req->is_done, 'request is done';
 is $req->method,  'POST', 'right method';
 is $req->version, '1.1', 'right version';
@@ -387,7 +436,7 @@ is $req->at_least_version('1.2'), undef, 'not version 1.2';
 is $req->url, '/foo/bar/baz.html?foo=13#23', 'right URL';
 is $req->headers->content_length, 13, 'right "Content-Length" value';
 is $req->headers->content_type, 'text/plain', 'right "Content-Type" value';
-is $buffer, 'abcdabcdefghi', 'right content';
+is $buffer, '131313abcd1313abcdefghi13', 'right content';
 
 # Parse HTTP 1.1 "x-application-urlencoded"
 $req = Mojo::Message::Request->new;
@@ -546,7 +595,7 @@ is $req->content->asset->slurp, 'abcdabcdefghi', 'right content';
 # Parse HTTP 1.1 multipart request
 $req = Mojo::Message::Request->new;
 $req->parse("GET /foo/bar/baz.html?foo13#23 HTTP/1.1\x0d\x0a");
-$req->parse("Content-Length: 420x0d\x0a");
+$req->parse("Content-Length: 418\x0d\x0a");
 $req->parse('Content-Type: multipart/form-data; bo');
 $req->parse("undary=----------0xKhTmLbOuNdArY\x0d\x0a\x0d\x0a");
 $req->parse("\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a");
@@ -563,15 +612,18 @@ $req->parse("use strict;\n");
 $req->parse("use warnings;\n\n");
 $req->parse("print \"Hello World :)\\n\"\n");
 $req->parse("\x0d\x0a------------0xKhTmLbOuNdArY--");
-ok $req->is_done, 'request is done';
-is $req->method,  'GET', 'right method';
-is $req->version, '1.1', 'right version';
+ok $req->is_done,      'request is done';
+is $req->is_multipart, 1, 'multipart content';
+is $req->method,       'GET', 'right method';
+is $req->version,      '1.1', 'right version';
 is $req->at_least_version('1.0'), 1,     'at least version 1.0';
 is $req->at_least_version('1.2'), undef, 'not version 1.2';
 is $req->url, '/foo/bar/baz.html?foo13#23', 'right URL';
 is $req->query_params, 'foo13', 'right parameters';
-like $req->headers->content_type,
-  qr/multipart\/form-data/, 'right "Content-Type" value';
+is $req->headers->content_type,
+  'multipart/form-data; boundary=----------0xKhTmLbOuNdArY',
+  'right "Content-Type" value';
+is $req->headers->content_length, 418, 'right "Content-Type" value';
 isa_ok $req->content->parts->[0], 'Mojo::Content::Single', 'right part';
 isa_ok $req->content->parts->[1], 'Mojo::Content::Single', 'right part';
 isa_ok $req->content->parts->[2], 'Mojo::Content::Single', 'right part';
@@ -587,6 +639,43 @@ my $file = File::Spec->catfile(File::Temp::tempdir(CLEANUP => 1),
   ("MOJO_TMP." . time . ".txt"));
 ok $req->upload('upload')->move_to($file), 'moved file';
 is unlink($file), 1, 'unlinked file';
+
+# Parse HTTP 1.1 multipart request (without upgrade)
+$req = Mojo::Message::Request->new;
+$req->content->auto_upgrade(0);
+$req->parse("GET /foo/bar/baz.html?foo13#23 HTTP/1.1\x0d\x0a");
+$req->parse("Content-Length: 418\x0d\x0a");
+$req->parse('Content-Type: multipart/form-data; bo');
+$req->parse("undary=----------0xKhTmLbOuNdArY\x0d\x0a\x0d\x0a");
+$req->parse("\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a");
+$req->parse("Content-Disposition: form-data; name=\"text1\"\x0d\x0a");
+$req->parse("\x0d\x0ahallo welt test123\n");
+$req->parse("\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a");
+$req->parse("Content-Disposition: form-data; name=\"text2\"\x0d\x0a");
+$req->parse("\x0d\x0a\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a");
+$req->parse('Content-Disposition: form-data; name="upload"; file');
+$req->parse("name=\"hello.pl\"\x0d\x0a");
+$req->parse("Content-Type: application/octet-stream\x0d\x0a\x0d\x0a");
+$req->parse("#!/usr/bin/perl\n\n");
+$req->parse("use strict;\n");
+$req->parse("use warnings;\n\n");
+$req->parse("print \"Hello World :)\\n\"\n");
+$req->parse("\x0d\x0a------------0xKhTmLbOuNdArY--");
+ok $req->is_done,      'request is done';
+is $req->is_multipart, undef, 'no multipart content';
+is $req->method,       'GET', 'right method';
+is $req->version,      '1.1', 'right version';
+is $req->at_least_version('1.0'), 1,     'at least version 1.0';
+is $req->at_least_version('1.2'), undef, 'not version 1.2';
+is $req->url, '/foo/bar/baz.html?foo13#23', 'right URL';
+is $req->query_params, 'foo13', 'right parameters';
+is $req->headers->content_type,
+  'multipart/form-data; boundary=----------0xKhTmLbOuNdArY',
+  'right "Content-Type" value';
+is $req->headers->content_length, 418, 'right "Content-Type" value';
+isa_ok $req->content, 'Mojo::Content::Single', 'right content';
+like $req->content->asset->slurp, qr/------------0xKhTmLbOuNdArY--$/,
+  'right content';
 
 # Parse full HTTP 1.1 proxy request with basic authorization
 $req = Mojo::Message::Request->new;
@@ -716,7 +805,7 @@ is $clone->headers->host,   '127.0.0.1', 'right "Host" value';
 # Build full HTTP 1.1 request
 $req      = Mojo::Message::Request->new;
 $finished = undef;
-$req->on_finish(sub { $finished = shift->is_done });
+$req->on(finish => sub { $finished = shift->is_done });
 $req->method('get');
 $req->url->parse('http://127.0.0.1/foo/bar');
 $req->headers->expect('100-continue');
@@ -733,13 +822,13 @@ is $req->headers->expect, '100-continue',             'right "Expect" value';
 is $req->headers->host,   '127.0.0.1',                'right "Host" value';
 is $req->headers->content_length, '13', 'right "Content-Length" value';
 is $req->body, "Hello World!\n", 'right content';
-ok $finished, 'finish callback was called';
+ok $finished, 'finish event has been emitted';
 ok $req->is_done, 'request is done';
 
 # Build full HTTP 1.1 request (with clone)
 $req      = Mojo::Message::Request->new;
 $finished = undef;
-$req->on_finish(sub { $finished = shift->is_done });
+$req->on(finish => sub { $finished = shift->is_done });
 $req->method('get');
 $req->url->parse('http://127.0.0.1/foo/bar');
 $req->headers->expect('100-continue');
@@ -757,7 +846,7 @@ is $req->headers->expect, '100-continue',             'right "Expect" value';
 is $req->headers->host,   '127.0.0.1',                'right "Host" value';
 is $req->headers->content_length, '13', 'right "Content-Length" value';
 is $req->body, "Hello World!\n", 'right content';
-ok $finished, 'finish callback was called';
+ok $finished, 'finish event has been emitted';
 ok $req->is_done, 'request is done';
 $finished = undef;
 $clone    = Mojo::Message::Request->new->parse($clone->to_string);
@@ -772,7 +861,7 @@ is $clone->headers->expect, '100-continue', 'right "Expect" value';
 is $clone->headers->host,   '127.0.0.1',    'right "Host" value';
 is $clone->headers->content_length, '13', 'right "Content-Length" value';
 is $clone->body, "Hello World!\n", 'right content';
-ok $finished, 'finish callback was called';
+ok !$finished, 'finish event has been emitted';
 ok $clone->is_done, 'request is done';
 
 # Build full HTTP 1.1 request (roundtrip)
@@ -815,14 +904,14 @@ is $req->body, "Hello World!\n", 'right content';
 # Build HTTP 1.1 request body
 $req      = Mojo::Message::Request->new;
 $finished = undef;
-$req->on_finish(sub { $finished = shift->is_done });
+$req->on(finish => sub { $finished = shift->is_done });
 $req->method('get');
 $req->url->parse('http://127.0.0.1/foo/bar');
 $req->headers->expect('100-continue');
 $req->body("Hello World!\n");
 my $i = 0;
 while (my $chunk = $req->get_body_chunk($i)) { $i += length $chunk }
-ok $finished, 'finish callback was called';
+ok $finished, 'finish event has been emitted';
 ok $req->is_done, 'request is done';
 
 # Build WebSocket handshake request
@@ -833,7 +922,7 @@ $req->headers->host('example.com');
 $req->headers->connection('Upgrade');
 $req->headers->sec_websocket_accept('abcdef=');
 $req->headers->sec_websocket_protocol('sample');
-$req->headers->upgrade('WebSocket');
+$req->headers->upgrade('websocket');
 $req = Mojo::Message::Request->new->parse($req->to_string);
 ok $req->is_done, 'request is done';
 is $req->method,  'GET', 'right method';
@@ -843,7 +932,7 @@ is $req->at_least_version('1.2'), undef, 'not version 1.2';
 is $req->url, '/demo', 'right URL';
 is $req->url->to_abs, 'http://example.com/demo', 'right absolute URL';
 is $req->headers->connection, 'Upgrade',     'right "Connection" value';
-is $req->headers->upgrade,    'WebSocket',   'right "Upgrade" value';
+is $req->headers->upgrade,    'websocket',   'right "Upgrade" value';
 is $req->headers->host,       'example.com', 'right "Host" value';
 is $req->headers->content_length, 0, 'right "Content-Length" value';
 is $req->headers->sec_websocket_accept, 'abcdef=',
@@ -851,7 +940,7 @@ is $req->headers->sec_websocket_accept, 'abcdef=',
 is $req->headers->sec_websocket_protocol, 'sample',
   'right "Sec-WebSocket-Protocol" value';
 is $req->body, '', 'no content';
-ok $finished, 'finish callback was called';
+ok $finished, 'finish event has been emitted';
 ok $req->is_done, 'request is done';
 
 # Build WebSocket handshake request (with clone)
@@ -862,7 +951,7 @@ $req->headers->host('example.com');
 $req->headers->connection('Upgrade');
 $req->headers->sec_websocket_accept('abcdef=');
 $req->headers->sec_websocket_protocol('sample');
-$req->headers->upgrade('WebSocket');
+$req->headers->upgrade('websocket');
 $clone = $req->clone;
 $req   = Mojo::Message::Request->new->parse($req->to_string);
 ok $req->is_done, 'request is done';
@@ -873,7 +962,7 @@ is $req->at_least_version('1.2'), undef, 'not version 1.2';
 is $req->url, '/demo', 'right URL';
 is $req->url->to_abs, 'http://example.com/demo', 'right absolute URL';
 is $req->headers->connection, 'Upgrade',     'right "Connection" value';
-is $req->headers->upgrade,    'WebSocket',   'right "Upgrade" value';
+is $req->headers->upgrade,    'websocket',   'right "Upgrade" value';
 is $req->headers->host,       'example.com', 'right "Host" value';
 is $req->headers->content_length, 0, 'right "Content-Length" value';
 is $req->headers->sec_websocket_accept, 'abcdef=',
@@ -891,7 +980,7 @@ is $clone->at_least_version('1.2'), undef, 'not version 1.2';
 is $clone->url, '/demo', 'right URL';
 is $clone->url->to_abs, 'http://example.com/demo', 'right absolute URL';
 is $clone->headers->connection, 'Upgrade',     'right "Connection" value';
-is $clone->headers->upgrade,    'WebSocket',   'right "Upgrade" value';
+is $clone->headers->upgrade,    'websocket',   'right "Upgrade" value';
 is $clone->headers->host,       'example.com', 'right "Host" value';
 is $clone->headers->content_length, 0, 'right "Content-Length" value';
 is $clone->headers->sec_websocket_accept, 'abcdef=',
@@ -900,6 +989,36 @@ is $clone->headers->sec_websocket_protocol, 'sample',
   'right "Sec-WebSocket-Protocol" value';
 is $clone->body, '', 'no content';
 ok $clone->is_done, 'request is done';
+
+# Build WebSocket handshake proxy request
+$req = Mojo::Message::Request->new;
+$req->method('GET');
+$req->url->parse('http://example.com/demo');
+$req->headers->host('example.com');
+$req->headers->connection('Upgrade');
+$req->headers->sec_websocket_accept('abcdef=');
+$req->headers->sec_websocket_protocol('sample');
+$req->headers->upgrade('websocket');
+$req->proxy('http://127.0.0.2:8080');
+$req = Mojo::Message::Request->new->parse($req->to_string);
+ok $req->is_done, 'request is done';
+is $req->method,  'GET', 'right method';
+is $req->version, '1.1', 'right version';
+is $req->at_least_version('1.0'), 1,     'at least version 1.0';
+is $req->at_least_version('1.2'), undef, 'not version 1.2';
+is $req->url, '/demo', 'right URL';
+is $req->url->to_abs, 'http://example.com/demo', 'right absolute URL';
+is $req->headers->connection, 'Upgrade',     'right "Connection" value';
+is $req->headers->upgrade,    'websocket',   'right "Upgrade" value';
+is $req->headers->host,       'example.com', 'right "Host" value';
+is $req->headers->content_length, 0, 'right "Content-Length" value';
+is $req->headers->sec_websocket_accept, 'abcdef=',
+  'right "Sec-WebSocket-Key" value';
+is $req->headers->sec_websocket_protocol, 'sample',
+  'right "Sec-WebSocket-Protocol" value';
+is $req->body, '', 'no content';
+ok $finished, 'finish event has been emitted';
+ok $req->is_done, 'request is done';
 
 # Build full HTTP 1.1 proxy request
 $req = Mojo::Message::Request->new;
@@ -915,6 +1034,26 @@ is $req->version, '1.1', 'right version';
 is $req->at_least_version('1.0'), 1,     'at least version 1.0';
 is $req->at_least_version('1.2'), undef, 'not version 1.2';
 is $req->url, 'http://127.0.0.1/foo/bar', 'right URL';
+is $req->url->to_abs,     'http://127.0.0.1/foo/bar', 'right absolute URL';
+is $req->headers->expect, '100-continue',             'right "Expect" value';
+is $req->headers->host,   '127.0.0.1',                'right "Host" value';
+is $req->headers->content_length, '13', 'right "Content-Length" value';
+is $req->body, "Hello World!\n", 'right content';
+
+# Build full HTTP 1.1 proxy request (HTTPS)
+$req = Mojo::Message::Request->new;
+$req->method('GET');
+$req->url->parse('https://127.0.0.1/foo/bar');
+$req->headers->expect('100-continue');
+$req->body("Hello World!\n");
+$req->proxy('http://127.0.0.2:8080');
+$req = Mojo::Message::Request->new->parse($req->to_string);
+ok $req->is_done, 'request is done';
+is $req->method,  'GET', 'right method';
+is $req->version, '1.1', 'right version';
+is $req->at_least_version('1.0'), 1,     'at least version 1.0';
+is $req->at_least_version('1.2'), undef, 'not version 1.2';
+is $req->url, '/foo/bar', 'right URL';
 is $req->url->to_abs,     'http://127.0.0.1/foo/bar', 'right absolute URL';
 is $req->headers->expect, '100-continue',             'right "Expect" value';
 is $req->headers->host,   '127.0.0.1',                'right "Host" value';
@@ -1098,8 +1237,8 @@ $req = Mojo::Message::Request->new;
 $req->method('GET');
 $req->url->parse('http://127.0.0.1:8080/foo/bar');
 $req->headers->transfer_encoding('chunked');
-my $counter2 = 0;
-$req->on_progress(sub { $counter2++ });
+my $counter = 0;
+$req->on(progress => sub { $counter++ });
 $req->write_chunk(
   'hello world!' => sub {
     shift->write_chunk(
@@ -1122,7 +1261,7 @@ is $req->url->to_abs, 'http://127.0.0.1:8080/foo/bar', 'right absolute URL';
 is $req->headers->host, '127.0.0.1:8080', 'right "Host" value';
 is $req->headers->transfer_encoding, undef, 'no "Transfer-Encoding" value';
 is $req->body, "hello world!hello world2!\n\n", 'right content';
-ok $counter2, 'right counter';
+ok $counter, 'right counter';
 
 # Build HTTP 1.1 chunked request
 $req = Mojo::Message::Request->new;
@@ -1966,7 +2105,7 @@ is $res->cookie('foo')->path,  '/test', 'right path';
 # Parse WebSocket handshake response
 $res = Mojo::Message::Response->new;
 $res->parse("HTTP/1.1 101 Switching Protocols\x0d\x0a");
-$res->parse("Upgrade: WebSocket\x0d\x0a");
+$res->parse("Upgrade: websocket\x0d\x0a");
 $res->parse("Connection: Upgrade\x0d\x0a");
 $res->parse("Sec-WebSocket-Accept: abcdef=\x0d\x0a");
 $res->parse("Sec-WebSocket-Protocol: sample\x0d\x0a\x0d\x0a");
@@ -1976,7 +2115,7 @@ is $res->message, 'Switching Protocols', 'right message';
 is $res->version, '1.1', 'right version';
 is $res->at_least_version('1.0'), 1,     'at least version 1.0';
 is $res->at_least_version('1.2'), undef, 'not version 1.2';
-is $res->headers->upgrade,    'WebSocket', 'right "Upgrade" value';
+is $res->headers->upgrade,    'websocket', 'right "Upgrade" value';
 is $res->headers->connection, 'Upgrade',   'right "Connection" value';
 is $res->headers->sec_websocket_accept, 'abcdef=',
   'right "Sec-WebSocket-Accept" value';
@@ -1988,7 +2127,7 @@ is $res->body, '', 'no content';
 $res = Mojo::Message::Response->new;
 $res->code(101);
 $res->headers->date('Sun, 17 Aug 2008 16:27:35 GMT');
-$res->headers->upgrade('WebSocket');
+$res->headers->upgrade('websocket');
 $res->headers->connection('Upgrade');
 $res->headers->sec_websocket_accept('abcdef=');
 $res->headers->sec_websocket_protocol('sample');
@@ -2001,7 +2140,7 @@ is $res->at_least_version('1.0'), 1,     'at least version 1.0';
 is $res->at_least_version('1.2'), undef, 'not version 1.2';
 is $res->headers->connection, 'Upgrade', 'right "Connection" value';
 is $res->headers->date, 'Sun, 17 Aug 2008 16:27:35 GMT', 'right "Date" value';
-is $res->headers->upgrade,        'WebSocket', 'right "Upgrade" value';
+is $res->headers->upgrade,        'websocket', 'right "Upgrade" value';
 is $res->headers->content_length, 0,           'right "Content-Length" value';
 is $res->headers->sec_websocket_accept, 'abcdef=',
   'right "Sec-WebSocket-Accept" value';
@@ -2142,9 +2281,9 @@ is $req2->cookie('bar')->value, 'baz',      'right value';
 is $req2->body, "Hello World!\n", 'right content';
 
 # Parse full HTTP 1.0 request with cookies and progress callback
-$req = Mojo::Message::Request->new;
-my $counter = 0;
-$req->on_progress(sub { $counter++ });
+$req     = Mojo::Message::Request->new;
+$counter = 0;
+$req->on(progress => sub { $counter++ });
 is $counter, 0, 'right count';
 is $req->content->is_parsing_body, undef, 'is not parsing body';
 is $req->is_done, undef, 'request is not done';
@@ -2452,19 +2591,23 @@ $req->body('');
 is $req->body, '', 'right content';
 $req->body('hi there!');
 is $req->body, 'hi there!', 'right content';
-$req->body(undef);
-is $req->body, '', 'right content';
-$req->body(sub { });
-isa_ok $req->body, 'CODE', 'body is callback';
-$req->body(undef);
+is $req->content->has_subscribers('read'), undef, 'no subscribers';
+$cb = $req->body(sub { });
+is $req->content->has_subscribers('read'), 1, 'has subscribers';
+$req->content->unsubscribe(read => $cb);
+is $req->content->has_subscribers('read'), undef, 'no subscribers';
+$req->body('');
 is $req->body, '', 'right content';
 $req->body(0);
 is $req->body, 0, 'right content';
-$req->body(sub { });
-isa_ok $req->body, 'CODE', 'body is callback';
+is $req->content->has_subscribers('read'), undef, 'no subscribers';
+$cb = $req->body(sub { });
+is $req->content->has_subscribers('read'), 1, 'has subscribers';
+$req->content->unsubscribe(read => $cb);
 $req->body('hello!');
+is $req->content->has_subscribers('read'), undef, 'no subscribers';
 is $req->body, 'hello!', 'right content';
-is $req->content->on_read, undef, 'no read callback';
+is $req->content->has_subscribers('read'), undef, 'no subscribers';
 $req->content(Mojo::Content::MultiPart->new);
 $req->body('hi!');
 is $req->body, 'hi!', 'right content';

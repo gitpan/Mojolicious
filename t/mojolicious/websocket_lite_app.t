@@ -1,6 +1,8 @@
 #!/usr/bin/env perl
 use Mojo::Base -strict;
 
+# "Oh, dear. She’s stuck in an infinite loop and he’s an idiot.
+#  Well, that’s love for you."
 use utf8;
 
 # Disable Bonjour, IPv6 and libev
@@ -9,11 +11,8 @@ BEGIN {
   $ENV{MOJO_IOWATCHER} = 'Mojo::IOWatcher';
 }
 
-# "Oh, dear. She’s stuck in an infinite loop and he’s an idiot.
-#  Well, that’s love for you."
-use Test::More tests => 78;
+use Test::More tests => 87;
 
-# "Your mistletoe is no match for my *tow* missile."
 use Mojo::ByteStream 'b';
 use Mojolicious::Lite;
 use Test::Mojo;
@@ -61,6 +60,23 @@ websocket '/bytes' => sub {
     sub {
       my ($self, $message) = @_;
       $self->send_message([$message]);
+    }
+  );
+};
+
+# WebSocket /once
+websocket '/once' => sub {
+  my $self = shift;
+  $self->on_message(
+    sub {
+      my ($self, $message) = @_;
+      $self->send_message("ONE: $message");
+    }
+  );
+  $self->tx->once(
+    message => sub {
+      my ($tx, $message) = @_;
+      $self->send_message("TWO: $message");
     }
   );
 };
@@ -150,6 +166,12 @@ $t->websocket_ok('/bytes')->send_message_ok([$bytes])->message_is($bytes)
 # WebSocket /bytes (multiple times)
 $t->websocket_ok('/bytes')->send_message_ok([$bytes])->message_is($bytes)
   ->send_message_ok([$bytes])->message_is($bytes)->finish_ok;
+
+# WebSocket /once
+$t->websocket_ok('/once')->send_message_ok('hello')->message_is('ONE: hello')
+  ->message_is('TWO: hello')->send_message_ok('hello')
+  ->message_is('ONE: hello')->send_message_ok('hello')
+  ->message_is('ONE: hello')->finish_ok;
 
 # WebSocket /nested
 $t->websocket_ok('/nested')->send_message_ok('hello')

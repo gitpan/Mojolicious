@@ -3,7 +3,7 @@ use Mojo::Base -strict;
 
 use utf8;
 
-use Test::More tests => 105;
+use Test::More tests => 127;
 
 # "This is the greatest case of false advertising I’ve seen since I sued the
 #  movie 'The Never Ending Story.'"
@@ -133,3 +133,32 @@ is $path->parts->[2], 'passwd', 'right part';
 is $path->parts->[3], undef,    'no part';
 is $path->leading_slash,  1,     'has leading slash';
 is $path->trailing_slash, undef, 'no trailing slash';
+
+# Contains
+$path = Mojo::Path->new('/foo/bar');
+is $path->contains('/'),            1,     'contains path';
+is $path->contains('/foo'),         1,     'contains path';
+is $path->contains('/foo/bar'),     1,     'contains path';
+is $path->contains('/foobar'),      undef, 'does not contain path';
+is $path->contains('/foo/b'),       undef, 'does not contain path';
+is $path->contains('/foo/bar/baz'), undef, 'does not contain path';
+$path = Mojo::Path->new('/♥/bar');
+is $path->contains('/♥'),     1,     'contains path';
+is $path->contains('/♥/bar'), 1,     'contains path';
+is $path->contains('/♥foo'),  undef, 'does not contain path';
+is $path->contains('/foo♥'),  undef, 'does not contain path';
+$path = Mojo::Path->new('/');
+is $path->contains('/'),    1,     'contains path';
+is $path->contains('/foo'), undef, 'does not contain path';
+$path = Mojo::Path->new('/0');
+is $path->contains('/'),    1,     'contains path';
+is $path->contains('/0'),   1,     'contains path';
+is $path->contains('/0/0'), undef, 'does not contain path';
+$path = Mojo::Path->new('/0/♥.html');
+is $path->contains('/'),           1,     'contains path';
+is $path->contains('/0'),          1,     'contains path';
+is $path->contains('/0/♥.html'), 1,     'contains path';
+is $path->contains('/0/♥'),      undef, 'does not contain path';
+is $path->contains('/0/0.html'),   undef, 'does not contain path';
+is $path->contains('/0.html'),     undef, 'does not contain path';
+is $path->contains('/♥.html'),   undef, 'does not contain path';

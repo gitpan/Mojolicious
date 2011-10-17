@@ -1,5 +1,5 @@
 package Mojo::IOLoop::Server;
-use Mojo::Base 'Mojo::IOLoop::EventEmitter';
+use Mojo::Base 'Mojo::EventEmitter';
 
 use Carp 'croak';
 use File::Spec;
@@ -16,7 +16,7 @@ use constant IPV6 => $ENV{MOJO_NO_IPV6}
 # TLS support requires IO::Socket::SSL
 use constant TLS => $ENV{MOJO_NO_TLS}
   ? 0
-  : eval 'use IO::Socket::SSL 1.43 "inet4"; 1';
+  : eval 'use IO::Socket::SSL 1.37 "inet4"; 1';
 use constant TLS_READ  => TLS ? IO::Socket::SSL::SSL_WANT_READ()  : 0;
 use constant TLS_WRITE => TLS ? IO::Socket::SSL::SSL_WANT_WRITE() : 0;
 
@@ -108,7 +108,7 @@ sub listen {
   # New socket
   else {
     my %options = (
-      Listen    => $args->{backlog} || SOMAXCONN,
+      Listen => $args->{backlog} // SOMAXCONN,
       LocalAddr => $args->{address} || '0.0.0.0',
       LocalPort => $port,
       Proto     => 'tcp',
@@ -128,7 +128,7 @@ sub listen {
 
   # TLS
   return unless $args->{tls};
-  croak "IO::Socket::SSL 1.43 required for TLS support" unless TLS;
+  croak "IO::Socket::SSL 1.37 required for TLS support" unless TLS;
 
   # Options
   my %options = (
@@ -186,10 +186,10 @@ sub _accept {
   setsockopt $handle, IPPROTO_TCP, TCP_NODELAY, 1;
 
   # Start TLS handshake
-  return $self->emit(accept => $handle) unless my $tls = $self->{tls};
+  return $self->emit_safe(accept => $handle) unless my $tls = $self->{tls};
   weaken $self;
   $tls->{SSL_error_trap} = sub {
-    my $handle = delete $self->{handles}->{$handle};
+    return unless my $handle = delete $self->{handles}->{shift()};
     $self->iowatcher->remove($handle);
     close $handle;
   };
@@ -245,7 +245,7 @@ sub _tls {
   if ($handle->accept_SSL) {
     $self->iowatcher->remove($handle);
     delete $self->{handles}->{$handle};
-    return $self->emit(accept => $handle);
+    return $self->emit_safe(accept => $handle);
   }
 
   # Switch between reading and writing
@@ -289,6 +289,10 @@ L<Mojo::IOLoop::Server> can emit the following events.
 
 =head2 C<accept>
 
+  $server->on(accept => sub {
+    my ($server, $handle) = @_;
+  });
+
 Emitted for each accepted connection.
 
 =head1 ATTRIBUTES
@@ -312,8 +316,8 @@ L<Mojo::IOWatcher::EV> object.
 
 =head1 METHODS
 
-L<Mojo::IOLoop::Server> inherits all methods from
-L<Mojo::IOLoop::EventEmitter> and implements the following new ones.
+L<Mojo::IOLoop::Server> inherits all methods from L<Mojo::EventEmitter> and
+implements the following new ones.
 
 =head2 C<listen>
 

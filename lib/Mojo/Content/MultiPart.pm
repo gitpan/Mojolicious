@@ -7,16 +7,11 @@ has parts => sub { [] };
 
 sub body_contains {
   my ($self, $chunk) = @_;
-
-  # Check parts
-  my $found = 0;
   for my $part (@{$self->parts}) {
-    my $headers = $part->build_headers;
-    $found += 1 if $headers =~ /$chunk/g;
-    $found += $part->body_contains($chunk);
+    return 1 if index($part->build_headers, $chunk) >= 0;
+    return 1 if $part->body_contains($chunk);
   }
-
-  return $found ? 1 : 0;
+  return;
 }
 
 sub body_size {
@@ -89,7 +84,7 @@ sub get_body_chunk {
   my ($self, $offset) = @_;
 
   # Body generator
-  return $self->generate_body_chunk($offset) if $self->on_read;
+  return $self->generate_body_chunk($offset) if $self->{dynamic};
 
   # First boundary
   my $boundary        = $self->build_boundary;
@@ -128,6 +123,8 @@ sub get_body_chunk {
   }
 }
 
+sub is_multipart {1}
+
 sub parse {
   my $self = shift;
 
@@ -135,10 +132,7 @@ sub parse {
   $self->SUPER::parse(@_);
 
   # Custom body parser
-  return $self if $self->on_read;
-
-  # Upgrade state
-  $self->{multi_state} ||= 'multipart_preamble';
+  return $self if $self->has_subscribers('read');
 
   # Parse multipart content
   $self->_parse_multipart;
@@ -150,11 +144,9 @@ sub _parse_multipart {
   my $self = shift;
 
   # Parse
-  my $boundary = $self->is_multipart;
-  while (1) {
-
-    # Done
-    last if $self->is_done;
+  $self->{multi_state} ||= 'multipart_preamble';
+  my $boundary = $self->boundary;
+  while (!$self->is_done) {
 
     # Preamble
     if (($self->{multi_state} || '') eq 'multipart_preamble') {
@@ -257,6 +249,10 @@ Mojo::Content::MultiPart - HTTP 1.1 multipart content container
 L<Mojo::Content::MultiPart> is a container for HTTP 1.1 multipart content as
 described in RFC 2616.
 
+=head1 EVENTS
+
+L<Mojo::Content::Multipart> inherits all events from L<Mojo::Content>.
+
 =head1 ATTRIBUTES
 
 L<Mojo::Content::MultiPart> inherits all attributes from L<Mojo::Content>
@@ -276,7 +272,7 @@ implements the following new ones.
 
 =head2 C<body_contains>
 
-  my $found = $content->body_contains('foobarbaz');
+  my $success = $content->body_contains('foobarbaz');
 
 Check if content parts contain a specific string.
 
@@ -304,6 +300,12 @@ Note that this method is EXPERIMENTAL and might change without warning!
   my $chunk = $content->get_body_chunk(0);
 
 Get a chunk of content starting from a specfic position.
+
+=head2 C<is_multipart>
+
+  my $true = $content->is_multipart;
+
+True.
 
 =head2 C<parse>
 
