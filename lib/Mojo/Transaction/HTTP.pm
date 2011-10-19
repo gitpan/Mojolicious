@@ -186,7 +186,7 @@ sub server_read {
   # EOF
   elsif ((length $chunk == 0) || ($req->is_done && !$self->{handled}++)) {
     my $ws = $self;
-    $self->emit(upgrade => \$ws) if $req->headers->upgrade;
+    $self->emit(upgrade => $ws) if $req->headers->upgrade;
     $self->emit(request => $ws);
   }
 
@@ -329,13 +329,6 @@ Mojo::Transaction::HTTP - HTTP 1.1 transaction container
 
   use Mojo::Transaction::HTTP;
 
-  my $tx = Mojo::Transaction::HTTP->new;
-
-  my $req = $tx->req;
-  my $res = $tx->res;
-
-  my $keep_alive = $tx->keep_alive;
-
 =head1 DESCRIPTION
 
 L<Mojo::Transaction::HTTP> is a container for HTTP 1.1 transactions as
@@ -357,7 +350,7 @@ Emitted when a request needs to be handled.
 =head2 C<upgrade>
 
   $tx->on(upgrade => sub {
-    my ($tx, $txref) = @_;
+    my ($tx, $ws) = @_;
   });
 
 Emitted when a connection needs to be upgraded.

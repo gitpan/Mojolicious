@@ -1,5 +1,12 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+2.01    2011-10-19 00:00:00
+        - Added EXPERIMENTAL upgrade event to Mojo::Content::Single.
+        - Added EXPERIMENTAL part event to Mojo::Content::MultiPart.
+        - Improved documentation.
+        - Fixed arguments of upgrade event in Mojo::Transaction::HTTP.
+        - Fixed small WebSocket upgrade bug in Mojo::Server::Daemon.
+
 2.0     2011-10-17 00:00:00
         - Code name "Leaf Fluttering In Wind", this is a major release.
         - Increased Perl version requirement to 5.10.1.

@@ -117,7 +117,13 @@ sub _build_tx {
   );
 
   # Upgrade
-  $tx->on(upgrade => sub { $self->_upgrade($id, pop) });
+  $tx->on(
+    upgrade => sub {
+      return unless $_[1]->req->headers->upgrade eq 'websocket';
+      $self->{connections}->{$id}->{websocket} = $_[1] =
+        $self->upgrade_tx($_[1]);
+    }
+  );
 
   # New request on the connection
   $c->{requests} ||= 0;
@@ -287,13 +293,6 @@ sub _read {
   elsif ($tx->is_writing) { $self->_write($id) }
 }
 
-sub _upgrade {
-  my ($self, $id, $txref) = @_;
-  return unless $$txref->req->headers->upgrade =~ /WebSocket/i;
-  my $c = $self->{connections}->{$id};
-  $c->{websocket} = $$txref = $self->upgrade_tx($$txref);
-}
-
 sub _user {
   my $self = shift;
   return unless my $user = $self->user;
@@ -338,7 +337,7 @@ Mojo::Server::Daemon - Non-blocking I/O HTTP 1.1 and WebSocket server
   my $daemon = Mojo::Server::Daemon->new(listen => ['http://*:8080']);
   $daemon->unsubscribe_all('request');
   $daemon->on(request => sub {
-    my ($self, $tx) = @_;
+    my ($daemon, $tx) = @_;
 
     # Request
     my $method = $tx->req->method;
