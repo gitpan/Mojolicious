@@ -294,8 +294,7 @@ sub is_dynamic { shift->content->is_dynamic }
 sub is_finished { (shift->{state} || '') eq 'finished' }
 
 sub is_limit_exceeded {
-  my $self = shift;
-  return unless my $code = ($self->error)[1];
+  return unless my $code = (shift->error)[1];
   return $code ~~ [413, 431];
 }
 
@@ -651,8 +650,13 @@ Check if message is at least a specific version.
   $message   = $message->body('Hello!');
   my $cb     = $message->body(sub {...});
 
-Access and replace text content or register C<read> event with content, which
-will be emitted when new content arrives.
+Access and replace text content or register C<read> event with C<content>,
+which will be emitted when new data arrives.
+
+  $message->body(sub {
+    my ($message, $chunk) = @_;
+    say "Streaming: $chunk";
+  });
 
 =head2 C<body_params>
 
