@@ -69,10 +69,8 @@ is $client, 'test321', 'right content';
 $loop   = Mojo::IOLoop->singleton;
 $port   = Mojo::IOLoop->generate_port;
 $server = $client = '';
-my $server_close = my $client_close = 0;
-my ($drop, $running);
+my ($drop, $running, $error, $server_close, $client_close);
 Mojo::IOLoop->drop(Mojo::IOLoop->recurring(0 => sub { $drop++ }));
-my $error = '';
 $loop->listen(
   port      => $port,
   tls       => 1,
@@ -102,10 +100,10 @@ $id = $loop->connect(
 $loop->connection_timeout($id => '0.5');
 $loop->timer(1 => sub { shift->stop });
 $loop->start;
-is $server, 'tset123', 'right content';
-is $client, 'test321', 'right content';
-ok $server_close, 'close event has been emitted';
-ok $client_close, 'close event has been emitted';
+is $server,       'tset123', 'right content';
+is $client,       'test321', 'right content';
+is $server_close, 1,         'server emitted close event once';
+is $client_close, 1,         'client emitted close event once';
 ok $running,      'loop was running';
 ok !$drop,  'event dropped successfully';
 ok !$error, 'no error';
@@ -134,10 +132,10 @@ $id           = $loop->connect(
 $loop->connection_timeout($id => '0.5');
 $loop->timer(1 => sub { shift->stop });
 $loop->start;
-is $server, 'tset123', 'right content';
-is $client, 'test321', 'right content';
-ok $server_close, 'close event has been emitted';
-ok $client_close, 'close event has been emitted';
+is $server,       'tset123', 'right content';
+is $client,       'test321', 'right content';
+is $server_close, 1,         'server emitted close event once';
+is $client_close, 1,         'client emitted close event once';
 ok $running,      'loop was running';
 ok !$drop,  'event dropped successfully';
 ok !$error, 'no error';
@@ -240,10 +238,10 @@ $id = $loop->connect(
 $loop->connection_timeout($id => '0.5');
 $loop->timer(1 => sub { shift->stop });
 $loop->start;
-is $server, 'tset123', 'right content';
-is $client, 'test321', 'right content';
-ok $server_close, 'close event has been emitted';
-ok $client_close, 'close event has been emitted';
+is $server,       'tset123', 'right content';
+is $client,       'test321', 'right content';
+is $server_close, 1,         'server emitted close event once';
+is $client_close, 1,         'client emitted close event once';
 
 # Missing client certificate
 $error = $cerror = '';
