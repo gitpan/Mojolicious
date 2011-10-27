@@ -9,7 +9,7 @@ use Test::More;
 plan skip_all => 'set TEST_EV to enable this test (developer only!)'
   unless $ENV{TEST_EV};
 plan skip_all => 'EV 4.0 required for this test!' unless eval 'use EV 4.0; 1';
-plan tests => 50;
+plan tests => 52;
 
 use IO::Socket::INET;
 use Mojo::IOLoop;
@@ -28,7 +28,7 @@ my $listen = IO::Socket::INET->new(
 my $watcher = Mojo::IOWatcher::EV->new;
 isa_ok $watcher, 'Mojo::IOWatcher::EV', 'right object';
 my ($readable, $writable);
-$watcher->add(
+$watcher->io(
   $listen,
   on_readable => sub { $readable++ },
   on_writable => sub { $writable++ }
@@ -51,8 +51,8 @@ my $server = $listen->accept;
 $watcher = undef;
 $watcher = Mojo::IOWatcher::EV->new;
 isa_ok $watcher, 'Mojo::IOWatcher::EV', 'right object';
-$readable = $writable = undef;
-$watcher->add(
+($readable, $writable) = undef;
+$watcher->io(
   $client,
   on_readable => sub { $readable++ },
   on_writable => sub { $writable++ }
@@ -66,29 +66,34 @@ sleep 1;
 $watcher = undef;
 $watcher = Mojo::IOWatcher::EV->new;
 isa_ok $watcher, 'Mojo::IOWatcher::EV', 'right object';
-$readable = $writable = undef;
-$watcher->add(
+($readable, $writable) = undef;
+$watcher->io(
   $server,
   on_readable => sub { $readable++ },
   on_writable => sub { $writable++ }
 );
-$watcher->not_writing($server);
+$watcher->watch($server, 1, 0);
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
 is $readable, 1,     'handle is readable';
 is $writable, undef, 'handle is not writable';
-$watcher->writing($server);
+$watcher->watch($server, 1, 1);
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
 is $readable, 2, 'handle is readable';
 is $writable, 1, 'handle is writable';
-$watcher->not_writing($server);
+$watcher->watch($server, 0, 0);
+$watcher->timer(0 => sub { shift->stop });
+$watcher->start;
+is $readable, 2, 'handle is not readable';
+is $writable, 1, 'handle is not writable';
+$watcher->watch($server, 1, 0);
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
 is $readable, 3, 'handle is readable';
 is $writable, 1, 'handle is not writable';
-$readable = $writable = undef;
-$watcher->add(
+($readable, $writable) = undef;
+$watcher->io(
   $server,
   on_readable => sub { $readable++ },
   on_writable => sub { $writable++ }

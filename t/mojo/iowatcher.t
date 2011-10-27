@@ -7,7 +7,7 @@ BEGIN {
   $ENV{MOJO_IOWATCHER} = 'Mojo::IOWatcher';
 }
 
-use Test::More tests => 50;
+use Test::More tests => 52;
 
 # "I don't mind being called a liar when I'm lying, or about to lie,
 #  or just finished lying, but NOT WHEN I'M TELLING THE TRUTH."
@@ -27,7 +27,7 @@ my $listen = IO::Socket::INET->new(
 my $watcher = Mojo::IOWatcher->new;
 isa_ok $watcher, 'Mojo::IOWatcher', 'right object';
 my ($readable, $writable);
-$watcher->add(
+$watcher->io(
   $listen,
   on_readable => sub { $readable++ },
   on_writable => sub { $writable++ }
@@ -50,8 +50,8 @@ my $server = $listen->accept;
 $watcher = undef;
 $watcher = Mojo::IOWatcher->new;
 isa_ok $watcher, 'Mojo::IOWatcher', 'right object';
-$readable = $writable = undef;
-$watcher->add(
+($readable, $writable) = undef;
+$watcher->io(
   $client,
   on_readable => sub { $readable++ },
   on_writable => sub { $writable++ }
@@ -65,29 +65,34 @@ sleep 1;
 $watcher = undef;
 $watcher = Mojo::IOWatcher->new;
 isa_ok $watcher, 'Mojo::IOWatcher', 'right object';
-$readable = $writable = undef;
-$watcher->add(
+($readable, $writable) = undef;
+$watcher->io(
   $server,
   on_readable => sub { $readable++ },
   on_writable => sub { $writable++ }
 );
-$watcher->not_writing($server);
+$watcher->watch($server, 1, 0);
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
 is $readable, 1,     'handle is readable';
 is $writable, undef, 'handle is not writable';
-$watcher->writing($server);
+$watcher->watch($server, 1, 1);
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
 is $readable, 2, 'handle is readable';
 is $writable, 1, 'handle is writable';
-$watcher->not_writing($server);
+$watcher->watch($server, 0, 0);
+$watcher->timer(0 => sub { shift->stop });
+$watcher->start;
+is $readable, 2, 'handle is not readable';
+is $writable, 1, 'handle is not writable';
+$watcher->watch($server, 1, 0);
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
 is $readable, 3, 'handle is readable';
 is $writable, 1, 'handle is not writable';
-$readable = $writable = undef;
-$watcher->add(
+($readable, $writable) = undef;
+$watcher->io(
   $server,
   on_readable => sub { $readable++ },
   on_writable => sub { $writable++ }

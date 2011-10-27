@@ -172,7 +172,7 @@ sub pause {
 sub resume {
   my $self = shift;
   weaken $self;
-  $self->iowatcher->add($self->{handle},
+  $self->iowatcher->io($self->{handle},
     on_readable => sub { $self->_accept for 1 .. $self->accepts });
 }
 
@@ -195,7 +195,7 @@ sub _accept {
     close $handle;
   };
   $handle = IO::Socket::SSL->start_SSL($handle, %$tls);
-  $self->iowatcher->add(
+  $self->iowatcher->io(
     $handle,
     on_readable => sub { $self->_tls($handle) },
     on_writable => sub { $self->_tls($handle) }
@@ -251,8 +251,8 @@ sub _tls {
 
   # Switch between reading and writing
   my $error = $IO::Socket::SSL::SSL_ERROR;
-  if    ($error == TLS_READ)  { $self->iowatcher->not_writing($handle) }
-  elsif ($error == TLS_WRITE) { $self->iowatcher->writing($handle) }
+  if    ($error == TLS_READ)  { $self->iowatcher->watch($handle, 1, 0) }
+  elsif ($error == TLS_WRITE) { $self->iowatcher->watch($handle, 1, 1) }
 }
 
 1;

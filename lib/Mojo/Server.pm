@@ -86,7 +86,7 @@ Mojo::Server - HTTP server base class
     # Get a transaction
     my $tx = $self->build_tx;
 
-    # Emit request
+    # Emit "request" event
     $self->emit(request => $tx);
   }
 

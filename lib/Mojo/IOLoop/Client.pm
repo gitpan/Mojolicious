@@ -121,7 +121,7 @@ sub _connect {
 
   # Start writing right away
   $self->{handle} = $handle;
-  $watcher->add(
+  $watcher->io(
     $handle,
     on_readable => sub { $self->_connecting },
     on_writable => sub { $self->_connecting }
@@ -138,8 +138,8 @@ sub _connecting {
   my $watcher = $self->resolver->ioloop->iowatcher;
   if ($self->{tls} && !$handle->connect_SSL) {
     my $error = $IO::Socket::SSL::SSL_ERROR;
-    if    ($error == TLS_READ)  { $watcher->not_writing($handle) }
-    elsif ($error == TLS_WRITE) { $watcher->writing($handle) }
+    if    ($error == TLS_READ)  { $watcher->watch($handle, 1, 0) }
+    elsif ($error == TLS_WRITE) { $watcher->watch($handle, 1, 1) }
     return;
   }
 
