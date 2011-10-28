@@ -27,7 +27,7 @@ my $listen = IO::Socket::INET->new(
 my $watcher = Mojo::IOWatcher->new;
 isa_ok $watcher, 'Mojo::IOWatcher', 'right object';
 my ($readable, $writable);
-$watcher->io(
+$watcher->watch(
   $listen,
   on_readable => sub { $readable++ },
   on_writable => sub { $writable++ }
@@ -51,7 +51,7 @@ $watcher = undef;
 $watcher = Mojo::IOWatcher->new;
 isa_ok $watcher, 'Mojo::IOWatcher', 'right object';
 ($readable, $writable) = undef;
-$watcher->io(
+$watcher->watch(
   $client,
   on_readable => sub { $readable++ },
   on_writable => sub { $writable++ }
@@ -66,33 +66,33 @@ $watcher = undef;
 $watcher = Mojo::IOWatcher->new;
 isa_ok $watcher, 'Mojo::IOWatcher', 'right object';
 ($readable, $writable) = undef;
-$watcher->io(
+$watcher->watch(
   $server,
   on_readable => sub { $readable++ },
   on_writable => sub { $writable++ }
 );
-$watcher->watch($server, 1, 0);
+$watcher->change($server, 1, 0);
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
 is $readable, 1,     'handle is readable';
 is $writable, undef, 'handle is not writable';
-$watcher->watch($server, 1, 1);
+$watcher->change($server, 1, 1);
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
 is $readable, 2, 'handle is readable';
 is $writable, 1, 'handle is writable';
-$watcher->watch($server, 0, 0);
+$watcher->change($server, 0, 0);
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
 is $readable, 2, 'handle is not readable';
 is $writable, 1, 'handle is not writable';
-$watcher->watch($server, 1, 0);
+$watcher->change($server, 1, 0);
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
 is $readable, 3, 'handle is readable';
 is $writable, 1, 'handle is not writable';
 ($readable, $writable) = undef;
-$watcher->io(
+$watcher->watch(
   $server,
   on_readable => sub { $readable++ },
   on_writable => sub { $writable++ }
@@ -105,7 +105,7 @@ is $writable, 1, 'handle is writable';
 # Timers
 my ($timer, $recurring);
 $watcher->timer(0 => sub { $timer++ });
-$watcher->cancel($watcher->timer(0 => sub { $timer++ }));
+$watcher->drop_timer($watcher->timer(0 => sub { $timer++ }));
 my $id = $watcher->recurring(0 => sub { $recurring++ });
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
@@ -131,7 +131,7 @@ is $readable,  5, 'handle is readable again';
 is $writable,  5, 'handle is writable again';
 is $timer,     1, 'timer was not triggered';
 is $recurring, 4, 'recurring was triggered again';
-$watcher->cancel($id);
+$watcher->drop_timer($id);
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
 is $readable,  6, 'handle is readable again';

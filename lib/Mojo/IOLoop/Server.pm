@@ -79,7 +79,7 @@ sub DESTROY {
   if (my $key  = $self->{key})  { unlink $key  if -w $key }
   return unless my $watcher = $self->{iowatcher};
   $self->pause if $self->{handle};
-  $watcher->remove($_) for values %{$self->{handles}};
+  $watcher->drop_handle($_) for values %{$self->{handles}};
 }
 
 # "And I gave that man directions, even though I didn't know the way,
@@ -166,13 +166,13 @@ sub generate_port {
 
 sub pause {
   my $self = shift;
-  $self->iowatcher->remove($self->{handle});
+  $self->iowatcher->drop_handle($self->{handle});
 }
 
 sub resume {
   my $self = shift;
   weaken $self;
-  $self->iowatcher->io($self->{handle},
+  $self->iowatcher->watch($self->{handle},
     on_readable => sub { $self->_accept for 1 .. $self->accepts });
 }
 
@@ -191,11 +191,11 @@ sub _accept {
   weaken $self;
   $tls->{SSL_error_trap} = sub {
     return unless my $handle = delete $self->{handles}->{shift()};
-    $self->iowatcher->remove($handle);
+    $self->iowatcher->drop_handle($handle);
     close $handle;
   };
   $handle = IO::Socket::SSL->start_SSL($handle, %$tls);
-  $self->iowatcher->io(
+  $self->iowatcher->watch(
     $handle,
     on_readable => sub { $self->_tls($handle) },
     on_writable => sub { $self->_tls($handle) }
@@ -244,15 +244,15 @@ sub _tls {
 
   # Accepted
   if ($handle->accept_SSL) {
-    $self->iowatcher->remove($handle);
+    $self->iowatcher->drop_handle($handle);
     delete $self->{handles}->{$handle};
     return $self->emit_safe(accept => $handle);
   }
 
   # Switch between reading and writing
   my $error = $IO::Socket::SSL::SSL_ERROR;
-  if    ($error == TLS_READ)  { $self->iowatcher->watch($handle, 1, 0) }
-  elsif ($error == TLS_WRITE) { $self->iowatcher->watch($handle, 1, 1) }
+  if    ($error == TLS_READ)  { $self->iowatcher->change($handle, 1, 0) }
+  elsif ($error == TLS_WRITE) { $self->iowatcher->change($handle, 1, 1) }
 }
 
 1;

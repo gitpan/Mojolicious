@@ -30,10 +30,10 @@ lib/Mojo/HelloWorld.pm
 lib/Mojo/Home.pm
 lib/Mojo/IOLoop.pm
 lib/Mojo/IOLoop/Client.pm
+lib/Mojo/IOLoop/Delay.pm
 lib/Mojo/IOLoop/Resolver.pm
 lib/Mojo/IOLoop/Server.pm
 lib/Mojo/IOLoop/Stream.pm
-lib/Mojo/IOLoop/Trigger.pm
 lib/Mojo/IOWatcher.pm
 lib/Mojo/IOWatcher/EV.pm
 lib/Mojo/JSON.pm
@@ -181,6 +181,7 @@ t/mojo/content.t
 t/mojo/cookie.t
 t/mojo/cookiejar.t
 t/mojo/date.t
+t/mojo/delay.t
 t/mojo/dom.t
 t/mojo/eventemitter.t
 t/mojo/headers.t
@@ -215,7 +216,6 @@ t/mojo/response.t
 t/mojo/server.t
 t/mojo/template.t
 t/mojo/transactor.t
-t/mojo/trigger.t
 t/mojo/url.t
 t/mojo/user_agent.t
 t/mojo/user_agent_online.t

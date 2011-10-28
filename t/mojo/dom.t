@@ -182,8 +182,8 @@ EOF
 is $dom->at('script')->text, "alert('lalala');", 'right script content';
 
 # HTML5 (unquoted values)
-$dom = Mojo::DOM->new->parse(
-  qq/<div id = test foo ="bar" class=tset>works<\/div>/);
+$dom =
+  Mojo::DOM->new->parse(qq#<div id = test foo ="bar" class=tset>works</div>#);
 is $dom->at('#test')->text,       'works', 'right text';
 is $dom->at('div')->text,         'works', 'right text';
 is $dom->at('[foo="bar"]')->text, 'works', 'right text';
@@ -194,7 +194,7 @@ is $dom->at('.tset')->text, 'works', 'right text';
 
 # HTML1 (single quotes, upper case tags and whitespace in attributes)
 $dom = Mojo::DOM->new->parse(
-  qq/<DIV id = 'test' foo ='bar' class= "tset">works<\/DIV>/);
+  qq#<DIV id = 'test' foo ='bar' class= "tset">works</DIV>#);
 is $dom->at('#test')->text,       'works', 'right text';
 is $dom->at('div')->text,         'works', 'right text';
 is $dom->at('[foo="bar"]')->text, 'works', 'right text';
@@ -209,9 +209,9 @@ is $dom->at('[id="sno\"wman"]')->text, '☃', 'right text';
 
 # Unicode and escaped selectors
 my $unicode =
-  qq/<html><div id="☃x">Snowman<\/div><div class="x ♥">Heart<\/div><\/html>/;
+  qq#<html><div id="☃x">Snowman</div><div class="x ♥">Heart</div></html>#;
 encode 'UTF-8', $unicode;
-$dom = Mojo::DOM->new(charset => 'UTF-8');
+$dom = Mojo::DOM->new->charset('UTF-8');
 $dom->parse($unicode);
 is $dom->at("#\\\n\\002603x")->text,                  'Snowman', 'right text';
 is $dom->at('#\\2603 x')->text,                       'Snowman', 'right text';
@@ -496,25 +496,25 @@ is $dom->at('[foo="bar"]')->attrs('class'), 'x', 'right attribute';
 
 # Markup characters in attribute values
 $dom = Mojo::DOM->new->parse(
-  qq/<div id="<a>" \n test='='>Test<div id='><' \/><\/div>/);
+  qq#<div id="<a>" \n test='='>Test<div id='><' /></div>#);
 is $dom->at('div[id="<a>"]')->attrs->{test}, '=', 'right attribute';
 is $dom->at('[id="<a>"]')->text, 'Test', 'right text';
 is $dom->at('[id="><"]')->attrs->{id}, '><', 'right attribute';
 
 # Empty attributes
-$dom = Mojo::DOM->new->parse(qq/<div test="" test2='' \/>/);
+$dom = Mojo::DOM->new->parse(qq#<div test="" test2='' />#);
 is $dom->at('div')->attrs->{test},  '', 'empty attribute value';
 is $dom->at('div')->attrs->{test2}, '', 'empty attribute value';
 
 # Whitespaces before closing bracket
-$dom = Mojo::DOM->new->parse(qq/<div >content<\/div>/);
+$dom = Mojo::DOM->new->parse(qq#<div >content</div>#);
 ok $dom->at('div'), 'tag found';
 is $dom->at('div')->text,        'content', 'right text';
 is $dom->at('div')->content_xml, 'content', 'right text';
 
 # Class with hyphen
-$dom = Mojo::DOM->new->parse(
-  qq/<div class="a">A<\/div><div class="a-1">A1<\/div>/);
+$dom =
+  Mojo::DOM->new->parse(qq#<div class="a">A</div><div class="a-1">A1</div>#);
 @div = ();
 $dom->find('.a')->each(sub { push @div, shift->text });
 is_deeply \@div, ['A'], 'found first element only';
@@ -1639,7 +1639,7 @@ is $dom->find('table > td > tr > thead')->[2], undef, 'no result';
 is $dom->find('table > td > tr > thead')->size, 2, 'right number of elements';
 
 # Ensure XML semantics again
-$dom = Mojo::DOM->new(xml => 1)->parse(<<'EOF');
+$dom = Mojo::DOM->new->xml(1)->parse(<<'EOF');
 <table>
   <td>
     <tr><thead>foo<thead></tr>
@@ -1707,7 +1707,7 @@ $dom->find('b')->each(
 is_deeply \@results, [qw/baz yada/], 'right results';
 
 # Autoload children in XML mode
-$dom = Mojo::DOM->new(<<EOF, xml => 1);
+$dom = Mojo::DOM->new->xml(1)->parse(<<EOF);
 <a id="one">
   <B class="two" test>
     foo
@@ -1741,7 +1741,7 @@ is $dom->a->b->c->[2], undef, 'no result';
 is $dom->a->b->c->size, 2, 'right number of elements';
 
 # Direct hash access to attributes in XML mode
-$dom = Mojo::DOM->new(<<EOF, xml => 1);
+$dom = Mojo::DOM->new->xml(1)->parse(<<EOF);
 <a id="one">
   <B class="two" test>
     foo
@@ -1771,7 +1771,7 @@ is $dom->a->B->c->size, 2, 'right number of elements';
 @results = ();
 $dom->a->B->c->each(sub { push @results, $_->text });
 is_deeply \@results, [qw/bar baz/], 'right results';
-is $dom->a->B->c, qq/<c id="three">bar<\/c>\n<c ID="four">baz<\/c>/,
+is $dom->a->B->c, qq#<c id="three">bar</c>\n<c ID="four">baz</c>#,
   'right result';
 is_deeply [keys %$dom], [], 'root has no attributes';
 is $dom->find('#nothing'), '', 'no result';
@@ -1807,7 +1807,7 @@ is $dom->a->b->c->size, 2, 'right number of elements';
 @results = ();
 $dom->a->b->c->each(sub { push @results, $_->text });
 is_deeply \@results, [qw/bar baz/], 'right results';
-is $dom->a->b->c, qq/<c id="three">bar<\/c>\n<c id="four">baz<\/c>/,
+is $dom->a->b->c, qq#<c id="three">bar</c>\n<c id="four">baz</c>#,
   'right result';
 is_deeply [keys %$dom], [], 'root has no attributes';
 is $dom->find('#nothing'), '', 'no result';
