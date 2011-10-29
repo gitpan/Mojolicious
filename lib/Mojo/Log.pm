@@ -125,9 +125,10 @@ L<Mojo::Log> can emit the following events.
 Emitted when a new message gets logged.
 Note that this event is EXPERIMENTAL and might change without warning!
 
+  $log->unsubscribe('message');
   $log->on(message => sub {
     my ($log, $level, @messages) = @_;
-    say "$level: ", join("\n", @messages);
+    say "$level: ", @messages;
   });
 
 =head1 ATTRIBUTES
@@ -139,21 +140,22 @@ L<Mojo::Log> implements the following attributes.
   my $handle = $log->handle;
   $log       = $log->handle(IO::File->new);
 
-Logfile handle.
+Logfile handle used by default C<message> event, defaults to opening C<path>
+or C<STDERR>.
 
 =head2 C<level>
 
   my $level = $log->level;
   $log      = $log->level('debug');
 
-Log level.
+Active log level.
 
 =head2 C<path>
 
   my $path = $log->path
   $log     = $log->path('/var/log/mojo.log');
 
-Logfile path.
+Logfile path used by C<handle>.
 
 =head1 METHODS
 
@@ -164,7 +166,7 @@ the following new ones.
 
   my $log = Mojo::Log->new;
 
-Construct a new L<Mojo::Log> object.
+Construct a new L<Mojo::Log> object and register default C<message> event.
 
 =head2 C<debug>
 
@@ -237,7 +239,7 @@ Check for warn log level.
 
   $log = $log->log(debug => 'This should work');
 
-Log a message.
+Emit C<message> event.
 
 =head2 C<warn>
 
