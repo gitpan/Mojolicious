@@ -332,7 +332,7 @@ sub render_json {
   return $self->render($args);
 }
 
-sub render_later { shift->stash->{'mojo.rendered'} = 1 }
+sub render_later { shift->stash->{'mojo.rendered'}++ }
 
 # "Excuse me, sir, you're snowboarding off the trail.
 #  Lick my frozen metal ass."
@@ -407,12 +407,11 @@ sub rendered {
 
   # Finish transaction
   my $stash = $self->stash;
-  unless ($stash->{'mojo.finished'}) {
+  unless ($stash->{'mojo.finished'}++) {
     $res->code(200) unless $res->code;
     my $app = $self->app;
     $app->plugins->run_hook_reverse(after_dispatch => $self);
     $app->sessions->store($self);
-    $stash->{'mojo.finished'} = 1;
   }
   $self->tx->resume;
 
@@ -853,7 +852,7 @@ Disable auto rendering, especially for long polling this can be quite useful.
 
   $c->render_not_found;
   $c->render_not_found($resource);
-    
+
 Render the not found template C<not_found.$mode.$format.*> or
 C<not_found.$format.*> and set the response status code to C<404>.
 
@@ -861,7 +860,7 @@ C<not_found.$format.*> and set the response status code to C<404>.
 
   my $output = $c->render_partial('menubar');
   my $output = $c->render_partial('menubar', format => 'txt');
-    
+
 Same as C<render> but returns the rendered result.
 
 =head2 C<render_static>
@@ -974,7 +973,7 @@ be set with L<Mojolicious/"defaults">.
 =head2 C<ua>
 
   my $ua = $c->ua;
-    
+
 Alias for C<$c-E<gt>app-E<gt>ua>.
 Usually refers to a L<Mojo::UserAgent> object.
 
