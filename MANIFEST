@@ -229,6 +229,7 @@ t/mojolicious/charset_lite_app.t
 t/mojolicious/dispatch.t
 t/mojolicious/dispatcher_lite_app.t
 t/mojolicious/embedded_app.t
+t/mojolicious/embedded_lite_app.json
 t/mojolicious/embedded_lite_app.t
 t/mojolicious/exception_lite_app.t
 t/mojolicious/external/lib/MyApp.pm
