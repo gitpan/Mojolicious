@@ -676,9 +676,9 @@ C<250KB> will be automatically streamed into a temporary file.
     </body>
   </html>
 
-To protect you from excessively large files there is also a global limit of
-C<5MB> by default, which you can tweak with the C<MOJO_MAX_MESSAGE_SIZE>
-environment variable.
+To protect you from excessively large files there is also a limit of C<5MB>
+by default, which you can tweak with the C<MOJO_MAX_MESSAGE_SIZE> environment
+variable.
 
   # Increase limit to 1GB
   $ENV{MOJO_MAX_MESSAGE_SIZE} = 1073741824;
@@ -706,6 +706,9 @@ WebSocket applications have never been this easy before.
       $self->send_message("echo: $message");
     });
   };
+
+The C<message> event will be emitted for every new WebSocket message that is
+received.
 
 =head2 External templates
 
