@@ -1,5 +1,14 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+2.21    2011-11-02 00:00:00
+        - Removed profile helper.
+        - Removed CSS4 selector subject support from Mojo::DOM::CSS until we
+          actually know the exact semantics.
+        - Improved Mojo::ByteStream to generate most Mojo::Util based methods
+          automatically.
+        - Fixed route pattern bug.
+        - Fixed bug in "user_agent.t".
+
 2.20    2011-11-01 00:00:00
         - Changed semantics of almost all functions in Mojo::Util.
         - Documentation improvements.
