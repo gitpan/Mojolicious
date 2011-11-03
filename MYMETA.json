@@ -69,7 +69,8 @@
             "Sys::Hostname" : 0,
             "Test::Harness" : 0,
             "Test::More" : 0,
-            "Time::HiRes" : 0
+            "Time::HiRes" : 0,
+            "re" : 0
          }
       }
    },
@@ -87,5 +88,5 @@
       },
       "x_MailingList" : "http://groups.google.com/group/mojolicious"
    },
-   "version" : "2.21"
+   "version" : "2.22"
 }

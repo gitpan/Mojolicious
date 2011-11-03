@@ -7,7 +7,7 @@ BEGIN {
   $ENV{MOJO_IOWATCHER} = 'Mojo::IOWatcher';
 }
 
-use Test::More tests => 82;
+use Test::More tests => 87;
 
 use FindBin;
 use lib "$FindBin::Bin/lib";
@@ -49,6 +49,9 @@ get '/layout_without_inheritance' => sub {
 # GET /double_inheritance
 get '/double_inheritance' =>
   sub { shift->render(template => 'double_inheritance') };
+
+# GET /triple_inheritance
+get '/triple_inheritance';
 
 # GET /nested-includes
 get '/nested-includes' => sub {
@@ -111,15 +114,15 @@ my $t = Test::Mojo->new;
 
 # GET /works
 $t->get_ok('/works')->status_is(200)
-  ->content_is("DefaultJust worksThis template just works!\n\n");
+  ->content_is("DefaultJust worksThis <template> just works!\n\n");
 
 # GET /works (different layout)
 $t->get_ok('/works?green=1')->status_is(200)
-  ->content_is("GreenJust worksThis template just works!\n\n");
+  ->content_is("GreenJust worksThis <template> just works!\n\n");
 
 # GET /works (extended)
 $t->get_ok('/works?blue=1')->status_is(200)
-  ->content_is("BlueJust worksThis template just works!\n\n");
+  ->content_is("BlueJust worksThis <template> just works!\n\n");
 
 # GET /doesnotexist
 $t->get_ok('/doesnotexist')->status_is(404)
@@ -163,8 +166,15 @@ $t->get_ok('/layout_without_inheritance')->status_is(200)
 $t->get_ok('/double_inheritance')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_is(
-  "<title>Works!</title>\n<br>\nSidebar too!\n\nDefault footer!\n");
+  ->content_is("<title>Works!</title>\n<br>\nSidebar too!\n"
+    . "Hello World!\n\nDefault footer!\n");
+
+# GET /triple_inheritance
+$t->get_ok('/triple_inheritance')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is("<title>Works!</title>\n<br>\nSidebar too!\n"
+    . "New <content>.\n\nDefault footer!\n");
 
 # GET /plugin_with_template
 $t->get_ok('/plugin_with_template')->status_is(200)
@@ -227,7 +237,7 @@ Blue<%= title %><%= content %>
 % title 'Just works';
 % layout 'green' if param 'green';
 % extends 'blue' if param 'blue';
-This template just works!
+This <template> just works!
 
 @@ exception.html.ep
 % title 'Exception happened';
@@ -271,6 +281,10 @@ Default footer!
 <% content sidebar => begin =%>
 Sidebar too!
 <% end =%>
+
+@@ triple_inheritance.html.ep
+% extends 'double_inheritance';
+New <content>.
 
 @@ layouts/plugin_with_template.html.ep
 layout_with_template

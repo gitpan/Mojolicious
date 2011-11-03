@@ -321,8 +321,9 @@ sub _selector {
       my $found = 0;
       for my $name (keys %$attrs) {
         if ($name =~ /\:?$key$/) {
-          next unless defined(my $value = $attrs->{$name});
-          ++$found and last if !$regex || $value =~ $regex;
+          next unless exists $attrs->{$name};
+          ++$found and last unless defined $attrs->{$name};
+          ++$found and last if !$regex || $attrs->{$name} =~ $regex;
         }
       }
       next if $found;
@@ -348,8 +349,7 @@ sub _selector {
       # ":checked"
       if ($class eq 'checked') {
         my $attrs = $current->[2];
-        next if ($attrs->{checked}  || '') eq 'checked';
-        next if ($attrs->{selected} || '') eq 'selected';
+        next if exists $attrs->{checked} || exists $attrs->{selected};
       }
 
       # ":empty"
@@ -363,9 +363,7 @@ sub _selector {
       }
 
       # "not"
-      elsif ($class eq 'not') {
-        next unless $self->_selector($args, $current);
-      }
+      elsif ($class eq 'not') { next if !$self->_selector($args, $current) }
 
       # "nth-*"
       elsif ($class =~ /^nth-/) {

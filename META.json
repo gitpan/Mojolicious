@@ -68,7 +68,8 @@
             "Test::Harness" : 0,
             "Test::More" : 0,
             "Time::HiRes" : 0,
-            "perl" : "5.010001"
+            "perl" : "5.010001",
+            "re" : 0
          }
       }
    },
@@ -86,5 +87,5 @@
       },
       "x_MailingList" : "http://groups.google.com/group/mojolicious"
    },
-   "version" : "2.21"
+   "version" : "2.22"
 }
