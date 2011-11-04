@@ -19,11 +19,7 @@ our $PCHAR      = "$UNRESERVED$SUBDELIM\%\:\@";
 
 # "Homer, it's easy to criticize.
 #  Fun, too."
-sub new {
-  my $self = shift->SUPER::new();
-  $self->parse(@_);
-  return $self;
-}
+sub new { shift->SUPER::new()->parse(@_) }
 
 sub authority {
   my ($self, $authority) = @_;
@@ -117,9 +113,8 @@ sub parse {
   my ($self, $url) = @_;
   return $self unless $url;
 
-  # Official regex
-  my ($scheme, $authority, $path, $query, $fragment) = $url
-    =~ m|(?:([^:/?#]+):)?(?://([^/?#]*))?([^?#]*)(?:\?([^#]*))?(?:#(.*))?|;
+  my ($scheme, $authority, $path, $query, $fragment) =
+    $url =~ m|(?:([^:/?#]+)://([^/?#]*))?([^?#]*)(?:\?([^#]*))?(?:#(.*))?|;
   $self->scheme($scheme);
   $self->authority($authority);
   $self->path->parse($path);

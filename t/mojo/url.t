@@ -3,7 +3,7 @@ use Mojo::Base -strict;
 
 use utf8;
 
-use Test::More tests => 340;
+use Test::More tests => 346;
 
 # "I don't want you driving around in a car you built yourself.
 #  You can sit there complaining, or you can knit me some seat belts."
@@ -88,6 +88,17 @@ $url->base->parse('http://sri:foobar@kraih.com:8080/');
 ok $url->is_abs, 'is absolute';
 is $url->to_rel, 'foo?foo=bar#23', 'right relative version';
 
+# Relative with empty elements
+$url = Mojo::URL->new('//bar/23/');
+ok !$url->is_abs, 'is not absolute';
+is "$url", '//bar/23/', 'right relative version';
+$url = Mojo::URL->new('///bar/23/');
+ok !$url->is_abs, 'is not absolute';
+is "$url", '///bar/23/', 'right relative version';
+$url = Mojo::URL->new('////bar//23/');
+ok !$url->is_abs, 'is not absolute';
+is "$url", '////bar//23/', 'right relative version';
+
 # Relative (base without trailing slash)
 $url = Mojo::URL->new('http://sri:foobar@kraih.com:8080/baz/foo?foo=bar#23');
 $url->base->parse('http://sri:foobar@kraih.com:8080');
@@ -118,13 +129,13 @@ is $rel, '', 'right relative version';
 is $rel->to_abs, 'http://kraih.com/', 'right absolute version';
 is $rel->to_abs->to_rel, '', 'right relative version';
 $rel = $url->to_rel(Mojo::URL->new('http://kraih.com/a/'));
-is $rel, '../', 'right relative version';
+is $rel, '..', 'right relative version';
 is $rel->to_abs, 'http://kraih.com/', 'right absolute version';
-is $rel->to_abs->to_rel, '../', 'right relative version';
+is $rel->to_abs->to_rel, '..', 'right relative version';
 $rel = $url->to_rel(Mojo::URL->new('http://kraih.com/a/b/'));
-is $rel, '../../', 'right relative version';
+is $rel, '../..', 'right relative version';
 is $rel->to_abs, 'http://kraih.com/', 'right absolute version';
-is $rel->to_abs->to_rel, '../../', 'right relative version';
+is $rel->to_abs->to_rel, '../..', 'right relative version';
 $url = Mojo::URL->new('http://kraih.com/index.html');
 $rel = $url->to_rel(Mojo::URL->new('http://kraih.com/'));
 is $rel, 'index.html', 'right relative version';
@@ -339,7 +350,7 @@ is $url->to_rel, 'foo//bar/23/', 'right relative version';
 $url = Mojo::URL->new('http://kraih.com//foo//bar/23/');
 $url->base->parse('http://kraih.com/');
 ok $url->is_abs, 'is absolute';
-is $url->to_rel, 'foo//bar/23/', 'right relative version';
+is $url->to_rel, '/foo//bar/23/', 'right relative version';
 $url = Mojo::URL->new('http://kraih.com/foo///bar/23/');
 $url->base->parse('http://kraih.com/');
 ok $url->is_abs, 'is absolute';

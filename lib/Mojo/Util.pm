@@ -370,20 +370,20 @@ sub encode {
 }
 
 sub get_line {
+  my $stringref = shift;
 
   # Locate line ending
-  return if (my $pos = index $_[0], "\x0a") == -1;
+  return if (my $pos = index $$stringref, "\x0a") == -1;
 
   # Extract line and ending
-  my $line = substr $_[0], 0, $pos + 1, '';
+  my $line = substr $$stringref, 0, $pos + 1, '';
   $line =~ s/\x0d?\x0a$//;
 
   return $line;
 }
 
-sub hmac_md5_sum { _hmac(\&_md5, @_) }
-
-sub hmac_sha1_sum { _hmac(\&_sha1, @_) }
+sub hmac_md5_sum  { _hmac(0, @_) }
+sub hmac_sha1_sum { _hmac(1, @_) }
 
 sub html_escape {
   my $string  = shift;
@@ -423,9 +423,8 @@ sub html_unescape {
   return $string;
 }
 
-sub md5_bytes { _md5(@_) }
-
-sub md5_sum { Digest::MD5::md5_hex(@_) }
+sub md5_bytes { Digest::MD5::md5(@_) }
+sub md5_sum   { Digest::MD5::md5_hex(@_) }
 
 sub punycode_decode {
   my $input = shift;
@@ -564,9 +563,8 @@ sub secure_compare {
   return $r == 0 ? 1 : undef;
 }
 
-sub sha1_bytes { _sha1(@_) }
-
-sub sha1_sum { Digest::SHA::sha1_hex(@_) }
+sub sha1_bytes { Digest::SHA::sha1(@_) }
+sub sha1_sum   { Digest::SHA::sha1_hex(@_) }
 
 sub trim {
   my $string = shift;
@@ -637,22 +635,21 @@ sub _adapt {
 }
 
 sub _hmac {
+  my ($sha, $string, $secret) = @_;
+
+  # Hash function
+  my $hash =
+    $sha ? sub { Digest::SHA::sha1(@_) } : sub { Digest::MD5::md5(@_) };
 
   # Secret
-  my $secret = $_[2] || 'Very unsecure!';
-  $secret = $_[0]->($secret) if length $secret > 64;
+  $secret ||= 'Very unsecure!';
+  $secret = $hash->($secret) if length $secret > 64;
 
   # HMAC
   my $ipad = $secret ^ (chr(0x36) x 64);
   my $opad = $secret ^ (chr(0x5c) x 64);
-  return unpack 'H*', $_[0]->($opad . $_[0]->($ipad . $_[1]));
+  return unpack 'H*', $hash->($opad . $hash->($ipad . $string));
 }
-
-# Helper for md5_bytes
-sub _md5 { Digest::MD5::md5(shift) }
-
-# Helper for sha1_bytes
-sub _sha1 { Digest::SHA::sha1(shift) }
 
 # Helper for html_unescape
 sub _unescape {
@@ -681,7 +678,6 @@ Mojo::Util - Portable utility functions
 =head1 DESCRIPTION
 
 L<Mojo::Util> provides portable utility functions for L<Mojo>.
-Note that this module is EXPERIMENTAL and might change without warning!
 
 =head1 FUNCTIONS
 
@@ -731,9 +727,9 @@ Encode characters to bytes.
 
 =head2 C<get_line>
 
-  my $line = get_line $chunk;
+  my $line = get_line \$string;
 
-Extract a whole line from chunk or return undef.
+Extract whole line from string or return C<undef>.
 Lines are expected to end with C<0x0d 0x0a> or C<0x0a>.
 
 =head2 C<hmac_md5_sum>
