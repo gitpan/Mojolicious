@@ -542,7 +542,7 @@ $res->body('');
 is $res->body, '', 'right content';
 $res->body('hi there!');
 is $res->body, 'hi there!', 'right content';
-ok !$res->content->has_subscribers('read'), 'no subscribers';
+ok $res->content->has_subscribers('read'), 'has subscribers';
 $cb = $res->body(sub { });
 ok $res->content->has_subscribers('read'), 'has subscribers';
 $res->content->unsubscribe(read => $cb);
