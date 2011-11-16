@@ -112,7 +112,8 @@ implements the following new ones.
   my $asset = $single->asset;
   $single   = $single->asset(Mojo::Asset::Memory->new);
 
-The actual content, defaults to a L<Mojo::Asset::Memory> object.
+The actual content, defaults to a L<Mojo::Asset::Memory> object with
+C<auto_upgrade> enabled.
 
 =head2 C<auto_upgrade>
 
@@ -132,8 +133,8 @@ implements the following new ones.
 
   my $single = Mojo::Content::Single->new;
 
-Construct a new L<Mojo::Content::Single> object and register default C<read>
-event.
+Construct a new L<Mojo::Content::Single> object and subscribe to C<read>
+event with default content parser.
 
 =head2 C<body_contains>
 

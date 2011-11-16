@@ -17,10 +17,9 @@ sub body_contains {
 sub body_size { croak 'Method "body_size" not implemented by subclass' }
 
 sub boundary {
-  return $1
-    if (shift->headers->content_type || '')
+  (shift->headers->content_type || '')
     =~ m#multipart.*boundary=\"*([a-zA-Z0-9\'\(\)\,\.\:\?\-\_\+/]+)#i;
-  return;
+  return $1;
 }
 
 # "Operator! Give me the number for 911!"
@@ -68,6 +67,11 @@ sub build_headers {
   }
 
   return $headers;
+}
+
+sub charset {
+  (shift->headers->content_type || '') =~ /charset="?([^"\s;]+)"?/i;
+  return $1;
 }
 
 sub clone {
@@ -498,7 +502,7 @@ Content size in bytes.
 
   my $boundary = $content->boundary;
 
-Extract multipart boundary from content type header.
+Extract multipart boundary from C<Content-Type> header.
 Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<build_body>
@@ -512,6 +516,13 @@ Render whole body.
   my $string = $content->build_headers;
 
 Render all headers.
+
+=head2 C<charset>
+
+  my $charset = $content->charset;
+
+Extract charset from C<Content-Type> header.
+Note that this method is EXPERIMENTAL and might change without warning!
 
 =head2 C<clone>
 

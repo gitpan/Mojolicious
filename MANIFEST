@@ -31,7 +31,6 @@ lib/Mojo/Home.pm
 lib/Mojo/IOLoop.pm
 lib/Mojo/IOLoop/Client.pm
 lib/Mojo/IOLoop/Delay.pm
-lib/Mojo/IOLoop/Resolver.pm
 lib/Mojo/IOLoop/Server.pm
 lib/Mojo/IOLoop/Stream.pm
 lib/Mojo/IOWatcher.pm
@@ -210,8 +209,6 @@ t/mojo/path.t
 t/mojo/psgi.t
 t/mojo/request.t
 t/mojo/request_cgi.t
-t/mojo/resolver.t
-t/mojo/resolver_online.t
 t/mojo/response.t
 t/mojo/server.t
 t/mojo/template.t
