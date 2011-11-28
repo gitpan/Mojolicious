@@ -7,7 +7,7 @@ BEGIN {
   $ENV{MOJO_IOWATCHER} = 'Mojo::IOWatcher';
 }
 
-use Test::More tests => 87;
+use Test::More tests => 102;
 
 use FindBin;
 use lib "$FindBin::Bin/lib";
@@ -109,6 +109,15 @@ get '/withblocklayout' => sub {
 
 # GET /content_for
 get '/content_for';
+
+# GET /inline
+get '/inline' => {inline => '<%= "inline!" %>'};
+
+# GET /inline/again
+get '/inline/again' => {inline => 0};
+
+# GET /data
+get '/data' => {data => 0};
 
 my $t = Test::Mojo->new;
 
@@ -222,6 +231,21 @@ $t->get_ok('/content_for')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_is("DefaultThis\n\nseems\nto\nHello    world!\n\nwork!\n\n");
+
+# GET /inline
+$t->get_ok('/inline')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is("inline!\n");
+
+# GET /inline/again
+$t->get_ok('/inline/again')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is("0\n");
+
+# GET /data
+$t->get_ok('/data')->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')->content_is(0);
 
 __DATA__
 @@ layouts/default.html.ep
