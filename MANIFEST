@@ -3,6 +3,7 @@ Changes
 examples/connect-proxy.pl
 examples/flash-policy-server.pl
 examples/microhttpd.pl
+examples/websocket.pl
 lib/Mojo.pm
 lib/Mojo/Asset.pm
 lib/Mojo/Asset/File.pm
