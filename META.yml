@@ -59,9 +59,9 @@ requires:
   perl: 5.010001
   re: 0
 resources:
-  bugtracker: http://groups.google.com/group/mojolicious
+  bugtracker: http://github.com/kraih/mojo/issues
   homepage: http://mojolicio.us
   license: http://dev.perl.org/licenses/
   repository: http://github.com/kraih/mojo
   x_MailingList: http://groups.google.com/group/mojolicious
-version: 2.36
+version: 2.37

@@ -77,7 +77,7 @@
    "release_status" : "stable",
    "resources" : {
       "bugtracker" : {
-         "web" : "http://groups.google.com/group/mojolicious"
+         "web" : "http://github.com/kraih/mojo/issues"
       },
       "homepage" : "http://mojolicio.us",
       "license" : [
@@ -88,5 +88,5 @@
       },
       "x_MailingList" : "http://groups.google.com/group/mojolicious"
    },
-   "version" : "2.36"
+   "version" : "2.37"
 }

@@ -32,7 +32,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Leaf Fluttering In Wind';
-our $VERSION  = '2.36';
+our $VERSION  = '2.37';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -709,15 +709,27 @@ that have been used in the past.
 
 =head1 AUTHOR
 
-Sebastian Riedel, C<sri@cpan.org>.
+Sebastian Riedel, C<sri@cpan.org>
+
+=head1 CORE DEVELOPERS
+
+Current members of the core team in alphabetical order:
+
+=over 4
+
+Abhijit Menon-Sen, C<ams@cpan.org>
+
+Glen Hinkle, C<tempire@cpan.org>
+
+Marcus Ramberg, C<mramberg@cpan.org>
+
+=back
 
 =head1 CREDITS
 
 In alphabetical order:
 
 =over 2
-
-Abhijit Menon-Sen
 
 Adam Kennedy
 
@@ -785,8 +797,6 @@ Eugene Toropov
 
 Gisle Aas
 
-Glen Hinkle
-
 Graham Barr
 
 Henry Tang
@@ -818,8 +828,6 @@ Leon Brocard
 Magnus Holm
 
 Maik Fischer
-
-Marcus Ramberg
 
 Mark Stosberg
 
