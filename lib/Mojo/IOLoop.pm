@@ -57,13 +57,13 @@ sub client {
       $self->stream($stream => $id);
 
       # Connected
-      $self->$cb($stream);
+      $self->$cb(undef, $stream);
     }
   );
   $client->on(
     error => sub {
       my $c = delete $self->{connections}->{$id};
-      $self->$cb(undef, pop);
+      $self->$cb(pop);
     }
   );
 
@@ -87,13 +87,13 @@ sub connect {
   my $id;
   $id = $self->client(
     $args => sub {
-      my ($self, $stream, $error) = @_;
+      my ($self, $err, $stream) = @_;
 
       my $c = $self->{connections}->{$id};
       $c->{$_} = delete($args->{"on_$_"}) || $c->{$_}
         for qw/close connect error read/;
-      if ($error) {
-        $c->{error}->($self, $id, $error) if $c->{error};
+      if ($err) {
+        $c->{error}->($self, $id, $err) if $c->{error};
         return;
       }
 
@@ -481,7 +481,7 @@ Mojo::IOLoop - Minimalistic reactor for non-blocking TCP clients and servers
 
   # Connect to port 3000
   my $id = Mojo::IOLoop->client({port => 3000} => sub {
-    my ($loop, $stream) = @_;
+    my ($loop, $err, $stream) = @_;
 
     $stream->on(read => sub {
       my ($stream, $chunk) = @_;
@@ -514,9 +514,8 @@ Optional modules L<EV>, L<IO::Socket::IP> and L<IO::Socket::SSL> are
 supported transparently and used if installed.
 
 A TLS certificate and key are also built right in to make writing test
-servers as easy as possible.
-Also note that for convenience the C<PIPE> signal will be set to C<IGNORE>
-when L<Mojo::IOLoop> is loaded.
+servers as easy as possible. Also note that for convenience the C<PIPE>
+signal will be set to C<IGNORE> when L<Mojo::IOLoop> is loaded.
 
 =head1 ATTRIBUTES
 
@@ -528,8 +527,8 @@ L<Mojo::IOLoop> implements the following attributes.
   $loop     = $loop->client_class('Mojo::IOLoop::Client');
 
 Class to be used for opening TCP connections with the C<client> method,
-defaults to L<Mojo::IOLoop::Client>.
-Note that this attribute is EXPERIMENTAL and might change without warning!
+defaults to L<Mojo::IOLoop::Client>. Note that this attribute is EXPERIMENTAL
+and might change without warning!
 
 =head2 C<iowatcher>
 
@@ -537,8 +536,8 @@ Note that this attribute is EXPERIMENTAL and might change without warning!
   $loop       = $loop->iowatcher(Mojo::IOWatcher->new);
 
 Low level event watcher, usually a L<Mojo::IOWatcher> or
-L<Mojo::IOWatcher::EV> object.
-Note that this attribute is EXPERIMENTAL and might change without warning!
+L<Mojo::IOWatcher::EV> object. Note that this attribute is EXPERIMENTAL and
+might change without warning!
 
 =head2 C<lock>
 
@@ -546,9 +545,9 @@ Note that this attribute is EXPERIMENTAL and might change without warning!
   $loop  = $loop->lock(sub {...});
 
 A locking callback that decides if this loop is allowed to accept new
-incoming connections, used to sync multiple server processes.
-The callback should return true or false.
-Note that exceptions in this callback are not captured.
+incoming connections, used to sync multiple server processes. The callback
+should return true or false. Note that exceptions in this callback are not
+captured.
 
   $loop->lock(sub {
     my ($loop, $blocking) = @_;
@@ -564,10 +563,9 @@ Note that exceptions in this callback are not captured.
 
 The maximum number of connections this loop is allowed to accept before
 shutting down gracefully without interrupting existing connections, defaults
-to C<0>.
-Setting the value to C<0> will allow this loop to accept new connections
-infinitely.
-Note that this attribute is EXPERIMENTAL and might change without warning!
+to C<0>. Setting the value to C<0> will allow this loop to accept new
+connections infinitely. Note that this attribute is EXPERIMENTAL and might
+change without warning!
 
 =head2 C<max_connections>
 
@@ -586,8 +584,8 @@ connections.
   $loop     = $loop->server_class('Mojo::IOLoop::Server');
 
 Class to be used for accepting TCP connections with the C<server> method,
-defaults to L<Mojo::IOLoop::Server>.
-Note that this attribute is EXPERIMENTAL and might change without warning!
+defaults to L<Mojo::IOLoop::Server>. Note that this attribute is EXPERIMENTAL
+and might change without warning!
 
 =head2 C<stream_class>
 
@@ -595,8 +593,8 @@ Note that this attribute is EXPERIMENTAL and might change without warning!
   $loop     = $loop->stream_class('Mojo::IOLoop::Stream');
 
 Class to be used by C<client> and C<server> methods for I/O streams, defaults
-to L<Mojo::IOLoop::Stream>.
-Note that this attribute is EXPERIMENTAL and might change without warning!
+to L<Mojo::IOLoop::Stream>. Note that this attribute is EXPERIMENTAL and
+might change without warning!
 
 =head2 C<unlock>
 
@@ -620,11 +618,11 @@ following new ones.
 
 Open TCP connection with C<client_class>, which is usually
 L<Mojo::IOLoop::Client>, takes the same arguments as
-L<Mojo::IOLoop::Client/"connect">.
-Note that this method is EXPERIMENTAL and might change without warning!
+L<Mojo::IOLoop::Client/"connect">. Note that this method is EXPERIMENTAL and
+might change without warning!
 
   Mojo::IOLoop->client({port => 3000} => sub {
-    my ($loop, $stream, $error) = @_;
+    my ($loop, $err, $stream) = @_;
   });
 
 =head2 C<defer>
@@ -632,8 +630,8 @@ Note that this method is EXPERIMENTAL and might change without warning!
   Mojo::IOLoop->defer(sub {...});
   $loop->defer(sub {...});
 
-Invoke callback on next reactor tick.
-Note that this method is EXPERIMENTAL and might change without warning!
+Invoke callback on next reactor tick. Note that this method is EXPERIMENTAL
+and might change without warning!
 
 =head2 C<delay>
 
@@ -641,8 +639,8 @@ Note that this method is EXPERIMENTAL and might change without warning!
   my $delay = $loop->delay;
   my $delay = $loop->delay(sub {...});
 
-Get L<Mojo::IOLoop::Delay> object to synchronize events.
-Note that this method is EXPERIMENTAL and might change without warning!
+Get L<Mojo::IOLoop::Delay> object to synchronize events. Note that this
+method is EXPERIMENTAL and might change without warning!
 
   # Synchronize multiple events
   my $delay = Mojo::IOLoop->delay(sub { say 'BOOM!' });
@@ -662,9 +660,8 @@ Note that this method is EXPERIMENTAL and might change without warning!
   $loop = Mojo::IOLoop->drop($id);
   $loop = $loop->drop($id);
 
-Drop anything with an id.
-Connections will be dropped gracefully by allowing them to finish writing all
-data in their write buffers.
+Drop anything with an id. Connections will be dropped gracefully by allowing
+them to finish writing all data in their write buffers.
 
 =head2 C<generate_port>
 
@@ -699,13 +696,10 @@ amount of time in seconds.
 
 Create a new recurring timer, invoking the callback repeatedly after a given
 amount of seconds.
-This for example allows you to run multiple reactors next to each other.
 
-  my $loop2 = Mojo::IOLoop->new(timeout => 0);
-  Mojo::IOLoop->recurring(0 => sub { $loop2->one_tick });
-
-Note that the loop timeout can be changed dynamically at any time to adjust
-responsiveness.
+  # Run multiple reactors next to each other
+  my $loop2 = Mojo::IOLoop->new;
+  Mojo::IOLoop->recurring(0 => sub { $loop2->one_tick(0) });
 
 =head2 C<server>
 
@@ -715,8 +709,8 @@ responsiveness.
 
 Accept TCP connections with C<server_class>, which is usually
 L<Mojo::IOLoop::Server>, takes the same arguments as
-L<Mojo::IOLoop::Server/"listen">.
-Note that this method is EXPERIMENTAL and might change without warning!
+L<Mojo::IOLoop::Server/"listen">. Note that this method is EXPERIMENTAL and
+might change without warning!
 
   Mojo::IOLoop->server({port => 3000} => sub {
     my ($loop, $stream, $id) = @_;
@@ -756,6 +750,9 @@ and the loop can be restarted by running C<start> again.
 
 Get L<Mojo::IOLoop::Stream> object for id or turn object into a connection.
 Note that this method is EXPERIMENTAL and might change without warning!
+
+  # Increase timeout for the connection of a transaction to 300 seconds
+  Mojo::IOLoop->stream($tx->connection)->timeout(300);
 
 =head2 C<timer>
 

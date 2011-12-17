@@ -1,7 +1,6 @@
-#!/usr/bin/env perl
 use Mojo::Base -strict;
 
-use Test::More tests => 50;
+use Test::More tests => 56;
 
 # "And now, in the spirit of the season: start shopping.
 #  And for every dollar of Krusty merchandise you buy,
@@ -133,3 +132,15 @@ $asset = $asset->add_chunk('lala');
 ok !$asset->is_file, 'stored in memory';
 $asset = $asset->add_chunk('lala');
 ok !$asset->is_file, 'stored in memory';
+
+# Temporary file without cleanup
+$file = Mojo::Asset::File->new(cleanup => 0)->add_chunk('test');
+ok $file->is_file, 'stored in file';
+is $file->slurp,   'test', 'right content';
+is $file->size,    4, 'right size';
+is $file->contains('es'), 1, '"es" at position 1';
+$path = $file->path;
+undef $file;
+ok -e $path, 'file exists';
+unlink $path;
+ok !-e $path, 'file has been cleaned up';

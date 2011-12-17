@@ -1,6 +1,3 @@
-#!/usr/bin/env perl
-
-# Use bundled libraries
 use FindBin;
 use lib "$FindBin::Bin/../lib";
 use Mojo::Base -strict;
@@ -32,9 +29,9 @@ Mojo::IOLoop->server(
             my $server;
             $server = Mojo::IOLoop->client(
               {address => $address, port => $port} => sub {
-                my ($loop, $stream, $error) = @_;
-                if ($error) {
-                  say "Connection error for $address:$port: $error";
+                my ($loop, $err, $stream) = @_;
+                if ($err) {
+                  say "Connection error for $address:$port: $err";
                   Mojo::IOLoop->drop($client);
                   return delete $c->{$client};
                 }

@@ -1,4 +1,3 @@
-#!/usr/bin/env perl
 use Mojo::Base -strict;
 
 # Disable Bonjour, IPv6 and libev
@@ -71,7 +70,7 @@ my $buffer = '';
 my $id;
 $id = Mojo::IOLoop->client(
   {port => $port} => sub {
-    my ($loop, $stream) = @_;
+    my ($loop, $err, $stream) = @_;
     $stream->on(
       read => sub {
         my ($stream, $chunk) = @_;
@@ -94,7 +93,7 @@ like $buffer, qr#HTTP/1.1 100 Continue.*Mojo$#s, 'request was continued';
 $buffer = '';
 $id     = Mojo::IOLoop->client(
   {port => $port} => sub {
-    my ($loop, $stream) = @_;
+    my ($loop, $err, $stream) = @_;
     $stream->on(
       read => sub {
         my ($stream, $chunk) = @_;

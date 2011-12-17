@@ -125,9 +125,9 @@ sub _connecting {
   my $handle  = $self->{handle};
   my $watcher = $self->iowatcher;
   if ($self->{tls} && !$handle->connect_SSL) {
-    my $error = $IO::Socket::SSL::SSL_ERROR;
-    if    ($error == TLS_READ)  { $watcher->change($handle, 1, 0) }
-    elsif ($error == TLS_WRITE) { $watcher->change($handle, 1, 1) }
+    my $err = $IO::Socket::SSL::SSL_ERROR;
+    if    ($err == TLS_READ)  { $watcher->change($handle, 1, 0) }
+    elsif ($err == TLS_WRITE) { $watcher->change($handle, 1, 1) }
     return;
   }
 
@@ -159,15 +159,15 @@ Mojo::IOLoop::Client - Non-blocking TCP client
     ...
   });
   $client->on(error => sub {
-    my ($client, $error) = @_;
+    my ($client, $err) = @_;
     ...
   });
   $client->connect(address => 'mojolicio.us', port => 80);
 
 =head1 DESCRIPTION
 
-L<Mojo::IOLoop::Client> opens TCP connections for L<Mojo::IOLoop>.
-Note that this module is EXPERIMENTAL and might change without warning!
+L<Mojo::IOLoop::Client> opens TCP connections for L<Mojo::IOLoop>. Note that
+this module is EXPERIMENTAL and might change without warning!
 
 =head1 EVENTS
 
@@ -184,7 +184,7 @@ Emitted safely once the connection is established.
 =head2 C<error>
 
   $client->on(error => sub {
-    my ($client, $error) = @_;
+    my ($client, $err) = @_;
   });
 
 Emitted safely if an error happens on the connection.
@@ -213,9 +213,8 @@ implements the following new ones.
     port    => 3000
   );
 
-Open a socket connection to a remote host.
-Note that TLS support depends on L<IO::Socket::SSL> and IPv6 support on
-L<IO::Socket::IP>.
+Open a socket connection to a remote host. Note that TLS support depends on
+L<IO::Socket::SSL> and IPv6 support on L<IO::Socket::IP>.
 
 These options are currently available:
 

@@ -1,4 +1,3 @@
-#!/usr/bin/env perl
 use Mojo::Base -strict;
 
 # Disable Bonjour, IPv6 and libev
@@ -7,7 +6,7 @@ BEGIN {
   $ENV{MOJO_IOWATCHER} = 'Mojo::IOWatcher';
 }
 
-use Test::More tests => 28;
+use Test::More tests => 32;
 
 # "Marge, you being a cop makes you the man!
 #  Which makes me the woman, and I have no interest in that,
@@ -34,16 +33,16 @@ $loop = Mojo::IOLoop->new;
 is ref $loop->iowatcher, 'MyWatcher', 'right class';
 
 # Double start
-my $error;
+my $err;
 Mojo::IOLoop->defer(
   sub {
     eval { Mojo::IOLoop->start };
-    $error = $@;
+    $err = $@;
     Mojo::IOLoop->stop;
   }
 );
 Mojo::IOLoop->start;
-like $error, qr/^Mojo::IOLoop already running/, 'right error';
+like $err, qr/^Mojo::IOLoop already running/, 'right error';
 
 # Ticks
 my $ticks = 0;
@@ -141,7 +140,7 @@ my $delay = Mojo::IOLoop->delay;
 $delay->begin;
 Mojo::IOLoop->client(
   {port => $port} => sub {
-    my ($loop, $stream, $error) = @_;
+    my ($loop, $err, $stream) = @_;
     $delay->end($stream);
     $stream->on(close => sub { $buffer .= 'should not happen' });
     $stream->on(error => sub { $buffer .= 'should not happen either' });
@@ -166,7 +165,7 @@ $id = $loop->server({port => $port} => sub { });
 my $connected;
 $loop->client(
   {port => $port} => sub {
-    my ($loop, $stream) = @_;
+    my ($loop, $err, $stream) = @_;
     $loop->drop($id);
     $loop->stop;
     $connected = 1;
@@ -176,15 +175,15 @@ like $ENV{MOJO_REUSE}, qr/(?:^|\,)$port\:/, 'file descriptor can be reused';
 $loop->start;
 unlike $ENV{MOJO_REUSE}, qr/(?:^|\,)$port\:/, 'environment is clean';
 ok $connected, 'connected';
-$error = undef;
+$err = undef;
 $loop->client(
   (port => $port) => sub {
     shift->stop;
-    $error = pop;
+    $err = pop;
   }
 );
 $loop->start;
-ok $error, 'has error';
+ok $err, 'has error';
 
 # Dropped connection
 $port = Mojo::IOLoop->generate_port;
@@ -197,7 +196,7 @@ Mojo::IOLoop->server(
 );
 $id = Mojo::IOLoop->client(
   (port => $port) => sub {
-    my ($loop, $stream) = @_;
+    my ($loop, $err, $stream) = @_;
     $stream->on(close => sub { $client_close++ });
     $loop->drop($id);
   }
@@ -206,6 +205,50 @@ Mojo::IOLoop->timer('0.5' => sub { shift->stop });
 Mojo::IOLoop->start;
 is $server_close, 1, 'server emitted close event once';
 is $client_close, 1, 'client emitted close event once';
+
+# Stream throttling
+$port = Mojo::IOLoop->generate_port;
+my ($client, $server, $client_after, $server_before, $server_after) = '';
+Mojo::IOLoop->server(
+  {port => $port} => sub {
+    my ($loop, $stream) = @_;
+    $stream->on(
+      read => sub {
+        my ($stream, $chunk) = @_;
+        Mojo::IOLoop->timer(
+          '0.5' => sub {
+            $server_before = $server;
+            $stream->pause;
+            $stream->write('works!');
+            Mojo::IOLoop->timer(
+              '0.5' => sub {
+                $server_after = $server;
+                $client_after = $client;
+                $stream->resume;
+                Mojo::IOLoop->timer('0.5' => sub { Mojo::IOLoop->stop });
+              }
+            );
+          }
+        ) unless $server;
+        $server .= $chunk;
+      }
+    );
+  }
+);
+Mojo::IOLoop->client(
+  {port => $port} => sub {
+    my ($loop, $err, $stream) = @_;
+    my $drain;
+    $drain = sub { shift->write('1', $drain) };
+    $stream->$drain();
+    $stream->on(read => sub { $client .= pop });
+  }
+);
+Mojo::IOLoop->start;
+is $server_before, $server_after, 'stream has been paused';
+ok length($server) > length($server_after), 'stream has been resumed';
+is $client, $client_after, 'stream was writable while paused';
+is $client, 'works!', 'full message has been written';
 
 # Defaults
 is Mojo::IOLoop::Client->new->iowatcher, Mojo::IOLoop->singleton->iowatcher,

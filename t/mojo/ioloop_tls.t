@@ -1,4 +1,3 @@
-#!/usr/bin/env perl
 use Mojo::Base -strict;
 
 # Disable Bonjour, IPv6 and libev
@@ -40,6 +39,7 @@ plan tests => 21;
 #  To the panic room store!"
 use_ok 'Mojo::IOLoop';
 
+# Built-in certificate
 my $loop = Mojo::IOLoop->new;
 my $port = Mojo::IOLoop->generate_port;
 my ($server, $client) = '';
@@ -52,7 +52,7 @@ $loop->server(
 );
 $loop->client(
   {port => $port, tls => 1} => sub {
-    my ($loop, $stream) = @_;
+    my ($loop, $err, $stream) = @_;
     $stream->write('tset', sub { shift->write('123') });
     $stream->on(read => sub { $client .= pop });
   }
@@ -91,7 +91,7 @@ my $id = $loop->client(
   tls_cert => 't/mojo/certs/client.crt',
   tls_key  => 't/mojo/certs/client.key',
   sub {
-    my ($loop, $stream) = @_;
+    my ($loop, $err, $stream) = @_;
     $stream->write('tset', sub { shift->write('123') });
     $stream->on(close => sub { $client_close++ });
     $stream->on(read => sub { $client .= pop });
@@ -175,7 +175,7 @@ $id = $loop->client(
   tls_cert => 't/mojo/certs/client.crt',
   tls_key  => 't/mojo/certs/client.key',
   sub {
-    my ($loop, $stream) = @_;
+    my ($loop, $err, $stream) = @_;
     $stream->write('tset', sub { shift->write('123') });
     $stream->on(close => sub { $client_close++ });
     $stream->on(read => sub { $client .= pop });

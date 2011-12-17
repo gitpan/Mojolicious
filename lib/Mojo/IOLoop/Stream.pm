@@ -17,15 +17,7 @@ has timeout => 15;
 #  Iran, Iraq, China, Mordor, the hoochies that laid low Tiger Woods,
 #  undesirable immigrants - by which I mean everyone that came after me,
 #  including my children..."
-sub DESTROY {
-  my $self = shift;
-  return unless my $watcher = $self->{iowatcher};
-  return unless my $handle  = $self->{handle};
-  $watcher->drop_handle($handle);
-  $watcher->drop_timer($self->{timer}) if $self->{timer};
-  close $handle;
-  $self->_close;
-}
+sub DESTROY { shift->_close }
 
 sub new { shift->SUPER::new(handle => shift, buffer => '', active => time) }
 
@@ -38,6 +30,7 @@ sub is_readable {
 
 sub is_writing {
   my $self = shift;
+  return unless exists $self->{handle};
   return length($self->{buffer}) || $self->has_subscribers('drain');
 }
 
@@ -55,9 +48,8 @@ sub resume {
   weaken $self;
   $self->{timer} ||= $watcher->recurring(
     '0.025' => sub {
-      return unless $self && (time - ($self->{active})) >= $self->timeout;
-      $self->emit_safe('timeout') unless $self->{timed}++;
-      $self->_close;
+      $self->emit_safe('timeout')->_close
+        if $self && (time - ($self->{active})) >= $self->timeout;
     }
   );
 
@@ -98,7 +90,16 @@ sub write {
 
 sub _close {
   my $self = shift;
-  $self->emit_safe('close') unless $self->{closed}++;
+
+  # Cleanup
+  return unless my $handle  = delete $self->{handle};
+  return unless my $watcher = $self->{iowatcher};
+  $watcher->drop_handle($handle);
+  $watcher->drop_timer(delete $self->{timer}) if $self->{timer};
+
+  # Close
+  close $handle;
+  $self->emit_safe('close');
 }
 
 sub _read {
@@ -117,7 +118,7 @@ sub _read {
     return $self->_close if $! == ECONNRESET;
 
     # Read error
-    return $self->emit_safe(error => $!);
+    return $self->emit_safe(error => $!)->_close;
   }
 
   # EOF
@@ -148,7 +149,7 @@ sub _write {
       return $self->_close if $! ~~ [ECONNRESET, EPIPE];
 
       # Write error
-      return $self->emit_safe(error => $!);
+      return $self->emit_safe(error => $!)->_close;
     }
 
     # Remove written chunk from buffer
@@ -186,7 +187,7 @@ Mojo::IOLoop::Stream - Non-blocking I/O stream
     ...
   });
   $stream->on(error => sub {
-    my ($stream, $error) = @_;
+    my ($stream, $err) = @_;
     ...
   });
 
@@ -197,8 +198,8 @@ Mojo::IOLoop::Stream - Non-blocking I/O stream
 =head1 DESCRIPTION
 
 L<Mojo::IOLoop::Stream> is a container for I/O streams used by
-L<Mojo::IOLoop>.
-Note that this module is EXPERIMENTAL and might change without warning!
+L<Mojo::IOLoop>. Note that this module is EXPERIMENTAL and might change
+without warning!
 
 =head1 EVENTS
 
@@ -223,7 +224,7 @@ Emitted safely once all data has been written.
 =head2 C<error>
 
   $stream->on(error => sub {
-    my ($stream, $error) = @_;
+    my ($stream, $err) = @_;
   });
 
 Emitted safely if an error happens on the stream.
@@ -243,8 +244,8 @@ Emitted safely if new data arrives on the stream.
   });
 
 Emitted safely if the stream has been inactive for too long and will get
-closed automatically.
-Note that this event is EXPERIMENTAL and might change without warning!
+closed automatically. Note that this event is EXPERIMENTAL and might change
+without warning!
 
 =head2 C<write>
 
@@ -272,8 +273,8 @@ global L<Mojo::IOLoop> singleton.
   $stream     = $stream->timeout(45);
 
 Maximum amount of time in seconds stream can be inactive before getting
-closed automatically, defaults to C<15>.
-Note that this attribute is EXPERIMENTAL and might change without warning!
+closed automatically, defaults to C<15>. Note that this attribute is
+EXPERIMENTAL and might change without warning!
 
 =head1 METHODS
 

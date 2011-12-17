@@ -223,10 +223,10 @@ sub _connect {
     tls_cert => $self->cert,
     tls_key  => $self->key,
     sub {
-      my ($loop, $stream, $error) = @_;
+      my ($loop, $err, $stream) = @_;
 
       # Events
-      return $self->_error($id, $error) if $error;
+      return $self->_error($id, $err) if $err;
       $self->_events($stream, $id);
       $self->_connected($id);
     }
@@ -265,10 +265,10 @@ sub _connect_proxy {
           tls_cert => $self->cert,
           tls_key  => $self->key,
           sub {
-            my ($loop, $stream, $error) = @_;
+            my ($loop, $err, $stream) = @_;
 
             # Events
-            return $self->_error($id, $error) if $error;
+            return $self->_error($id, $err) if $err;
             $self->_events($stream, $id);
 
             # Start real transaction
@@ -326,10 +326,10 @@ sub _drop {
 }
 
 sub _error {
-  my ($self, $id, $error, $log) = @_;
-  if (my $tx = $self->{connections}->{$id}->{tx}) { $tx->res->error($error) }
-  $self->log->error($error) if $log;
-  $self->_handle($id, $error);
+  my ($self, $id, $err, $log) = @_;
+  if (my $tx = $self->{connections}->{$id}->{tx}) { $tx->res->error($err) }
+  $self->log->error($err) if $log;
+  $self->_handle($id, $err);
 }
 
 sub _events {
@@ -665,8 +665,8 @@ environment variable.
   $ua         = $ua->connect_timeout(5);
 
 Maximum amount of time in seconds establishing a connection may take,
-defaults to C<3>.
-Note that this attribute is EXPERIMENTAL and might change without warning!
+defaults to C<3>. Note that this attribute is EXPERIMENTAL and might change
+without warning!
 
 =head2 C<cookie_jar>
 
@@ -781,7 +781,8 @@ implements the following new ones.
   $ua     = $ua->app(MyApp->new);
 
 Application relative URLs will be processed with, defaults to the value of
-the C<MOJO_APP> environment variable.
+the C<MOJO_APP> environment variable, which is usually a L<Mojo> or
+L<Mojolicious> object.
 
   say $ua->app->secret;
   $ua->app->log->level('fatal');
@@ -811,8 +812,8 @@ Alias for L<Mojo::UserAgent::Transactor/"websocket">.
 
 Perform blocking HTTP C<DELETE> request and return resulting
 L<Mojo::Transaction::HTTP> object, takes the exact same arguments as
-L<Mojo::UserAgent::Transactor/"tx"> (except for the method).
-You can also append a callback to perform requests non-blocking.
+L<Mojo::UserAgent::Transactor/"tx"> (except for the method). You can also
+append a callback to perform requests non-blocking.
 
   $ua->delete('http://kraih.com' => sub {
     my ($ua, $tx) = @_;
@@ -834,8 +835,8 @@ C<https_proxy>, C<NO_PROXY> and C<no_proxy> for proxy information.
 
 Perform blocking HTTP C<GET> request and return resulting
 L<Mojo::Transaction::HTTP> object, takes the exact same arguments as
-L<Mojo::UserAgent::Transactor/"tx"> (except for the method).
-You can also append a callback to perform requests non-blocking.
+L<Mojo::UserAgent::Transactor/"tx"> (except for the method). You can also
+append a callback to perform requests non-blocking.
 
   $ua->get('http://kraih.com' => sub {
     my ($ua, $tx) = @_;
@@ -850,8 +851,8 @@ You can also append a callback to perform requests non-blocking.
 
 Perform blocking HTTP C<HEAD> request and return resulting
 L<Mojo::Transaction::HTTP> object, takes the exact same arguments as
-L<Mojo::UserAgent::Transactor/"tx"> (except for the method).
-You can also append a callback to perform requests non-blocking.
+L<Mojo::UserAgent::Transactor/"tx"> (except for the method). You can also
+append a callback to perform requests non-blocking.
 
   $ua->head('http://kraih.com' => sub {
     my ($ua, $tx) = @_;
@@ -872,8 +873,8 @@ Check if request for domain would use a proxy server.
 
 Perform blocking HTTP C<POST> request and return resulting
 L<Mojo::Transaction::HTTP> object, takes the exact same arguments as
-L<Mojo::UserAgent::Transactor/"tx"> (except for the method).
-You can also append a callback to perform requests non-blocking.
+L<Mojo::UserAgent::Transactor/"tx"> (except for the method). You can also
+append a callback to perform requests non-blocking.
 
   $ua->post('http://kraih.com' => sub {
     my ($ua, $tx) = @_;
@@ -888,8 +889,8 @@ You can also append a callback to perform requests non-blocking.
 
 Perform blocking HTTP C<POST> request with form data and return resulting
 L<Mojo::Transaction::HTTP> object, takes the exact same arguments as
-L<Mojo::UserAgent::Transactor/"form">.
-You can also append a callback to perform requests non-blocking.
+L<Mojo::UserAgent::Transactor/"form">. You can also append a callback to
+perform requests non-blocking.
 
   $ua->post_form('http://kraih.com' => {q => 'test'} => sub {
     my ($ua, $tx) = @_;
@@ -904,8 +905,8 @@ You can also append a callback to perform requests non-blocking.
 
 Perform blocking HTTP C<PUT> request and return resulting
 L<Mojo::Transaction::HTTP> object, takes the exact same arguments as
-L<Mojo::UserAgent::Transactor/"tx"> (except for the method).
-You can also append a callback to perform requests non-blocking.
+L<Mojo::UserAgent::Transactor/"tx"> (except for the method). You can also
+append a callback to perform requests non-blocking.
 
   $ua->put('http://kraih.com' => sub {
     my ($ua, $tx) = @_;
@@ -918,8 +919,8 @@ You can also append a callback to perform requests non-blocking.
 
   $ua = $ua->start($tx);
 
-Process blocking transaction.
-You can also append a callback to perform transactions non-blocking.
+Process blocking transaction. You can also append a callback to perform
+transactions non-blocking.
 
   $ua->start($tx => sub {
     my ($ua, $tx) = @_;
@@ -935,16 +936,16 @@ You can also append a callback to perform transactions non-blocking.
   my $url = $ua->test_server('https');
 
 Starts a test server for C<app> if necessary and returns absolute
-L<Mojo::URL> object for it.
-Note that this method is EXPERIMENTAL and might change without warning!
+L<Mojo::URL> object for it. Note that this method is EXPERIMENTAL and might
+change without warning!
 
 =head2 C<websocket>
 
   $ua->websocket('ws://localhost:3000' => sub {...});
 
 Open a non-blocking WebSocket connection with transparent handshake, takes
-the exact same arguments as L<Mojo::UserAgent::Transactor/"websocket">.
-Note that this method is EXPERIMENTAL and might change without warning!
+the exact same arguments as L<Mojo::UserAgent::Transactor/"websocket">. Note
+that this method is EXPERIMENTAL and might change without warning!
 
   $ua->websocket('ws://localhost:3000/echo' => sub {
     my ($ua, $tx) = @_;
