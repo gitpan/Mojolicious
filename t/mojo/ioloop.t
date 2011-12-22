@@ -130,8 +130,7 @@ Mojo::IOLoop->server(
         my ($stream, $chunk) = @_;
         $buffer .= $chunk;
         return unless $buffer eq 'acceptedhello';
-        $stream->write('world');
-        $stream->emit('close');
+        $stream->write('world', sub { shift->close });
       }
     );
   }
@@ -179,6 +178,7 @@ $err = undef;
 $loop->client(
   (port => $port) => sub {
     shift->stop;
+    pop;
     $err = pop;
   }
 );

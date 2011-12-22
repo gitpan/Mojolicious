@@ -6,19 +6,21 @@ BEGIN {
   $ENV{MOJO_IOWATCHER} = 'Mojo::IOWatcher';
 }
 
-use Test::More tests => 46;
+use Test::More tests => 47;
 
 # "I can't believe it! Reading and writing actually paid off!"
 use IO::Socket::INET;
 use Mojo::IOLoop;
+use Mojo::Transaction::WebSocket;
 use Mojo::UserAgent;
 use Mojolicious::Lite;
 
-# User agent
-my $ua = app->ua;
-
-# Loop
-my $loop = Mojo::IOLoop->singleton;
+# Max WebSocket size
+my $backup = $ENV{MOJO_MAX_WEBSOCKET_SIZE} || '';
+$ENV{MOJO_MAX_WEBSOCKET_SIZE} = 1024;
+is(Mojo::Transaction::WebSocket->new->max_websocket_size, 1024,
+  'right value');
+$ENV{MOJO_MAX_WEBSOCKET_SIZE} = $backup;
 
 # Silence
 app->log->level('fatal');
@@ -150,6 +152,7 @@ websocket '/deadcallback' => sub {
 };
 
 # GET /link
+my $ua  = app->ua;
 my $res = $ua->get('/link')->success;
 is $res->code, 200, 'right status';
 like $res->body, qr#ws\://localhost\:\d+/#, 'right content';
@@ -160,6 +163,7 @@ is $res->code,   404,           'right status';
 like $res->body, qr/Not Found/, 'right content';
 
 # WebSocket /
+my $loop = Mojo::IOLoop->singleton;
 my $result;
 $ua->websocket(
   '/' => sub {
@@ -200,10 +204,9 @@ my $port     = $ua->test_server->port;
 my $tx       = $ua->build_websocket_tx('ws://lalala/socket');
 my $finished = 0;
 $tx->on(finish => sub { $finished++ });
-my $socket =
-  IO::Socket::INET->new(PeerAddr => '127.0.0.1', PeerPort => $port);
-$socket->blocking(0);
-$tx->connection($socket);
+my $sock = IO::Socket::INET->new(PeerAddr => '127.0.0.1', PeerPort => $port);
+$sock->blocking(0);
+$tx->connection($sock);
 $result = '';
 my ($local, $early);
 $ua->start(
@@ -227,7 +230,7 @@ is $early,    1, 'finish event has been emitted at the right time';
 ok $result =~ /^lalala(\d+)$/, 'right result';
 ok $1 > 100, 'right timeout';
 ok $local, 'local port';
-is $loop->stream($tx->connection)->handle, $socket, 'right connection id';
+is $loop->stream($tx->connection)->handle, $sock, 'right connection id';
 
 # WebSocket /early_start (server directly sends a message)
 my $client_flag;

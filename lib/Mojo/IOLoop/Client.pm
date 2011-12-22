@@ -58,9 +58,9 @@ sub _connect {
       Blocking => 0,
       PeerAddr => $args->{address},
       PeerPort => $args->{port} || ($args->{tls} ? 443 : 80),
-      Proto    => 'tcp',
-      %{$args->{args} || {}}
+      Proto    => 'tcp'
     );
+    $options{LocalAddr} = $args->{local_address} if $args->{local_address};
     $options{PeerAddr} =~ s/[\[\]]//g if $options{PeerAddr};
     my $class = IPV6 ? 'IO::Socket::IP' : 'IO::Socket::INET';
     return $self->emit_safe(error => "Couldn't connect.")
@@ -99,8 +99,7 @@ sub _connect {
       SSL_cert_file   => $args->{tls_cert},
       SSL_key_file    => $args->{tls_key},
       SSL_verify_mode => 0x00,
-      Timeout         => $timeout,
-      %{$args->{tls_args} || {}}
+      Timeout         => $timeout
     );
     $self->{tls} = 1;
     return $self->emit_safe(error => 'TLS upgrade failed.')
@@ -177,6 +176,7 @@ L<Mojo::IOLoop::Client> can emit the following events.
 
   $client->on(connect => sub {
     my ($client, $handle) = @_;
+    ...
   });
 
 Emitted safely once the connection is established.
@@ -185,6 +185,7 @@ Emitted safely once the connection is established.
 
   $client->on(error => sub {
     my ($client, $err) = @_;
+    ...
   });
 
 Emitted safely if an error happens on the connection.
@@ -227,6 +228,11 @@ Address or host name of the peer to connect to.
 =item C<handle>
 
 Use an already prepared handle.
+
+=item C<local_address>
+
+Local address to bind to. Note that this option is EXPERIMENTAL and might
+change without warning!
 
 =item C<port>
 

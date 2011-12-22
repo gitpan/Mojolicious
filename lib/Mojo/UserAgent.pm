@@ -4,7 +4,6 @@ use Mojo::Base 'Mojo::EventEmitter';
 use Carp 'croak';
 use Mojo::CookieJar;
 use Mojo::IOLoop;
-use Mojo::Log;
 use Mojo::Server::Daemon;
 use Mojo::Transaction::WebSocket;
 use Mojo::URL;
@@ -17,11 +16,10 @@ use constant DEBUG => $ENV{MOJO_USERAGENT_DEBUG} || 0;
 has cert => sub { $ENV{MOJO_CERT_FILE} };
 has connect_timeout => 3;
 has cookie_jar => sub { Mojo::CookieJar->new };
-has [qw/http_proxy https_proxy no_proxy/];
-has ioloop => sub { Mojo::IOLoop->new };
-has keep_alive_timeout => 20;
+has [qw/http_proxy https_proxy local_address no_proxy/];
+has inactivity_timeout => 20;
+has ioloop             => sub { Mojo::IOLoop->new };
 has key                => sub { $ENV{MOJO_KEY_FILE} };
-has log                => sub { Mojo::Log->new };
 has max_connections    => 5;
 has max_redirects      => sub { $ENV{MOJO_MAX_REDIRECTS} || 0 };
 has name               => 'Mojolicious (Perl)';
@@ -70,6 +68,15 @@ sub detect_proxy {
   }
 
   return $self;
+}
+
+# DEPRECATED in Leaf Fluttering In Wind!
+sub keep_alive_timeout {
+  warn <<EOF;
+Mojo::UserAgent->keep_alive_timeout is DEPRECATED in favor of
+Mojo::UserAgent->inactivity_timeout!
+EOF
+  shift->inactivity_timeout(@_);
 }
 
 sub need_proxy {
@@ -131,7 +138,6 @@ sub test_server {
   my $server = $self->_test_server(@_);
   delete $server->{app};
   $server->app($self->app);
-  $self->log($server->app->log);
 
   # Build absolute URL for test server
   return Mojo::URL->new->scheme($self->{scheme})->host('localhost')
@@ -215,13 +221,14 @@ sub _connect {
   warn "NEW CONNECTION ($scheme:$host:$port)\n" if DEBUG;
   weaken $self;
   $id = $self->_loop->client(
-    address  => $host,
-    port     => $port,
-    handle   => $id,
-    timeout  => $self->connect_timeout,
-    tls      => $scheme eq 'https' ? 1 : 0,
-    tls_cert => $self->cert,
-    tls_key  => $self->key,
+    address       => $host,
+    port          => $port,
+    handle        => $id,
+    local_address => $self->local_address,
+    timeout       => $self->connect_timeout,
+    tls           => $scheme eq 'https' ? 1 : 0,
+    tls_cert      => $self->cert,
+    tls_key       => $self->key,
     sub {
       my ($loop, $err, $stream) = @_;
 
@@ -290,9 +297,9 @@ sub _connect_proxy {
 sub _connected {
   my ($self, $id) = @_;
 
-  # Keep alive timeout
+  # Inactivity timeout
   my $loop = $self->_loop;
-  $loop->stream($id)->timeout($self->keep_alive_timeout);
+  $loop->stream($id)->timeout($self->inactivity_timeout);
 
   # Store connection information in transaction
   my $tx = $self->{connections}->{$id}->{tx};
@@ -326,9 +333,9 @@ sub _drop {
 }
 
 sub _error {
-  my ($self, $id, $err, $log) = @_;
+  my ($self, $id, $err, $emit) = @_;
   if (my $tx = $self->{connections}->{$id}->{tx}) { $tx->res->error($err) }
-  $self->log->error($err) if $log;
+  $self->emit(error => $err) if $emit;
   $self->_handle($id, $err);
 }
 
@@ -633,10 +640,21 @@ supported transparently and used if installed.
 
 L<Mojo::UserAgent> can emit the following events.
 
+=head2 C<error>
+
+  $ua->on(error => sub {
+    my ($ua, $err) = @_;
+    ...
+  });
+
+Emitted if an error happens that can't be associated with a transaction. Note
+that this event is EXPERIMENTAL and might change without warning!
+
 =head2 C<start>
 
   $ua->on(start => sub {
     my ($ua, $tx) = @_;
+    ...
   });
 
 Emitted whenever a new transaction is about to start, this includes
@@ -690,6 +708,14 @@ Proxy server to use for HTTP and WebSocket requests.
 
 Proxy server to use for HTTPS and WebSocket requests.
 
+=head2 C<inactivity_timeout>
+
+  my $timeout = $ua->inactivity_timeout;
+  $ua         = $ua->inactivity_timeout(15);
+
+Maximum amount of time in seconds a connection can be inactive before getting
+dropped, defaults to C<20>.
+
 =head2 C<ioloop>
 
   my $loop = $ua->ioloop;
@@ -697,14 +723,6 @@ Proxy server to use for HTTPS and WebSocket requests.
 
 Loop object to use for blocking I/O operations, defaults to a L<Mojo::IOLoop>
 object.
-
-=head2 C<keep_alive_timeout>
-
-  my $keep_alive_timeout = $ua->keep_alive_timeout;
-  $ua                    = $ua->keep_alive_timeout(15);
-
-Maximum amount of time in seconds a connection can be inactive before getting
-dropped, defaults to C<20>.
 
 =head2 C<key>
 
@@ -714,13 +732,13 @@ dropped, defaults to C<20>.
 Path to TLS key file, defaults to the value of the C<MOJO_KEY_FILE>
 environment variable.
 
-=head2 C<log>
+=head2 C<local_address>
 
-  my $log = $ua->log;
-  $ua     = $ua->log(Mojo::Log->new);
+  my $address = $ua->local_address;
+  $ua         = $ua->local_address('127.0.0.1');
 
-A L<Mojo::Log> object used for logging, defaults to the application log or a
-L<Mojo::Log> object.
+Local address to bind to. Note that this attribute is EXPERIMENTAL and might
+change without warning!
 
 =head2 C<max_connections>
 
@@ -763,8 +781,8 @@ Note that this attribute is EXPERIMENTAL and might change without warning!
 
 =head2 C<websocket_timeout>
 
-  my $websocket_timeout = $ua->websocket_timeout;
-  $ua                   = $ua->websocket_timeout(300);
+  my $timeout = $ua->websocket_timeout;
+  $ua         = $ua->websocket_timeout(300);
 
 Maximum amount of time in seconds a WebSocket connection can be inactive
 before getting dropped, defaults to C<300>.

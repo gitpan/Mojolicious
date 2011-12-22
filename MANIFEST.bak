@@ -158,6 +158,7 @@ Makefile.PL
 MANIFEST			This list of files
 MANIFEST.bak
 MANIFEST.SKIP
+Mojolicious-2.39.tar.gz
 MYMETA.yml
 README.pod
 script/hypnotoad
@@ -306,4 +307,3 @@ t/mojolicious/upload_stream_lite_app.t
 t/mojolicious/websocket_lite_app.t
 t/pod.t
 t/pod_coverage.t
-META.yml                                 Module meta-data (added by MakeMaker)

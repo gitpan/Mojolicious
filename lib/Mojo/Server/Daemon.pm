@@ -15,13 +15,13 @@ use constant BONJOUR => $ENV{MOJO_NO_BONJOUR}
 use constant DEBUG => $ENV{MOJO_DAEMON_DEBUG} || 0;
 
 has [qw/backlog group listen silent user/];
-has ioloop => sub { Mojo::IOLoop->singleton };
-has keep_alive_timeout => 15;
+has inactivity_timeout => 15;
+has ioloop             => sub { Mojo::IOLoop->singleton };
 has max_clients        => 1000;
 has max_requests       => 25;
 has websocket_timeout  => 300;
 
-my $SOCKET_RE = qr|
+my $LISTEN_RE = qr|
   ^
   (http(?:s)?)\://   # Scheme
   (.+)               # Address
@@ -36,15 +36,18 @@ my $SOCKET_RE = qr|
 
 sub DESTROY {
   my $self = shift;
-
-  # Clean up connections
   return unless my $loop = $self->ioloop;
-  my $cs = $self->{connections} || {};
-  for my $id (keys %$cs) { $loop->drop($id) }
+  $loop->drop($_) for keys %{$self->{connections} || {}};
+  $loop->drop($_) for @{$self->{listening} || []};
+}
 
-  # Clean up listen sockets
-  return unless my $listen = $self->{listening};
-  for my $id (@$listen) { $loop->drop($id) }
+# DEPRECATED in Leaf Fluttering In Wind!
+sub keep_alive_timeout {
+  warn <<EOF;
+Mojo::Server::Daemon->keep_alive_timeout is DEPRECATED in favor of
+Mojo::Server::Daemon->inactivity_timeout!
+EOF
+  shift->inactivity_timeout(@_);
 }
 
 sub prepare_ioloop {
@@ -198,7 +201,7 @@ sub _listen {
   return unless $listen;
 
   # Check listen value
-  croak qq/Invalid listen value "$listen"/ unless $listen =~ $SOCKET_RE;
+  croak qq/Invalid listen value "$listen"/ unless $listen =~ $LISTEN_RE;
   my $options = {};
   my $tls;
   $tls = $options->{tls} = 1 if $1 eq 'https';
@@ -221,8 +224,8 @@ sub _listen {
       # Add new connection
       $self->{connections}->{$id} = {tls => $tls};
 
-      # Keep alive timeout
-      $stream->timeout($self->keep_alive_timeout);
+      # Inactivity timeout
+      $stream->timeout($self->inactivity_timeout);
 
       # Events
       $stream->on(
@@ -384,6 +387,14 @@ Listen backlog size, defaults to C<SOMAXCONN>.
 
 Group for server process.
 
+=head2 C<inactivity_timeout>
+
+  my $timeout = $daemon->inactivity_timeout;
+  $daemon     = $daemon->inactivity_timeout(5);
+
+Maximum amount of time in seconds a connection can be inactive before getting
+dropped, defaults to C<15>.
+
 =head2 C<ioloop>
 
   my $loop = $daemon->ioloop;
@@ -391,14 +402,6 @@ Group for server process.
 
 Loop object to use for I/O operations, defaults to the global L<Mojo::IOLoop>
 singleton.
-
-=head2 C<keep_alive_timeout>
-
-  my $keep_alive_timeout = $daemon->keep_alive_timeout;
-  $daemon                = $daemon->keep_alive_timeout(5);
-
-Maximum amount of time in seconds a connection can be inactive before getting
-dropped, defaults to C<15>.
 
 =head2 C<listen>
 
@@ -446,8 +449,8 @@ User for the server process.
 
 =head2 C<websocket_timeout>
 
-  my $websocket_timeout = $server->websocket_timeout;
-  $server               = $server->websocket_timeout(300);
+  my $timeout = $server->websocket_timeout;
+  $server     = $server->websocket_timeout(300);
 
 Maximum amount of time in seconds a WebSocket connection can be inactive
 before getting dropped, defaults to C<300>.
