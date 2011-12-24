@@ -575,8 +575,8 @@ Mojo::UserAgent - Non-blocking I/O HTTP 1.1 and WebSocket user agent
   say $ua->get('www.☃.net?hello=there')->res->body;
 
   # Quick JSON API request with Basic authentication
-  say $ua->get('https://sri:s3cret@api.twitter.com/1/trends.json')
-    ->res->json->{trends}->[0]->{name};
+  say $ua->get('https://sri:s3cret@search.twitter.com/search.json?q=perl')
+    ->res->json('/results/0/text');
 
   # Extract data from HTML and XML resources
   say $ua->get('mojolicio.us')->res->dom->html->head->title->text;
@@ -714,7 +714,8 @@ Proxy server to use for HTTPS and WebSocket requests.
   $ua         = $ua->inactivity_timeout(15);
 
 Maximum amount of time in seconds a connection can be inactive before getting
-dropped, defaults to C<20>.
+dropped, defaults to C<20>. Setting the value to C<0> will allow connections
+to be inactive indefinitely.
 
 =head2 C<ioloop>
 
@@ -785,7 +786,8 @@ Note that this attribute is EXPERIMENTAL and might change without warning!
   $ua         = $ua->websocket_timeout(300);
 
 Maximum amount of time in seconds a WebSocket connection can be inactive
-before getting dropped, defaults to C<300>.
+before getting dropped, defaults to C<300>. Setting the value to C<0> will
+allow WebSocket connections to be inactive indefinitely.
 
 =head1 METHODS
 

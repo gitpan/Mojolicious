@@ -4,6 +4,8 @@ use Mojo::Base 'Mojo::Command';
 use Getopt::Long 'GetOptions';
 use Mojo::DOM;
 use Mojo::IOLoop;
+use Mojo::JSON;
+use Mojo::JSON::Pointer;
 use Mojo::Transaction::HTTP;
 use Mojo::UserAgent;
 use Mojo::Util qw/decode encode/;
@@ -12,7 +14,7 @@ has description => <<'EOF';
 Perform HTTP 1.1 request.
 EOF
 has usage => <<"EOF";
-usage: $0 get [OPTIONS] URL [SELECTOR] [COMMANDS]
+usage: $0 get [OPTIONS] URL [SELECTOR|JSON-POINTER] [COMMANDS]
 
   mojo get /
   mojo get mojolicio.us
@@ -24,6 +26,7 @@ usage: $0 get [OPTIONS] URL [SELECTOR] [COMMANDS]
   mojo get mojolicio.us a attr href
   mojo get mojolicio.us '*' attr id
   mojo get mojolicio.us 'h1, h2, h3' 3 text
+  mojo get http://search.twitter.com/search.json /error
 
 These options are available:
   --charset <charset>     Charset of HTML5/XML content, defaults to auto
@@ -141,9 +144,22 @@ sub run {
   $url = encode 'UTF-8', $url;
   warn qq/Problem loading URL "$url". ($message)\n/ if $message && !$code;
 
-  # Select
-  $charset //= $tx->res->content->charset;
-  $self->_select($buffer, $charset, $selector) if $selector;
+  # JSON Pointer
+  return unless $selector;
+  return $self->_json($buffer, $selector)
+    if ($tx->res->headers->content_type || '') =~ /JSON/i;
+
+  # Selector
+  $self->_select($buffer, $charset // $tx->res->content->charset, $selector);
+}
+
+sub _json {
+  my ($self, $buffer, $pointer) = @_;
+  my $json = Mojo::JSON->new;
+  return unless my $data = $json->decode($buffer);
+  return unless $data = Mojo::JSON::Pointer->get($data, $pointer);
+  ref $data eq 'HASH'
+    || ref $data eq 'ARRAY' ? say($json->encode($data)) : _say($data);
 }
 
 sub _say {

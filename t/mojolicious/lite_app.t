@@ -9,7 +9,7 @@ BEGIN {
   $ENV{MOJO_MODE}       = 'development';
 }
 
-use Test::More tests => 711;
+use Test::More tests => 715;
 
 # "Wait you're the only friend I have...
 #  You really want a robot for a friend?
@@ -1169,7 +1169,9 @@ is $tx->res->body, '%E1', 'right content';
 $t->get_ok('/json')->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_type_is('application/json')
-  ->json_content_is({foo => [1, -2, 3, 'b☃r']});
+  ->json_content_is({foo => [1, -2, 3, 'b☃r']})
+  ->json_is('/foo', [1, -2, 3, 'b☃r'])->json_is('/foo/3', 'b☃r')
+  ->json_has('/foo')->json_hasnt('/bar');
 
 # GET /autostash
 $t->get_ok('/autostash?bar=23')->status_is(200)
