@@ -1,5 +1,22 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+2.41    2011-12-28 00:00:00
+        - Deprecated Mojo::Cookie->version.
+        - Deprecated Mojo::Cookie::Response->comment and
+          Mojo::Cookie::Response->port.
+        - Removed experimental status from group feature of
+          Mojolicious::Lite.
+        - Removed experimental status from Mojo::Collection.
+        - Removed experimental status from Mojolicious::Plugin::Mount.
+        - Removed experimental status from dnt and etag methods in
+          Mojo::Headers.
+        - Improved session expiration by allowing it to be disabled.
+          (nwatkiss, sri)
+        - Improved session cookies to always enable the HttpOnly flag.
+          (nwatkiss, sri)
+        - Improved RFC 6265 compliance of cookie implementation.
+        - Improved documentation.
+
 2.40    2011-12-24 00:00:00
         - Added EXPERIMENTAL JSON Pointer support. (crab)
         - Improved inactivity timeouts by allowing them to be disabled.

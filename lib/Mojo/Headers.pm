@@ -13,7 +13,7 @@ my @HEADERS = (
   qw/Expires Host If-Modified-Since Last-Modified Location/,
   qw/Proxy-Authenticate Proxy-Authorization Range Sec-WebSocket-Accept/,
   qw/Sec-WebSocket-Key Sec-WebSocket-Origin Sec-WebSocket-Protocol/,
-  qw/Sec-WebSocket-Version Server Set-Cookie Set-Cookie2 Status Trailer/,
+  qw/Sec-WebSocket-Version Server Set-Cookie Status Trailer/,
   qw/Transfer-Encoding Upgrade User-Agent WWW-Authenticate X-Forwarded-For/,
 );
 {
@@ -341,16 +341,14 @@ Shortcut for the C<Date> header.
   my $dnt  = $headers->dnt;
   $headers = $headers->dnt(1);
 
-Shortcut for the C<DNT> (Do Not Track) header. Note that this method is
-EXPERIMENTAL and might change without warning!
+Shortcut for the C<DNT> (Do Not Track) header.
 
 =head2 C<etag>
 
   my $etag = $headers->etag;
   $headers = $headers->etag('abc321');
 
-Shortcut for the C<ETag> header. Note that this method is EXPERIMENTAL and
-might change without warning!
+Shortcut for the C<ETag> header.
 
 =head2 C<expect>
 
@@ -532,13 +530,6 @@ Shortcut for the C<Server> header.
   $headers       = $headers->set_cookie('f=b; Version=1; Path=/');
 
 Shortcut for the C<Set-Cookie> header.
-
-=head2 C<set_cookie2>
-
-  my $set_cookie2 = $headers->set_cookie2;
-  $headers        = $headers->set_cookie2('f=b; Version=1; Path=/');
-
-Shortcut for the C<Set-Cookie2> header.
 
 =head2 C<status>
 
