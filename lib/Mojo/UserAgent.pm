@@ -45,12 +45,23 @@ sub app {
   # Try to detect application
   $self->{app} ||= $ENV{MOJO_APP} if ref $ENV{MOJO_APP};
   if ($app) {
-    $self->{app} =
-      ref $app ? $app : $self->_test_server->app_class($app)->app;
+    $self->{app} = ref $app ? $app : $self->_server->app_class($app)->app;
     return $self;
   }
 
   return $self->{app};
+}
+
+sub app_url {
+  my $self = shift;
+
+  # Prepare application for testing
+  my $server = $self->_server(@_);
+  delete $server->{app};
+  $server->app($self->app);
+
+  # Build absolute URL for test server
+  return Mojo::URL->new("$self->{scheme}://localhost:$self->{port}/");
 }
 
 sub build_form_tx      { shift->transactor->form(@_) }
@@ -84,14 +95,6 @@ sub need_proxy {
   return 1 unless my $no = $self->no_proxy;
   $host =~ /\Q$_\E$/ and return for @$no;
   return 1;
-}
-
-# DEPRECATED in Smiling Face With Sunglasses!
-sub on_start {
-  warn <<EOF;
-Mojo::UserAgent->on_start is DEPRECATED in favor of Mojo::UserAgent->on!
-EOF
-  shift->on(start => shift);
 }
 
 sub post_form {
@@ -129,19 +132,6 @@ sub start {
   $self->ioloop->start;
 
   return $tx;
-}
-
-sub test_server {
-  my $self = shift;
-
-  # Prepare application for testing
-  my $server = $self->_test_server(@_);
-  delete $server->{app};
-  $server->app($self->app);
-
-  # Build absolute URL for test server
-  return Mojo::URL->new->scheme($self->{scheme})->host('localhost')
-    ->port($self->{port})->path('/');
 }
 
 sub websocket {
@@ -440,6 +430,27 @@ sub _redirect {
   return 1;
 }
 
+sub _server {
+  my ($self, $scheme) = @_;
+
+  # Restart with different scheme
+  delete $self->{port}   if $scheme;
+  return $self->{server} if $self->{port};
+
+  # Start test server
+  my $loop   = $self->_loop;
+  my $server = $self->{server} =
+    Mojo::Server::Daemon->new(ioloop => $loop, silent => 1);
+  my $port = $self->{port} = $loop->generate_port;
+  die "Couldn't find a free TCP port for testing.\n" unless $port;
+  $self->{scheme} = $scheme ||= 'http';
+  $server->listen(["$scheme://*:$port"]);
+  $server->prepare_ioloop;
+  warn "TEST SERVER STARTED ($scheme://*:$port)\n" if DEBUG;
+
+  return $server;
+}
+
 sub _start {
   my ($self, $tx, $cb) = @_;
 
@@ -447,7 +458,7 @@ sub _start {
   if ($self->app) {
     my $req = $tx->req;
     my $url = $req->url->to_abs;
-    $req->url($url->base($self->test_server)->to_abs) unless $url->host;
+    $req->url($url->base($self->app_url)->to_abs) unless $url->host;
   }
 
   # Proxy
@@ -481,28 +492,6 @@ sub _start {
   $self->{processing} += 1;
 
   return $id;
-}
-
-sub _test_server {
-  my ($self, $scheme) = @_;
-
-  # Fresh start
-  delete $self->{port} if $scheme;
-
-  # Start test server
-  unless ($self->{port}) {
-    my $loop   = $self->_loop;
-    my $server = $self->{server} =
-      Mojo::Server::Daemon->new(ioloop => $loop, silent => 1);
-    my $port = $self->{port} = $loop->generate_port;
-    die "Couldn't find a free TCP port for testing.\n" unless $port;
-    $self->{scheme} = $scheme ||= 'http';
-    $server->listen(["$scheme://*:$port"]);
-    $server->prepare_ioloop;
-    warn "TEST SERVER STARTED ($scheme://*:$port)\n" if DEBUG;
-  }
-
-  return $self->{server};
 }
 
 sub _upgrade {
@@ -644,8 +633,7 @@ L<Mojo::UserAgent> can emit the following events.
     ...
   });
 
-Emitted if an error happens that can't be associated with a transaction. Note
-that this event is EXPERIMENTAL and might change without warning!
+Emitted if an error happens that can't be associated with a transaction.
 
   $ua->on(error => sub {
     my ($ua, $err) = @_;
@@ -685,8 +673,7 @@ environment variable.
   $ua         = $ua->connect_timeout(5);
 
 Maximum amount of time in seconds establishing a connection may take,
-defaults to C<3>. Note that this attribute is EXPERIMENTAL and might change
-without warning!
+defaults to C<3>.
 
 =head2 C<cookie_jar>
 
@@ -809,6 +796,17 @@ L<Mojolicious> object.
   say $ua->app->secret;
   $ua->app->log->level('fatal');
   $ua->app->defaults(testing => 'oh yea!');
+
+=head2 C<app_url>
+
+  my $url = $ua->app_url;
+  my $url = $ua->app_url('http');
+  my $url = $ua->app_url('https');
+
+Get absolute L<Mojo::URL> object for C<app> and switch protocol if necessary.
+Note that this method is EXPERIMENTAL and might change without warning!
+
+  say $ua->app_url->port;
 
 =head2 C<build_form_tx>
 
@@ -950,16 +948,6 @@ transactions non-blocking.
     Mojo::IOLoop->stop;
   });
   Mojo::IOLoop->start;
-
-=head2 C<test_server>
-
-  my $url = $ua->test_server;
-  my $url = $ua->test_server('http');
-  my $url = $ua->test_server('https');
-
-Starts a test server for C<app> if necessary and returns absolute
-L<Mojo::URL> object for it. Note that this method is EXPERIMENTAL and might
-change without warning!
 
 =head2 C<websocket>
 

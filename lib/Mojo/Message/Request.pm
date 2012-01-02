@@ -40,24 +40,20 @@ sub cookies {
   my $self = shift;
 
   # Add cookies
+  my $headers = $self->headers;
   if (@_) {
-    my $cookies = shift;
-    $cookies = Mojo::Cookie::Request->new($cookies)
-      if ref $cookies eq 'HASH';
-    $cookies = $cookies->to_string;
+    my @cookies = $headers->cookie || ();
     for my $cookie (@_) {
-      $cookie = Mojo::Cookie::Request->new($cookie)
-        if ref $cookie eq 'HASH';
-      $cookies .= "; $cookie";
+      $cookie = Mojo::Cookie::Request->new($cookie) if ref $cookie eq 'HASH';
+      push @cookies, $cookie;
     }
-    $self->headers->add('Cookie', $cookies);
+    $headers->cookie(join('; ', @cookies));
     return $self;
   }
 
   # Cookie
   my @cookies;
-  push @cookies, @{Mojo::Cookie::Request->parse($_)}
-    for $self->headers->cookie;
+  push @cookies, @{Mojo::Cookie::Request->parse($_)} for $headers->cookie;
   return \@cookies;
 }
 

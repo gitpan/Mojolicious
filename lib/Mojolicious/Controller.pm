@@ -130,10 +130,6 @@ sub flash {
   $flash = {} unless $flash && ref $flash eq 'HASH';
   $session->{new_flash} = $flash;
 
-  # DEPRECATED in Smiling Face With Sunglasses!
-  warn "Direct hash access to the flash is DEPRECATED!\n" and return $flash
-    unless @_;
-
   # Set
   my $values = @_ > 1 ? {@_} : $_[0];
   $session->{new_flash} = {%$flash, %$values};
@@ -914,8 +910,7 @@ L<Mojo::Message::Response> object.
 
 Automatically select best possible representation for resource from C<Accept>
 request header, C<format> stash value or C<format> GET/POST parameter,
-defaults to rendering an empty C<204> response. Note that this method is
-EXPERIMENTAL and might change without warning!
+defaults to rendering an empty C<204> response.
 
   $c->respond_to(
     json => sub { $c->render_json({just => 'works'}) },

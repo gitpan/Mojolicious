@@ -2,7 +2,7 @@ use Mojo::Base -strict;
 
 use utf8;
 
-use Test::More tests => 928;
+use Test::More tests => 930;
 
 # "When will I learn?
 #  The answer to life's problems aren't at the bottom of a bottle,
@@ -306,44 +306,44 @@ is $req->headers->content_type,   'text/plain', 'right "Content-Type" value';
 is $req->headers->content_length, undef,        'no "Content-Length" value';
 
 # Parse full HTTP 1.0 request (file storage)
-my $backup = $ENV{MOJO_MAX_MEMORY_SIZE} || '';
-$ENV{MOJO_MAX_MEMORY_SIZE} = 12;
-$req = Mojo::Message::Request->new;
-my ($upgrade, $size);
-$req->content->asset->on(
-  upgrade => sub {
-    my ($mem, $file) = @_;
-    $upgrade = $file->is_file;
-    $size    = $file->size;
-  }
-);
-is $req->content->progress, 0, 'right progress';
-$req->parse('GET /foo/bar/baz.html?fo');
-is $req->content->progress, 0, 'right progress';
-$req->parse("o=13#23 HTTP/1.0\x0d\x0aContent");
-$req->parse('-Type: text/');
-is $req->content->progress, 0, 'right progress';
-$req->parse("plain\x0d\x0aContent-Length: 27\x0d\x0a\x0d\x0aHell");
-is $req->content->progress, 4, 'right progress';
-ok !$req->content->asset->is_file, 'stored in memory';
-ok !$upgrade, 'upgrade event has not been emitted';
-$req->parse("o World!\n");
-ok $upgrade, 'upgrade event has been emitted';
-is $size, 0, 'file was empty when upgrade event got emitted';
-is $req->content->progress, 13, 'right progress';
-ok $req->content->asset->is_file, 'stored in file';
-$req->parse("1234\nlalalala\n");
-is $req->content->progress, 27, 'right progress';
-ok $req->content->asset->is_file, 'stored in file';
-ok $req->is_finished, 'request is finished';
-is $req->method,      'GET', 'right method';
-is $req->version,     '1.0', 'right version';
-ok $req->at_least_version('1.0'), 'at least version 1.0';
-ok !$req->at_least_version('1.2'), 'not version 1.2';
-is $req->url, '/foo/bar/baz.html?foo=13#23', 'right URL';
-is $req->headers->content_type, 'text/plain', 'right "Content-Type" value';
-is $req->headers->content_length, 27, 'right "Content-Length" value';
-$ENV{MOJO_MAX_MEMORY_SIZE} = $backup;
+{
+  local $ENV{MOJO_MAX_MEMORY_SIZE} = 12;
+  $req = Mojo::Message::Request->new;
+  my ($upgrade, $size);
+  $req->content->asset->on(
+    upgrade => sub {
+      my ($mem, $file) = @_;
+      $upgrade = $file->is_file;
+      $size    = $file->size;
+    }
+  );
+  is $req->content->progress, 0, 'right progress';
+  $req->parse('GET /foo/bar/baz.html?fo');
+  is $req->content->progress, 0, 'right progress';
+  $req->parse("o=13#23 HTTP/1.0\x0d\x0aContent");
+  $req->parse('-Type: text/');
+  is $req->content->progress, 0, 'right progress';
+  $req->parse("plain\x0d\x0aContent-Length: 27\x0d\x0a\x0d\x0aHell");
+  is $req->content->progress, 4, 'right progress';
+  ok !$req->content->asset->is_file, 'stored in memory';
+  ok !$upgrade, 'upgrade event has not been emitted';
+  $req->parse("o World!\n");
+  ok $upgrade, 'upgrade event has been emitted';
+  is $size, 0, 'file was empty when upgrade event got emitted';
+  is $req->content->progress, 13, 'right progress';
+  ok $req->content->asset->is_file, 'stored in file';
+  $req->parse("1234\nlalalala\n");
+  is $req->content->progress, 27, 'right progress';
+  ok $req->content->asset->is_file, 'stored in file';
+  ok $req->is_finished, 'request is finished';
+  is $req->method,      'GET', 'right method';
+  is $req->version,     '1.0', 'right version';
+  ok $req->at_least_version('1.0'), 'at least version 1.0';
+  ok !$req->at_least_version('1.2'), 'not version 1.2';
+  is $req->url, '/foo/bar/baz.html?foo=13#23', 'right URL';
+  is $req->headers->content_type, 'text/plain', 'right "Content-Type" value';
+  is $req->headers->content_length, 27, 'right "Content-Length" value';
+}
 
 # Parse HTTP 1.0 start line and headers, no body (missing Content-Length)
 $req = Mojo::Message::Request->new;
@@ -360,64 +360,64 @@ is $req->headers->content_type,   'text/plain', 'right "Content-Type" value';
 is $req->headers->content_length, undef,        'no "Content-Length" value';
 
 # Parse HTTP 1.0 start line (with line size limit)
-$req                     = Mojo::Message::Request->new;
-$backup                  = $ENV{MOJO_MAX_LINE_SIZE} || '';
-$ENV{MOJO_MAX_LINE_SIZE} = 5;
-$req->parse('GET /foo/bar/baz.html HTTP/1');
-ok $req->is_finished, 'request is finished';
-is(($req->error)[0], 'Maximum line size exceeded.', 'right error');
-is(($req->error)[1], 431, 'right status');
-ok $req->is_limit_exceeded, 'limit is exceeded';
-$ENV{MOJO_MAX_LINE_SIZE} = $backup;
+{
+  $req = Mojo::Message::Request->new;
+  local $ENV{MOJO_MAX_LINE_SIZE} = 5;
+  $req->parse('GET /foo/bar/baz.html HTTP/1');
+  ok $req->is_finished, 'request is finished';
+  is(($req->error)[0], 'Maximum line size exceeded.', 'right error');
+  is(($req->error)[1], 431, 'right status');
+  ok $req->is_limit_exceeded, 'limit is exceeded';
+}
 
 # Parse HTTP 1.0 start line and headers (with line size limit)
-$req                     = Mojo::Message::Request->new;
-$backup                  = $ENV{MOJO_MAX_LINE_SIZE} || '';
-$ENV{MOJO_MAX_LINE_SIZE} = 20;
-$req->parse("GET / HTTP/1.0\x0d\x0a");
-$req->parse("Content-Type: text/plain\x0d\x0a");
-ok $req->is_finished, 'request is finished';
-is(($req->error)[0], 'Maximum line size exceeded.', 'right error');
-is(($req->error)[1], 431, 'right status');
-ok $req->is_limit_exceeded, 'limit is exceeded';
-$ENV{MOJO_MAX_LINE_SIZE} = $backup;
+{
+  $req = Mojo::Message::Request->new;
+  local $ENV{MOJO_MAX_LINE_SIZE} = 20;
+  $req->parse("GET / HTTP/1.0\x0d\x0a");
+  $req->parse("Content-Type: text/plain\x0d\x0a");
+  ok $req->is_finished, 'request is finished';
+  is(($req->error)[0], 'Maximum line size exceeded.', 'right error');
+  is(($req->error)[1], 431, 'right status');
+  ok $req->is_limit_exceeded, 'limit is exceeded';
+}
 
 # Parse HTTP 1.0 start line (with message size limit)
-$req                        = Mojo::Message::Request->new;
-$backup                     = $ENV{MOJO_MAX_MESSAGE_SIZE} || '';
-$ENV{MOJO_MAX_MESSAGE_SIZE} = 5;
-$req->parse('GET /foo/bar/baz.html HTTP/1');
-ok $req->is_finished, 'request is finished';
-is(($req->error)[0], 'Maximum message size exceeded.', 'right error');
-is(($req->error)[1], 413, 'right status');
-ok $req->is_limit_exceeded, 'limit is exceeded';
-$ENV{MOJO_MAX_MESSAGE_SIZE} = $backup;
+{
+  $req = Mojo::Message::Request->new;
+  local $ENV{MOJO_MAX_MESSAGE_SIZE} = 5;
+  $req->parse('GET /foo/bar/baz.html HTTP/1');
+  ok $req->is_finished, 'request is finished';
+  is(($req->error)[0], 'Maximum message size exceeded.', 'right error');
+  is(($req->error)[1], 413, 'right status');
+  ok $req->is_limit_exceeded, 'limit is exceeded';
+}
 
 # Parse HTTP 1.0 start line and headers (with message size limit)
-$req                        = Mojo::Message::Request->new;
-$backup                     = $ENV{MOJO_MAX_MESSAGE_SIZE} || '';
-$ENV{MOJO_MAX_MESSAGE_SIZE} = 20;
-$req->parse("GET / HTTP/1.0\x0d\x0a");
-$req->parse("Content-Type: text/plain\x0d\x0a");
-ok $req->is_finished, 'request is finished';
-is(($req->error)[0], 'Maximum message size exceeded.', 'right error');
-is(($req->error)[1], 413, 'right status');
-ok $req->is_limit_exceeded, 'limit is exceeded';
-$ENV{MOJO_MAX_MESSAGE_SIZE} = $backup;
+{
+  $req = Mojo::Message::Request->new;
+  local $ENV{MOJO_MAX_MESSAGE_SIZE} = 20;
+  $req->parse("GET / HTTP/1.0\x0d\x0a");
+  $req->parse("Content-Type: text/plain\x0d\x0a");
+  ok $req->is_finished, 'request is finished';
+  is(($req->error)[0], 'Maximum message size exceeded.', 'right error');
+  is(($req->error)[1], 413, 'right status');
+  ok $req->is_limit_exceeded, 'limit is exceeded';
+}
 
 # Parse HTTP 1.0 start line, headers and body (with message size limit)
-$req                        = Mojo::Message::Request->new;
-$backup                     = $ENV{MOJO_MAX_MESSAGE_SIZE} || '';
-$ENV{MOJO_MAX_MESSAGE_SIZE} = 50;
-$req->parse("GET / HTTP/1.0\x0d\x0a");
-$req->parse("Content-Length: 24\x0d\x0a\x0d\x0a");
-$req->parse('Hello World!');
-$req->parse('Hello World!');
-ok $req->is_finished, 'request is finished';
-is(($req->error)[0], 'Maximum message size exceeded.', 'right error');
-is(($req->error)[1], 413, 'right status');
-ok $req->is_limit_exceeded, 'limit is exceeded';
-$ENV{MOJO_MAX_MESSAGE_SIZE} = $backup;
+{
+  $req = Mojo::Message::Request->new;
+  local $ENV{MOJO_MAX_MESSAGE_SIZE} = 50;
+  $req->parse("GET / HTTP/1.0\x0d\x0a");
+  $req->parse("Content-Length: 24\x0d\x0a\x0d\x0a");
+  $req->parse('Hello World!');
+  $req->parse('Hello World!');
+  ok $req->is_finished, 'request is finished';
+  is(($req->error)[0], 'Maximum message size exceeded.', 'right error');
+  is(($req->error)[1], 413, 'right status');
+  ok $req->is_limit_exceeded, 'limit is exceeded';
+}
 
 # Parse full HTTP 1.0 request
 $req = Mojo::Message::Request->new;
@@ -1572,20 +1572,9 @@ $req = Mojo::Message::Request->new;
 $req->method('GET');
 $req->url->parse('http://127.0.0.1/foo/bar');
 $req->headers->expect('100-continue');
-$req->cookies(
-  Mojo::Cookie::Request->new(
-    name  => 'foo',
-    value => 'bar',
-    path  => '/foobar'
-
-  ),
-  Mojo::Cookie::Request->new(
-    name  => 'bar',
-    value => 'baz',
-    path  => '/test/23'
-
-  )
-);
+$req->cookies({name => 'foo', value => 'bar'},
+  {name => 'bar', value => 'baz'});
+$req->cookies(Mojo::Cookie::Request->new(name => 'baz', value => 'yada'));
 $req->body("Hello World!\n");
 ok !!$req->to_string, 'message built';
 $req2 = Mojo::Message::Request->new;
@@ -1598,14 +1587,17 @@ ok !$req2->at_least_version('1.2'), 'not version 1.2';
 is $req2->headers->expect, '100-continue', 'right "Expect" value';
 is $req2->headers->host,   '127.0.0.1',    'right "Host" value';
 is $req2->headers->content_length, 13, 'right "Content-Length" value';
-is $req2->headers->cookie, 'foo=bar; bar=baz', 'right "Cookie" value';
+is $req2->headers->cookie, 'foo=bar; bar=baz; baz=yada',
+  'right "Cookie" value';
 is $req2->url, '/foo/bar', 'right URL';
 is $req2->url->to_abs, 'http://127.0.0.1/foo/bar', 'right absolute URL';
-is defined $req2->cookie('foo'), 1,  'right value';
-is defined $req2->cookie('baz'), '', 'no value';
-is defined $req2->cookie('bar'), 1,  'right value';
-is $req2->cookie('foo')->value, 'bar', 'right value';
-is $req2->cookie('bar')->value, 'baz', 'right value';
+ok defined $req2->cookie('foo'),   'cookie "foo" exists';
+ok defined $req2->cookie('bar'),   'cookie "bar" exists';
+ok defined $req2->cookie('baz'),   'cookie "baz" exists';
+ok !defined $req2->cookie('yada'), 'cookie "yada" does not exist';
+is $req2->cookie('foo')->value, 'bar',  'right value';
+is $req2->cookie('bar')->value, 'baz',  'right value';
+is $req2->cookie('baz')->value, 'yada', 'right value';
 is $req2->body, "Hello World!\n", 'right content';
 
 # Parse full HTTP 1.0 request with cookies and progress callback
