@@ -4,16 +4,14 @@ use Mojo::Base 'Mojo::Command';
 use Cwd;
 use FindBin;
 use File::Spec;
-use Getopt::Long 'GetOptions';
+use Getopt::Long qw/GetOptions :config no_auto_abbrev no_ignore_case/;
 
-has description => <<'EOF';
-Run unit tests.
-EOF
-has usage => <<"EOF";
+has description => "Run unit tests.\n";
+has usage       => <<"EOF";
 usage: $0 test [OPTIONS] [TESTS]
 
 These options are available:
-  --verbose   Print verbose debug information to STDERR.
+  -v, --verbose   Print verbose debug information to STDERR.
 EOF
 
 # "Why, the secret ingredient was...water!
@@ -23,7 +21,7 @@ sub run {
 
   # Options
   local @ARGV = @_;
-  GetOptions(verbose => sub { $ENV{HARNESS_VERBOSE} = 1 });
+  GetOptions('v|verbose' => sub { $ENV{HARNESS_VERBOSE} = 1 });
   my @tests = @ARGV;
 
   # Search tests

@@ -882,6 +882,11 @@ C<text/html;charset=UTF-8> by default.
 
 Finalize response and run C<after_dispatch> plugin hook.
 
+  # Stream content directly from file
+  $c->res->content->asset(Mojo::Asset::File->new(path => '/etc/passwd'));
+  $c->res->headers->content_type('text/plain');
+  $c->rendered(200);
+
 =head2 C<req>
 
   my $req = $c->req;
@@ -1005,11 +1010,11 @@ object.
 
 Generate a portable L<Mojo::URL> object with base for a route, path or URL.
 
-  # "/perldoc" if application is deployed under "/"
-  say $c->url_for('/perldoc');
+  # "/perldoc?foo=bar" if application is deployed under "/"
+  say $c->url_for('/perldoc')->query(foo => 'bar');
 
-  # "/myapp/perldoc" if application is deployed under "/myapp"
-  say $c->url_for('/perldoc');
+  # "/myapp/perldoc?foo=bar" if application is deployed under "/myapp"
+  say $c->url_for('/perldoc')->query(foo => 'bar');
 
 =head2 C<write>
 

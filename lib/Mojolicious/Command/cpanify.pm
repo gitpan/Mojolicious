@@ -2,20 +2,18 @@ package Mojolicious::Command::cpanify;
 use Mojo::Base 'Mojo::Command';
 
 use File::Basename 'basename';
-use Getopt::Long 'GetOptions';
+use Getopt::Long qw/GetOptions :config no_auto_abbrev no_ignore_case/;
 use Mojo::UserAgent;
 
-has description => <<'EOF';
-Upload distribution to CPAN.
-EOF
-has usage => <<"EOF";
+has description => "Upload distribution to CPAN.\n";
+has usage       => <<"EOF";
 usage: $0 cpanify [OPTIONS] [FILE]
 
   mojo cpanify -u sri -p secr3t Mojolicious-Plugin-MyPlugin-0.01.tar.gz
 
 These options are available:
-  --password <password>   PAUSE password.
-  --user <name>           PAUSE username.
+  -p, --password <password>   PAUSE password.
+  -u, --user <name>           PAUSE username.
 EOF
 
 # "Hooray! A happy ending for the rich people!"
@@ -26,8 +24,8 @@ sub run {
   local @ARGV = @_;
   my $password = my $user = '';
   GetOptions(
-    'password=s' => sub { $password = $_[1] },
-    'user=s'     => sub { $user     = $_[1] }
+    'p|password=s' => sub { $password = $_[1] },
+    'u|user=s'     => sub { $user     = $_[1] }
   );
   my $file = shift @ARGV;
   die $self->usage unless $file;
