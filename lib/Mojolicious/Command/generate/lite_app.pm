@@ -24,7 +24,7 @@ use Mojolicious::Lite;
 # Documentation browser under "/perldoc"
 plugin 'PODRenderer';
 
-get '/welcome' => sub {
+get '/' => sub {
   my $self = shift;
   $self->render('index');
 };
@@ -35,7 +35,7 @@ app->start;
 <% %>@@ index.html.ep
 %% layout 'default';
 %% title 'Welcome';
-Welcome to Mojolicious!
+Welcome to the Mojolicious real-time web framework!
 
 <% %>@@ layouts/default.html.ep
 <!DOCTYPE html>

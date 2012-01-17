@@ -49,13 +49,12 @@ Mojo::IOLoop::Delay - Synchronize events
     });
   }
 
-  # Wait for events
-  $delay->wait;
+  # Wait for events if necessary
+  $delay->wait unless Mojo::IOLoop->is_running;
 
 =head1 DESCRIPTION
 
-L<Mojo::IOLoop::Delay> synchronizes events for L<Mojo::IOLoop>. Note that
-this module is EXPERIMENTAL and might change without warning!
+L<Mojo::IOLoop::Delay> synchronizes events for L<Mojo::IOLoop>.
 
 =head1 EVENTS
 
@@ -108,7 +107,15 @@ Decrement active event counter.
 
   my @args = $delay->wait;
 
-Start C<ioloop> and stop it again once the C<finish> event gets emitted.
+Start C<ioloop> and stop it again once the C<finish> event gets emitted, only
+works when C<ioloop> is not running already.
+
+  # Use the "finish" event to synchronize portably
+  $delay->on(finish => sub {
+    my ($delay, @args) = @_;
+    ...
+  });
+  $delay->wait unless $delay->ioloop->is_running;
 
 =head1 SEE ALSO
 

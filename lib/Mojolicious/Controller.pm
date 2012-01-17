@@ -22,14 +22,13 @@ has match => sub {
 has tx => sub { Mojo::Transaction::HTTP->new };
 
 # Bundled files
-my $H = Mojo::Home->new;
+our $H = Mojo::Home->new;
 $H->parse($H->parse($H->mojo_lib_dir)->rel_dir('Mojolicious/templates'));
-our $EXCEPTION = $H->slurp_rel_file('exception.html.ep');
-our $DEVELOPMENT_EXCEPTION =
-  $H->slurp_rel_file('exception.development.html.ep');
-our $NOT_FOUND = $H->slurp_rel_file('not_found.html.ep');
-our $DEVELOPMENT_NOT_FOUND =
-  $H->slurp_rel_file('not_found.development.html.ep');
+our $EXCEPTION     = $H->slurp_rel_file('exception.html.ep');
+our $DEV_EXCEPTION = $H->slurp_rel_file('exception.development.html.ep');
+our $MOJOBAR       = $H->slurp_rel_file('mojobar.html.ep');
+our $NOT_FOUND     = $H->slurp_rel_file('not_found.html.ep');
+our $DEV_NOT_FOUND = $H->slurp_rel_file('not_found.development.html.ep');
 
 # Reserved stash values
 my @RESERVED = (
@@ -300,7 +299,7 @@ sub render_exception {
     exception        => $e,
     'mojo.exception' => 1
   };
-  my $inline = $mode eq 'development' ? $DEVELOPMENT_EXCEPTION : $EXCEPTION;
+  my $inline = $mode eq 'development' ? $DEV_EXCEPTION : $EXCEPTION;
   return if $self->_render_fallbacks($options, 'exception', $inline);
   $options->{format} = 'html';
   $self->_render_fallbacks($options, 'exception', $inline);
@@ -328,22 +327,15 @@ sub render_not_found {
   return if $stash->{'mojo.exception'};
   return if $stash->{'mojo.not_found'};
 
-  # Check for POD plugin
-  my $guide =
-      $self->app->renderer->helpers->{pod_to_html}
-    ? $self->url_for('/perldoc')
-    : 'http://mojolicio.us/perldoc';
-
   # Render with fallbacks
   my $mode    = $self->app->mode;
   my $options = {
     template         => "not_found.$mode",
     format           => $stash->{format} || 'html',
     status           => 404,
-    guide            => $guide,
     'mojo.not_found' => 1
   };
-  my $inline = $mode eq 'development' ? $DEVELOPMENT_NOT_FOUND : $NOT_FOUND;
+  my $inline = $mode eq 'development' ? $DEV_NOT_FOUND : $NOT_FOUND;
   return if $self->_render_fallbacks($options, 'not_found', $inline);
   $options->{format} = 'html';
   $self->_render_fallbacks($options, 'not_found', $inline);
@@ -681,6 +673,8 @@ controller, defaults to a L<Mojolicious> object.
 Routes dispatcher results for the current request, defaults to a
 L<Mojolicious::Routes::Match> object.
 
+  my $name = $c->match->endpoint->name;
+
 =head2 C<tx>
 
   my $tx = $c->tx;
@@ -807,8 +801,8 @@ C<extends> features.
 
 =head2 C<render_data>
 
-  $c->render_data($bits);
-  $c->render_data($bits, format => 'png');
+  $c->render_data($bytes);
+  $c->render_data($bytes, format => 'png');
 
 Render the given content as raw bytes, similar to C<render_text> but data
 will not be encoded.
@@ -824,7 +818,7 @@ C<exception.$format.*> and set the response status code to C<500>.
 =head2 C<render_json>
 
   $c->render_json({foo => 'bar'});
-  $c->render_json([1, 2, -3]);
+  $c->render_json([1, 2, -3], status => 201);
 
 Render a data structure as JSON.
 
@@ -925,12 +919,17 @@ defaults to rendering an empty C<204> response.
 
 =head2 C<send_message>
 
+  $c = $c->send_message([binary => $bytes]);
+  $c = $c->send_message([text   => $bytes]);
   $c = $c->send_message('Hi there!');
   $c = $c->send_message('Hi there!', sub {...});
 
 Send a message non-blocking via WebSocket, the optional drain callback will
 be invoked once all data has been written. Note that this method is
 EXPERIMENTAL and might change without warning!
+
+  # Send JSON object as text frame
+  $c->send_message([text => Mojo::JSON->new->encode({hello => 'world'})]);
 
 =head2 C<session>
 
@@ -1011,10 +1010,16 @@ object.
 Generate a portable L<Mojo::URL> object with base for a route, path or URL.
 
   # "/perldoc?foo=bar" if application is deployed under "/"
-  say $c->url_for('/perldoc')->query(foo => 'bar');
+  $c->url_for('/perldoc')->query(foo => 'bar');
 
   # "/myapp/perldoc?foo=bar" if application is deployed under "/myapp"
-  say $c->url_for('/perldoc')->query(foo => 'bar');
+  $c->url_for('/perldoc')->query(foo => 'bar');
+
+You can also use L<Mojolicious::Plugin::DefaultHelpers/"url_with"> to inherit
+query parameters from the current request.
+
+  # "/list?q=mojo&page=2" if current request was for "/list?q=mojo&page=1"
+  $c->url_with->query([page => 2]);
 
 =head2 C<write>
 
