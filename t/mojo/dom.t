@@ -2,7 +2,7 @@ use Mojo::Base -strict;
 
 use utf8;
 
-use Test::More tests => 683;
+use Test::More tests => 720;
 
 use ojo;
 use Mojo::Util 'encode';
@@ -1882,6 +1882,46 @@ is $dom->div->pre->code->text, "like\n  it\n    really", 'right text';
 is $dom->div->pre->code->text(0), "like\n  it\n    really", 'right text';
 is $dom->div->pre->code->all_text, "like\n  it\n    really", 'right text';
 is $dom->div->pre->code->all_text(0), "like\n  it\n    really", 'right text';
+is $dom->div->pre->text_before, 'looks', 'right text';
+is $dom->div->pre->text_after,  'works', 'right text';
+
+# Text siblings
+$dom = Mojo::DOM->new(<<EOF);
+ok
+<div>
+  looks<p>like</p>
+  thi<![CDATA[s]]>
+  <p>might</p><p>really</p>
+  <p>
+    just
+  </p>work
+</div>
+wow
+EOF
+is $dom->text_before, '', 'right text';
+is $dom->text_before(0), '', 'right text';
+is $dom->div->text_before, 'ok', 'right text';
+is $dom->div->text_before(0), "ok\n", 'right text';
+is $dom->div->p->[0]->text_before, 'looks', 'right text';
+is $dom->div->p->[0]->text_before(0), "\n  looks", 'right text';
+is $dom->div->p->[1]->text_before, 'thi s', 'right text';
+is $dom->div->p->[1]->text_before(0), "\n  thi s\n  ", 'right text';
+is $dom->div->p->[2]->text_before, '', 'right text';
+is $dom->div->p->[2]->text_before(0), '', 'right text';
+is $dom->div->p->[3]->text_before, '', 'right text';
+is $dom->div->p->[3]->text_before(0), "\n  ", 'right text';
+is $dom->text_after, '', 'right text';
+is $dom->text_after(0), '', 'right text';
+is $dom->div->text_after, 'wow', 'right text';
+is $dom->div->text_after(0), "\nwow\n", 'right text';
+is $dom->div->p->[0]->text_after, 'thi s', 'right text';
+is $dom->div->p->[0]->text_after(0), "\n  thi s\n  ", 'right text';
+is $dom->div->p->[1]->text_after, '', 'right text';
+is $dom->div->p->[1]->text_after(0), '', 'right text';
+is $dom->div->p->[2]->text_after, '', 'right text';
+is $dom->div->p->[2]->text_after(0), "\n  ", 'right text';
+is $dom->div->p->[3]->text_after, 'work', 'right text';
+is $dom->div->p->[3]->text_after(0), "work\n", 'right text';
 
 # PoCo example with whitespace sensitive text
 $dom = Mojo::DOM->new(<<EOF);
@@ -1976,3 +2016,27 @@ is $dom->find('a[accesskey~="1"]')->[0]->text, 'One', 'right text';
 is $dom->find('a[accesskey~="1]')->[1], undef, 'no result';
 is $dom->find('a[accesskey*="1"]')->[0]->text, 'One', 'right text';
 is $dom->find('a[accesskey*="1]')->[1], undef, 'no result';
+
+# Empty attribute value
+$dom = Mojo::DOM->new->parse(<<EOF);
+<foo bar=>
+  test
+</foo>
+<bar>after</bar>
+EOF
+is $dom->tree->[0], 'root', 'right element';
+is $dom->tree->[1]->[0], 'tag', 'right element';
+is $dom->tree->[1]->[1], 'foo', 'right tag';
+is_deeply $dom->tree->[1]->[2], {bar => ''}, 'right attributes';
+is $dom->tree->[1]->[4]->[0], 'text',       'right element';
+is $dom->tree->[1]->[4]->[1], "\n  test\n", 'right text';
+is $dom->tree->[3]->[0], 'tag', 'right element';
+is $dom->tree->[3]->[1], 'bar', 'right tag';
+is $dom->tree->[3]->[4]->[0], 'text',  'right element';
+is $dom->tree->[3]->[4]->[1], 'after', 'right text';
+is "$dom", <<EOF, 'stringified right';
+<foo bar="">
+  test
+</foo>
+<bar>after</bar>
+EOF
