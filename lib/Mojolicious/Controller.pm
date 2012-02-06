@@ -144,15 +144,6 @@ sub on {
   $tx->on($name => sub { shift and $self->$cb(@_) });
 }
 
-# DEPRECATED in Leaf Fluttering In Wind!
-sub on_finish {
-  warn <<EOF;
-Mojolicious::Controller->on_finish is DEPRECATED in favor of
-Mojolicious::Controller->on!
-EOF
-  shift->on(finish => @_);
-}
-
 # "Just make a simple cake. And this time, if someone's going to jump out of
 #  it make sure to put them in *after* you cook it."
 sub param {
@@ -445,22 +436,17 @@ sub send_message {
 sub session {
   my $self = shift;
 
-  # Get
-  my $stash   = $self->stash;
-  my $session = $stash->{'mojo.session'};
-  if ($_[0] && !defined $_[1] && !ref $_[0]) {
-    return unless $session && ref $session eq 'HASH';
-    return $session->{$_[0]};
-  }
-
   # Hash
-  $session = {} unless $session && ref $session eq 'HASH';
-  $stash->{'mojo.session'} = $session;
-  return $session unless @_;
+  my $stash = $self->stash;
+  $stash->{'mojo.session'} ||= {};
+  return $stash->{'mojo.session'} unless @_;
+
+  # Get
+  return $stash->{'mojo.session'}->{$_[0]} unless @_ > 1 || ref $_[0];
 
   # Set
-  my $values = @_ > 1 ? {@_} : $_[0];
-  $stash->{'mojo.session'} = {%$session, %$values};
+  my $values = ref $_[0] ? $_[0] : {@_};
+  $stash->{'mojo.session'} = {%{$stash->{'mojo.session'}}, %$values};
 
   return $self;
 }

@@ -8,7 +8,7 @@ use Test::More;
 plan skip_all => 'set TEST_EV to enable this test (developer only!)'
   unless $ENV{TEST_EV};
 plan skip_all => 'EV 4.0 required for this test!' unless eval 'use EV 4.0; 1';
-plan tests => 53;
+plan tests => 57;
 
 use IO::Socket::INET;
 use Mojo::IOLoop;
@@ -27,11 +27,13 @@ my $listen = IO::Socket::INET->new(
 my $watcher = Mojo::IOWatcher::EV->new;
 isa_ok $watcher, 'Mojo::IOWatcher::EV', 'right object';
 my ($readable, $writable);
-$watcher->watch($listen, sub { $readable++ }, sub { $writable++ });
+$watcher->io($listen => sub { pop() ? $writable++ : $readable++ })
+  ->watch($listen, 0, 0)->watch($listen, 1, 1);
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
 is $readable, undef, 'handle is not readable';
 is $writable, undef, 'handle is not writable';
+ok !$watcher->is_readable($listen), 'handle is not readable';
 
 # Connect
 my $client =
@@ -40,6 +42,7 @@ $watcher->timer(1 => sub { shift->stop });
 $watcher->start;
 ok $readable, 'handle is readable';
 ok !$writable, 'handle is not writable';
+ok $watcher->is_readable($listen), 'handle is readable';
 
 # Accept
 my $server = $listen->accept;
@@ -47,7 +50,7 @@ $watcher = undef;
 $watcher = Mojo::IOWatcher::EV->new;
 isa_ok $watcher, 'Mojo::IOWatcher::EV', 'right object';
 ($readable, $writable) = undef;
-$watcher->watch($client, sub { $readable++ }, sub { $writable++ });
+$watcher->io($client => sub { pop() ? $writable++ : $readable++ });
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
 is $readable, undef, 'handle is not readable';
@@ -58,29 +61,29 @@ $watcher = undef;
 $watcher = Mojo::IOWatcher::EV->new;
 isa_ok $watcher, 'Mojo::IOWatcher::EV', 'right object';
 ($readable, $writable) = undef;
-$watcher->watch($server, sub { $readable++ }, sub { $writable++ });
-$watcher->change($server, 1, 0);
+$watcher->io($server => sub { pop() ? $writable++ : $readable++ });
+$watcher->watch($server, 1, 0);
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
 is $readable, 1,     'handle is readable';
 is $writable, undef, 'handle is not writable';
-$watcher->change($server, 1, 1);
+$watcher->watch($server, 1, 1);
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
 is $readable, 2, 'handle is readable';
 is $writable, 1, 'handle is writable';
-$watcher->change($server, 0, 0);
+$watcher->watch($server, 0, 0);
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
 is $readable, 2, 'handle is not readable';
 is $writable, 1, 'handle is not writable';
-$watcher->change($server, 1, 0);
+$watcher->watch($server, 1, 0);
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
 is $readable, 3, 'handle is readable';
 is $writable, 1, 'handle is not writable';
 ($readable, $writable) = undef;
-$watcher->watch($server, sub { $readable++ }, sub { $writable++ });
+$watcher->io($server => sub { pop() ? $writable++ : $readable++ });
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
 is $readable, 1, 'handle is readable';
@@ -89,7 +92,7 @@ is $writable, 1, 'handle is writable';
 # Timers
 my ($timer, $recurring);
 $watcher->timer(0 => sub { $timer++ });
-$watcher->drop_timer($watcher->timer(0 => sub { $timer++ }));
+$watcher->drop($watcher->timer(0 => sub { $timer++ }));
 my $id = $watcher->recurring(0 => sub { $recurring++ });
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
@@ -115,7 +118,7 @@ is $readable,  5, 'handle is readable again';
 is $writable,  5, 'handle is writable again';
 is $timer,     1, 'timer was not triggered';
 is $recurring, 4, 'recurring was triggered again';
-$watcher->drop_timer($id);
+$watcher->drop($id);
 $watcher->timer(0 => sub { shift->stop });
 $watcher->start;
 is $readable,  6, 'handle is readable again';
@@ -168,3 +171,16 @@ $watcher->on(
 $watcher->timer(0 => sub { die "works!\n" });
 $watcher->start;
 like $err, qr/works!/, 'right error';
+
+# Detection
+is(Mojo::IOWatcher->detect, 'Mojo::IOWatcher::EV', 'right class');
+
+# Dummy watcher
+package Mojo::IOWatcher::Test;
+use Mojo::Base 'Mojo::IOWatcher';
+$ENV{MOJO_IOWATCHER} = 'Mojo::IOWatcher::Test';
+
+package main;
+
+# Detection (env)
+is(Mojo::IOWatcher->detect, 'Mojo::IOWatcher::Test', 'right class');

@@ -70,7 +70,6 @@ lib/Mojolicious/Command/eval.pm
 lib/Mojolicious/Command/generate.pm
 lib/Mojolicious/Command/generate/app.pm
 lib/Mojolicious/Command/generate/gitignore.pm
-lib/Mojolicious/Command/generate/hypnotoad.pm
 lib/Mojolicious/Command/generate/lite_app.pm
 lib/Mojolicious/Command/generate/makefile.pm
 lib/Mojolicious/Command/generate/plugin.pm

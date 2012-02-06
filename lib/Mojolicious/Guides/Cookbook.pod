@@ -10,13 +10,16 @@ This document cotains many fun recipes for cooking with L<Mojolicious>.
 =head1 DEPLOYMENT
 
 Getting L<Mojolicious> and L<Mojolicious::Lite> applications running on
-different platforms.
+different platforms. Note that many real-time web features are based on the
+L<Mojo::IOLoop> reactor, and therefore require one of the built-in web
+servers to be able to use them to their full potential.
 
-=head2 Built-in server
+=head2 Built-in web server
 
-L<Mojolicious> contains a very portable HTTP 1.1 compliant web server. It is
-usually used during development but is solid and fast enough for small to mid
-sized applications.
+L<Mojolicious> contains a very portable non-blocking I/O HTTP 1.1 and
+WebSocket server with L<Mojo::Server::Daemon>. It is usually used during
+development and in the construction of more advanced web servers, but is
+solid and fast enough for small to mid sized applications.
 
   $ ./script/myapp daemon
   Server available at http://127.0.0.1:3000.
@@ -35,6 +38,21 @@ Another huge advantage is that it supports TLS and WebSockets out of the box.
 A development certificate for testing purposes is built right in, so it just
 works.
 
+=head2 Morbo
+
+After reading the L<Mojolicious::Lite> tutorial, you should already be
+familiar with L<Mojo::Server::Morbo>.
+
+  Mojo::Server::Morbo
+  `- Mojo::Server::Daemon
+
+It is basically a restarter that forks a new L<Mojo::Server::Daemon> web
+server whenever a file in your project changes, and should therefore only be
+used during development.
+
+  $ morbo script/myapp
+  Server available at http://127.0.0.1:3000.
+
 =head2 Hypnotoad
 
 For bigger applications L<Mojolicious> contains the UNIX optimized preforking
@@ -47,16 +65,29 @@ of multiple cpu cores and copy-on-write.
   |- Mojo::Server::Daemon [3]
   `- Mojo::Server::Daemon [4]
 
-It is based on the normal built-in web server but optimized specifically for
-production environments out of the box.
+It is also based on the L<Mojo::Server::Daemon> web server, but optimized
+specifically for production environments out of the box.
 
   $ hypnotoad script/myapp
   Server available at http://127.0.0.1:8080.
 
-Config files are plain Perl scripts for maximal customizability.
+You can tweak many configuration settings right from within your application.
 
-  # hypnotoad.conf
-  {listen => ['http://*:80'], workers => 10};
+  use Mojolicious::Lite;
+
+  app->config(hypnotoad => {listen => ['http://*:3000']});
+
+  get '/' => {text => 'ALL GLORY TO THE HYPNOTOAD!'};
+
+  app->start;
+
+Or just add a C<hypnotoad> section to your L<Mojolicious::Plugin::Config> or
+L<Mojolicious::Config::JSONConfig> configuration file.
+
+  # myapp.conf
+  {hypnotoad => {listen => ['http://*:80'], workers => 10}};
+
+Or change the application configuration directly.
 
 But one of its biggest advantages is the support for effortless zero downtime
 software upgrades. That means you can upgrade L<Mojolicious>, Perl or even
@@ -70,8 +101,8 @@ You might also want to enable proxy support if you're using Hypnotoad behind
 a reverse proxy. This allows L<Mojolicious> to automatically pick up the
 C<X-Forwarded-For>, C<X-Forwarded-Host> and C<X-Forwarded-HTTPS> headers.
 
-  # hypnotoad.conf
-  {proxy => 1};
+  # myapp.conf
+  {hypnotoad => {proxy => 1}};
 
 =head2 Nginx
 
@@ -190,7 +221,7 @@ cases you can use a C<before_dispatch> hook to rewrite incoming requests.
       if $self->req->headers->header('X-Forwarded-Protocol') eq 'https';
   });
 
-=head2 Embedding
+=head2 Application embedding
 
 From time to time you might want to reuse parts of L<Mojolicious>
 applications like configuration files, database connection or helpers for
@@ -205,6 +236,8 @@ other scripts, with this little mock server you can just embed them.
   # Access fully initialized application
   say $app->static->root;
 
+=head2 Web server embedding
+
 You can also use the built-in web server to embed L<Mojolicious> applications
 into alien environments like foreign event loops.
 
@@ -217,13 +250,13 @@ into alien environments like foreign event loops.
     $self->render(text => 'Hello World!');
   };
 
-  # Connect application with custom daemon
+  # Connect application with custom daemon and start accepting connections
   my $daemon =
     Mojo::Server::Daemon->new(app => app, listen => ['http://*:8080']);
-  $daemon->prepare_ioloop;
+  $daemon->start;
 
   # Call "one_tick" repeatedly from the alien environment
-  $daemon->ioloop->one_tick while 1;
+  Mojo::IOLoop->one_tick while 1;
 
 =head1 REAL-TIME WEB
 
@@ -265,6 +298,38 @@ latency backend web services.
       % }
     </body>
   </html>
+
+Multiple events such as parallel requests can be easily synchronized with a
+L<Mojo::IOLoop> delay.
+
+  use Mojolicious::Lite;
+
+  # Search Twitter for "perl" and "python"
+  get '/' => sub {
+    my $self = shift;
+
+    # Delay rendering
+    my $delay = Mojo::IOLoop->delay(sub {
+      my ($delay, @results) = @_;
+      $self->render(json => {results => \@results});
+    });
+
+    # First request
+    $delay->begin;
+    $self->ua->get('http://search.twitter.com/search.json?q=perl' => sub {
+      my ($ua, $tx) = @_;
+      $delay->end($tx->res->json->{results}->[0]->{text});
+    });
+
+    # Second request
+    $delay->begin;
+    $self->ua->get('http://search.twitter.com/search.json?q=python' => sub {
+      my ($ua, $tx) = @_;
+      $delay->end($tx->res->json->{results}->[0]->{text});
+    });
+  };
+
+  app->start;
 
 =head2 Timers
 
@@ -462,6 +527,68 @@ HTTP protocol for transport.
 
 The C<message> event will be emitted for every new log message and the
 C<finish> event right after the transaction has been finished.
+
+=head2 Streaming multipart uploads
+
+L<Mojolicious> contains a very sophisticated event system based on
+L<Mojo::EventEmitter>, with ready-to-use events on almost all layers, and
+which can be combined to solve some of hardest problems in web development.
+
+  use Mojolicious::Lite;
+  use Scalar::Util 'weaken';
+
+  # Emit "request" event early for requests that get upgraded to multipart
+  hook after_build_tx => sub {
+    my $tx = shift;
+    weaken $tx;
+    $tx->req->content->on(upgrade => sub { $tx->emit('request') });
+  };
+
+  # Upload form
+  get '/' => 'index';
+
+  # Streaming multipart upload (invoked twice, due to early "request" event)
+  post '/upload' => sub {
+    my $self = shift;
+
+    # First invocation, subscribe to "part" event to find the right one
+    return $self->req->content->on(part => sub {
+      my ($multi, $single) = @_;
+
+      # Subscribe to "body" event of part to make sure we have all headers
+      $single->on(body => sub {
+        my $single = shift;
+
+        # Make sure we have the right part and replace "read" event
+        return unless $single->headers->content_disposition =~ /example/;
+        $single->unsubscribe('read')->on(read => sub {
+          my ($single, $chunk) = @_;
+
+          # Log size of every chunk we receive
+          $self->app->log->debug(length($chunk) . ' bytes uploaded.');
+        });
+      });
+    }) unless $self->req->is_finished;
+
+    # Second invocation, render response
+    $self->render(text => 'Upload was successful.');
+  };
+
+  app->start;
+  __DATA__
+
+  @@ index.html.ep
+  <!DOCTYPE html>
+  <html>
+    <head><title>Streaming multipart upload</title></head>
+    <body>
+      % my @attrs = (method => 'POST', enctype => 'multipart/form-data');
+      %= form_for upload => @attrs => begin
+        %= file_field 'example'
+        %= submit_button 'Upload'
+      % end
+    </body>
+  </html>
 
 =head2 Event loops
 

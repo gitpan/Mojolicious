@@ -290,7 +290,8 @@ on L<Mojo::DOM>.
   require "$FindBin::Bin/../myapp.pl";
 
   # Allow 302 redirect responses
-  my $t = Test::Mojo->new->max_redirects(1);
+  my $t = Test::Mojo->new;
+  $t->ua->max_redirects(1);
 
   # Test if the HTML login form exists
   $t->get_ok('/')
@@ -655,8 +656,7 @@ environments.
   use File::Basename 'dirname';
   use File::Spec;
 
-  use lib join '/', File::Spec->splitdir(dirname(__FILE__)), 'lib';
-  use lib join '/', File::Spec->splitdir(dirname(__FILE__)), '..', 'lib';
+  push @INC, join('/', File::Spec->splitdir(dirname(__FILE__)), '..', 'lib');
 
   # Check if Mojolicious is installed
   die <<EOF unless eval 'use Mojolicious::Commands; 1';

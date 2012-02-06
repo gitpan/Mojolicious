@@ -1,12 +1,19 @@
 use Mojo::Base -strict;
 
-use Test::More tests => 48;
+use Test::More tests => 51;
 
 # "'What are you lookin at?' - the innocent words of a drunken child."
 use_ok 'Mojo::Collection', 'c';
 
+# Array
+is c(1, 2, 3)->[1], 2, 'right result';
+is_deeply [@{c(3, 2, 1)}], [3, 2, 1], 'right result';
+my $collection = c(1, 2);
+push @$collection, 3, 4, 5;
+is_deeply [@$collection], [1, 2, 3, 4, 5], 'right result';
+
 # each
-my $collection = c(3, 2, 1);
+$collection = c(3, 2, 1);
 is_deeply [$collection->each], [3, 2, 1], 'right elements';
 $collection = c([3], [2], [1]);
 my @results;
@@ -94,7 +101,7 @@ is_deeply [$collection->sort->each], [], 'no elements';
 is_deeply [$collection->sort(sub { $_[1] cmp $_[0] })->each], [],
   'no elements';
 
-# Slice
+# slice
 $collection = c(1, 2, 3, 4, 5, 6, 7, 10, 9, 8);
 is_deeply [$collection->slice(0)->each],  [1], 'right result';
 is_deeply [$collection->slice(1)->each],  [2], 'right result';

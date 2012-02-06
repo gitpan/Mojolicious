@@ -1,5 +1,38 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+2.47    2012-02-06 00:00:00
+        - Deprecated Hypnotoad configuration files in favor of more powerful
+          application configuration files.
+        - Deprecated Mojo::Server::Daemon->prepare_ioloop in favor of
+          Mojo::Server::Daemon->start.
+        - Deprecated Mojo::Headers->x_forwarded_for.
+        - Added EXPERIMENTAL config method to Mojo.
+        - Added EXPERIMENTAL ca attribute to Mojo::UserAgent.
+        - Added EXPERIMENTAL drain event to Mojo::Content.
+        - Added EXPERIMENTAL drain event to Mojo::Transaction::WebSocket.
+        - Added EXPERIMENTAL support for RSV1-3 flags to
+          Mojo::Transaction::WebSocket.
+        - Added EXPERIMENTAL tls_ca option to Mojo::IOLoop::Client->connect.
+        - Added lock_timeout parameter to Hypnotoad.
+        - Removed experimental status from JSON Pointer support.
+        - Removed Cygwin exception from Hypnotoad.
+        - Replaced drop_handle and drop_timer methods in Mojo::IOWatcher with
+          drop method.
+        - Renamed change and watch methods in Mojo::IOWatcher to watch and
+          io.
+        - Renamed resume and pause methods in Mojo::IOLoop::Server to start
+          and stop.
+        - Renamed resume and pause methods in Mojo::IOLoop::Stream to start
+          and stop.
+        - Added pdf MIME type. (bfaist)
+        - Improved documentation.
+        - Improved tests.
+        - Improved CSS of some built-in templates.
+        - Fixed bug that prevented newer dual-life modules to be loaded.
+        - Fixed small bug in Mojo::IOLoop::Stream that caused close events to
+          fail sometimes.
+        - Fixed small relative URL detection bug in get command.
+
 2.46    2012-01-25 00:00:00
         - Added EXPERIMENTAL request_timeout attribute to Mojo::UserAgent.
         - Added EXPERIMENTAL text_after and text_before methods to Mojo::DOM.
@@ -435,8 +468,8 @@ This file documents the revision history for Perl extension Mojolicious.
         - Added EXPERIMENTAL binary support to Mojo::Transaction::WebSocket.
         - Updated WebSocket implementation to ietf-16.
         - Changed default upgrade timeout of Hypnotoad from 30 to 60 seconds.
-        - Improved accept performance of all built-in servers by up to 1000%
-          with the EV backend.
+        - Improved accept performance of all built-in web servers by up to
+          1000% with the EV backend.
         - Improved connection_timeout method in Mojo::IOLoop by allowing it
           to be called as a class method.
         - Improved documentation.
@@ -1328,7 +1361,7 @@ This file documents the revision history for Perl extension Mojolicious.
         - Added support for selector groups to Mojo::DOM.
         - Added more attribute selectors, pseudo classes and combinators to
           Mojo::DOM.
-        - Added support for mode specific config files to
+        - Added support for mode specific configuration files to
           Mojolicious::Plugin::JsonConfig. (marcus)
         - Added reserved route name current.
         - Simplified transaction pausing by replacing it with an automatism.

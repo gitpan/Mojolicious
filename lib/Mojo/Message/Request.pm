@@ -163,7 +163,7 @@ sub parse {
       }
 
       # "X-Forwarded-HTTPS"
-      if ($headers->header('X-Forwarded-HTTPS')) { $base->scheme('https') }
+      $base->scheme('https') if $headers->header('X-Forwarded-HTTPS');
     }
   }
 

@@ -18,6 +18,7 @@ has types => sub {
     js   => 'application/x-javascript',
     json => 'application/json',
     mp3  => 'audio/mpeg',
+    pdf  => 'application/pdf',
     png  => 'image/png',
     rss  => 'application/rss+xml',
     svg  => 'image/svg+xml',

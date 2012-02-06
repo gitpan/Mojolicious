@@ -12,6 +12,7 @@ use List::Util 'shuffle';
 use Mojo::Server::Daemon;
 use POSIX qw/setsid WNOHANG/;
 use Scalar::Util 'weaken';
+use Time::HiRes 'ualarm';
 
 # Preload
 use Mojo::UserAgent;
@@ -47,13 +48,12 @@ sub run {
   my ($self, $app, $config) = @_;
 
   # No windows support
-  _exit('Hypnotoad not available for Windows.')
-    if $^O eq 'MSWin32' || $^O =~ /cygwin/;
+  _exit('Hypnotoad not available for Windows.') if $^O eq 'MSWin32';
 
   # Application
   $ENV{HYPNOTOAD_APP} ||= abs_path $app;
 
-  # Config
+  # DEPRECATED in Leaf Fluttering In Wind!
   $ENV{HYPNOTOAD_CONFIG} ||= abs_path $config;
 
   # This is a production server
@@ -66,13 +66,10 @@ sub run {
   # Clean start
   exec $ENV{HYPNOTOAD_EXE} unless $ENV{HYPNOTOAD_REV}++;
 
-  # Preload application
+  # Preload application and configure server
   my $daemon = $self->{daemon} = Mojo::Server::Daemon->new;
   warn "APPLICATION $ENV{HYPNOTOAD_APP}\n" if DEBUG;
-  $daemon->load_app($ENV{HYPNOTOAD_APP});
-
-  # Load configuration
-  $self->_config;
+  $self->_config($daemon->load_app($ENV{HYPNOTOAD_APP}));
 
   # Testing
   _exit('Everything looks good!') if $ENV{HYPNOTOAD_TEST};
@@ -83,8 +80,8 @@ sub run {
   # Initiate hot deployment
   $self->_hot_deploy unless $ENV{HYPNOTOAD_PID};
 
-  # Prepare loop
-  $daemon->prepare_ioloop;
+  # Start accepting connections
+  $daemon->start;
 
   # Pipe for worker communication
   pipe($self->{reader}, $self->{writer})
@@ -127,13 +124,16 @@ sub run {
 }
 
 sub _config {
-  my $self = shift;
+  my ($self, $app) = @_;
 
-  # Load config file
+  # Load configuration from application
+  my $c = $app->config('hypnotoad') || {};
+
+  # DEPRECATED in Leaf Fluttering In Wind!
   my $file = $ENV{HYPNOTOAD_CONFIG};
   warn "CONFIG $file\n" if DEBUG;
-  my $c = {};
   if (-r $file) {
+    warn "Hypnotoad config files are DEPRECATED!\n";
     unless ($c = do $file) {
       die qq/Can't load config file "$file": $@/ if $@;
       die qq/Can't load config file "$file": $!/ unless defined $c;
@@ -141,9 +141,9 @@ sub _config {
         unless ref $c eq 'HASH';
     }
   }
-  $self->{config} = $c;
 
   # Hypnotoad settings
+  $self->{config} = $c;
   $c->{graceful_timeout}   ||= 30;
   $c->{heartbeat_interval} ||= 5;
   $c->{heartbeat_timeout}  ||= 10;
@@ -151,6 +151,7 @@ sub _config {
     ||= File::Spec->catfile($ENV{MOJO_TMPDIR} || File::Spec->tmpdir,
     'hypnotoad.lock');
   $c->{lock_file} .= ".$$";
+  $c->{lock_timeout} ||= '0.5';
   $c->{pid_file}
     ||= File::Spec->catfile(dirname($ENV{HYPNOTOAD_APP}), 'hypnotoad.pid');
   $c->{upgrade_timeout} ||= 60;
@@ -357,9 +358,9 @@ sub _spawn {
       if ($_[1]) {
         eval {
           local $SIG{ALRM} = sub { die "alarm\n" };
-          my $old = alarm 1;
+          my $old = ualarm $c->{lock_timeout} * 1000000;
           $l = flock $lock, LOCK_EX;
-          alarm $old;
+          ualarm $old;
         };
         if ($@) {
           die $@ unless $@ eq "alarm\n";
@@ -416,7 +417,7 @@ Mojo::Server::Hypnotoad - ALL GLORY TO THE HYPNOTOAD!
   use Mojo::Server::Hypnotoad;
 
   my $toad = Mojo::Server::Hypnotoad->new;
-  $toad->run('./myapp.pl', './hypnotoad.conf');
+  $toad->run('./myapp.pl');
 
 =head1 DESCRIPTION
 
@@ -446,7 +447,8 @@ See L<Mojolicious::Guides::Cookbook> for deployment recipes.
 
 =head1 SIGNALS
 
-You can control C<hypnotoad> at runtime with signals.
+L<Mojo::Server::Hypnotoad> can be controlled at runtime with the following
+signals.
 
 =head2 Manager
 
@@ -503,14 +505,12 @@ Stop worker gracefully.
 
 =back
 
-=head1 CONFIGURATION
+=head1 SETTINGS
 
-C<Hypnotoad> configuration files are normal Perl scripts returning a hash.
+L<Mojo::Server::Hypnotoad> can be configured with the following settings.
 
-  # hypnotoad.conf
-  {listen => ['http://*:3000', 'http://*:4000'], workers => 10};
-
-The following parameters are currently available:
+  # myapp.conf
+  {hypnotoad => {listen => ['http://*:3000'], workers => 10}};
 
 =head2 C<accepts>
 
@@ -586,6 +586,13 @@ also L<Mojo::Server::Daemon/"listen"> for more examples.
 
 Full path to accept mutex lock file, defaults to a random temporary file.
 
+=head2 C<lock_timeout>
+
+  lock_timeout => 1
+
+Maximum amount of time in seconds a worker may block when waiting for the
+accept mutex, defaults to C<0.5>.
+
 =head2 C<pid_file>
 
   pid_file => '/var/run/hypnotoad.pid'
@@ -635,9 +642,9 @@ implements the following new ones.
 
 =head2 C<run>
 
-  $toad->run('script/myapp', 'hypnotoad.conf');
+  $toad->run('script/myapp');
 
-Start server.
+Run server.
 
 =head1 DEBUGGING
 

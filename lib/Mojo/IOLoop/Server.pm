@@ -81,8 +81,8 @@ sub DESTROY {
   if (my $cert = $self->{cert}) { unlink $cert if -w $cert }
   if (my $key  = $self->{key})  { unlink $key  if -w $key }
   return unless my $watcher = $self->{iowatcher};
-  $self->pause if $self->{handle};
-  $watcher->drop_handle($_) for values %{$self->{handles}};
+  $self->stop if $self->{handle};
+  $watcher->drop($_) for values %{$self->{handles}};
 }
 
 # "And I gave that man directions, even though I didn't know the way,
@@ -140,11 +140,9 @@ sub listen {
     SSL_key_file       => $args->{tls_key} || $self->_key_file,
   };
   %$options = (
-    SSL_verify_callback => $args->{tls_verify},
-    SSL_ca_file         => -T $args->{tls_ca} ? $args->{tls_ca} : undef,
-    SSL_ca_path         => -d $args->{tls_ca} ? $args->{tls_ca} : undef,
-    SSL_verify_mode     => $args->{tls_ca} ? 0x03 : undef,
-    %$options
+    %$options,
+    SSL_ca_file => -T $args->{tls_ca} ? $args->{tls_ca} : undef,
+    SSL_verify_mode => 0x03
   ) if $args->{tls_ca};
 }
 
@@ -165,16 +163,16 @@ sub generate_port {
   return;
 }
 
-sub pause {
-  my $self = shift;
-  $self->iowatcher->drop_handle($self->{handle});
-}
-
-sub resume {
+sub start {
   my $self = shift;
   weaken $self;
-  $self->iowatcher->watch($self->{handle},
-    sub { $self->_accept for 1 .. $self->accepts });
+  $self->iowatcher->io(
+    $self->{handle} => sub { $self->_accept for 1 .. $self->accepts });
+}
+
+sub stop {
+  my $self = shift;
+  $self->iowatcher->drop($self->{handle});
 }
 
 sub _accept {
@@ -192,15 +190,11 @@ sub _accept {
   weaken $self;
   $tls->{SSL_error_trap} = sub {
     return unless my $handle = delete $self->{handles}->{shift()};
-    $self->iowatcher->drop_handle($handle);
+    $self->iowatcher->drop($handle);
     close $handle;
   };
-  $handle = IO::Socket::SSL->start_SSL($handle, %$tls);
-  $self->iowatcher->watch(
-    $handle,
-    sub { $self->_tls($handle) },
-    sub { $self->_tls($handle) }
-  );
+  return unless $handle = IO::Socket::SSL->start_SSL($handle, %$tls);
+  $self->iowatcher->io($handle => sub { $self->_tls($handle) });
   $self->{handles}->{$handle} = $handle;
 }
 
@@ -245,15 +239,15 @@ sub _tls {
 
   # Accepted
   if ($handle->accept_SSL) {
-    $self->iowatcher->drop_handle($handle);
+    $self->iowatcher->drop($handle);
     delete $self->{handles}->{$handle};
     return $self->emit_safe(accept => $handle);
   }
 
   # Switch between reading and writing
   my $err = $IO::Socket::SSL::SSL_ERROR;
-  if    ($err == TLS_READ)  { $self->iowatcher->change($handle, 1, 0) }
-  elsif ($err == TLS_WRITE) { $self->iowatcher->change($handle, 1, 1) }
+  if    ($err == TLS_READ)  { $self->iowatcher->watch($handle, 1, 0) }
+  elsif ($err == TLS_WRITE) { $self->iowatcher->watch($handle, 1, 1) }
 }
 
 1;
@@ -276,8 +270,8 @@ Mojo::IOLoop::Server - Non-blocking TCP server
   $server->listen(port => 3000);
 
   # Start and stop accepting connections
-  $server->resume;
-  $server->pause;
+  $server->start;
+  $server->stop;
 
 =head1 DESCRIPTION
 
@@ -348,6 +342,10 @@ Port to listen on.
 
 Enable TLS.
 
+=item C<tls_ca>
+
+Path to TLS certificate authority file.
+
 =item C<tls_cert>
 
 Path to the TLS cert file, defaulting to a built-in test certificate.
@@ -355,10 +353,6 @@ Path to the TLS cert file, defaulting to a built-in test certificate.
 =item C<tls_key>
 
 Path to the TLS key file, defaulting to a built-in test key.
-
-=item C<tls_ca>
-
-Path to TLS certificate authority file or directory.
 
 =back
 
@@ -368,17 +362,17 @@ Path to TLS certificate authority file or directory.
 
 Find a free TCP port.
 
-=head2 C<pause>
+=head2 C<start>
 
-  $server->pause;
-
-Stop accepting connections.
-
-=head2 C<resume>
-
-  $server->resume;
+  $server->start;
 
 Start accepting connections.
+
+=head2 C<stop>
+
+  $server->stop;
+
+Stop accepting connections.
 
 =head1 SEE ALSO
 

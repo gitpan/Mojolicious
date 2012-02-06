@@ -29,15 +29,6 @@ sub error {
   return;
 }
 
-# DEPRECATED in Leaf Fluttering In Wind!
-sub is_done {
-  warn <<EOF;
-Mojo::Transaction->is_done is DEPRECATED in favor of
-Mojo::Transaction->is_finished!
-EOF
-  shift->is_finished;
-}
-
 sub is_finished { (shift->{state} || '') eq 'finished' }
 
 sub is_websocket {undef}
@@ -59,8 +50,8 @@ sub remote_address {
   # Reverse proxy
   if ($ENV{MOJO_REVERSE_PROXY}) {
     return $self->{forwarded_for} if $self->{forwarded_for};
-    return $self->{forwarded_for} = $1
-      if ($self->req->headers->x_forwarded_for || '') =~ /([^,\s]+)$/;
+    ($self->req->headers->header('X-Forwarded-For') || '') =~ /([^,\s]+)$/
+      and return $self->{forwarded_for} = $1;
   }
 
   return $self->{remote_address};

@@ -32,7 +32,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Leaf Fluttering In Wind';
-our $VERSION  = '2.46';
+our $VERSION  = '2.47';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -110,24 +110,7 @@ sub build_tx {
   return $tx;
 }
 
-sub defaults {
-  my $self = shift;
-
-  # Hash
-  $self->{defaults} ||= {};
-  return $self->{defaults} unless @_;
-
-  # Get
-  return $self->{defaults}->{$_[0]} unless @_ > 1 || ref $_[0];
-
-  # Set
-  my $values = ref $_[0] ? $_[0] : {@_};
-  for my $key (keys %$values) {
-    $self->{defaults}->{$key} = $values->{$key};
-  }
-
-  return $self;
-}
+sub defaults { shift->_dict(defaults => @_) }
 
 sub dispatch {
   my ($self, $c) = @_;
@@ -148,10 +131,7 @@ sub dispatch {
   return if $res->code;
   if (my $code = ($tx->req->error)[1]) { $res->code($code) }
   elsif ($tx->is_websocket) { $res->code(426) }
-  unless ($self->routes->dispatch($c)) {
-    $c->render_not_found
-      unless $res->code;
-  }
+  $c->render_not_found unless $self->routes->dispatch($c) || $res->code;
 }
 
 # "Bite my shiny metal ass!"
@@ -476,6 +456,7 @@ parsed.
 
   $app->hook(after_build_tx => sub {
     my ($tx, $app) = @_;
+    ...
   });
 
 This is a very powerful hook and should not be used lightly, it makes some
@@ -489,6 +470,7 @@ Emitted right before the static and routes dispatchers start their work.
 
   $app->hook(before_dispatch => sub {
     my $c = shift;
+    ...
   });
 
 Very useful for rewriting incoming requests and other preprocessing tasks.
@@ -501,6 +483,7 @@ file should be served and before the routes dispatcher starts its work.
 
   $app->hook(after_static_dispatch => sub {
     my $c = shift;
+    ...
   });
 
 Mostly used for custom dispatchers and postprocessing static file responses.
@@ -513,6 +496,7 @@ hook can trigger before C<after_static_dispatch> due to its dynamic nature.
 
   $app->hook(after_dispatch => sub {
     my $c = shift;
+    ...
   });
 
 Useful for all kinds of postprocessing tasks. (Passed the current controller
@@ -527,7 +511,9 @@ change without warning!
 
   $app->hook(around_dispatch => sub {
     my ($next, $c) = @_;
+    ...
     $next->();
+    ...
   });
 
 This is a very powerful hook and should not be used lightly, consider it the

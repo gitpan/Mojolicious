@@ -13,6 +13,7 @@ use Scalar::Util 'weaken';
 use constant DEBUG => $ENV{MOJO_USERAGENT_DEBUG} || 0;
 
 # "You can't let a single bad experience scare you away from drugs."
+has ca   => sub { $ENV{MOJO_CA_FILE} };
 has cert => sub { $ENV{MOJO_CERT_FILE} };
 has connect_timeout => 3;
 has cookie_jar => sub { Mojo::CookieJar->new };
@@ -218,6 +219,7 @@ sub _connect {
     local_address => $self->local_address,
     timeout       => $self->connect_timeout,
     tls           => $scheme eq 'https' ? 1 : 0,
+    tls_ca        => $self->ca,
     tls_cert      => $self->cert,
     tls_key       => $self->key,
     sub {
@@ -260,6 +262,7 @@ sub _connect_proxy {
           handle   => $handle,
           id       => $id,
           tls      => 1,
+          tls_ca   => $self->ca,
           tls_cert => $self->cert,
           tls_key  => $self->key,
           sub {
@@ -445,8 +448,7 @@ sub _server {
   my $port = $self->{port} = $loop->generate_port;
   die "Couldn't find a free TCP port for testing.\n" unless $port;
   $self->{scheme} = $scheme ||= 'http';
-  $server->listen(["$scheme://*:$port"]);
-  $server->prepare_ioloop;
+  $server->listen(["$scheme://*:$port"])->start;
   warn "TEST SERVER STARTED ($scheme://*:$port)\n" if DEBUG;
 
   return $server;
@@ -668,10 +670,23 @@ automatically prepared proxy C<CONNECT> requests and followed redirects.
 
 L<Mojo::UserAgent> implements the following attributes.
 
+=head2 C<ca>
+
+  my $ca = $ua->ca;
+  $ua    = $ua->ca('/etc/tls/ca.crt');
+
+Path to TLS certificate authority file, defaults to the value of the
+C<MOJO_CA_FILE> environment variable. Note that this attribute is
+EXPERIMENTAL and might change without warning!
+
+  # Show certificate authorities for debugging
+  IO::Socket::SSL::set_ctx_defaults(
+    SSL_verify_callback => sub { say "Authority: $_[2]" and return $_[0] });
+
 =head2 C<cert>
 
   my $cert = $ua->cert;
-  $ua      = $ua->cert('tls.crt');
+  $ua      = $ua->cert('/etc/tls/client.crt');
 
 Path to TLS certificate file, defaults to the value of the C<MOJO_CERT_FILE>
 environment variable.
@@ -726,7 +741,7 @@ object.
 =head2 C<key>
 
   my $key = $ua->key;
-  $ua     = $ua->key('tls.crt');
+  $ua     = $ua->key('/etc/tls/client.crt');
 
 Path to TLS key file, defaults to the value of the C<MOJO_KEY_FILE>
 environment variable.

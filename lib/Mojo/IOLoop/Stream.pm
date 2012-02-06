@@ -26,9 +26,9 @@ sub close {
 
   # Cleanup
   return unless my $watcher = $self->{iowatcher};
-  $watcher->drop_timer(delete $self->{timer}) if $self->{timer};
+  $watcher->drop(delete $self->{timer}) if $self->{timer};
   return unless my $handle = delete $self->{handle};
-  $watcher->drop_handle($handle);
+  $watcher->drop($handle);
 
   # Close
   close $handle;
@@ -39,7 +39,7 @@ sub handle { shift->{handle} }
 
 sub is_readable {
   my $self = shift;
-  return $self->iowatcher->is_readable($self->{handle});
+  return $self->{handle} && $self->iowatcher->is_readable($self->{handle});
 }
 
 sub is_writing {
@@ -48,13 +48,7 @@ sub is_writing {
   return length($self->{buffer}) || $self->has_subscribers('drain');
 }
 
-sub pause {
-  my $self = shift;
-  return if $self->{paused}++;
-  $self->iowatcher->change($self->{handle}, 0, $self->is_writing);
-}
-
-sub resume {
+sub start {
   my $self = shift;
 
   # Timeout
@@ -68,22 +62,26 @@ sub resume {
   );
 
   # Start streaming
-  return $watcher->watch(
-    $self->{handle},
-    sub { $self->_read },
-    sub { $self->_write }
-  ) unless $self->{streaming}++;
+  my $handle = $self->{handle};
+  return $watcher->io($handle => sub { pop() ? $self->_write : $self->_read })
+    unless $self->{streaming}++;
 
   # Resume streaming
   return unless delete $self->{paused};
-  $self->iowatcher->change($self->{handle}, 1, $self->is_writing);
+  $watcher->watch($handle, 1, $self->is_writing);
+}
+
+sub stop {
+  my $self = shift;
+  return if $self->{paused}++;
+  $self->iowatcher->watch($self->{handle}, 0, $self->is_writing);
 }
 
 # "No children have ever meddled with the Republican Party and lived to tell
 #  about it."
 sub steal_handle {
   my $self = shift;
-  $self->iowatcher->drop_handle($self->{handle});
+  $self->iowatcher->drop($self->{handle});
   return delete $self->{handle};
 }
 
@@ -98,7 +96,7 @@ sub write {
   else     { return unless length $self->{buffer} }
 
   # Start writing
-  $self->iowatcher->change($self->{handle}, !$self->{paused}, 1)
+  $self->iowatcher->watch($self->{handle}, !$self->{paused}, 1)
     if $self->{handle};
 }
 
@@ -162,7 +160,7 @@ sub _write {
 
   # Stop writing
   return if $self->is_writing;
-  $self->iowatcher->change($handle, !$self->{paused}, 0);
+  $self->iowatcher->watch($handle, !$self->{paused}, 0);
 }
 
 1;
@@ -192,8 +190,8 @@ Mojo::IOLoop::Stream - Non-blocking I/O stream
   });
 
   # Start and stop watching for new data
-  $stream->resume;
-  $stream->pause;
+  $stream->start;
+  $stream->stop;
 
 =head1 DESCRIPTION
 
@@ -316,17 +314,17 @@ Quick check if stream is readable, useful for identifying tainted sockets.
 
 Check if stream is writing.
 
-=head2 C<pause>
+=head2 C<start>
 
-  $stream->pause;
-
-Stop watching for new data on the stream.
-
-=head2 C<resume>
-
-  $stream->resume;
+  $stream->start;
 
 Start watching for new data on the stream.
+
+=head2 C<stop>
+
+  $stream->stop;
+
+Stop watching for new data on the stream.
 
 =head2 C<steal_handle>
 

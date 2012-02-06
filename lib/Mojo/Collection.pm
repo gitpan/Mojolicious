@@ -89,6 +89,7 @@ Mojo::Collection - Collection
   # Manipulate collections
   use Mojo::Collection;
   my $collection = Mojo::Collection->new(qw/just works/);
+  unshift @$collection, 'it';
   $collection->map(sub { ucfirst })->each(sub {
     my ($word, $count) = @_;
     say "$count: $word";

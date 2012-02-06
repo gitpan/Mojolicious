@@ -42,8 +42,8 @@ sub connect {
 sub _cleanup {
   my $self = shift;
   return unless my $watcher = $self->{iowatcher};
-  $watcher->drop_timer($self->{timer})   if $self->{timer};
-  $watcher->drop_handle($self->{handle}) if $self->{handle};
+  $watcher->drop($self->{timer})  if $self->{timer};
+  $watcher->drop($self->{handle}) if $self->{handle};
 }
 
 sub _connect {
@@ -52,7 +52,6 @@ sub _connect {
   # New socket
   my $handle;
   my $watcher = $self->iowatcher;
-  my $timeout = $args->{timeout} || 3;
   unless ($handle = $args->{handle}) {
     my %options = (
       Blocking => 0,
@@ -67,8 +66,7 @@ sub _connect {
       unless $handle = $class->new(%options);
 
     # Timer
-    $self->{timer} =
-      $watcher->timer($timeout,
+    $self->{timer} = $watcher->timer($args->{timeout} || 3,
       sub { $self->emit_safe(error => 'Connect timeout.') });
 
     # IPv6 needs an early start
@@ -96,10 +94,11 @@ sub _connect {
         close delete $self->{handle};
         $self->emit_safe(error => $_[1]);
       },
-      SSL_cert_file   => $args->{tls_cert},
-      SSL_key_file    => $args->{tls_key},
-      SSL_verify_mode => 0x00,
-      Timeout         => $timeout
+      SSL_cert_file => $args->{tls_cert},
+      SSL_key_file  => $args->{tls_key},
+      SSL_ca_file   => $args->{tls_ca}
+        && -T $args->{tls_ca} ? $args->{tls_ca} : undef,
+      SSL_verify_mode => $args->{tls_ca} ? 0x01 : 0x00
     );
     $self->{tls} = 1;
     return $self->emit_safe(error => 'TLS upgrade failed.')
@@ -108,11 +107,7 @@ sub _connect {
 
   # Start writing right away
   $self->{handle} = $handle;
-  $watcher->watch(
-    $handle,
-    sub { $self->_connecting },
-    sub { $self->_connecting }
-  );
+  $watcher->io($handle => sub { $self->_connecting });
 }
 
 # "Have you ever seen that Blue Man Group? Total ripoff of the Smurfs.
@@ -125,8 +120,8 @@ sub _connecting {
   my $watcher = $self->iowatcher;
   if ($self->{tls} && !$handle->connect_SSL) {
     my $err = $IO::Socket::SSL::SSL_ERROR;
-    if    ($err == TLS_READ)  { $watcher->change($handle, 1, 0) }
-    elsif ($err == TLS_WRITE) { $watcher->change($handle, 1, 1) }
+    if    ($err == TLS_READ)  { $watcher->watch($handle, 1, 0) }
+    elsif ($err == TLS_WRITE) { $watcher->watch($handle, 1, 1) }
     return;
   }
 
@@ -245,6 +240,10 @@ getting canceled.
 =item C<tls>
 
 Enable TLS.
+
+=item C<tls_ca>
+
+Path to TLS certificate authority file.
 
 =item C<tls_cert>
 
