@@ -1,0 +1,91 @@
+{
+   "abstract" : "Real-time web framework",
+   "author" : [
+      "Sebastian Riedel <sri@cpan.org>"
+   ],
+   "dynamic_config" : 1,
+   "generated_by" : "ExtUtils::MakeMaker version 6.62, CPAN::Meta::Converter version 2.113640",
+   "license" : [
+      "artistic_2"
+   ],
+   "meta-spec" : {
+      "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
+      "version" : "2"
+   },
+   "name" : "Mojolicious",
+   "no_index" : {
+      "directory" : [
+         "t",
+         "inc",
+         "t"
+      ]
+   },
+   "prereqs" : {
+      "build" : {
+         "requires" : {}
+      },
+      "configure" : {
+         "requires" : {}
+      },
+      "runtime" : {
+         "requires" : {
+            "B" : 0,
+            "Carp" : 0,
+            "Config" : 0,
+            "Cwd" : 0,
+            "Data::Dumper" : 0,
+            "Digest::MD5" : 0,
+            "Digest::SHA" : 0,
+            "Encode" : 0,
+            "Errno" : 0,
+            "Exporter" : 0,
+            "ExtUtils::MakeMaker" : 0,
+            "Fcntl" : 0,
+            "File::Basename" : 0,
+            "File::Copy" : 0,
+            "File::Find" : 0,
+            "File::Path" : 0,
+            "File::Spec" : 0,
+            "File::Temp" : 0,
+            "FindBin" : 0,
+            "Getopt::Long" : 0,
+            "I18N::LangTags" : 0,
+            "I18N::LangTags::Detect" : 0,
+            "IO::File" : 0,
+            "IO::Poll" : 0,
+            "IO::Socket" : 0,
+            "IO::Socket::INET" : 0,
+            "List::Util" : 0,
+            "Locale::Maketext" : 0,
+            "MIME::Base64" : 0,
+            "MIME::QuotedPrint" : 0,
+            "POSIX" : 0,
+            "Pod::Simple::HTML" : 0,
+            "Pod::Simple::Search" : 0,
+            "Scalar::Util" : 0,
+            "Socket" : 0,
+            "Sys::Hostname" : 0,
+            "Test::Harness" : 0,
+            "Test::More" : 0,
+            "Time::HiRes" : 0,
+            "perl" : "5.010001",
+            "re" : 0
+         }
+      }
+   },
+   "release_status" : "stable",
+   "resources" : {
+      "bugtracker" : {
+         "web" : "http://github.com/kraih/mojo/issues"
+      },
+      "homepage" : "http://mojolicio.us",
+      "license" : [
+         "http://dev.perl.org/licenses/"
+      ],
+      "repository" : {
+         "url" : "http://github.com/kraih/mojo"
+      },
+      "x_MailingList" : "http://groups.google.com/group/mojolicious"
+   },
+   "version" : "2.48"
+}

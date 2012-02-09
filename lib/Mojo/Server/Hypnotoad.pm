@@ -80,16 +80,7 @@ sub run {
   # Initiate hot deployment
   $self->_hot_deploy unless $ENV{HYPNOTOAD_PID};
 
-  # Start accepting connections
-  $daemon->start;
-
-  # Pipe for worker communication
-  pipe($self->{reader}, $self->{writer})
-    or croak "Can't create pipe: $!";
-  $self->{poll} = IO::Poll->new;
-  $self->{poll}->mask($self->{reader}, POLLIN);
-
-  # Daemonize
+  # Daemonize as early as possible
   if (!DEBUG && !$ENV{HYPNOTOAD_FOREGROUND}) {
 
     # Fork and kill parent
@@ -102,6 +93,15 @@ sub run {
     open STDOUT, '>/dev/null';
     open STDERR, '>&STDOUT';
   }
+
+  # Start accepting connections
+  $daemon->start;
+
+  # Pipe for worker communication
+  pipe($self->{reader}, $self->{writer})
+    or croak "Can't create pipe: $!";
+  $self->{poll} = IO::Poll->new;
+  $self->{poll}->mask($self->{reader}, POLLIN);
 
   # Manager environment
   my $c = $self->{config};
@@ -507,10 +507,8 @@ Stop worker gracefully.
 
 =head1 SETTINGS
 
-L<Mojo::Server::Hypnotoad> can be configured with the following settings.
-
-  # myapp.conf
-  {hypnotoad => {listen => ['http://*:3000'], workers => 10}};
+L<Mojo::Server::Hypnotoad> can be configured with the following settings, see
+L<Mojolicious::Guides::Cookbook/"Hypnotoad"> for examples.
 
 =head2 C<accepts>
 
