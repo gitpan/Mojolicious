@@ -32,7 +32,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Leaf Fluttering In Wind';
-our $VERSION  = '2.48';
+our $VERSION  = '2.49';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -59,10 +59,10 @@ sub DESTROY { }
 sub new {
   my $self = shift->SUPER::new(@_);
 
-  # Root directories
+  # Paths
   my $home = $self->home;
-  $self->renderer->root($home->rel_dir('templates'));
-  $self->static->root($home->rel_dir('public'));
+  push @{$self->renderer->paths}, $home->rel_dir('templates');
+  push @{$self->static->paths},   $home->rel_dir('public');
 
   # Default to application namespace
   my $r = $self->routes;
@@ -316,6 +316,9 @@ L<Mojolicious::Renderer> object. The two main renderer plugins
 L<Mojolicious::Plugin::EPRenderer> and L<Mojolicious::Plugin::EPLRenderer>
 contain more information.
 
+  # Add another "templates" directory
+  push @{$app->renderer->paths}, '/foo/bar/templates';
+
 =head2 C<routes>
 
   my $routes = $app->routes;
@@ -358,6 +361,9 @@ session data.
 
 For serving static assets from your C<public> directory, defaults to a
 L<Mojolicious::Static> object.
+
+  # Add another "public" directory
+  push @{$app->static->paths}, '/foo/bar/public';
 
 =head2 C<types>
 

@@ -616,6 +616,61 @@ to C<CPAN>.
   $ make dist
   $ mojo cpanify -u USER -p PASS Mojolicious-Plugin-DebugHelper-0.01.tar.gz
 
+=head2 Bundling assets with plugins
+
+Assets such as templates and static files can be easily bundled with your
+plugins, even if you plan to release them to C<CPAN>.
+
+  $ mojo generate plugin AlertAssets
+  $ mkdir AlertAssets/lib/Mojolicious/Plugin/AlertAssets
+  $ cd AlertAssets/lib/Mojolicious/Plugin/AlertAssets
+  $ mkdir public
+  $ echo 'alert("Hello World!");' > public/alertassets.js
+  $ mkdir templates
+  $ echo '%= javascript "/alertassets.js"' > templates/alertassets.html.ep
+
+Just append their respective directories to the list of search paths when
+C<register> is called.
+
+  package Mojolicious::Plugin::AlertAssets;
+  use Mojo::Base 'Mojolicious::Plugin';
+
+  use File::Basename 'dirname';
+  use File::Spec::Functions 'catdir';
+
+  sub register {
+    my ($self, $app) = @_;
+
+    # Append "templates" and "public" directories
+    my $base = catdir(dirname(__FILE__), 'AlertAssets');
+    push @{$app->renderer->paths}, catdir($base, 'templates');
+    push @{$app->static->paths},   catdir($base, 'public');
+  }
+
+  1;
+
+Both will work just like normal C<templates> and C<public> direcotries once
+you've installed and loaded the plugin, with slightly lower precedence.
+
+  use Mojolicious::Lite;
+
+  plugin 'AlertAssets';
+
+  get '/alert_me';
+
+  app->start;
+  __DATA__
+
+  @@ alert_me.html.ep
+  <!DOCTYPE html>
+  <html>
+    <head>
+      <title>Alert me!</title>
+      %= include 'alertassets'
+    </head>
+    <body>You've been alerted.</body>
+  </html>
+
 =head2 Custom C<exception> and C<not_found> templates
 
 While the built-in C<exception> and C<not_found> templates are very useful
