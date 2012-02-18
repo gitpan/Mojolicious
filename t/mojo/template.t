@@ -17,7 +17,7 @@ use Mojo::Base -strict;
 
 use utf8;
 
-use Test::More tests => 199;
+use Test::More tests => 197;
 
 use File::Spec::Functions qw/catfile splitdir/;
 use File::Temp;
@@ -27,9 +27,14 @@ use FindBin;
 #  like God must feel when he's holding a gun."
 use_ok 'Mojo::Template';
 
-# Trim tag
+# Consistent scalar context
 my $mt     = Mojo::Template->new;
-my $output = $mt->render(" ♥    <%= 'test♥' =%> \n");
+my $output = $mt->render('<%= split /,/, "a,b" %>:<%== split /,/, "a,b" %>');
+is $output, "2:2\n", 'same context';
+
+# Trim tag
+$mt     = Mojo::Template->new;
+$output = $mt->render(" ♥    <%= 'test♥' =%> \n");
 is $output, ' ♥test♥', 'tag trimmed';
 
 # Trim expression
@@ -262,48 +267,6 @@ $output = $mt->render(<<'EOF');
 <%== $block->() %>
 EOF
 is $output, "<html>\n\n", 'escaped expression block';
-
-# Captured escaped expression block (passed through with extra whitespace)
-$mt     = Mojo::Template->new;
-$output = $mt->render(<<'EOF');
-<%== my $result = capture begin  =%>
-<html>
-<%  end =%>
-<%= $result =%>
-EOF
-is $output, "<html>\n<html>\n", 'captured escaped expression block';
-
-# Captured escaped expression block
-# (passed through with perl lines and extra whitespace)
-$mt     = Mojo::Template->new;
-$output = $mt->render(<<'EOF');
-%== my $result = capture  begin
-<html>
-%  end
-<%= $result =%>
-EOF
-is $output, <<EOF, 'captured escaped expression block';
-
-<html>
-
-<html>
-EOF
-
-# Captured escaped expression block
-# (passed through with indented perl lines and extra whitespace)
-$mt     = Mojo::Template->new;
-$output = $mt->render(<<'EOF');
-%== my $result = capture  begin
-<html>
- %  end
-<%= $result =%>
-EOF
-is $output, <<EOF, 'captured escaped expression block';
-
-<html>
-
-<html>
-EOF
 
 # Capture lines (passed through with extra whitespace)
 $mt     = Mojo::Template->new;

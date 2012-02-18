@@ -1,5 +1,20 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+2.50    2012-02-18 00:00:00
+        - Added EXPERIMENTAL is_running method to Mojo::IOWatcher and
+          Mojo::IOWatcher::EV.
+        - Added file upload support to param method in
+          Mojolicious::Controller.
+        - Removed gitignore command.
+        - Improved Mojo::IOLoop to be controllable from foreign event loops.
+        - Improved protection from excessively large form values in
+          Mojo::Message.
+        - Improved resilience of Mojo::IOLoop::Client.
+        - Improved documentation.
+        - Fixed Mojo::Template expressions and escaped expressions to
+          consistently enforce scalar context.
+        - Fixed small bugs in makefile command. (tempire, marcus, sri)
+
 2.49    2012-02-13 00:00:00
         - Deprecated Mojolicious::Renderer->root in favor of
           Mojolicious::Renderer->paths. (memowe, sri)

@@ -8,7 +8,7 @@ use Test::More;
 plan skip_all => 'set TEST_EV to enable this test (developer only!)'
   unless $ENV{TEST_EV};
 plan skip_all => 'EV 4.0 required for this test!' unless eval 'use EV 4.0; 1';
-plan tests => 57;
+plan tests => 64;
 
 use IO::Socket::INET;
 use Mojo::IOLoop;
@@ -184,3 +184,35 @@ package main;
 
 # Detection (env)
 is(Mojo::IOWatcher->detect, 'Mojo::IOWatcher::Test', 'right class');
+
+# EV in control
+$ENV{MOJO_IOWATCHER} = 'Mojo::IOWatcher::EV';
+is ref Mojo::IOLoop->singleton->iowatcher, 'Mojo::IOWatcher::EV',
+  'right object';
+ok !Mojo::IOLoop->is_running, 'loop is not running';
+$port = Mojo::IOLoop->generate_port;
+my ($server_running, $client_running);
+($server, $client) = '';
+Mojo::IOLoop->server(
+  {port => $port} => sub {
+    my ($loop, $stream) = @_;
+    $stream->write('test', sub { shift->write('321') });
+    $stream->on(read => sub { $server .= pop });
+    $server_running = Mojo::IOLoop->is_running;
+  }
+);
+Mojo::IOLoop->client(
+  {port => $port} => sub {
+    my ($loop, $err, $stream) = @_;
+    $stream->write('tset', sub { shift->write('123') });
+    $stream->on(read => sub { $client .= pop });
+    $client_running = Mojo::IOLoop->is_running;
+  }
+);
+Mojo::IOLoop->timer(1 => sub { EV::break(EV::BREAK_ONE()) });
+EV::run();
+ok !Mojo::IOLoop->is_running, 'loop is not running';
+ok $server_running, 'loop is running';
+ok $client_running, 'loop is running';
+is $server,         'tset123', 'right content';
+is $client,         'test321', 'right content';
