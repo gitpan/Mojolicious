@@ -4,9 +4,12 @@ use strict;
 use warnings;
 
 use File::Basename 'dirname';
-use File::Spec::Functions 'splitdir';
+use File::Spec::Functions qw/catdir splitdir/;
 
-push @INC, join('/', splitdir(dirname(__FILE__)), '..', 'lib');
+# Source directory has precedence
+my @base = (splitdir(dirname(__FILE__)), '..');
+my $lib = join('/', @base, 'lib');
+-e catdir(@base, 't') ? unshift(@INC, $lib) : push(@INC, $lib);
 
 # Check if Mojolicious is installed
 die <<EOF unless eval 'use Mojolicious::Commands; 1';

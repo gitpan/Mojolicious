@@ -1,5 +1,16 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+2.51    2012-02-19 00:00:00
+        - Added EXPERIMENTAL to_psgi method to Mojo::Server::PSGI.
+        - Removed experimental status from around_dispatch hook.
+        - Removed experimental status from emit_chain method in
+          Mojolicious::Plugins.
+        - Removed experimental status from drain event in Mojo::Content.
+        - Improved portability of scripts.
+        - Improved documentation.
+        - Fixed bug that can prevent foreign event loops from being able to
+          control Mojo::IOLoop.
+
 2.50    2012-02-18 00:00:00
         - Added EXPERIMENTAL is_running method to Mojo::IOWatcher and
           Mojo::IOWatcher::EV.
