@@ -32,7 +32,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Leaf Fluttering In Wind';
-our $VERSION  = '2.51';
+our $VERSION  = '2.52';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -73,7 +73,7 @@ sub new {
   $r->hide(qw/param redirect_to render render_content render_data/);
   $r->hide(qw/render_exception render_json render_not_found render_partial/);
   $r->hide(qw/render_static render_text rendered req res respond_to/);
-  $r->hide(qw/send_message session signed_cookie stash tx ua url_for write/);
+  $r->hide(qw/send session signed_cookie stash tx ua url_for write/);
   $r->hide('write_chunk');
 
   # Prepare log
@@ -404,7 +404,8 @@ object.
 
 =head2 C<handler>
 
-  $tx = $app->handler($tx);
+  $app->handler($tx);
+  $app->handler($c);
 
 Sets up the default controller and calls process for every request.
 
@@ -681,7 +682,7 @@ that have been used in the past.
 
 0.999920, C<Snowman> (u2603)
 
-=head1 AUTHOR
+=head1 PROJECT FOUNDER
 
 Sebastian Riedel, C<sri@cpan.org>
 

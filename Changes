@@ -1,5 +1,21 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+2.52    2012-02-24 00:00:00
+        - Removed experimental status from config method in Mojo.
+        - Renamed send_message method in Mojolicious::Controller to send.
+        - Renamed send_message_ok method in Test::mojo to send_ok.
+        - Renamed to_psgi method in Mojo::Server::PSGI to to_psgi_app.
+        - Combined send_message and send_frame methods in
+          Mojo::Transaction::WebSocket to send.
+        - Improved emit_chain method in Mojolicious::Plugins to allow
+          reforwarding. (jamadam)
+        - Improved documentation.
+        - Fixed bug that prevented Mojo::IOLoop from dying when started
+          twice.
+        - Fixed a cookie jar path parsing bug. (marcus)
+        - Fixed multiple value bug in param method of
+          Mojolicious::Controller.
+
 2.51    2012-02-19 00:00:00
         - Added EXPERIMENTAL to_psgi method to Mojo::Server::PSGI.
         - Removed experimental status from around_dispatch hook.
