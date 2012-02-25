@@ -1,5 +1,11 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+2.53    2012-02-25 00:00:00
+        - Improved Hypnotoad with many info level log messages.
+        - Improved resilience of Mojo::IOLoop::Stream.
+        - Improved documentation.
+        - Fixed Hypnotoad upgrade timeout bug.
+
 2.52    2012-02-24 00:00:00
         - Removed experimental status from config method in Mojo.
         - Renamed send_message method in Mojolicious::Controller to send.

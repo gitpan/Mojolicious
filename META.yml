@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Mojolicious
-version:            2.52
+version:            2.53
 abstract:           Real-time web framework
 author:
     - Sebastian Riedel <sri@cpan.org>
