@@ -81,7 +81,6 @@ lib/Mojolicious/Command/version.pm
 lib/Mojolicious/Commands.pm
 lib/Mojolicious/Controller.pm
 lib/Mojolicious/Guides.pod
-lib/Mojolicious/Guides/Cheatsheet.pod
 lib/Mojolicious/Guides/CodingGuidelines.pod
 lib/Mojolicious/Guides/Cookbook.pod
 lib/Mojolicious/Guides/FAQ.pod
@@ -151,9 +150,7 @@ lib/Test/Mojo.pm
 LICENSE
 Makefile.PL
 MANIFEST			This list of files
-MANIFEST.bak
 MANIFEST.SKIP
-Mojolicious-2.52.tar.gz
 README.pod
 script/hypnotoad
 script/mojo

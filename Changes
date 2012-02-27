@@ -1,5 +1,25 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+2.54    2012-02-27 00:00:00
+        - Deprecated class and method stash values in favor of controller and
+          action.
+        - Added EXPERIMENTAL patch function to Mojolicious::Lite.
+        - Added EXPERIMENTAL patch method to Mojolicious::Routes.
+        - Added EXPERIMENTAL patch method to Mojo::UserAgent.
+        - Added EXPERIMENTAL patch_ok method to Test::Mojo.
+        - Added EXPERIMENTAL t function to ojo.
+        - Added support for MOJO_CONNECT_TIMEOUT, MOJO_INACTIVITY_TIMEOUT,
+          MOJO_REQUEST_TIMEOUT and MOJO_WEBSOCKET_TIMEOUT environment
+          variables.
+        - Split up Mojolicious::Guides::Cheatsheet into more reference
+          documentation.
+        - Increased default connect timeout from 3 to 10 seconds in
+          Mojo::UserAgent and Mojo::IOLoop::Client.
+        - Improved resilience of Mojo::IOLoop::Stream.
+        - Improved test command to colorize by default.
+        - Improved documentation.
+        - Fixed small rendering bug in Mojolicious::Plugin::PODRenderer.
+
 2.53    2012-02-25 00:00:00
         - Improved Hypnotoad with many info level log messages.
         - Improved resilience of Mojo::IOLoop::Stream.

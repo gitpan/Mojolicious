@@ -32,7 +32,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Leaf Fluttering In Wind';
-our $VERSION  = '2.53';
+our $VERSION  = '2.54';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -388,7 +388,8 @@ object.
   $app         = $app->defaults({foo => 'bar'});
   $app         = $app->defaults(foo => 'bar');
 
-Default values for the stash, assigned for every new request.
+Default values for L<Mojolicious::Controller/"stash">, assigned for every new
+request.
 
   $app->defaults->{foo} = 'bar';
   my $foo = $app->defaults->{foo};
@@ -398,7 +399,7 @@ Default values for the stash, assigned for every new request.
 
   $app->dispatch($c);
 
-The heart of every Mojolicious application, calls the static and routes
+The heart of every Mojolicious application, calls the C<static> and C<routes>
 dispatchers for every request and passes them a L<Mojolicious::Controller>
 object.
 
@@ -603,6 +604,7 @@ startup.
 
   sub startup {
     my $self = shift;
+    ...
   }
 
 =head1 HELPERS
