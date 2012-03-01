@@ -113,9 +113,12 @@ sub _one_tick {
       elsif ($after && $t->{recurring}) { $t->{recurring} += $after }
 
       # Handle timer
-      if (my $cb = $t->{cb}) { $self->_sandbox("Timer $id", $cb, $id) }
+      if (my $cb = $t->{cb}) { $self->_sandbox("Timer $id", $cb) }
     }
   }
+
+  # Stop automatically
+  $self->stop unless keys(%{$self->{timers}}) || keys(%{$self->{handles}});
 }
 
 sub _poll { shift->{poll} ||= IO::Poll->new }
@@ -219,14 +222,14 @@ Check if watcher is running.
   my $id = $watcher->recurring(3 => sub {...});
 
 Create a new recurring timer, invoking the callback repeatedly after a given
-amount of seconds.
+amount of time in seconds.
 
 =head2 C<start>
 
   $watcher->start;
 
 Start watching for I/O and timer events, this will block until C<stop> is
-called.
+called or no events are being watched anymore.
 
 =head2 C<stop>
 
@@ -238,7 +241,8 @@ Stop watching for I/O and timer events.
 
   my $id = $watcher->timer(3 => sub {...});
 
-Create a new timer, invoking the callback after a given amount of seconds.
+Create a new timer, invoking the callback after a given amount of time in
+seconds.
 
 =head2 C<watch>
 

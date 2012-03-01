@@ -35,10 +35,11 @@ sub import {
   # Export
   no warnings 'redefine';
   my $root = $routes;
+  for my $name (qw/any get patch post put websocket/) {
+    *{"${caller}::$name"} = sub { $routes->$name(@_) };
+  }
   *{"${caller}::new"} = *{"${caller}::app"} = sub {$app};
-  *{"${caller}::any"} = sub { $routes->any(@_) };
   *{"${caller}::del"} = sub { $routes->delete(@_) };
-  *{"${caller}::get"} = sub { $routes->get(@_) };
   *{"${caller}::group"} = sub (&) {
     my $old = $root;
     $_[0]->($root = $routes);
@@ -47,13 +48,9 @@ sub import {
   };
   *{"${caller}::helper"} = sub { $app->helper(@_) };
   *{"${caller}::hook"}   = sub { $app->hook(@_) };
+  *{"${caller}::plugin"} = sub { $app->plugin(@_) };
   *{"${caller}::under"}  = *{"${caller}::ladder"} =
     sub { $routes = $root->under(@_) };
-  *{"${caller}::patch"}     = sub { $routes->patch(@_) };
-  *{"${caller}::plugin"}    = sub { $app->plugin(@_) };
-  *{"${caller}::post"}      = sub { $routes->post(@_) };
-  *{"${caller}::put"}       = sub { $routes->put(@_) };
-  *{"${caller}::websocket"} = sub { $routes->websocket(@_) };
 
   # We are most likely the app in a lite environment
   $ENV{MOJO_APP} ||= $app;
@@ -794,40 +791,6 @@ For more control the L<Mojolicious> instance can be accessed directly.
     $self->render(text => 'Hello Mojo!');
   });
 
-=head2 Growing
-
-In case a lite app needs to grow, lite and real L<Mojolicious> applications
-can be easily mixed to make the transition process very smooth.
-
-  package MyApp::Foo;
-  use Mojo::Base 'Mojolicious::Controller';
-
-  sub index {
-    my $self = shift;
-    $self->render(text => 'It works.');
-  }
-
-  package main;
-  use Mojolicious::Lite;
-
-  get '/bar' => sub {
-    my $self = shift;
-    $self->render(text => 'This too.');
-  };
-
-  app->routes->namespace('MyApp');
-  app->routes->route('/foo/:action')->via('GET')->to('foo#index');
-
-  app->start;
-
-There is also a helper command to generate a full L<Mojolicious> example that
-will let you explore the astonishing similarities between
-L<Mojolicious::Lite> and L<Mojolicious> applications. Both share about 99% of
-the same code, so almost everything you learned in this tutorial applies
-there too. :)
-
-  $ mojo generate app
-
 =head2 More
 
 You can continue with L<Mojolicious::Guides> now, and don't forget to have
@@ -888,8 +851,7 @@ Alias for L<Mojolicious/"hook">.
   my $route = patch '/:foo' => sub {...};
 
 Generate route matching only C<PATCH> requests. See also the tutorial above
-for more argument variations. Note that this function is EXPERIMENTAL and
-might change without warning!
+for more argument variations.
 
 =head2 C<plugin>
 
@@ -924,7 +886,8 @@ also the tutorial above for more argument variations.
   my $route = websocket '/:foo' => sub {...};
 
 Generate route matching only C<WebSocket> handshakes. See also the tutorial
-above for more argument variations.
+above for more argument variations. Note that this function is EXPERIMENTAL
+and might change without warning!
 
 =head1 ATTRIBUTES
 

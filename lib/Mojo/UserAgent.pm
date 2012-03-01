@@ -296,7 +296,8 @@ sub _connected {
   $loop->stream($id)->timeout($self->inactivity_timeout);
 
   # Store connection information in transaction
-  (my $tx = $self->{connections}->{$id}->{tx})->connection($id);
+  my $tx = $self->{connections}->{$id}->{tx};
+  $tx->connection($id);
   my $handle = $loop->stream($id)->handle;
   $tx->local_address($handle->sockhost)->local_port($handle->sockport);
   $tx->remote_address($handle->peerhost)->remote_port($handle->peerport);
@@ -857,7 +858,8 @@ Alias for L<Mojo::UserAgent::Transactor/"tx">.
 
   my $tx = $ua->build_websocket_tx('ws://localhost:3000');
 
-Alias for L<Mojo::UserAgent::Transactor/"websocket">.
+Alias for L<Mojo::UserAgent::Transactor/"websocket">. Note that this method
+is EXPERIMENTAL and might change without warning!
 
 =head2 C<delete>
 
@@ -928,8 +930,7 @@ Check if request for domain would use a proxy server.
 Perform blocking HTTP C<PATCH> request and return resulting
 L<Mojo::Transaction::HTTP> object, takes the exact same arguments as
 L<Mojo::UserAgent::Transactor/"tx"> (except for the method). You can also
-append a callback to perform requests non-blocking. Note that this method is
-EXPERIMENTAL and might change without warning!
+append a callback to perform requests non-blocking.
 
   $ua->patch('http://kraih.com' => sub {
     my ($ua, $tx) = @_;

@@ -116,7 +116,7 @@ sub recurring {
   my ($self, $after, $cb) = @_;
   $self = $self->singleton unless ref $self;
   weaken $self;
-  return $self->iowatcher->recurring($after => sub { $self->$cb(pop) });
+  return $self->iowatcher->recurring($after => sub { $self->$cb });
 }
 
 # "Fat Tony is a cancer on this fair city!
@@ -143,7 +143,8 @@ sub server {
       my $handle = pop;
 
       # Accept
-      my $id = $self->stream(my $stream = $self->stream_class->new($handle));
+      my $stream = $self->stream_class->new($handle);
+      my $id     = $self->stream($stream);
       $self->$cb($stream, $id);
 
       # Enforce limit
@@ -209,7 +210,7 @@ sub timer {
   my ($self, $after, $cb) = @_;
   $self = $self->singleton unless ref $self;
   weaken $self;
-  return $self->iowatcher->timer($after => sub { $self->$cb(pop) });
+  return $self->iowatcher->timer($after => sub { $self->$cb });
 }
 
 sub _cleaner {
@@ -227,6 +228,8 @@ sub _cleaner {
       }
 
       # Graceful shutdown
+      $self->_drop(delete $self->{cleaner})
+        unless keys(%$connections) || keys(%{$self->{servers}});
       $self->stop if $self->max_connections == 0 && keys %$connections == 0;
     }
   );
@@ -523,7 +526,7 @@ amount of time in seconds.
   my $id = $loop->recurring(3 => sub {...});
 
 Create a new recurring timer, invoking the callback repeatedly after a given
-amount of seconds.
+amount of time in seconds.
 
   # Run multiple reactors next to each other
   my $loop2 = Mojo::IOLoop->new;
@@ -561,7 +564,8 @@ instance from everywhere inside the process.
   Mojo::IOLoop->start;
   $loop->start;
 
-Start the loop, this will block until C<stop> is called.
+Start the loop, this will block until C<stop> is called or no events are
+being watched anymore.
 
 =head2 C<stop>
 
@@ -580,8 +584,8 @@ and the loop can be restarted by running C<start> again.
 Get L<Mojo::IOLoop::Stream> object for id or turn object into a connection.
 Note that this method is EXPERIMENTAL and might change without warning!
 
-  # Increase timeout for the connection of a transaction to 300 seconds
-  Mojo::IOLoop->stream($tx->connection)->timeout(300);
+  # Increase inactivity timeout for connection to 300 seconds
+  Mojo::IOLoop->stream($id)->timeout(300);
 
 =head2 C<timer>
 
@@ -589,7 +593,8 @@ Note that this method is EXPERIMENTAL and might change without warning!
   my $id = $loop->timer(5 => sub {...});
   my $id = $loop->timer(0.25 => sub {...});
 
-Create a new timer, invoking the callback after a given amount of seconds.
+Create a new timer, invoking the callback after a given amount of time in
+seconds.
 
 =head1 DEBUGGING
 
