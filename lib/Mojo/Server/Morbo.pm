@@ -8,11 +8,7 @@ use POSIX 'WNOHANG';
 
 use constant DEBUG => $ENV{MORBO_DEBUG} || 0;
 
-has listen => sub { [] };
-has watch  => sub { [qw/lib templates/] };
-
-# Cache stats
-my $STATS = {};
+has watch => sub { [qw/lib templates/] };
 
 # "All in all, this is one day Mittens the kitten won’t soon forget.
 #  Kittens give Morbo gas.
@@ -25,9 +21,10 @@ sub check_file {
   # Check if modify time and/or size have changed
   my ($size, $mtime) = (stat $file)[7, 9];
   return unless defined $mtime;
-  my $stats = $STATS->{$file} ||= [$^T, $size];
+  my $cache = $self->{cache} ||= {};
+  my $stats = $cache->{$file} ||= [$^T, $size];
   return if $mtime <= $stats->[0] && $size == $stats->[1];
-  $STATS->{$file} = [$mtime, $size];
+  $cache->{$file} = [$mtime, $size];
 
   return 1;
 }
@@ -114,7 +111,6 @@ sub _spawn {
   my $daemon = Mojo::Server::Daemon->new;
   $daemon->load_app($self->watch->[0]);
   $daemon->silent(1) if $ENV{MORBO_REV} > 1;
-  $daemon->listen($self->listen) if @{$self->listen};
   $daemon->start;
   my $loop = $daemon->ioloop;
   $loop->recurring(
@@ -159,13 +155,6 @@ C<MOJO_NO_BONJOUR>, C<MOJO_NO_IPV6> and C<MOJO_NO_TLS> environment variables.
 
 L<Mojo::Server::Morbo> implements the following attributes.
 
-=head2 C<listen>
-
-  my $listen = $morbo->listen;
-  $morbo     = $morbo->listen(['http://*:3000']);
-
-List of one or more locations to listen on, defaults to C<http://*:3000>.
-
 =head2 C<watch>
 
   my $watch = $morbo->watch;
@@ -182,7 +171,7 @@ the following new ones.
 
 =head2 C<check_file>
 
-  $morbo->check_file('script/myapp');
+  my $success = $morbo->check_file('/home/sri/lib/MyApp.pm');
 
 Check if file has been modified since last check.
 
