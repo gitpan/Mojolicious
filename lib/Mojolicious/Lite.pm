@@ -166,7 +166,8 @@ both, the HTTP request and response.
 
 =head2 GET/POST parameters
 
-All C<GET> and C<POST> parameters are accessible via C<param>.
+All C<GET> and C<POST> parameters are accessible via
+L<Mojolicious::Controller/"param">.
 
   # /foo?user=sri
   get '/foo' => sub {
@@ -177,8 +178,8 @@ All C<GET> and C<POST> parameters are accessible via C<param>.
 
 =head2 Stash and templates
 
-The C<stash> is used to pass data to templates, which can be inlined in the
-C<DATA> section.
+The L<Mojolicious::Controller/"stash"> is used to pass data to templates,
+which can be inlined in the C<DATA> section.
 
   # /bar
   get '/bar' => sub {
@@ -197,8 +198,8 @@ L<Mojolicious::Guides::Rendering/"Embedded Perl">.
 
 =head2 HTTP
 
-L<Mojo::Message::Request> and L<Mojo::Message::Response> give you full access
-to all HTTP features and information.
+L<Mojolicious::Controller/"req"> and L<Mojolicious::Controller/"res"> give
+you full access to all HTTP features and information.
 
   # /agent
   get '/agent' => sub {
@@ -210,9 +211,11 @@ to all HTTP features and information.
 =head2 Route names
 
 All routes can have a name associated with them, this allows automatic
-template detection and back referencing with C<url_for>, C<link_to> and
-C<form_for>. Nameless routes get an automatically generated one assigned that
-is simply equal to the route itself without non-word characters.
+template detection and back referencing with
+L<Mojolicious::Controller/"url_for"> as well as many helpers like
+L<Mojolicious::Plugin::TagHelpers/"link_to">. Nameless routes get an
+automatically generated one assigned that is simply equal to the route itself
+without non-word characters.
 
   # /
   get '/' => sub {
@@ -234,7 +237,10 @@ is simply equal to the route itself without non-word characters.
 
 =head2 Layouts
 
-Templates can have layouts.
+Templates can have layouts too, you just select one with the helper
+L<Mojolicious::Plugin::DefaultHelpers/"layout"> and place the result of the
+current template with the helper
+L<Mojolicious::Plugin::DefaultHelpers/"content">.
 
   # /with_layout
   get '/with_layout' => sub {
@@ -282,8 +288,8 @@ delimited by the C<begin> and C<end> keywords.
 
 =head2 Captured content
 
-The C<content_for> helper can be used to pass around blocks of captured
-content.
+The helper L<Mojolicious::Plugin::TagHelpers/"content_for"> can be used to
+pass around blocks of captured content.
 
   # /captured
   get '/captured' => sub {
@@ -342,8 +348,8 @@ L<Mojolicious::Plugin::TagHelpers>.
 =head2 Placeholders
 
 Route placeholders allow capturing parts of a request path until a C</> or
-C<.> separator occurs, results will be stored by name in the C<stash> and
-C<param>.
+C<.> separator occurs, results are accessible via
+L<Mojolicious::Controller/"stash"> and L<Mojolicious::Controller/"param">.
 
   # /foo/test
   # /foo/test123
@@ -487,7 +493,8 @@ Restrictive placeholders can also be used for format detection.
 =head2 Content negotiation
 
 For resources with different representations and that require truly
-C<RESTful> content negotiation you can also use C<respond_to>.
+C<RESTful> content negotiation you can also use
+L<Mojolicious::Controller/"respond_to">.
 
   # /hello (Accept: application/json)
   # /hello (Accept: text/xml)
@@ -623,7 +630,8 @@ constructs.
 =head2 Sessions
 
 Signed cookie based sessions just work out of the box as soon as you start
-using them.
+using them through the helper
+L<Mojolicious::Plugin::DefaultHelpers/"session">.
 
   use Mojolicious::Lite;
 
@@ -640,8 +648,8 @@ using them.
 
 =head2 Secret
 
-Note that you should use a custom C<secret> to make signed cookies really
-secure.
+Note that you should use a custom L<Mojolicious/"secret"> to make signed
+cookies really secure.
 
   app->secret('My secret passphrase here');
 
@@ -694,9 +702,9 @@ variable.
 
 =head2 User agent
 
-With L<Mojo::UserAgent> there's a full featured HTTP 1.1 and WebSocket user
-agent built right in. Especially in combination with L<Mojo::JSON> and
-L<Mojo::DOM> this can be a very powerful tool.
+With L<Mojolicious::Controller/"ua"> there's a full featured HTTP 1.1 and
+WebSocket user agent built right in. Especially in combination with
+L<Mojo::JSON> and L<Mojo::DOM> this can be a very powerful tool.
 
   get '/test' => sub {
     my $self = shift;
@@ -715,8 +723,9 @@ WebSocket applications have never been this easy before.
     });
   };
 
-The C<message> event will be emitted for every new WebSocket message that is
-received.
+The event L<Mojo::Transaction::WebSocket/"message">, which you can subscribe
+to with L<Mojolicious::Controller/"on">, will be emitted for every new
+WebSocket message that is received.
 
 =head2 External templates
 

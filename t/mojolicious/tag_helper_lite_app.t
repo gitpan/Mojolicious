@@ -8,7 +8,7 @@ BEGIN {
   $ENV{MOJO_IOWATCHER} = 'Mojo::IOWatcher';
 }
 
-use Test::More tests => 57;
+use Test::More tests => 63;
 
 # "Hey! Bite my glorious golden ass!"
 use Mojolicious::Lite;
@@ -201,7 +201,7 @@ $t->get_ok('/form/lala?a=2&b=0&c=2&d=3&escaped=1%22+%222')->status_is(200)
 EOF
 
 # GET /form (alternative)
-$t->get_ok('/form/lala?c=b&d=3&e=4&f=5')->status_is(200)->content_is(<<EOF);
+$t->get_ok('/form/lala?c=b&d=3&e=4&f=<5')->status_is(200)->content_is(<<EOF);
 <form action="/links" method="post">
   <input name="foo" />
 </form>
@@ -214,7 +214,7 @@ $t->get_ok('/form/lala?c=b&d=3&e=4&f=5')->status_is(200)->content_is(<<EOF);
   <input name="c" type="hidden" value="foo" />
   <input name="d" type="file" />
   <textarea cols="40" name="e" rows="50">4</textarea>
-  <textarea name="f">5</textarea>
+  <textarea name="f">&lt;5</textarea>
   <input name="g" type="password" />
   <input id="foo" name="h" type="password" />
   <input type="submit" value="Ok!" />
@@ -234,7 +234,7 @@ $t->put_ok('/selection')->status_is(200)
     . '<select name="a">'
     . '<option value="b">b</option>'
     . '<optgroup label="c">'
-    . '<option value="d">d</option>'
+    . '<option value="&lt;d">&lt;d</option>'
     . '<option value="e">E</option>'
     . '<option value="f">f</option>'
     . '</optgroup>'
@@ -258,7 +258,7 @@ $t->put_ok('/selection?a=e&foo=bar&bar=baz')->status_is(200)
     . '<select name="a">'
     . '<option value="b">b</option>'
     . '<optgroup label="c">'
-    . '<option value="d">d</option>'
+    . '<option value="&lt;d">&lt;d</option>'
     . '<option selected="selected" value="e">E</option>'
     . '<option value="f">f</option>'
     . '</optgroup>'
@@ -282,7 +282,7 @@ $t->put_ok('/selection?foo=bar&a=e&foo=baz&bar=d')->status_is(200)
     . '<select name="a">'
     . '<option value="b">b</option>'
     . '<optgroup label="c">'
-    . '<option value="d">d</option>'
+    . '<option value="&lt;d">&lt;d</option>'
     . '<option selected="selected" value="e">E</option>'
     . '<option value="f">f</option>'
     . '</optgroup>'
@@ -306,7 +306,7 @@ $t->put_ok('/selection?preselect=1')->status_is(200)
     . '<select name="a">'
     . '<option selected="selected" value="b">b</option>'
     . '<optgroup label="c">'
-    . '<option value="d">d</option>'
+    . '<option value="&lt;d">&lt;d</option>'
     . '<option value="e">E</option>'
     . '<option value="f">f</option>'
     . '</optgroup>'
@@ -327,6 +327,23 @@ $t->put_ok('/selection?preselect=1')->status_is(200)
 # PATCH /☃
 $t->patch_ok('/☃')->status_is(200)->content_is(<<'EOF');
 <form action="/%E2%98%83">
+  <textarea cols="40" name="foo">b&lt;a&gt;r</textarea>
+  <input type="submit" value="☃" />
+</form>
+EOF
+
+# PATCH /☃ (form value)
+$t->patch_ok('/☃?foo=ba<z')->status_is(200)->content_is(<<'EOF');
+<form action="/%E2%98%83">
+  <textarea cols="40" name="foo">ba&lt;z</textarea>
+  <input type="submit" value="☃" />
+</form>
+EOF
+
+# PATCH /☃ (empty form value)
+$t->patch_ok('/☃?foo=')->status_is(200)->content_is(<<'EOF');
+<form action="/%E2%98%83">
+  <textarea cols="40" name="foo"></textarea>
   <input type="submit" value="☃" />
 </form>
 EOF
@@ -423,7 +440,7 @@ __DATA__
 @@ selection.html.ep
 % param a => qw/b g/ if param 'preselect';
 %= form_for selection => begin
-  %= select_field a => ['b', {c => ['d', [ E => 'e'], 'f']}, 'g']
+  %= select_field a => ['b', {c => ['<d', [ E => 'e'], 'f']}, 'g']
   %= select_field foo => [qw/bar baz/], multiple => 'multiple'
   %= select_field bar => [['D' => 'd', disabled => 'disabled'], 'baz']
   %= submit_button
@@ -431,5 +448,6 @@ __DATA__
 
 @@ snowman.html.ep
 %= form_for snowman => begin
+  %= text_area foo => 'b<a>r', cols => 40
   %= submit_button '☃'
 %= end
