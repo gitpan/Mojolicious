@@ -2,6 +2,7 @@ package Mojolicious;
 use Mojo::Base 'Mojo';
 
 use Carp 'croak';
+use Mojo::Exception;
 use Mojolicious::Commands;
 use Mojolicious::Controller;
 use Mojolicious::Plugins;
@@ -32,7 +33,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Leaf Fluttering In Wind';
-our $VERSION  = '2.60';
+our $VERSION  = '2.61';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -89,6 +90,16 @@ sub new {
   $self->plugin('EPRenderer');
   $self->plugin('RequestTimer');
   $self->plugin('PoweredBy');
+
+  # Exception handling
+  $self->hook(
+    around_dispatch => sub {
+      my ($next, $c) = @_;
+      local $SIG{__DIE__} =
+        sub { ref $_[0] ? CORE::die($_[0]) : Mojo::Exception->throw(@_) };
+      $c->render_exception($@) unless eval { $next->(); 1 };
+    }
+  );
 
   # Reduced log output outside of development mode
   $self->log->level('info') unless $mode eq 'development';
@@ -391,6 +402,7 @@ object.
 Default values for L<Mojolicious::Controller/"stash">, assigned for every new
 request.
 
+  # Manipulate defaults
   $app->defaults->{foo} = 'bar';
   my $foo = $app->defaults->{foo};
   delete $app->defaults->{foo};
@@ -509,7 +521,8 @@ want to continue the chain.
     ...
   });
 
-This is a very powerful hook and should not be used lightly, consider it the
+This is a very powerful hook and should not be used lightly, it allows you to
+customize application wide exception handling for example, consider it the
 sledgehammer in your toolbox. (Passed a closure leading to the next hook and
 the current controller object)
 
