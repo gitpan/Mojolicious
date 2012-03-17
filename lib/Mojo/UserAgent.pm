@@ -30,7 +30,7 @@ has transactor => sub { Mojo::UserAgent::Transactor->new };
 # Common HTTP methods
 {
   no strict 'refs';
-  for my $name (qw/DELETE GET HEAD PATCH POST PUT/) {
+  for my $name (qw/DELETE GET HEAD OPTIONS PATCH POST PUT/) {
     *{__PACKAGE__ . '::' . lc($name)} = sub {
       my $self = shift;
       $self->start($self->build_tx($name, @_));
@@ -449,8 +449,8 @@ sub _server {
   my $port = $self->{port} = $loop->generate_port;
   die "Couldn't find a free TCP port for testing.\n" unless $port;
   $self->{scheme} = $scheme ||= 'http';
-  $server->listen(["$scheme://*:$port"])->start;
-  warn "TEST SERVER STARTED ($scheme://*:$port)\n" if DEBUG;
+  $server->listen(["$scheme://127.0.0.1:$port"])->start;
+  warn "TEST SERVER STARTED ($scheme://127.0.0.1:$port)\n" if DEBUG;
 
   return $server;
 }
@@ -678,8 +678,7 @@ L<Mojo::UserAgent> implements the following attributes.
   $ua    = $ua->ca('/etc/tls/ca.crt');
 
 Path to TLS certificate authority file, defaults to the value of the
-C<MOJO_CA_FILE> environment variable. Note that this attribute is
-EXPERIMENTAL and might change without warning!
+C<MOJO_CA_FILE> environment variable.
 
   # Show certificate authorities for debugging
   IO::Socket::SSL::set_ctx_defaults(
@@ -755,8 +754,7 @@ environment variable.
   my $address = $ua->local_address;
   $ua         = $ua->local_address('127.0.0.1');
 
-Local address to bind to. Note that this attribute is EXPERIMENTAL and might
-change without warning!
+Local address to bind to.
 
 =head2 C<max_connections>
 
@@ -798,8 +796,7 @@ Maximum amount of time in seconds establishing a connection, sending the
 request and receiving a whole response may take before getting canceled,
 defaults to the value of the C<MOJO_REQUEST_TIMEOUT> environment variable or
 C<0>. Setting the value to C<0> will allow the user agent to wait
-indefinitely. The timeout will reset for every followed redirect. Note that
-this attribute is EXPERIMENTAL and might change without warning!
+indefinitely. The timeout will reset for every followed redirect.
 
   # Total limit of 5 seconds, of which 3 seconds may be spent connecting
   $ua->max_redirects(0)->connect_timeout(3)->request_timeout(5);
@@ -810,7 +807,6 @@ this attribute is EXPERIMENTAL and might change without warning!
   $ua   = $ua->transactor(Mojo::UserAgent::Transactor->new);
 
 Transaction builder, defaults to a L<Mojo::UserAgent::Transactor> object.
-Note that this attribute is EXPERIMENTAL and might change without warning!
 
 =head1 METHODS
 
@@ -838,7 +834,6 @@ L<Mojolicious> object.
   my $url = $ua->app_url('https');
 
 Get absolute L<Mojo::URL> object for C<app> and switch protocol if necessary.
-Note that this method is EXPERIMENTAL and might change without warning!
 
   say $ua->app_url->port;
 
@@ -858,8 +853,7 @@ Alias for L<Mojo::UserAgent::Transactor/"tx">.
 
   my $tx = $ua->build_websocket_tx('ws://localhost:3000');
 
-Alias for L<Mojo::UserAgent::Transactor/"websocket">. Note that this method
-is EXPERIMENTAL and might change without warning!
+Alias for L<Mojo::UserAgent::Transactor/"websocket">.
 
 =head2 C<delete>
 
@@ -922,6 +916,22 @@ append a callback to perform requests non-blocking.
   my $success = $ua->need_proxy('intranet.mojolicio.us');
 
 Check if request for domain would use a proxy server.
+
+=head2 C<options>
+
+  my $tx = $ua->options('http://kraih.com');
+
+Perform blocking HTTP C<OPTIONS> request and return resulting
+L<Mojo::Transaction::HTTP> object, takes the exact same arguments as
+L<Mojo::UserAgent::Transactor/"tx"> (except for the method). You can also
+append a callback to perform requests non-blocking.
+
+  $ua->options('http://kraih.com' => sub {
+    my ($ua, $tx) = @_;
+    say $tx->res->body;
+    Mojo::IOLoop->stop;
+  });
+  Mojo::IOLoop->start;
 
 =head2 C<patch>
 
@@ -1006,8 +1016,7 @@ transactions non-blocking.
   $ua->websocket('ws://localhost:3000' => sub {...});
 
 Open a non-blocking WebSocket connection with transparent handshake, takes
-the exact same arguments as L<Mojo::UserAgent::Transactor/"websocket">. Note
-that this method is EXPERIMENTAL and might change without warning!
+the exact same arguments as L<Mojo::UserAgent::Transactor/"websocket">.
 
   $ua->websocket('ws://localhost:3000/echo' => sub {
     my ($ua, $tx) = @_;

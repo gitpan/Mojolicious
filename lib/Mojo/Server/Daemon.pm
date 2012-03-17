@@ -195,7 +195,7 @@ sub _listen {
 
   # DEPRECATED in Leaf Fluttering In Wind!
   my ($address, $port, $cert, $key, $ca);
-  if ($listen =~ qr|//(.+)\:(\d+)\:(.*?)\:(.*?)(?:\:(.+)?)?$|) {
+  if ($listen =~ qr|//([^\[\]]]+)\:(\d+)\:(.*?)\:(.*?)(?:\:(.+)?)?$|) {
     warn "Custom HTTPS listen values are DEPRECATED in favor of URLs!\n";
     ($address, $port, $cert, $key, $ca) = ($1, $2, $3, $4, $5);
   }
@@ -248,20 +248,18 @@ sub _listen {
 
   # Bonjour
   if (BONJOUR && (my $p = Net::Rendezvous::Publish->new)) {
-    my $port = $options->{port};
     my $name = $options->{address} || Sys::Hostname::hostname();
     $p->publish(
-      name   => "Mojolicious ($name:$port)",
-      type   => '_http._tcp',
-      domain => 'local',
-      port   => $port
-    ) if $port && !$tls;
+      name => "Mojolicious ($name:$options->{port})",
+      type => '_http._tcp',
+      port => $options->{port}
+    ) if $options->{port} && !$tls;
   }
 
   # Friendly message
   return if $self->silent;
   $self->app->log->info(qq/Listening at "$listen"./);
-  $listen =~ s|^(https?\://)\*|${1}127.0.0.1|i;
+  $listen =~ s|//\*|//127.0.0.1|i;
   say "Server available at $listen.";
 }
 

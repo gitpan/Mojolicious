@@ -8,7 +8,7 @@ use Test::More;
 plan skip_all => 'set TEST_EV to enable this test (developer only!)'
   unless $ENV{TEST_EV};
 plan skip_all => 'EV 4.0 required for this test!' unless eval 'use EV 4.0; 1';
-plan tests => 66;
+plan tests => 67;
 
 # "Oh well. At least we'll die doing what we love: inhaling molten rock."
 use IO::Socket::INET;
@@ -20,7 +20,7 @@ is ref $watcher, 'Mojo::IOWatcher::EV', 'right object';
 is ref Mojo::IOWatcher::EV->new, 'Mojo::IOWatcher', 'right object';
 undef $watcher;
 is ref Mojo::IOWatcher::EV->new, 'Mojo::IOWatcher::EV', 'right object';
-require Mojo::IOLoop;
+use_ok 'Mojo::IOLoop';
 $watcher = Mojo::IOLoop->singleton->iowatcher;
 is ref $watcher, 'Mojo::IOWatcher::EV', 'right object';
 
@@ -165,7 +165,7 @@ is $timer2, 2, 'timer was triggered';
 
 # Error
 my $err;
-$watcher->unsubscribe('error')->on(
+$watcher->on(
   error => sub {
     shift->stop;
     $err = pop;
@@ -197,7 +197,7 @@ $port = Mojo::IOLoop->generate_port;
 my ($server_err, $server_running, $client_err, $client_running);
 ($server, $client) = '';
 Mojo::IOLoop->server(
-  {port => $port} => sub {
+  {address => '127.0.0.1', port => $port} => sub {
     my ($loop, $stream) = @_;
     $stream->write('test', sub { shift->write('321') });
     $stream->on(read => sub { $server .= pop });

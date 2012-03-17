@@ -17,9 +17,7 @@ has client_class => 'Mojo::IOLoop::Client';
 has iowatcher    => sub {
   my $class = Mojo::IOWatcher->detect;
   warn "MAINLOOP ($class)\n" if DEBUG;
-  my $watcher = $class->new;
-  $watcher->on(error => sub { warn pop });
-  return $watcher;
+  return $class->new;
 };
 has [qw/lock unlock/];
 has max_accepts     => 0;
@@ -81,11 +79,9 @@ sub client {
 sub delay {
   my ($self, $cb) = @_;
   $self = $self->singleton unless ref $self;
-
   my $delay = Mojo::IOLoop::Delay->new;
   weaken $delay->ioloop($self)->{ioloop};
   $delay->once(finish => $cb) if $cb;
-
   return $delay;
 }
 
@@ -398,7 +394,7 @@ captured.
 The maximum number of connections this loop is allowed to accept before
 shutting down gracefully without interrupting existing connections, defaults
 to C<0>. Setting the value to C<0> will allow this loop to accept new
-connections infinitely. Note that this attribute is EXPERIMENTAL and might
+connections indefinitely. Note that this attribute is EXPERIMENTAL and might
 change without warning!
 
 =head2 C<max_connections>

@@ -414,9 +414,6 @@ method L<Mojolicious::Controller/"on">.
     # Connected
     $self->app->log->debug('WebSocket connected.');
 
-    # Increase inactivity timeout for connection a bit
-    Mojo::IOLoop->stream($self->tx->connection)->timeout(300);
-
     # Incoming message
     $self->on(message => sub {
       my ($self, $message) = @_;
@@ -494,9 +491,6 @@ HTTP protocol for transport.
   # EventSource for log messages
   get '/events' => sub {
     my $self = shift;
-
-    # Increase inactivity timeout for connection a bit
-    Mojo::IOLoop->stream($self->tx->connection)->timeout(300);
 
     # Change content type
     $self->res->headers->content_type('text/event-stream');

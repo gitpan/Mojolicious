@@ -29,13 +29,13 @@ sub import {
   $routes->namespace('');
 
   # Default static and template class
-  $app->static->default_static_class($caller);
-  $app->renderer->default_template_class($caller);
+  $app->static->classes->[0]   = $caller;
+  $app->renderer->classes->[0] = $caller;
 
   # Export
   no warnings 'redefine';
   my $root = $routes;
-  for my $name (qw/any get patch post put websocket/) {
+  for my $name (qw/any get options patch post put websocket/) {
     *{"${caller}::$name"} = sub { $routes->$name(@_) };
   }
   *{"${caller}::new"} = *{"${caller}::app"} = sub {$app};
@@ -855,6 +855,13 @@ Alias for L<Mojolicious/"helper">.
 
 Alias for L<Mojolicious/"hook">.
 
+=head2 C<options>
+
+  my $route = options '/:foo' => sub {...};
+
+Generate route matching only C<OPTIONS> requests. See also the tutorial above
+for more argument variations.
+
 =head2 C<patch>
 
   my $route = patch '/:foo' => sub {...};
@@ -895,8 +902,7 @@ also the tutorial above for more argument variations.
   my $route = websocket '/:foo' => sub {...};
 
 Generate route matching only C<WebSocket> handshakes. See also the tutorial
-above for more argument variations. Note that this function is EXPERIMENTAL
-and might change without warning!
+above for more argument variations.
 
 =head1 ATTRIBUTES
 

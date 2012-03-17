@@ -192,8 +192,7 @@ Append content to named buffer and retrieve it.
   % }
   %= current_route
 
-Check or get name of current route. Note that this helper is EXPERIMENTAL and
-might change without warning!
+Check or get name of current route.
 
 =head2 C<dumper>
 
@@ -284,8 +283,7 @@ Alias for L<Mojolicious::Controller/"url_for">.
   %= url_with 'named', controller => 'bar', action => 'baz'
 
 Does the same as C<url_for>, but inherits query parameters from the current
-request. Note that this helper is EXPERIMENTAL and might change without
-warning!
+request.
 
   %= url_with->query([page => 2])
 

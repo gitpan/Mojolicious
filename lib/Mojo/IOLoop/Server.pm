@@ -2,8 +2,7 @@ package Mojo::IOLoop::Server;
 use Mojo::Base 'Mojo::EventEmitter';
 
 use Carp 'croak';
-use File::Spec::Functions qw/catfile tmpdir/;
-use IO::File;
+use File::Temp;
 use IO::Socket::INET;
 use Scalar::Util 'weaken';
 use Socket qw/IPPROTO_TCP TCP_NODELAY/;
@@ -78,8 +77,7 @@ has iowatcher => sub {
 sub DESTROY {
   my $self = shift;
   if (my $port = $self->{port}) { $ENV{MOJO_REUSE} =~ s/(?:^|\,)$port\:\d+// }
-  if (my $cert = $self->{cert}) { unlink $cert if -w $cert }
-  if (my $key  = $self->{key})  { unlink $key  if -w $key }
+  defined $_ and -w $_ and unlink $_ for $self->{cert}, $self->{key};
   return unless my $watcher = $self->{iowatcher};
   $self->stop if $self->{handle};
   $watcher->drop($_) for values %{$self->{handles}};
@@ -147,20 +145,11 @@ sub listen {
 }
 
 sub generate_port {
-
-  # Try random ports
-  my $port = 1 . int(rand 10) . int(rand 10) . int(rand 10) . int(rand 10);
-  while ($port++ < 30000) {
-    return $port
-      if IO::Socket::INET->new(
-      Listen    => 5,
-      LocalAddr => '127.0.0.1',
-      LocalPort => $port,
-      Proto     => 'tcp'
-      );
-  }
-
-  return;
+  IO::Socket::INET->new(
+    Listen    => 5,
+    LocalAddr => '127.0.0.1',
+    Proto     => 'tcp'
+  )->sockport;
 }
 
 sub start {
@@ -200,34 +189,18 @@ sub _accept {
 
 sub _cert_file {
   my $self = shift;
-
-  # Check if temporary TLS cert file already exists
-  my $cert = $self->{cert};
-  return $cert if $cert && -r $cert;
-
-  # Create temporary TLS cert file
-  $cert = catfile $ENV{MOJO_TMPDIR} || tmpdir, "mojocert-$$.pem";
-  croak qq/Can't create temporary TLS cert file "$cert"/
-    unless my $file = IO::File->new("> $cert");
-  print $file CERT;
-
-  $self->{cert} = $cert;
+  return $self->{cert} if $self->{cert};
+  my $cert = File::Temp->new(UNLINK => 0, SUFFIX => ".$$.pem");
+  print $cert CERT;
+  return $self->{cert} = $cert->filename;
 }
 
 sub _key_file {
   my $self = shift;
-
-  # Check if temporary TLS key file already exists
-  my $key = $self->{key};
-  return $key if $key && -r $key;
-
-  # Create temporary TLS key file
-  $key = catfile $ENV{MOJO_TMPDIR} || tmpdir, "mojokey-$$.pem";
-  croak qq/Can't create temporary TLS key file "$key"/
-    unless my $file = IO::File->new("> $key");
-  print $file KEY;
-
-  $self->{key} = $key;
+  return $self->{key} if $self->{key};
+  my $key = File::Temp->new(UNLINK => 0, SUFFIX => ".$$.pem");
+  print $key KEY;
+  return $self->{key} = $key->filename;
 }
 
 # "Where on my badge does it say anything about protecting people?
@@ -358,7 +331,7 @@ Path to the TLS key file, defaults to a built-in test key.
 
   my $port = $server->generate_port;
 
-Find a free TCP port.
+Find a free TCP port, this is a utility function primarily used for tests.
 
 =head2 C<start>
 

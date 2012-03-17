@@ -166,6 +166,8 @@ sub name {
   return $self->{name};
 }
 
+sub options { shift->_generate_route(options => @_) }
+
 sub over {
   my $self = shift;
   my $conditions = ref $_[0] eq 'ARRAY' ? $_[0] : [@_];
@@ -310,7 +312,7 @@ sub websocket {
 sub _dispatch_callback {
   my ($self, $c, $field, $staging) = @_;
   $c->stash->{'mojo.routed'}++;
-  $c->app->log->debug(qq/Dispatching callback./);
+  $c->app->log->debug(qq/Routing to a callback./);
   my $continue = $field->{cb}->($c);
   return !$staging || $continue ? 1 : undef;
 }
@@ -322,9 +324,8 @@ sub _dispatch_controller {
   return 1
     unless my $app = $field->{app} || $self->_generate_class($field, $c);
   my $method = $self->_generate_method($field, $c);
-  my $target = ref $app || $app;
-  $target .= "->$method" if $method;
-  $c->app->log->debug(qq/Dispatching "$target"./);
+  my $target = (ref $app || $app) . ($method ? "->$method" : '');
+  $c->app->log->debug(qq/Routing to "$target"./);
 
   # Controller or application
   return unless $self->_load_class($c, $app);
@@ -570,8 +571,7 @@ The children of this routes object, used for nesting routes.
   my $cache = $r->cache;
   $r        = $r->cache(Mojo::Cache->new);
 
-Routing cache, defaults to a L<Mojo::Cache> object. Note that this attribute
-is EXPERIMENTAL and might change without warning!
+Routing cache, defaults to a L<Mojo::Cache> object.
 
 =head2 C<conditions>
 
@@ -736,22 +736,19 @@ L<Mojolicious::Lite> tutorial for more argument variations.
 
   my $success = $r->has_conditions;
 
-Returns true if this route contains conditions. Note that this method is
-EXPERIMENTAL and might change without warning!
+Check if this route contains conditions.
 
 =head2 C<has_custom_name>
 
   my $success = $r->has_custom_name;
 
-Returns true if this route has a custom user defined name. Note that this
-method is EXPERIMENTAL and might change without warning!
+Check if this route has a custom user defined name.
 
 =head2 C<has_websocket>
 
   my $success = $r->has_websocket;
 
-Returns true if this route has a WebSocket ancestor. Note that this method is
-EXPERIMENTAL and might change without warning!
+Check if this route has a WebSocket ancestor.
 
 =head2 C<hide>
 
@@ -763,14 +760,13 @@ Hide controller method or attribute from routes.
 
   my $success = $r->is_endpoint;
 
-Returns true if this route qualifies as an endpoint.
+Check if this route qualifies as an endpoint.
 
 =head2 C<is_websocket>
 
   my $success = $r->is_websocket;
 
-Returns true if this route is a WebSocket. Note that this method is
-EXPERIMENTAL and might change without warning!
+Check if this route is a WebSocket.
 
 =head2 C<name>
 
@@ -780,6 +776,13 @@ EXPERIMENTAL and might change without warning!
 The name of this route, defaults to an automatically generated name based on
 the route pattern. Note that the name C<current> is reserved for refering to
 the current route.
+
+=head2 C<options>
+
+  my $route = $route->options('/:foo' => sub {...});
+
+Generate route matching only C<OPTIONS> requests. See also the
+L<Mojolicious::Lite> tutorial for more argument variations.
 
 =head2 C<over>
 
@@ -879,8 +882,7 @@ Add a waypoint to this route as nested child.
   my $websocket = $r->websocket('/:foo' => sub {...});
 
 Generate route matching only C<WebSocket> handshakes. See also the
-L<Mojolicious::Lite> tutorial for more argument variations. Note that this
-method is EXPERIMENTAL and might change without warning!
+L<Mojolicious::Lite> tutorial for more argument variations.
 
 =head1 SHORTCUTS
 

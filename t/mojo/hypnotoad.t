@@ -35,8 +35,11 @@ use Mojolicious::Lite;
 
 plugin Config => {
   default => {
-    hypnotoad =>
-      {listen => ['http://*:$port1', 'http://*:$port2'], workers => 1}
+    hypnotoad => {
+      inactivity_timeout => 3,
+      listen => ['http://127.0.0.1:$port1', 'http://127.0.0.1:$port2'],
+      workers => 1
+    }
   }
 };
 
@@ -50,10 +53,11 @@ EOF
 # Start
 my $prefix = "$FindBin::Bin/../../script";
 open my $start, '-|', $^X, "$prefix/hypnotoad", $script;
+sleep 3;
 sleep 1
   while !IO::Socket::INET->new(
   Proto    => 'tcp',
-  PeerAddr => 'localhost',
+  PeerAddr => '127.0.0.1',
   PeerPort => $port2
   );
 my $old = _pid();
@@ -98,8 +102,11 @@ use Mojolicious::Lite;
 
 plugin Config => {
   default => {
-    hypnotoad =>
-      {listen => ['http://*:$port1', 'http://*:$port2'], workers => 1}
+    hypnotoad => {
+      inactivity_timeout => 3,
+      listen => ['http://127.0.0.1:$port1', 'http://127.0.0.1:$port2'],
+      workers => 1
+    }
   }
 };
 
@@ -174,7 +181,7 @@ open my $stop, '-|', $^X, "$prefix/hypnotoad", $script, '-s';
 sleep 1
   while IO::Socket::INET->new(
   Proto    => 'tcp',
-  PeerAddr => 'localhost',
+  PeerAddr => '127.0.0.1',
   PeerPort => $port2
   );
 

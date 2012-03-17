@@ -353,8 +353,7 @@ Mojo::Transaction::WebSocket - WebSocket transaction container
 =head1 DESCRIPTION
 
 L<Mojo::Transaction::WebSocket> is a container for WebSocket transactions as
-described in RFC 6455. Note that this module is EXPERIMENTAL and might change
-without warning!
+described in RFC 6455.
 
 =head1 EVENTS
 
@@ -528,15 +527,11 @@ Alias for L<Mojo::Transaction/"remote_port">.
 
 Alias for L<Mojo::Transaction/"req">.
 
-  $ws->req->headers->header('X-Bender' => 'Bite my shiny metal ass!');
-
 =head2 C<res>
 
   my $res = $ws->res;
 
 Alias for L<Mojo::Transaction/"res">.
-
-  $ws->res->headers->header('X-Bender' => 'Bite my shiny metal ass!');
 
 =head2 C<resume>
 
