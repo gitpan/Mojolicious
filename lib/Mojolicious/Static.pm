@@ -169,6 +169,7 @@ sub _get_data_file {
 
 sub _get_file {
   my ($self, $path, $rel) = @_;
+  no warnings 'newline';
   return unless -f $path;
   return [] unless -r $path;
   return [Mojo::Asset::File->new(path => $path), (stat $path)[7, 9]];
@@ -202,6 +203,9 @@ L<Mojolicious::Static> implements the following attributes.
   $static     = $static->classes(['main']);
 
 Classes to use for finding files in C<DATA> section, defaults to C<main>.
+
+  # Add another class with static files in DATA section
+  push @{$static->classes}, 'Mojolicious::Plugin::Fun';
 
 =head2 C<paths>
 

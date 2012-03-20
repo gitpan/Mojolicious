@@ -27,7 +27,7 @@ solid and fast enough for small to mid sized applications.
 It has many configuration options and is known to work on every platform
 Perl works on.
 
-  $ ./script/myapp help daemon
+  $ ./script/myapp daemon -h
   ...List of available options...
 
 Another huge advantage is that it supports TLS and WebSockets out of the box.
@@ -547,7 +547,7 @@ which can be combined to solve some of hardest problems in web development.
     $tx->req->content->on(upgrade => sub { $tx->emit('request') });
   };
 
-  # Upload form
+  # Upload form in DATA section
   get '/' => 'index';
 
   # Streaming multipart upload (invoked twice, due to early "request" event)
@@ -585,8 +585,7 @@ which can be combined to solve some of hardest problems in web development.
   <html>
     <head><title>Streaming multipart upload</title></head>
     <body>
-      % my @attrs = (method => 'POST', enctype => 'multipart/form-data');
-      %= form_for upload => @attrs => begin
+      %= form_for upload => (enctype => 'multipart/form-data') => begin
         %= file_field 'example'
         %= submit_button 'Upload'
       % end

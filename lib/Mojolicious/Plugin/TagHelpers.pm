@@ -18,11 +18,7 @@ sub register {
   # Add "checkbox" helper
   $app->helper(
     check_box => sub {
-      $self->_input(
-        shift, shift,
-        value => shift,
-        @_, type => 'checkbox'
-      );
+      $self->_input(shift, shift, value => shift, @_, type => 'checkbox');
     }
   );
 
@@ -33,13 +29,21 @@ sub register {
   # Add "form_for" helper
   $app->helper(
     form_for => sub {
-      my $c   = shift;
-      my @url = (shift);
-
-      # Captures
+      my ($c, @url) = (shift, shift);
       push @url, shift if ref $_[0] eq 'HASH';
 
-      return $self->_tag('form', action => $c->url_for(@url), @_);
+      # POST detection
+      my @post;
+      if (my $r = $c->app->routes->find($url[0])) {
+        my %methods = (GET => 1, POST => 1);
+        do {
+          my @via = @{$r->via || []};
+          %methods = map { $_ => 1 } grep { $methods{$_} } @via if @via;
+        } while $r = $r->parent;
+        @post = (method => 'POST') if $methods{POST} && !$methods{GET};
+      }
+
+      return $self->_tag('form', action => $c->url_for(@url), @post, @_);
     }
   );
 
@@ -77,8 +81,7 @@ sub register {
       }
 
       # Path
-      my $src;
-      $src = shift if @_ % 2;
+      my $src = @_ % 2 ? shift : undef;
 
       # Attributes
       my %attrs = @_;
@@ -261,8 +264,7 @@ sub _input {
   my %attrs;
   if (@_ % 2) {
     my $value = shift;
-    %attrs = @_;
-    $attrs{value} = $value;
+    %attrs = (@_, value => $value);
   }
 
   # Even
@@ -313,9 +315,7 @@ sub _tag {
 
   # Block
   if ($cb || defined $content) {
-    $tag .= '>';
-    $tag .= $cb ? $cb->() : $content;
-    $tag .= "</$name>";
+    $tag .= '>' . ($cb ? $cb->() : $content) . "</$name>";
   }
 
   # Empty element
@@ -344,10 +344,11 @@ Mojolicious::Plugin::TagHelpers - Tag helpers plugin
 
 L<Mojolicious::Plugin::TagHelpers> is a collection of HTML5 tag helpers for
 L<Mojolicious>. This is a core plugin, that means it is always enabled and
-its code a good example for learning to build new plugins.
+its code a good example for learning how to build new plugins.
 
 Most form helpers can automatically pick up previous input values and will
-show them as default. You can also use C<param> to set them manually and let
+show them as default. You can also use
+L<Mojolicious::Plugin::DefaultHelpers/"param"> to set them manually and let
 necessary attributes always be generated automatically.
 
   % param country => 'germany' unless param 'country';
@@ -390,38 +391,39 @@ Generate file input element.
 
 =head2 C<form_for>
 
-  %= form_for login => (method => 'post') => begin
+  %= form_for login => (method => 'POST') => begin
     %= text_field 'first_name'
     %= submit_button
   % end
-  %= form_for login => {foo => 'bar'} => (method => 'post') => begin
+  %= form_for login => {foo => 'bar'} => (method => 'POST') => begin
     %= text_field 'first_name'
     %= submit_button
   % end
-  %= form_for '/login' => (method => 'post') => begin
+  %= form_for '/login' => (method => 'POST') => begin
     %= text_field 'first_name'
     %= submit_button
   % end
-  %= form_for 'http://kraih.com/login' => (method => 'post') => begin
+  %= form_for 'http://kraih.com/login' => (method => 'POST') => begin
     %= text_field 'first_name'
     %= submit_button
   % end
 
-Generate form for route, path or URL.
+Generate form for route, path or URL. For routes that allow C<POST> but not
+C<GET>, a C<method> attribute will be automatically added.
 
-  <form action="/path/to/login" method="post">
+  <form action="/path/to/login" method="POST">
     <input name="first_name" />
     <input value="Ok" type="submit" />
   </form>
-  <form action="/path/to/login/bar" method="post">
+  <form action="/path/to/login/bar" method="POST">
     <input name="first_name" />
     <input value="Ok" type="submit" />
   </form>
-  <form action="/login" method="post">
+  <form action="/login" method="POST">
     <input name="first_name" />
     <input value="Ok" type="submit" />
   </form>
-  <form action="http://kraih.com/login" method="post">
+  <form action="http://kraih.com/login" method="POST">
     <input name="first_name" />
     <input value="Ok" type="submit" />
   </form>

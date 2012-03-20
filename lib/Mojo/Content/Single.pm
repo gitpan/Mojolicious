@@ -9,12 +9,15 @@ has auto_upgrade => 1;
 
 sub new {
   my $self = shift->SUPER::new(@_);
+
+  # Default content parser
   $self->{read} = $self->on(
     read => sub {
       my ($self, $chunk) = @_;
       $self->asset($self->asset->add_chunk($chunk));
     }
   );
+
   return $self;
 }
 
@@ -51,7 +54,8 @@ sub parse {
   # Content needs to be upgraded to multipart
   if ($self->auto_upgrade && defined($self->boundary)) {
     $self->unsubscribe(read => $self->{read});
-    $self->emit(upgrade => my $multi = Mojo::Content::MultiPart->new($self));
+    my $multi = Mojo::Content::MultiPart->new($self);
+    $self->emit(upgrade => $multi);
     return $multi->parse;
   }
 

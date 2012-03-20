@@ -36,8 +36,6 @@ lib/Mojo/IOLoop/Client.pm
 lib/Mojo/IOLoop/Delay.pm
 lib/Mojo/IOLoop/Server.pm
 lib/Mojo/IOLoop/Stream.pm
-lib/Mojo/IOWatcher.pm
-lib/Mojo/IOWatcher/EV.pm
 lib/Mojo/JSON.pm
 lib/Mojo/JSON/Pointer.pm
 lib/Mojo/Loader.pm
@@ -47,6 +45,8 @@ lib/Mojo/Message/Request.pm
 lib/Mojo/Message/Response.pm
 lib/Mojo/Parameters.pm
 lib/Mojo/Path.pm
+lib/Mojo/Reactor.pm
+lib/Mojo/Reactor/EV.pm
 lib/Mojo/Server.pm
 lib/Mojo/Server/CGI.pm
 lib/Mojo/Server/Daemon.pm
@@ -136,6 +136,7 @@ lib/Mojolicious/Renderer.pm
 lib/Mojolicious/Routes.pm
 lib/Mojolicious/Routes/Match.pm
 lib/Mojolicious/Routes/Pattern.pm
+lib/Mojolicious/Routes/Route.pm
 lib/Mojolicious/Sessions.pm
 lib/Mojolicious/Static.pm
 lib/Mojolicious/templates/exception.development.html.ep
@@ -185,8 +186,6 @@ t/mojo/home.t
 t/mojo/hypnotoad.t
 t/mojo/ioloop.t
 t/mojo/ioloop_tls.t
-t/mojo/iowatcher.t
-t/mojo/iowatcher_ev.t
 t/mojo/json.t
 t/mojo/json_pointer.t
 t/mojo/lib/BaseTest/Base1.pm
@@ -205,6 +204,8 @@ t/mojo/morbo.t
 t/mojo/parameters.t
 t/mojo/path.t
 t/mojo/psgi.t
+t/mojo/reactor.t
+t/mojo/reactor_ev.t
 t/mojo/request.t
 t/mojo/request_cgi.t
 t/mojo/response.t

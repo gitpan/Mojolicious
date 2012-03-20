@@ -161,10 +161,6 @@ sub _config {
   my $listen = $c->{listen} || ['http://*:8080'];
   $listen = [$listen] unless ref $listen;
   $daemon->listen($listen);
-
-  # DEPRECATED in Leaf Fluttering In Wind!
-  $daemon->inactivity_timeout($c->{keep_alive_timeout})
-    if $c->{keep_alive_timeout};
 }
 
 sub _exit { say shift and exit 0 }
@@ -509,7 +505,9 @@ Listen backlog size, defaults to C<SOMAXCONN>.
   clients => 100
 
 Maximum number of parallel client connections per worker process, defaults to
-C<1000>.
+C<1000>. Note that depending on how much your application may block, you
+might want to decrease this value and increase C<workers> instead for better
+performance.
 
 =head2 C<graceful_timeout>
 

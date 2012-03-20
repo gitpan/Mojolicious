@@ -16,7 +16,7 @@ use Scalar::Util ();
 # "Scalpel... blood bucket... priest."
 has app => sub { Mojolicious->new };
 has match => sub {
-  Mojolicious::Routes::Match->new(get => '/')->root(shift->app->routes);
+  Mojolicious::Routes::Match->new(GET => '/')->root(shift->app->routes);
 };
 has tx => sub { Mojo::Transaction::HTTP->new };
 
@@ -683,8 +683,8 @@ implements the following new ones.
 
 Access request cookie values and create new response cookies.
 
-  # Extract value from request cookie
-  my $foo = $c->cookie('foo')->value;
+  # Create response cookie with domain
+  $c->cookie(name => 'sebastian', {domain => 'mojolicio.us'});
 
 =head2 C<finish>
 
@@ -904,7 +904,6 @@ Automatically select best possible representation for resource from C<Accept>
 request header, C<format> stash value or C<format> GET/POST parameter,
 defaults to rendering an empty C<204> response.
 
-  # Negotiate content
   $c->respond_to(
     json => sub { $c->render_json({just => 'works'}) },
     xml  => {text => '<just>works</just>'},
@@ -942,6 +941,9 @@ that cookies are generally limited to 4096 bytes of data.
   $c->session->{foo} = 'bar';
   my $foo = $c->session->{foo};
   delete $c->session->{foo};
+
+  # Delete whole session
+  $c->session(expires => 1);
 
 =head2 C<signed_cookie>
 

@@ -7,6 +7,8 @@ has parts => sub { [] };
 
 sub new {
   my $self = shift->SUPER::new(@_);
+
+  # Default content parser
   $self->on(
     read => sub {
       my ($self, $chunk) = @_;
@@ -14,6 +16,7 @@ sub new {
       $self->_parse_multipart;
     }
   );
+
   return $self;
 }
 
@@ -187,7 +190,8 @@ sub _parse_multipart_boundary {
     substr $self->{multipart}, 0, length($boundary) + 6, '';
 
     # New part
-    $self->emit(part => my $part = Mojo::Content::Single->new(relaxed => 1));
+    my $part = Mojo::Content::Single->new(relaxed => 1);
+    $self->emit(part => $part);
     push @{$self->parts}, $part;
     return $self->{multi_state} = 'multipart_body';
   }

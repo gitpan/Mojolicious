@@ -399,8 +399,8 @@ Routes can be restricted to specific request methods.
     $self->render(text => "You uploaded $size bytes to /hello.");
   };
 
-  # GET|POST|DELETE /bye
-  any ['get', 'post', 'delete'] => '/bye' => sub {
+  # GET|POST|PATCH /bye
+  any ['GET', 'POST', 'PATCH'] => '/bye' => sub {
     my $self = shift;
     $self->render(text => 'Bye World!');
   };
@@ -662,7 +662,11 @@ into a temporary file.
 
   use Mojolicious::Lite;
 
-  any '/upload' => sub {
+  # Upload form in DATA section
+  get '/' => 'form';
+
+  # Multipart upload handler
+  post '/upload' => sub {
     my $self = shift;
 
     # Check file size
@@ -680,13 +684,12 @@ into a temporary file.
   app->start;
   __DATA__
 
-  @@ upload.html.ep
+  @@ form.html.ep
   <!DOCTYPE html>
   <html>
     <head><title>Upload</title></head>
     <body>
-      % my @attrs = (method => 'POST', enctype => 'multipart/form-data');
-      %= form_for upload => @attrs => begin
+      %= form_for upload => (enctype => 'multipart/form-data') => begin
         %= file_field 'example'
         %= submit_button 'Upload'
       % end
@@ -812,7 +815,7 @@ L<Mojolicious::Lite> implements the following functions.
 =head2 C<any>
 
   my $route = any '/:foo' => sub {...};
-  my $route = any ['get', 'post'] => '/:foo' => sub {...};
+  my $route = any ['GET', 'POST'] => '/:foo' => sub {...};
 
 Generate route matching any of the listed HTTP request methods or all. See
 also the tutorial above for more argument variations.
