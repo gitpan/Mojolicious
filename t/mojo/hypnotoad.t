@@ -3,7 +3,7 @@ use Mojo::Base -strict;
 # Disable Bonjour, IPv6 and libev
 BEGIN {
   $ENV{MOJO_NO_BONJOUR} = $ENV{MOJO_NO_IPV6} = 1;
-  $ENV{MOJO_REACTOR} = 'Mojo::Reactor';
+  $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Poll';
 }
 
 use Test::More;
@@ -134,7 +134,7 @@ ok $tx->kept_alive,  'connection was kept alive';
 is $tx->res->code, 200, 'right status';
 is $tx->res->body, 'Hello Hypnotoad!', 'right content';
 
-# Drop keep alive connections
+# Remove keep alive connections
 $ua = Mojo::UserAgent->new;
 
 # Wait for hot deployment to finish

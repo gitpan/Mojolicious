@@ -3,10 +3,10 @@ use Mojo::Base -strict;
 # Disable Bonjour, IPv6 and libev
 BEGIN {
   $ENV{MOJO_NO_BONJOUR} = $ENV{MOJO_NO_IPV6} = 1;
-  $ENV{MOJO_REACTOR} = 'Mojo::Reactor';
+  $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Poll';
 }
 
-use Test::More tests => 30;
+use Test::More tests => 32;
 
 # "Marge, you being a cop makes you the man!
 #  Which makes me the woman, and I have no interest in that,
@@ -20,14 +20,14 @@ use Mojo::IOLoop::Stream;
 
 # Custom reactor
 package MyReactor;
-use Mojo::Base 'Mojo::Reactor';
+use Mojo::Base 'Mojo::Reactor::Poll';
 
 package main;
 
 # Reactor detection
 $ENV{MOJO_REACTOR} = 'MyReactorDoesNotExist';
 my $loop = Mojo::IOLoop->new;
-is ref $loop->reactor, 'Mojo::Reactor', 'right class';
+is ref $loop->reactor, 'Mojo::Reactor::Poll', 'right class';
 $ENV{MOJO_REACTOR} = 'MyReactor';
 $loop = Mojo::IOLoop->new;
 is ref $loop->reactor, 'MyReactor', 'right class';
@@ -87,11 +87,11 @@ ok $ticks > 2, 'more than two ticks';
 my $before = $ticks;
 my $after  = 0;
 my $id2    = $loop->recurring(0 => sub { $after++ });
-$loop->drop($id);
+$loop->remove($id);
 $loop->timer(1 => sub { shift->stop });
 $loop->start;
 $loop->one_tick;
-$loop->drop($id2);
+$loop->remove($id2);
 ok $after > 1, 'more than one tick';
 is $ticks, $before, 'no additional ticks';
 
@@ -101,7 +101,7 @@ $id = $loop->recurring(0.5 => sub { $count++ });
 $loop->timer(3 => sub { shift->stop });
 $loop->start;
 $loop->one_tick;
-$loop->drop($id);
+$loop->remove($id);
 ok $count > 1, 'more than one recurring event';
 ok $count < 10, 'less than ten recurring events';
 
@@ -119,8 +119,8 @@ $id = $loop->server(
 );
 $id2 = $loop->client((address => 'localhost', port => $port) => sub { });
 $loop->start;
-$loop->drop($id);
-$loop->drop($id2);
+$loop->remove($id);
+$loop->remove($id2);
 isa_ok $handle, 'IO::Socket', 'right reference';
 
 # Make sure it stops automatically when not watching for events
@@ -163,19 +163,19 @@ $stream->on(read => sub { $buffer .= pop });
 $stream->write('hello');
 ok(Mojo::IOLoop->stream($id), 'stream exists');
 Mojo::IOLoop->start;
-Mojo::IOLoop->timer('0.25' => sub { Mojo::IOLoop->stop });
+Mojo::IOLoop->timer(0.25 => sub { Mojo::IOLoop->stop });
 Mojo::IOLoop->start;
 ok !Mojo::IOLoop->stream($id), 'stream does not exist anymore';
 is $buffer, 'acceptedhelloworld', 'right result';
 
-# Dropped listen socket
+# Removed listen socket
 $port = Mojo::IOLoop->generate_port;
 $id = $loop->server({address => '127.0.0.1', port => $port} => sub { });
 my $connected;
 $loop->client(
   {port => $port} => sub {
     my ($loop, $err, $stream) = @_;
-    $loop->drop($id);
+    $loop->remove($id);
     $loop->stop;
     $connected = 1;
   }
@@ -188,14 +188,13 @@ $err = undef;
 $loop->client(
   (port => $port) => sub {
     shift->stop;
-    pop;
-    $err = pop;
+    $err = shift;
   }
 );
 $loop->start;
 ok $err, 'has error';
 
-# Dropped connection
+# Removed connection
 $port = Mojo::IOLoop->generate_port;
 my ($server_close, $client_close);
 Mojo::IOLoop->server(
@@ -208,10 +207,10 @@ $id = Mojo::IOLoop->client(
   (port => $port) => sub {
     my ($loop, $err, $stream) = @_;
     $stream->on(close => sub { $client_close++ });
-    $loop->drop($id);
+    $loop->remove($id);
   }
 );
-Mojo::IOLoop->timer('0.5' => sub { shift->stop });
+Mojo::IOLoop->timer(0.5 => sub { shift->stop });
 Mojo::IOLoop->start;
 is $server_close, 1, 'server emitted close event once';
 is $client_close, 1, 'client emitted close event once';
@@ -226,16 +225,16 @@ Mojo::IOLoop->server(
       read => sub {
         my ($stream, $chunk) = @_;
         Mojo::IOLoop->timer(
-          '0.5' => sub {
+          0.5 => sub {
             $server_before = $server;
             $stream->stop;
             $stream->write('works!');
             Mojo::IOLoop->timer(
-              '0.5' => sub {
+              0.5 => sub {
                 $server_after = $server;
                 $client_after = $client;
                 $stream->start;
-                Mojo::IOLoop->timer('0.5' => sub { Mojo::IOLoop->stop });
+                Mojo::IOLoop->timer(0.5 => sub { Mojo::IOLoop->stop });
               }
             );
           }
@@ -260,19 +259,26 @@ ok length($server) > length($server_after), 'stream has been resumed';
 is $client, $client_after, 'stream was writable while paused';
 is $client, 'works!', 'full message has been written';
 
-# Graceful shutdown
+# Graceful shutdown (max_connections)
 $err = '';
 $loop = Mojo::IOLoop->new(max_connections => 0);
-$loop->drop($loop->client({port => $loop->generate_port}));
-$loop->timer(
-  1 => sub {
-    shift->stop;
-    $err = 'failed!';
-  }
-);
+$loop->remove($loop->client({port => $loop->generate_port}));
+$loop->timer(1 => sub { shift->stop; $err = 'failed!' });
 $loop->start;
 ok !$err, 'no error';
 is $loop->max_connections, 0, 'right value';
+
+# Graceful shutdown (max_accepts)
+$err  = '';
+$loop = Mojo::IOLoop->new(max_accepts => 1);
+$port = $loop->generate_port;
+$loop->server(
+  {address => '127.0.0.1', port => $port} => sub { shift; shift->close });
+$loop->client({port => $port} => sub { });
+$loop->timer(1 => sub { shift->stop; $err = 'failed!' });
+$loop->start;
+ok !$err, 'no error';
+is $loop->max_accepts, 1, 'right value';
 
 # Defaults
 is(

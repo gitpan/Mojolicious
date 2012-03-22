@@ -17,7 +17,7 @@ use IO::Socket::INET;
 use_ok 'Mojo::Reactor::EV';
 my $reactor = Mojo::Reactor::EV->new;
 is ref $reactor, 'Mojo::Reactor::EV', 'right object';
-is ref Mojo::Reactor::EV->new, 'Mojo::Reactor', 'right object';
+is ref Mojo::Reactor::EV->new, 'Mojo::Reactor::Poll', 'right object';
 undef $reactor;
 is ref Mojo::Reactor::EV->new, 'Mojo::Reactor::EV', 'right object';
 use_ok 'Mojo::IOLoop';
@@ -55,7 +55,7 @@ ok $reactor->is_readable($listen), 'handle is readable';
 
 # Accept
 my $server = $listen->accept;
-$reactor->drop($listen);
+$reactor->remove($listen);
 ($readable, $writable) = undef;
 $reactor->io($client => sub { pop() ? $writable++ : $readable++ });
 $reactor->timer(0 => sub { shift->stop });
@@ -64,7 +64,7 @@ is $readable, undef, 'handle is not readable';
 is $writable, 1,     'handle is writable';
 print $client "hello!\n";
 sleep 1;
-$reactor->drop($client);
+$reactor->remove($client);
 ($readable, $writable) = undef;
 $reactor->io($server => sub { pop() ? $writable++ : $readable++ });
 $reactor->watch($server, 1, 0);
@@ -97,16 +97,16 @@ is $writable, 1, 'handle is writable';
 # Timers
 my ($timer, $recurring);
 $reactor->timer(0 => sub { $timer++ });
-$reactor->drop($reactor->timer(0 => sub { $timer++ }));
+$reactor->remove($reactor->timer(0 => sub { $timer++ }));
 my $id = $reactor->recurring(0 => sub { $recurring++ });
-$reactor->timer(0 => sub { shift->stop });
-$reactor->start;
+$reactor->one_tick;
 is $readable,  2, 'handle is readable again';
 is $writable,  2, 'handle is writable again';
 is $timer,     1, 'timer was triggered';
 is $recurring, 1, 'recurring was triggered';
-$reactor->timer(0 => sub { shift->stop });
-$reactor->start;
+my $done = 0;
+$reactor->timer(0 => sub { $done = shift->is_running });
+$reactor->one_tick while !$done;
 is $readable,  3, 'handle is readable again';
 is $writable,  3, 'handle is writable again';
 is $timer,     1, 'timer was not triggered';
@@ -123,7 +123,7 @@ is $readable,  5, 'handle is readable again';
 is $writable,  5, 'handle is writable again';
 is $timer,     1, 'timer was not triggered';
 is $recurring, 4, 'recurring was triggered again';
-$reactor->drop($id);
+$reactor->remove($id);
 $reactor->timer(0 => sub { shift->stop });
 $reactor->start;
 is $readable,  6, 'handle is readable again';
@@ -132,14 +132,14 @@ is $timer,     1, 'timer was not triggered';
 is $recurring, 4, 'recurring was not triggered again';
 
 # Reset
-$reactor->drop($id);
-$reactor->drop($server);
+$reactor->remove($id);
+$reactor->remove($server);
 $reactor->timer(0 => sub { shift->stop });
 $reactor->start;
 is $readable, 6, 'io event was not triggered again';
 is $writable, 6, 'io event was not triggered again';
 my $reactor2 = Mojo::Reactor::EV->new;
-is ref $reactor2, 'Mojo::Reactor', 'right object';
+is ref $reactor2, 'Mojo::Reactor::Poll', 'right object';
 
 # Parallel loops
 $timer = 0;
@@ -180,7 +180,7 @@ is(Mojo::Reactor->detect, 'Mojo::Reactor::EV', 'right class');
 
 # Dummy reactor
 package Mojo::Reactor::Test;
-use Mojo::Base 'Mojo::Reactor';
+use Mojo::Base 'Mojo::Reactor::Poll';
 $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Test';
 
 package main;
@@ -215,7 +215,7 @@ Mojo::IOLoop->client(
     $client_err = $@;
   }
 );
-Mojo::IOLoop->timer(1 => sub { EV::break(EV::BREAK_ONE()) });
+Mojo::IOLoop->timer(1 => sub { EV::break(EV::BREAK_ALL()) });
 EV::run();
 ok !Mojo::IOLoop->is_running, 'loop is not running';
 like $server_err, qr/^Mojo::IOLoop already running/, 'right error';

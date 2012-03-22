@@ -143,7 +143,7 @@ sub _config {
   $c->{heartbeat_timeout}  ||= 10;
   $c->{lock_file}          ||= catfile tmpdir, 'hypnotoad.lock';
   $c->{lock_file} .= ".$$";
-  $c->{lock_timeout} ||= '0.5';
+  $c->{lock_timeout} ||= 0.5;
   $c->{pid_file} ||= catfile dirname($ENV{HYPNOTOAD_APP}), 'hypnotoad.pid';
   $c->{upgrade_timeout} ||= 60;
   $c->{workers}         ||= 4;
@@ -540,7 +540,7 @@ stopped, defaults to C<10>.
   inactivity_timeout => 10
 
 Maximum amount of time in seconds a connection can be inactive before getting
-dropped, defaults to C<15>. Setting the value to C<0> will allow connections
+closed, defaults to C<15>. Setting the value to C<0> will allow connections
 to be inactive indefinitely.
 
 =head2 C<keep_alive_requests>

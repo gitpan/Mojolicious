@@ -1,5 +1,5 @@
 package Mojo::Reactor::EV;
-use Mojo::Base 'Mojo::Reactor';
+use Mojo::Base 'Mojo::Reactor::Poll';
 
 use EV 4.0;
 use Scalar::Util 'weaken';
@@ -8,10 +8,12 @@ my $EV;
 
 sub DESTROY { undef $EV }
 
-# We have to fall back to Mojo::Reactor, since EV is unique
-sub new { $EV++ ? Mojo::Reactor->new : shift->SUPER::new }
+# We have to fall back to Mojo::Reactor::Poll, since EV is unique
+sub new { $EV++ ? Mojo::Reactor::Poll->new : shift->SUPER::new }
 
 sub is_running {EV::depth}
+
+sub one_tick { EV::run(EV::RUN_NOWAIT) }
 
 sub recurring { shift->_timer(shift, 1, @_) }
 
@@ -19,7 +21,7 @@ sub recurring { shift->_timer(shift, 1, @_) }
 #  Yeah... where do I fill it up?"
 sub start {EV::run}
 
-sub stop { EV::break(EV::BREAK_ONE) }
+sub stop { EV::break(EV::BREAK_ALL) }
 
 sub timer { shift->_timer(shift, 0, @_) }
 
@@ -75,27 +77,40 @@ __END__
 
 =head1 NAME
 
-Mojo::Reactor::EV - Minimalistic low level event reactor with libev support
+Mojo::Reactor::EV - Low level event reactor with libev support
 
 =head1 SYNOPSIS
 
   use Mojo::Reactor::EV;
 
+  # Watch if handle becomes readable or writable
   my $reactor = Mojo::Reactor::EV->new;
+  $reactor->io($handle => sub {
+    my ($reactor, $writable) = @_;
+    say $writable ? 'Handle is writable' : 'Handle is readable';
+  });
+
+  # Add a timer
+  $reactor->timer(15 => sub {
+    my $reactor = shift;
+    $reactor->remove($handle);
+    say 'Timeout!';
+  });
+
+  # Start reactor if necessary
+  $reactor->start unless $reactor->is_running;
 
 =head1 DESCRIPTION
 
-L<Mojo::Reactor::EV> is a minimalistic low level event reactor with C<libev>
-support. Note that this module is EXPERIMENTAL and might change without
-warning!
+L<Mojo::Reactor::EV> is a low level event reactor based on L<EV>.
 
 =head1 EVENTS
 
-L<Mojo::Reactor::EV> inherits all events from L<Mojo::Reactor>.
+L<Mojo::Reactor::EV> inherits all events from L<Mojo::Reactor::Poll>.
 
 =head1 METHODS
 
-L<Mojo::Reactor::EV> inherits all methods from L<Mojo::Reactor> and
+L<Mojo::Reactor::EV> inherits all methods from L<Mojo::Reactor::Poll> and
 implements the following new ones.
 
 =head2 C<new>
@@ -110,9 +125,16 @@ Construct a new L<Mojo::Reactor::EV> object.
 
 Check if reactor is running.
 
+=head2 C<one_tick>
+
+  $reactor->one_tick;
+
+Run reactor for roughly one tick. Note that this method can recurse back into
+the reactor, so you need to be careful.
+
 =head2 C<recurring>
 
-  my $id = $reactor->recurring(3 => sub {...});
+  my $id = $reactor->recurring(0.25 => sub {...});
 
 Create a new recurring timer, invoking the callback repeatedly after a given
 amount of time in seconds.
@@ -132,7 +154,7 @@ Stop watching for I/O and timer events.
 
 =head2 C<timer>
 
-  my $id = $reactor->timer(3 => sub {...});
+  my $id = $reactor->timer(0.5 => sub {...});
 
 Create a new timer, invoking the callback after a given amount of time in
 seconds.

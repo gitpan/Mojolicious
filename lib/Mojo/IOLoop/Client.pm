@@ -38,9 +38,9 @@ sub connect {
 sub _cleanup {
   my $self = shift;
   return unless my $reactor = $self->{reactor};
-  $reactor->drop(delete $self->{delay})  if $self->{delay};
-  $reactor->drop(delete $self->{timer})  if $self->{timer};
-  $reactor->drop(delete $self->{handle}) if $self->{handle};
+  $reactor->remove(delete $self->{delay})  if $self->{delay};
+  $reactor->remove(delete $self->{timer})  if $self->{timer};
+  $reactor->remove(delete $self->{handle}) if $self->{handle};
 }
 
 sub _connect {
@@ -155,8 +155,7 @@ Mojo::IOLoop::Client - Non-blocking TCP client
 
 =head1 DESCRIPTION
 
-L<Mojo::IOLoop::Client> opens TCP connections for L<Mojo::IOLoop>. Note that
-this module is EXPERIMENTAL and might change without warning!
+L<Mojo::IOLoop::Client> opens TCP connections for L<Mojo::IOLoop>.
 
 =head1 EVENTS
 
@@ -187,7 +186,7 @@ L<Mojo::IOLoop::Client> implements the following attributes.
 =head2 C<reactor>
 
   my $reactor = $client->reactor;
-  $client     = $client->reactor(Mojo::Reactor->new);
+  $client     = $client->reactor(Mojo::Reactor::Poll->new);
 
 Low level event reactor, defaults to the C<reactor> attribute value of the
 global L<Mojo::IOLoop> singleton.

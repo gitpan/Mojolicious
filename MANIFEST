@@ -47,6 +47,7 @@ lib/Mojo/Parameters.pm
 lib/Mojo/Path.pm
 lib/Mojo/Reactor.pm
 lib/Mojo/Reactor/EV.pm
+lib/Mojo/Reactor/Poll.pm
 lib/Mojo/Server.pm
 lib/Mojo/Server/CGI.pm
 lib/Mojo/Server/Daemon.pm
@@ -204,8 +205,8 @@ t/mojo/morbo.t
 t/mojo/parameters.t
 t/mojo/path.t
 t/mojo/psgi.t
-t/mojo/reactor.t
 t/mojo/reactor_ev.t
+t/mojo/reactor_poll.t
 t/mojo/request.t
 t/mojo/request_cgi.t
 t/mojo/response.t
@@ -221,6 +222,7 @@ t/mojo/websocket_frames.t
 t/mojo/websocket_proxy.t
 t/mojo/websocket_proxy_tls.t
 t/mojolicious/app.t
+t/mojolicious/caching_lite_app.t
 t/mojolicious/charset_lite_app.t
 t/mojolicious/dispatch.t
 t/mojolicious/dispatcher_lite_app.t

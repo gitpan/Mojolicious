@@ -3,7 +3,7 @@ use Mojo::Base -strict;
 # Disable Bonjour, IPv6 and libev
 BEGIN {
   $ENV{MOJO_NO_BONJOUR} = $ENV{MOJO_NO_IPV6} = 1;
-  $ENV{MOJO_REACTOR} = 'Mojo::Reactor';
+  $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Poll';
 }
 
 use Test::More tests => 9;
@@ -84,7 +84,7 @@ Mojo::IOLoop->server(
               {address => $1, port => $fail ? $port : $2} => sub {
                 my ($loop, $err, $stream) = @_;
                 if ($err) {
-                  Mojo::IOLoop->drop($client);
+                  Mojo::IOLoop->remove($client);
                   return delete $c->{$client};
                 }
                 $c->{$client}->{connection} = $server;
@@ -98,7 +98,7 @@ Mojo::IOLoop->server(
                 );
                 $stream->on(
                   close => sub {
-                    Mojo::IOLoop->drop($client);
+                    Mojo::IOLoop->remove($client);
                     delete $c->{$client};
                   }
                 );
@@ -107,12 +107,12 @@ Mojo::IOLoop->server(
             );
           }
         }
-        else { Mojo::IOLoop->drop($client) }
+        else { Mojo::IOLoop->remove($client) }
       }
     );
     $stream->on(
       close => sub {
-        Mojo::IOLoop->drop($c->{$client}->{connection})
+        Mojo::IOLoop->remove($c->{$client}->{connection})
           if $c->{$client}->{connection};
         delete $c->{$client};
       }

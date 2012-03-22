@@ -26,9 +26,9 @@ sub close {
 
   # Cleanup
   return unless my $reactor = $self->{reactor};
-  $reactor->drop(delete $self->{timer}) if $self->{timer};
+  $reactor->remove(delete $self->{timer}) if $self->{timer};
   return unless my $handle = delete $self->{handle};
-  $reactor->drop($handle);
+  $reactor->remove($handle);
 
   # Close
   close $handle;
@@ -56,7 +56,7 @@ sub start {
   my $reactor = $self->reactor;
   weaken $self;
   $self->{timer} ||= $reactor->recurring(
-    '0.025' => sub {
+    0.025 => sub {
       return unless $self && (my $t = $self->timeout);
       $self->emit_safe('timeout')->close if (time - ($self->{active})) >= $t;
     }
@@ -82,7 +82,7 @@ sub stop {
 #  about it."
 sub steal_handle {
   my $self = shift;
-  $self->reactor->drop($self->{handle});
+  $self->reactor->remove($self->{handle});
   return delete $self->{handle};
 }
 
@@ -197,8 +197,7 @@ Mojo::IOLoop::Stream - Non-blocking I/O stream
 =head1 DESCRIPTION
 
 L<Mojo::IOLoop::Stream> is a container for I/O streams used by
-L<Mojo::IOLoop>. Note that this module is EXPERIMENTAL and might change
-without warning!
+L<Mojo::IOLoop>.
 
 =head1 EVENTS
 
@@ -266,7 +265,7 @@ L<Mojo::IOLoop::Stream> implements the following attributes.
 =head2 C<reactor>
 
   my $reactor = $stream->reactor;
-  $stream     = $stream->reactor(Mojo::Reactor->new);
+  $stream     = $stream->reactor(Mojo::Reactor::Poll->new);
 
 Low level event reactor, defaults to the C<reactor> attribute value of the
 global L<Mojo::IOLoop> singleton.
@@ -307,7 +306,8 @@ Get handle for stream.
 
   my $success = $stream->is_readable;
 
-Quick check if stream is readable, useful for identifying tainted sockets.
+Quick non-blocking check if stream is readable, useful for identifying
+tainted sockets.
 
 =head2 C<is_writing>
 

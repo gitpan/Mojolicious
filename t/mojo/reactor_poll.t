@@ -3,7 +3,7 @@ use Mojo::Base -strict;
 # Disable Bonjour, IPv6 and libev
 BEGIN {
   $ENV{MOJO_NO_BONJOUR} = $ENV{MOJO_NO_IPV6} = 1;
-  $ENV{MOJO_REACTOR} = 'Mojo::Reactor';
+  $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Poll';
 }
 
 use Test::More tests => 66;
@@ -11,17 +11,17 @@ use Test::More tests => 66;
 # "I don't mind being called a liar when I'm lying, or about to lie,
 #  or just finished lying, but NOT WHEN I'M TELLING THE TRUTH."
 use IO::Socket::INET;
-use Mojo::Reactor;
+use Mojo::Reactor::Poll;
 
 # Instantiation
-my $reactor = Mojo::Reactor->new;
-is ref $reactor, 'Mojo::Reactor', 'right object';
-is ref Mojo::Reactor->new, 'Mojo::Reactor', 'right object';
+my $reactor = Mojo::Reactor::Poll->new;
+is ref $reactor, 'Mojo::Reactor::Poll', 'right object';
+is ref Mojo::Reactor::Poll->new, 'Mojo::Reactor::Poll', 'right object';
 undef $reactor;
-is ref Mojo::Reactor->new, 'Mojo::Reactor', 'right object';
+is ref Mojo::Reactor::Poll->new, 'Mojo::Reactor::Poll', 'right object';
 use_ok 'Mojo::IOLoop';
 $reactor = Mojo::IOLoop->singleton->reactor;
-is ref $reactor, 'Mojo::Reactor', 'right object';
+is ref $reactor, 'Mojo::Reactor::Poll', 'right object';
 
 # Make sure it stops automatically when not watching for events
 Mojo::IOLoop->start;
@@ -54,7 +54,7 @@ ok $reactor->is_readable($listen), 'handle is readable';
 
 # Accept
 my $server = $listen->accept;
-$reactor->drop($listen);
+$reactor->remove($listen);
 ($readable, $writable) = undef;
 $reactor->io($client => sub { pop() ? $writable++ : $readable++ });
 $reactor->timer(0 => sub { shift->stop });
@@ -63,7 +63,7 @@ is $readable, undef, 'handle is not readable';
 is $writable, 1,     'handle is writable';
 print $client "hello!\n";
 sleep 1;
-$reactor->drop($client);
+$reactor->remove($client);
 ($readable, $writable) = undef;
 $reactor->io($server => sub { pop() ? $writable++ : $readable++ });
 $reactor->watch($server, 1, 0);
@@ -96,16 +96,16 @@ is $writable, 1, 'handle is writable';
 # Timers
 my ($timer, $recurring);
 $reactor->timer(0 => sub { $timer++ });
-$reactor->drop($reactor->timer(0 => sub { $timer++ }));
+$reactor->remove($reactor->timer(0 => sub { $timer++ }));
 my $id = $reactor->recurring(0 => sub { $recurring++ });
-$reactor->timer(0 => sub { shift->stop });
-$reactor->start;
+$reactor->one_tick;
 is $readable,  2, 'handle is readable again';
 is $writable,  2, 'handle is writable again';
 is $timer,     1, 'timer was triggered';
 is $recurring, 1, 'recurring was triggered';
-$reactor->timer(0 => sub { shift->stop });
-$reactor->start;
+my $done = 0;
+$reactor->timer(0 => sub { $done = shift->is_running });
+$reactor->one_tick while !$done;
 is $readable,  3, 'handle is readable again';
 is $writable,  3, 'handle is writable again';
 is $timer,     1, 'timer was not triggered';
@@ -122,7 +122,7 @@ is $readable,  5, 'handle is readable again';
 is $writable,  5, 'handle is writable again';
 is $timer,     1, 'timer was not triggered';
 is $recurring, 4, 'recurring was triggered again';
-$reactor->drop($id);
+$reactor->remove($id);
 $reactor->timer(0 => sub { shift->stop });
 $reactor->start;
 is $readable,  6, 'handle is readable again';
@@ -131,14 +131,14 @@ is $timer,     1, 'timer was not triggered';
 is $recurring, 4, 'recurring was not triggered again';
 
 # Reset
-$reactor->drop($id);
-$reactor->drop($server);
+$reactor->remove($id);
+$reactor->remove($server);
 $reactor->timer(0 => sub { shift->stop });
 $reactor->start;
 is $readable, 6, 'io event was not triggered again';
 is $writable, 6, 'io event was not triggered again';
-my $reactor2 = Mojo::Reactor->new;
-is ref $reactor2, 'Mojo::Reactor', 'right object';
+my $reactor2 = Mojo::Reactor::Poll->new;
+is ref $reactor2, 'Mojo::Reactor::Poll', 'right object';
 
 # Parallel loops
 $timer = 0;
@@ -175,11 +175,11 @@ $reactor->start;
 like $err, qr/works!/, 'right error';
 
 # Detection
-is(Mojo::Reactor->detect, 'Mojo::Reactor', 'right class');
+is(Mojo::Reactor::Poll->detect, 'Mojo::Reactor::Poll', 'right class');
 
 # Dummy reactor
 package Mojo::Reactor::Test;
-use Mojo::Base 'Mojo::Reactor';
+use Mojo::Base 'Mojo::Reactor::Poll';
 $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Test';
 
 package main;
@@ -188,8 +188,9 @@ package main;
 is(Mojo::Reactor->detect, 'Mojo::Reactor::Test', 'right class');
 
 # Reactor in control
-$ENV{MOJO_REACTOR} = 'Mojo::Reactor';
-is ref Mojo::IOLoop->singleton->reactor, 'Mojo::Reactor', 'right object';
+$ENV{MOJO_REACTOR} = 'Mojo::Reactor::Poll';
+is ref Mojo::IOLoop->singleton->reactor, 'Mojo::Reactor::Poll',
+  'right object';
 ok !Mojo::IOLoop->is_running, 'loop is not running';
 $port = Mojo::IOLoop->generate_port;
 my ($server_err, $server_running, $client_err, $client_running);

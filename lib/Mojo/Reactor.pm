@@ -1,35 +1,18 @@
 package Mojo::Reactor;
 use Mojo::Base 'Mojo::EventEmitter';
 
-use IO::Poll qw/POLLERR POLLHUP POLLIN POLLOUT/;
+use Carp 'croak';
+use IO::Poll qw/POLLERR POLLHUP POLLIN/;
 use Mojo::Loader;
-use Mojo::Util 'md5_sum';
-use Time::HiRes qw/time usleep/;
 
-# "I don't know.
-#  Can I really betray my country?
-#  I say the Pledge of Allegiance every day.
-#  You pledge allegiance to the flag.
-#  And the flag is made in China."
 sub detect {
   my $try = $ENV{MOJO_REACTOR} || 'Mojo::Reactor::EV';
-  return $try unless Mojo::Loader->load($try);
-  return 'Mojo::Reactor';
+  return Mojo::Loader->load($try) ? 'Mojo::Reactor::Poll' : $try;
 }
 
-sub drop {
-  my ($self, $drop) = @_;
-  return delete shift->{timers}->{shift()} unless ref $drop;
-  $self->_poll->remove($drop);
-  return delete $self->{io}->{fileno $drop};
-}
+sub io { croak 'Method "io" not implemented by subclass' }
 
-sub io {
-  my ($self, $handle, $cb) = @_;
-  $self->{io}->{fileno $handle} = {cb => $cb};
-  return $self->watch($handle, 1, 1);
-}
-
+# "This was such a pleasant St. Patrick's Day until Irish people showed up."
 sub is_readable {
   my ($self, $handle) = @_;
 
@@ -42,122 +25,44 @@ sub is_readable {
   return !!$result;
 }
 
-sub is_running { shift->{running} }
-
-# "This was such a pleasant St. Patrick's Day until Irish people showed up."
-sub recurring { shift->_timer(pop, after => pop, recurring => time) }
-
-sub start {
-  my $self = shift;
-  return if $self->{running}++;
-  $self->_one_tick while $self->{running};
-}
-
-sub stop { delete shift->{running} }
-
-# "Bart, how did you get a cellphone?
-#  The same way you got me, by accident on a golf course."
-sub timer { shift->_timer(pop, after => pop, started => time) }
-
-sub watch {
-  my ($self, $handle, $read, $write) = @_;
-
-  my $poll = $self->_poll;
-  $poll->remove($handle);
-  if ($read && $write) { $poll->mask($handle, POLLIN | POLLOUT) }
-  elsif ($read)  { $poll->mask($handle, POLLIN) }
-  elsif ($write) { $poll->mask($handle, POLLOUT) }
-
-  return $self;
-}
-
-sub _timer {
-  my ($self, $cb) = (shift, shift);
-  my $t = {cb => $cb, @_};
-  my $id;
-  do { $id = md5_sum('t' . time . rand 999) } while $self->{timers}->{$id};
-  $self->{timers}->{$id} = $t;
-  return $id;
-}
-
-sub _one_tick {
-  my $self = shift;
-
-  # I/O
-  my $poll = $self->_poll;
-  $poll->poll('0.025');
-  $self->_sandbox('Read', $self->{io}->{fileno $_}->{cb}, 0)
-    for $poll->handles(POLLIN | POLLHUP | POLLERR);
-  $self->_sandbox('Write', $self->{io}->{fileno $_}->{cb}, 1)
-    for $poll->handles(POLLOUT);
-
-  # Wait for timeout
-  usleep 25000 unless keys %{$self->{io}};
-
-  # Timers
-  while (my ($id, $t) = each %{$self->{timers} || {}}) {
-    my $after = $t->{after} || 0;
-    if ($after <= time - ($t->{started} || $t->{recurring} || 0)) {
-
-      # Normal timer
-      if ($t->{started}) { $self->drop($id) }
-
-      # Recurring timer
-      elsif ($after && $t->{recurring}) { $t->{recurring} += $after }
-
-      # Handle timer
-      if (my $cb = $t->{cb}) { $self->_sandbox("Timer $id", $cb) }
-    }
-  }
-
-  # Stop automatically
-  $self->stop unless keys(%{$self->{timers}}) || keys(%{$self->{io}});
-}
-
-sub _poll { shift->{poll} ||= IO::Poll->new }
-
-sub _sandbox {
-  my ($self, $desc, $cb) = (shift, shift, shift);
-  return if eval { $self->$cb(@_); 1 };
-  $self->once(error => sub { warn $_[1] })
-    unless $self->has_subscribers('error');
-  $self->emit_safe(error => "$desc failed: $@");
-}
+sub is_running { croak 'Method "is_running" not implemented by subclass' }
+sub one_tick   { croak 'Method "one_tick" not implemented by subclass' }
+sub recurring  { croak 'Method "recurring" not implemented by subclass' }
+sub remove     { croak 'Method "remove" not implemented by subclass' }
+sub start      { croak 'Method "start" not implemented by subclass' }
+sub stop       { croak 'Method "stop" not implemented by subclass' }
+sub timer      { croak 'Method "timer" not implemented by subclass' }
+sub watch      { croak 'Method "watch" not implemented by subclass' }
 
 1;
 __END__
 
 =head1 NAME
 
-Mojo::Reactor - Minimalistic low level event reactor
+Mojo::Reactor - Low level event reactor base class
 
 =head1 SYNOPSIS
 
-  use Mojo::Reactor;
+  package Mojo::Reactor::MyEventLoop;
+  use Mojo::Base 'Mojo::Reactor';
 
-  # Watch if handle becomes readable or writabe
-  my $reactor = Mojo::Reactor->new;
-  $reactor->io($handle => sub {
-    my ($reactor, $writable) = @_;
-    say $writable ? 'Handle is writable' : 'Handle is readable';
-  });
+  $ENV{MOJO_REACTOR} ||= 'Mojo::Reactor::MyEventLoop';
 
-  # Add a timer
-  $reactor->timer(15 => sub {
-    my $reactor = shift;
-    $reactor->drop($handle);
-    say 'Timeout!';
-  });
+  sub io         {...}
+  sub is_running {...}
+  sub one_tick   {...}
+  sub recurring  {...}
+  sub remove     {...}
+  sub start      {...}
+  sub stop       {...}
+  sub timer      {...}
+  sub watch      {...}
 
-  # Start reactor if necessary
-  $reactor->start unless $reactor->is_running;
+  1;
 
 =head1 DESCRIPTION
 
-L<Mojo::Reactor> is a minimalistic low level event reactor based on
-L<IO::Poll> and the foundation of L<Mojo::IOLoop>. L<Mojo::Reactor::EV> is a
-good example for its extensibility. Note that this module is EXPERIMENTAL and
-might change without warning!
+L<Mojo::Reactor> is an abstract base class for low level event reactors.
 
 =head1 EVENTS
 
@@ -170,7 +75,7 @@ L<Mojo::Reactor> can emit the following events.
     ...
   });
 
-Emitted safely if an error happens.
+Emitted safely for exceptions caught in callbacks.
 
   $reactor->on(error => sub {
     my ($reactor, $err) = @_;
@@ -187,14 +92,8 @@ implements the following new ones.
   my $class = Mojo::Reactor->detect;
 
 Detect and load the best reactor implementation available, will try the value
-of the C<MOJO_REACTOR> environment variable or L<Mojo::Reactor::EV>.
-
-=head2 C<drop>
-
-  my $success = $reactor->drop($handle);
-  my $success = $reactor->drop($id);
-
-Drop handle or timer.
+of the C<MOJO_REACTOR> environment variable, L<Mojo::Reactor::EV> or
+L<Mojo::Reactor::Poll>.
 
 =head2 C<io>
 
@@ -213,8 +112,8 @@ readable or writable.
 
   my $success = $reactor->is_readable($handle);
 
-Quick check if a handle is readable, useful for identifying tainted
-sockets.
+Quick non-blocking check if a handle is readable, useful for identifying
+tainted sockets.
 
 =head2 C<is_running>
 
@@ -222,12 +121,29 @@ sockets.
 
 Check if reactor is running.
 
+=head2 C<one_tick>
+
+  $reactor->one_tick;
+
+Run reactor for roughly one tick. Note that this method can recurse back into
+the reactor, so you need to be careful.
+
 =head2 C<recurring>
 
-  my $id = $reactor->recurring(3 => sub {...});
+  my $id = $reactor->recurring(0.25 => sub {...});
 
 Create a new recurring timer, invoking the callback repeatedly after a given
 amount of time in seconds.
+
+  # Invoke as soon as possible
+  $reactor->recurring(0 => sub { say 'Reactor tick.' });
+
+=head2 C<remove>
+
+  my $success = $reactor->remove($handle);
+  my $success = $reactor->remove($id);
+
+Remove handle or timer.
 
 =head2 C<start>
 
@@ -244,7 +160,7 @@ Stop watching for I/O and timer events.
 
 =head2 C<timer>
 
-  my $id = $reactor->timer(3 => sub {...});
+  my $id = $reactor->timer(0.5 => sub {...});
 
 Create a new timer, invoking the callback after a given amount of time in
 seconds.
