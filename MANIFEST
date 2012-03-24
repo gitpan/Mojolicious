@@ -224,6 +224,7 @@ t/mojo/websocket_proxy_tls.t
 t/mojolicious/app.t
 t/mojolicious/caching_lite_app.t
 t/mojolicious/charset_lite_app.t
+t/mojolicious/commands.t
 t/mojolicious/dispatch.t
 t/mojolicious/dispatcher_lite_app.t
 t/mojolicious/embedded_app.t

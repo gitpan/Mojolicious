@@ -1,8 +1,10 @@
 package Mojolicious::Commands;
-use Mojo::Base 'Mojo::Command';
+use Mojo::Base 'Mojo::Base';
 
 use Getopt::Long
   qw/GetOptions :config no_auto_abbrev no_ignore_case pass_through/;
+use Mojo::Loader;
+use Mojo::Server;
 
 # "One day a man has everything, the next day he blows up a $400 billion
 #  space station, and the next day he has nothing. It makes you think."
@@ -17,7 +19,29 @@ These options are available for all commands:
 
 See '$0 help COMMAND' for more information on a specific command.
 EOF
+has message => <<"EOF";
+usage: $0 COMMAND [OPTIONS]
+
+Tip: CGI and PSGI environments can be automatically detected very often and
+     work without commands.
+
+These commands are currently available:
+EOF
 has namespaces => sub { [qw/Mojolicious::Command Mojo::Command/] };
+
+sub detect {
+  my ($self, $guess) = @_;
+
+  # PSGI (Plack only for now)
+  return 'psgi' if defined $ENV{PLACK_ENV};
+
+  # CGI
+  return 'cgi'
+    if defined $ENV{PATH_INFO} || defined $ENV{GATEWAY_INTERFACE};
+
+  # Nothing
+  return $guess;
+}
 
 # Command line options for MOJO_HELP, MOJO_HOME and MOJO_MODE
 BEGIN {
@@ -25,7 +49,97 @@ BEGIN {
     'h|help'   => sub { $ENV{MOJO_HELP} = 1 },
     'home=s'   => sub { $ENV{MOJO_HOME} = $_[1] },
     'm|mode=s' => sub { $ENV{MOJO_MODE} = $_[1] }
-  ) unless Mojo::Command->detect;
+  ) unless __PACKAGE__->detect;
+}
+
+sub run {
+  my ($self, $name, @args) = @_;
+
+  # Application loader
+  return Mojo::Server->new->app if defined $ENV{MOJO_APP_LOADER};
+
+  # Try to detect environment
+  $name = $self->detect($name) unless $ENV{MOJO_NO_DETECT};
+
+  # Run command
+  if ($name && $name =~ /^\w+$/ && ($name ne 'help' || $args[0])) {
+
+    # Help
+    my $help = $name eq 'help';
+    $name = shift @args if $help;
+    $help = 1           if $ENV{MOJO_HELP};
+
+    # Try all namespaces
+    my $module;
+    $module = _command("${_}::$name") and last for @{$self->namespaces};
+
+    # Command missing
+    die qq/Command "$name" missing, maybe you need to install it?\n/
+      unless $module;
+
+    # Run
+    return $help ? $module->new->help : $module->new->run(@args);
+  }
+
+  # Test
+  return 1 if $ENV{HARNESS_ACTIVE};
+
+  # Try all namespaces
+  my $commands = [];
+  my $seen     = {};
+  for my $namespace (@{$self->namespaces}) {
+    for my $module (@{Mojo::Loader->search($namespace)}) {
+      next unless my $command = _command($module);
+      $command =~ s/^$namespace\:\://;
+      push @$commands, [$command => $module] unless $seen->{$command}++;
+    }
+  }
+
+  # Print overview
+  print $self->message;
+
+  # Make list
+  my $list = [];
+  my $max  = 0;
+  foreach my $command (@$commands) {
+    my $len = length $command->[0];
+    $max = $len if $len > $max;
+    push @$list, [$command->[0], $command->[1]->new->description];
+  }
+
+  # Print list
+  foreach my $command (@$list) {
+    my ($name, $description) = @$command;
+    print "  $name" . (' ' x ($max - length $name)) . "   $description";
+  }
+  print $self->hint;
+  return 1;
+}
+
+sub start {
+  my $self = shift;
+
+  # Executable
+  $ENV{MOJO_EXE} ||= (caller)[1] if $ENV{MOJO_APP};
+
+  # Run
+  my @args = @_ ? @_ : @ARGV;
+  ref $self ? $self->run(@args) : $self->new->run(@args);
+}
+
+sub start_app {
+  my $self = shift;
+  $ENV{MOJO_APP} = shift;
+  $self->start(@_);
+}
+
+sub _command {
+  my $module = shift;
+  if (my $e = Mojo::Loader->load($module)) {
+    return unless ref $e;
+    die $e;
+  }
+  return $module->isa('Mojo::Command') ? $module : undef;
 }
 
 1;
@@ -173,8 +287,7 @@ for debugging.
 
 =head1 ATTRIBUTES
 
-L<Mojolicious::Commands> inherits all attributes from L<Mojo::Command> and
-implements the following new ones.
+L<Mojolicious::Commands> implements the following attributes.
 
 =head2 C<hint>
 
@@ -182,6 +295,13 @@ implements the following new ones.
   $commands = $commands->hint('Foo!');
 
 Short hint shown after listing available commands.
+
+=head2 C<message>
+
+  my $message = $commands->message;
+  $commands   = $commands->message('Hello World!');
+
+Short usage message shown before listing available commands.
 
 =head2 C<namespaces>
 
@@ -193,7 +313,37 @@ C<Mojolicious::Command> and C<Mojo::Command>.
 
 =head1 METHODS
 
-L<Mojolicious::Commands> inherits all methods from L<Mojo::Command>.
+L<Mojolicious::Commands> inherits all methods from L<Mojo::Base> and
+implements the following new ones.
+
+=head2 C<detect>
+
+  my $env = $commands->detect;
+  my $env = $commands->detect($guess);
+
+Try to detect environment.
+
+=head2 C<run>
+
+  $commands->run;
+  $commands->run(@ARGV);
+
+Load and run commands. Automatic deployment environment detection can be
+disabled with the C<MOJO_NO_DETECT> environment variable.
+
+=head2 C<start>
+
+  Mojolicious::Commands->start;
+  Mojolicious::Commands->start(@ARGV);
+
+Start the command line interface.
+
+=head2 C<start_app>
+
+  Mojolicious::Commands->start_app('MyApp');
+  Mojolicious::Commands->start_app(MyApp => @ARGV);
+
+Start the command line interface for application.
 
 =head1 SEE ALSO
 
