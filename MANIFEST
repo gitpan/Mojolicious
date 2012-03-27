@@ -273,6 +273,7 @@ t/mojolicious/pod_renderer_lite_app.t
 t/mojolicious/production_app.t
 t/mojolicious/public/hello.txt
 t/mojolicious/public/hello2.txt
+t/mojolicious/public2/hello.txt
 t/mojolicious/public2/hello3.txt
 t/mojolicious/public_dev/hello.txt
 t/mojolicious/rebased_lite_app.t
@@ -298,6 +299,7 @@ t/mojolicious/templates/syntaxerror.html.epl
 t/mojolicious/templates/withblock.txt.epl
 t/mojolicious/templates/withlayout.html.epl
 t/mojolicious/templates2/42.html.ep
+t/mojolicious/templates2/foo/yada.html.ep
 t/mojolicious/testing_app.t
 t/mojolicious/tls_lite_app.t
 t/mojolicious/twinkle_lite_app.conf

@@ -100,19 +100,18 @@ sub run {
   # Make list
   my $list = [];
   my $max  = 0;
-  foreach my $command (@$commands) {
+  for my $command (@$commands) {
     my $len = length $command->[0];
     $max = $len if $len > $max;
     push @$list, [$command->[0], $command->[1]->new->description];
   }
 
   # Print list
-  foreach my $command (@$list) {
+  for my $command (@$list) {
     my ($name, $description) = @$command;
     print "  $name" . (' ' x ($max - length $name)) . "   $description";
   }
-  print $self->hint;
-  return 1;
+  return print $self->hint;
 }
 
 sub start {

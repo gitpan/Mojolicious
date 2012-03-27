@@ -78,7 +78,7 @@ sub form {
 
     # Parts
     my @parts;
-    foreach my $name (sort keys %$form) {
+    for my $name (sort keys %$form) {
       my $part = Mojo::Content::Single->new;
       my $h    = $part->headers;
       my $f    = $form->{$name};
@@ -120,8 +120,7 @@ sub form {
     # Multipart content
     my $content = Mojo::Content::MultiPart->new;
     $headers->content_type('multipart/form-data');
-    $content->headers($headers);
-    $content->parts(\@parts);
+    $content->headers($headers)->parts(\@parts);
 
     # Add content to transaction
     $req->content($content);
@@ -202,16 +201,11 @@ sub redirect {
   if ($code ~~ [301, 307]) {
     return unless $req = $req->clone;
     $new->req($req);
-    my $headers = $req->headers;
-    $headers->remove('Host');
-    $headers->remove('Cookie');
-    $headers->remove('Referer');
+    $req->headers->remove('Host')->remove('Cookie')->remove('Referer');
   }
   else { $method = 'GET' unless $method ~~ [qw/GET HEAD/] }
   $new->req->method($method)->url($location);
-  $new->previous($old);
-
-  return $new;
+  return $new->previous($old);
 }
 
 # "If he is so smart, how come he is dead?"
@@ -284,39 +278,23 @@ implements the following new ones.
 
 =head2 C<form>
 
-  my $tx = $t->form('http://kraih.com/foo' => {test => 123});
-  my $tx = $t->form(
-    'http://kraih.com/foo',
-    'UTF-8',
-    {test => 123}
-  );
-  my $tx = $t->form(
-    'http://kraih.com/foo',
-    {test => 123},
-    {Accept => '*/*'}
-  );
-  my $tx = $t->form(
-    'http://kraih.com/foo',
-    'UTF-8',
-    {test => 123},
-    {Accept => '*/*'}
-  );
-  my $tx = $t->form(
-    'http://kraih.com/foo',
-    {mytext => {file => '/foo/bar.txt'}}
-  );
-  my $tx = $t->form(
-    'http://kraih.com/foo',
-    {mytext => {content => 'lalala'}}
-  );
-  my $tx = $t->form(
-    'http://kraih.com/foo',
-    {myzip => {file => $asset, filename => 'foo.zip'}}
-  );
+  my $tx = $t->form('kraih.com' => {a => 'b'});
+  my $tx = $t->form('http://kraih.com' => {a => 'b'});
+  my $tx = $t->form('http://kraih.com' => {mytext => {file => '/foo.txt'}});
+  my $tx = $t->form('http://kraih.com' => {mytext => {content => 'lalala'}});
+  my $tx = $t->form('http://kraih.com' => {
+    myzip => {
+      file     => Mojo::Asset::Memory->new->add_chunk('lalala'),
+      filename => 'foo.zip'
+    }
+  });
+  my $tx = $t->form('http://kraih.com' => 'UTF-8' => {a => 'b'});
+  my $tx = $t->form('http://kraih.com' => {a => 'b'} => {DNT => 1});
+  my $tx = $t->form('http://kraih.com', 'UTF-8', {a => 'b'}, {DNT => 1});
 
 Versatile L<Mojo::Transaction::HTTP> builder for form requests.
 
-  my $tx = $t->form('http://kraih.com/foo' => {test => 123});
+  my $tx = $t->form('http://kraih.com/foo' => {a => 'b'});
   $tx->res->body(sub { say $_[1] });
   $ua->start($tx);
 
@@ -326,7 +304,7 @@ enforce it by setting the header manually.
 
   my $tx = $t->form(
     'http://kraih.com/foo',
-    {test => 123},
+    {a => 'b'},
     {'Content-Type' => 'multipart/form-data'}
   );
 
@@ -352,11 +330,11 @@ or C<307> redirect response if possible.
 
 =head2 C<tx>
 
-  my $tx = $t->tx(GET  => 'mojolicio.us');
-  my $tx = $t->tx(POST => 'http://mojolicio.us');
-  my $tx = $t->tx(GET  => 'http://kraih.com' => {Accept => '*/*'});
+  my $tx = $t->tx(GET  => 'kraih.com');
+  my $tx = $t->tx(POST => 'http://kraih.com');
+  my $tx = $t->tx(GET  => 'http://kraih.com' => {DNT => 1});
   my $tx = $t->tx(PUT  => 'http://kraih.com' => 'Hi!');
-  my $tx = $t->tx(POST => 'http://kraih.com' => {Accept => '*/*'} => 'Hi!');
+  my $tx = $t->tx(POST => 'http://kraih.com' => {DNT => 1} => 'Hi!');
 
 Versatile general purpose L<Mojo::Transaction::HTTP> builder for requests.
 
@@ -373,8 +351,7 @@ Versatile general purpose L<Mojo::Transaction::HTTP> builder for requests.
 =head2 C<websocket>
 
   my $tx = $t->websocket('ws://localhost:3000');
-  my $tx =
-    $t->websocket('ws://localhost:3000' => {'User-Agent' => 'Agent 1.0'});
+  my $tx = $t->websocket('ws://localhost:3000' => {DNT => 1});
 
 Versatile L<Mojo::Transaction::WebSocket> builder for WebSocket handshake
 requests.

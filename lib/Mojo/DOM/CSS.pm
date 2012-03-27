@@ -81,6 +81,20 @@ sub _ancestor {
   return;
 }
 
+sub _attr {
+  my ($self, $key, $regex, $current) = @_;
+
+  # Ignore namespace prefix
+  my $attrs = $current->[2];
+  for my $name (keys %$attrs) {
+    next unless $name =~ /\:?$key$/;
+    return 1 unless defined $attrs->{$name} && defined $regex;
+    return 1 if $attrs->{$name} =~ $regex;
+  }
+
+  return;
+}
+
 sub _combinator {
   my ($self, $selectors, $current, $tree) = @_;
 
@@ -143,12 +157,11 @@ sub _compile {
     while ($element =~ /$CLASS_ID_RE/g) {
 
       # Class
-      push @$selector, ['attribute', 'class', $self->_regex('~', $1)]
+      push @$selector, ['attr', 'class', $self->_regex('~', $1)]
         if defined $1;
 
       # ID
-      push @$selector, ['attribute', 'id', $self->_regex('', $2)]
-        if defined $2;
+      push @$selector, ['attr', 'id', $self->_regex('', $2)] if defined $2;
     }
 
     # Pseudo classes
@@ -157,17 +170,17 @@ sub _compile {
       # "not"
       if ($1 eq 'not') {
         my $subpattern = $self->_compile($2)->[-1]->[-1];
-        push @$selector, ['pseudoclass', 'not', $subpattern];
+        push @$selector, ['pc', 'not', $subpattern];
       }
 
       # Everything else
-      else { push @$selector, ['pseudoclass', $1, $2] }
+      else { push @$selector, ['pc', $1, $2] }
     }
 
     # Attributes
     while ($attrs =~ /$ATTR_RE/g) {
       my ($key, $op, $value) = ($self->_unescape($1), $2 // '', $3 // $4);
-      push @$selector, ['attribute', $key, $self->_regex($op, $value)];
+      push @$selector, ['attr', $key, $self->_regex($op, $value)];
     }
 
     # Combinator
@@ -207,6 +220,90 @@ sub _parent {
   return $self->_combinator($selectors, $parent, $tree) ? 1 : undef;
 }
 
+sub _pc {
+  my ($self, $class, $args, $current) = @_;
+
+  # "first-*"
+  if ($class =~ /^first\-(?:(child)|of-type)$/) {
+    $class = defined $1 ? 'nth-child' : 'nth-of-type';
+    $args = 1;
+  }
+
+  # "last-*"
+  elsif ($class =~ /^last\-(?:(child)|of-type)$/) {
+    $class = defined $1 ? 'nth-last-child' : 'nth-last-of-type';
+    $args = '-n+1';
+  }
+
+  # ":checked"
+  if ($class eq 'checked') {
+    my $attrs = $current->[2];
+    return 1 if exists $attrs->{checked} || exists $attrs->{selected};
+  }
+
+  # ":empty"
+  elsif ($class eq 'empty') { return 1 unless defined $current->[4] }
+
+  # ":root"
+  elsif ($class eq 'root') {
+    if (my $parent = $current->[3]) { return 1 if $parent->[0] eq 'root' }
+  }
+
+  # "not"
+  elsif ($class eq 'not') { return 1 if !$self->_selector($args, $current) }
+
+  # "nth-*"
+  elsif ($class =~ /^nth-/) {
+
+    # Numbers
+    $args = $self->_equation($args) unless ref $args;
+
+    # Siblings
+    my $parent = $current->[3];
+    my $start = $parent->[0] eq 'root' ? 1 : 4;
+    my @siblings;
+    my $type = $class =~ /of-type$/ ? $current->[1] : undef;
+    for my $j ($start .. $#$parent) {
+      my $sibling = $parent->[$j];
+      next unless $sibling->[0] eq 'tag';
+      next if defined $type && $type ne $sibling->[1];
+      push @siblings, $sibling;
+    }
+
+    # Reverse
+    @siblings = reverse @siblings if $class =~ /^nth-last/;
+
+    # Find
+    for my $i (0 .. $#siblings) {
+      my $result = $args->[0] * $i + $args->[1];
+      next if $result < 1;
+      last unless my $sibling = $siblings[$result - 1];
+      return 1 if $sibling eq $current;
+    }
+  }
+
+  # "only-*"
+  elsif ($class =~ /^only-(?:child|(of-type))$/) {
+    my $type = $1 ? $current->[1] : undef;
+
+    # Siblings
+    my $parent = $current->[3];
+    my $start = $parent->[0] eq 'root' ? 1 : 4;
+    for my $j ($start .. $#$parent) {
+      my $sibling = $parent->[$j];
+      next unless $sibling->[0] eq 'tag';
+      next if $sibling eq $current;
+      next if defined $type && $sibling->[1] ne $type;
+      return if $sibling ne $current;
+    }
+
+    # No siblings
+    return 1;
+  }
+
+  return;
+}
+
 sub _sibling {
   my ($self, $selectors, $current, $tree, $immediate) = @_;
 
@@ -234,22 +331,19 @@ sub _regex {
   $value = quotemeta $self->_unescape($value);
 
   # "~=" (word)
-  my $regex;
-  if ($op eq '~') { $regex = qr/(?:^|.*\s+)$value(?:\s+.*|$)/ }
+  if ($op eq '~') { return qr/(?:^|.*\s+)$value(?:\s+.*|$)/ }
 
   # "*=" (contains)
-  elsif ($op eq '*') { $regex = qr/$value/ }
+  elsif ($op eq '*') { return qr/$value/ }
 
   # "^=" (begins with)
-  elsif ($op eq '^') { $regex = qr/^$value/ }
+  elsif ($op eq '^') { return qr/^$value/ }
 
   # "$=" (ends with)
-  elsif ($op eq '$') { $regex = qr/$value$/ }
+  elsif ($op eq '$') { return qr/$value$/ }
 
   # Everything else
-  else { $regex = qr/^$value$/ }
-
-  return $regex;
+  return qr/^$value$/;
 }
 
 # "All right, brain.
@@ -262,128 +356,21 @@ sub _selector {
   for my $c (@$selector[1 .. $#$selector]) {
     my $type = $c->[0];
 
-    # Tag
+    # Tag (ignore namespace prefix)
     if ($type eq 'tag') {
-      my $type = $c->[1];
-
-      # Wildcard
-      next if $type eq '*';
-
-      # Type (ignore namespace prefix)
-      next if $current->[1] =~ /(?:^|\:)$type$/;
+      my $tag = $c->[1];
+      return unless $tag eq '*' || $current->[1] =~ /(?:^|\:)$tag$/;
     }
 
     # Attribute
-    elsif ($type eq 'attribute') {
-      my $key   = $c->[1];
-      my $regex = $c->[2];
-      my $attrs = $current->[2];
-
-      # Find attributes (ignore namespace prefix)
-      my $found = 0;
-      for my $name (keys %$attrs) {
-        if ($name =~ /\:?$key$/) {
-          next unless exists $attrs->{$name};
-          ++$found and last unless defined $attrs->{$name};
-          ++$found and last if !$regex || $attrs->{$name} =~ $regex;
-        }
-      }
-      next if $found;
+    elsif ($type eq 'attr') {
+      return unless $self->_attr($c->[1], $c->[2], $current);
     }
 
     # Pseudo class
-    elsif ($type eq 'pseudoclass') {
-      my $class = lc $c->[1];
-      my $args  = $c->[2];
-
-      # "first-*"
-      if ($class =~ /^first\-(?:(child)|of-type)$/) {
-        $class = defined $1 ? 'nth-child' : 'nth-of-type';
-        $args = 1;
-      }
-
-      # "last-*"
-      elsif ($class =~ /^last\-(?:(child)|of-type)$/) {
-        $class = defined $1 ? 'nth-last-child' : 'nth-last-of-type';
-        $args = '-n+1';
-      }
-
-      # ":checked"
-      if ($class eq 'checked') {
-        my $attrs = $current->[2];
-        next if exists $attrs->{checked} || exists $attrs->{selected};
-      }
-
-      # ":empty"
-      elsif ($class eq 'empty') { next unless defined $current->[4] }
-
-      # ":root"
-      elsif ($class eq 'root') {
-        if (my $parent = $current->[3]) {
-          next if $parent->[0] eq 'root';
-        }
-      }
-
-      # "not"
-      elsif ($class eq 'not') { next if !$self->_selector($args, $current) }
-
-      # "nth-*"
-      elsif ($class =~ /^nth-/) {
-
-        # Numbers
-        $args = $c->[2] = $self->_equation($args)
-          unless ref $args;
-
-        # Siblings
-        my $parent = $current->[3];
-        my $start = $parent->[0] eq 'root' ? 1 : 4;
-        my @siblings;
-        my $type = $class =~ /of-type$/ ? $current->[1] : undef;
-        for my $j ($start .. $#$parent) {
-          my $sibling = $parent->[$j];
-          next unless $sibling->[0] eq 'tag';
-          next if defined $type && $type ne $sibling->[1];
-          push @siblings, $sibling;
-        }
-
-        # Reverse
-        @siblings = reverse @siblings if $class =~ /^nth-last/;
-
-        # Find
-        my $found = 0;
-        for my $i (0 .. $#siblings) {
-          my $result = $args->[0] * $i + $args->[1];
-          next if $result < 1;
-          last unless my $sibling = $siblings[$result - 1];
-          if ($sibling eq $current) {
-            $found = 1;
-            last;
-          }
-        }
-        next if $found;
-      }
-
-      # "only-*"
-      elsif ($class =~ /^only-(?:child|(of-type))$/) {
-        my $type = $1 ? $current->[1] : undef;
-
-        # Siblings
-        my $parent = $current->[3];
-        my $start = $parent->[0] eq 'root' ? 1 : 4;
-        for my $j ($start .. $#$parent) {
-          my $sibling = $parent->[$j];
-          next unless $sibling->[0] eq 'tag';
-          next if $sibling eq $current;
-          next if defined $type && $sibling->[1] ne $type;
-          return if $sibling ne $current;
-        }
-
-        # No siblings
-        next;
-      }
+    elsif ($type eq 'pc') {
+      return unless $self->_pc(lc $c->[1], $c->[2], $current);
     }
-
-    return;
   }
 
   return 1;
