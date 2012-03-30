@@ -4,18 +4,19 @@ use Mojo::Base -base;
 use Mojo::Util qw/decode encode html_unescape xml_escape/;
 use Scalar::Util 'weaken';
 
+has [qw/charset xml/];
+has tree => sub { ['root'] };
+
 my $ATTR_RE = qr/
   \s*
   ([^=\s>]+)       # Key
   (?:
-    \s*
-    =
-    \s*
+    \s*=\s*
     (?:
       "([^"]*?)"   # Quotation marks
-      |
+    |
       '([^']*?)'   # Apostrophes
-      |
+    |
       ([^>\s]*)    # Unquoted
     )
   )?
@@ -27,18 +28,18 @@ my $TOKEN_RE = qr/
   ([^<]*)                                           # Text
   (?:
     <\?(.*?)\?>                                     # Processing Instruction
-    |
+  |
     <\!--(.*?)-->                                   # Comment
-    |
+  |
     <\!\[CDATA\[(.*?)\]\]>                          # CDATA
-    |
+  |
     <!DOCTYPE(
       \s+\w+
       (?:(?:\s+\w+)?(?:\s+(?:"[^"]*"|'[^']*'))+)?   # External ID
       (?:\s+\[.+?\])?                               # Int Subset
       \s*
     )>
-    |
+  |
     <(
       \s*
       [^>\s]+                                       # Tag
@@ -48,31 +49,25 @@ my $TOKEN_RE = qr/
 /xis;
 
 # Optional HTML elements
-my @OPTIONAL =
+my %OPTIONAL = map { $_ => 1 }
   qw/body colgroup dd head li optgroup option p rt rp tbody td tfoot th/;
-my %OPTIONAL;
-$OPTIONAL{$_}++ for @OPTIONAL;
 
 # Elements that break HTML paragraphs
 my @PARAGRAPH = (
   qw/address article aside blockquote dir div dl fieldset footer form h1 h2/,
   qw/h3 h4 h5 h6 header hgroup hr menu nav ol p pre section table or ul/
 );
-my %PARAGRAPH;
-$PARAGRAPH{$_}++ for @PARAGRAPH;
+my %PARAGRAPH = map { $_ => 1 } @PARAGRAPH;
 
 # HTML table elements
-my @TABLE = qw/col colgroup tbody td th thead tr/;
-my %TABLE;
-$TABLE{$_}++ for @TABLE;
+my %TABLE = map { $_ => 1 } qw/col colgroup tbody td th thead tr/;
 
 # HTML5 void elements
 my @VOID = (
   qw/area base br col command embed hr img input keygen link meta param/,
   qw/source track wbr/
 );
-my %VOID;
-$VOID{$_}++ for @VOID;
+my %VOID = map { $_ => 1 } @VOID;
 
 # HTML4/5 inline elements
 my @HTML4_INLINE = qw/applet basefont big del font iframe ins s strike u/;
@@ -81,11 +76,7 @@ my @HTML5_INLINE = (
   qw/label map object q samp script select small strong span sub sup/,
   qw/textarea tt var/
 );
-my %INLINE;
-$INLINE{$_}++ for @HTML4_INLINE, @HTML5_INLINE;
-
-has [qw/charset xml/];
-has tree => sub { ['root'] };
+my %INLINE = map { $_ => 1 } @HTML4_INLINE, @HTML5_INLINE;
 
 # "No one believes me.
 #  I believe you, dad.

@@ -299,7 +299,7 @@ t/mojolicious/templates/syntaxerror.html.epl
 t/mojolicious/templates/withblock.txt.epl
 t/mojolicious/templates/withlayout.html.epl
 t/mojolicious/templates2/42.html.ep
-t/mojolicious/templates2/foo/yada.html.ep
+t/mojolicious/templates2/foo/yada.html.epl
 t/mojolicious/testing_app.t
 t/mojolicious/tls_lite_app.t
 t/mojolicious/twinkle_lite_app.conf

@@ -34,7 +34,7 @@ sub chmod_rel_file {
 sub class_to_file {
   my ($self, $class) = @_;
   $class =~ s/:://g;
-  $class =~ s/([A-Z])([A-Z]*)/$1.lc($2)/gex;
+  $class =~ s/([A-Z])([A-Z]*)/$1.lc($2)/ge;
   return decamelize $class;
 }
 
@@ -68,7 +68,7 @@ sub get_all_data {
 
   # Refresh or use cached data
   my $d = do { no strict 'refs'; \*{"$class\::DATA"} };
-  return $CACHE->{$class} unless fileno $d;
+  return $CACHE->{$class} || {} unless fileno $d;
   seek $d, 0, 0;
   my $content = join '', <$d>;
   close $d;
@@ -96,7 +96,7 @@ sub get_all_data {
 
 sub get_data {
   my ($self, $data, $class) = @_;
-  ($self->get_all_data($class) || {})->{$data};
+  $self->get_all_data($class)->{$data};
 }
 
 # "You don’t like your job, you don’t strike.
