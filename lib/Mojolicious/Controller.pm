@@ -621,8 +621,8 @@ implements the following new ones.
   my $app = $c->app;
   $c      = $c->app(Mojolicious->new);
 
-A reference back to the L<Mojolicious> application that dispatched to this
-controller, defaults to a L<Mojolicious> object.
+A reference back to the application that dispatched to this controller,
+defaults to a L<Mojolicious> object.
 
   # Use application logger
   $c->app->log->debug('Hello Mojo!');
@@ -675,9 +675,9 @@ Gracefully end WebSocket connection or long poll stream.
 
 =head2 C<flash>
 
-  my $foo   = $c->flash('foo');
-  $c        = $c->flash({foo => 'bar'});
-  $c        = $c->flash(foo => 'bar');
+  my $foo = $c->flash('foo');
+  $c      = $c->flash({foo => 'bar'});
+  $c      = $c->flash(foo => 'bar');
 
 Data storage persistent only for the next request, stored in the C<session>.
 
@@ -753,10 +753,11 @@ C<url_for>.
   my $success = $c->render('foo/bar');
   my $output  = $c->render('foo/bar', partial => 1);
 
-This is a wrapper around L<Mojolicious::Renderer> exposing pretty much all
-functionality provided by it. It will set a default template to use based on
-the controller and action name or fall back to the route name. You can call
-it with a hash of options which can be preceded by an optional template name.
+This is a wrapper around L<Mojolicious::Renderer/"render"> exposing pretty
+much all functionality provided by it. It will set a default template to use
+based on the controller and action name or fall back to the route name. You
+can call it with a hash or hash reference of options which can be preceded by
+an optional template name.
 
 =head2 C<render_content>
 
@@ -824,8 +825,8 @@ Same as C<render> but returns the rendered result.
   my $success = $c->render_static('images/logo.png');
   my $success = $c->render_static('../lib/MyApp.pm');
 
-Render a static file using L<Mojolicious::Static>, relative to the C<public>
-directories of your application.
+Render a static file using L<Mojolicious::Static/"serve">, usually from the
+C<public> directory or C<DATA> section of your application.
 
 =head2 C<render_text>
 
@@ -860,7 +861,7 @@ Alias for C<$c-E<gt>tx-E<gt>req>. Usually refers to a
 L<Mojo::Message::Request> object.
 
   # Extract request information
-  $c->render_json({url => $c->req->url->to_abs->to_string});
+  my $userinfo = $c->req->url->userinfo;
 
 =head2 C<res>
 

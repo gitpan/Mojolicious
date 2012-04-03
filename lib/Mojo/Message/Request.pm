@@ -69,12 +69,12 @@ sub fix_headers {
     $headers->host($host) unless $headers->host;
   }
 
-  # Basic authorization
+  # Basic authentication
   if ((my $u = $url->userinfo) && !$headers->authorization) {
     $headers->authorization('Basic ' . b64_encode($u, ''));
   }
 
-  # Basic proxy authorization
+  # Basic proxy authentication
   if (my $proxy = $self->proxy) {
     if ((my $u = $proxy->userinfo) && !$headers->proxy_authorization) {
       $headers->proxy_authorization('Basic ' . b64_encode($u, ''));
@@ -101,8 +101,7 @@ sub param {
 sub params {
   my $self   = shift;
   my $params = Mojo::Parameters->new;
-  $params->merge($self->body_params, $self->query_params);
-  return $params;
+  return $params->merge($self->body_params, $self->query_params);
 }
 
 sub parse {
@@ -134,14 +133,14 @@ sub parse {
       $base->authority($host);
     }
 
-    # Basic authorization
+    # Basic authentication
     if (my $auth = $headers->authorization) {
       if (my $userinfo = $self->_parse_basic_auth($auth)) {
         $base->userinfo($userinfo);
       }
     }
 
-    # Basic proxy authorization
+    # Basic proxy authentication
     if (my $auth = $headers->proxy_authorization) {
       if (my $userinfo = $self->_parse_basic_auth($auth)) {
         $self->proxy(Mojo::URL->new->userinfo($userinfo));
@@ -159,19 +158,16 @@ sub parse {
 sub proxy {
   my ($self, $url) = @_;
 
+  # Get
+  return $self->{proxy} unless $url;
+
   # Mojo::URL object
-  if (ref $url) {
-    $self->{proxy} = $url;
-    return $self;
-  }
+  if (ref $url) { $self->{proxy} = $url }
 
   # String
-  elsif ($url) {
-    $self->{proxy} = Mojo::URL->new($url);
-    return $self;
-  }
+  elsif ($url) { $self->{proxy} = Mojo::URL->new($url) }
 
-  return $self->{proxy};
+  return $self;
 }
 
 sub query_params { shift->url->query }
@@ -361,6 +357,9 @@ implements the following new ones.
 
 Direct access to the C<CGI> or C<PSGI> environment hash if available.
 
+  # Check CGI version
+  my $version = $req->env->{GATEWAY_INTERFACE};
+
   # Check PSGI version
   my $version = $req->env->{'psgi.version'};
 
@@ -377,6 +376,8 @@ HTTP request method.
   $req    = $req->url(Mojo::URL->new);
 
 HTTP request URL, defaults to a L<Mojo::URL> object.
+
+  my $foo = $req->url->query->to_hash->{foo};
 
 =head1 METHODS
 
@@ -455,7 +456,7 @@ Proxy URL for message.
 
 All C<GET> parameters, usually a L<Mojo::Parameters> object.
 
-  say $req->query_params->param('foo');
+  say $req->query_params->to_hash->{'foo'};
 
 =head1 SEE ALSO
 

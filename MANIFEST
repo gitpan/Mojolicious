@@ -201,6 +201,7 @@ t/mojo/lib/LoaderTest/C.pm
 t/mojo/lib/test.mt
 t/mojo/lib/utf8_exception.mt
 t/mojo/loader.t
+t/mojo/log.t
 t/mojo/morbo.t
 t/mojo/parameters.t
 t/mojo/path.t

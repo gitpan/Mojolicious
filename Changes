@@ -1,5 +1,12 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+2.71  2012-04-03
+  - Improved Hypnotoad error handling.
+  - Improved version command to detect proxy servers automatically.
+  - Improved documentation.
+  - Improved tests.
+  - Fixed small argument bug in Mojo::Headers->to_hash.
+
 2.70  2012-03-30
   - Improved speed of version command by switching to the MetaCPAN API.
   - Improved all bundled TLS test certificates to expire at the same time.
@@ -1771,7 +1778,7 @@ This file documents the revision history for Perl extension Mojolicious.
   - Added default TLS cert and key to Mojo::IOLoop to make HTTPS testing
     easier, so "mojo daemon --listen https://*:3000" now just works.
   - Added request limit support to the daemons.
-  - Added basic authorization and proxy authorization support to
+  - Added basic authentication and proxy authentication support to
     Mojo::Message::Request. (esskar)
   - Added tick callback to Mojo::IOLoop to make mixing multiple event loops
     trivial.
@@ -2373,7 +2380,8 @@ This file documents the revision history for Perl extension Mojolicious.
   - Added proper home detection to Mojo itself. (charsbar)
   - Fixed a bug where errors got cached in the router. (charsbar)
   - Updated error handling in MojoX::Dispatcher::Static.
-  - Fixed Mojo::Message::Request::cookies() to always return a arrayref.
+  - Fixed Mojo::Message::Request::cookies() to always return an array
+    reference.
   - Fixed url_for to support references. (vti)
   - Fixed unescaping of captures. (vti)
   - Fixed typos. (uwe)

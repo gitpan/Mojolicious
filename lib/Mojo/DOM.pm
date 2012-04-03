@@ -33,8 +33,7 @@ sub DESTROY { }
 sub new {
   my $class = shift;
   my $self = bless [Mojo::DOM::HTML->new], ref $class || $class;
-  $self->parse(@_) if @_;
-  return $self;
+  return @_ ? $self->parse(@_) : $self;
 }
 
 sub all_text {
@@ -724,7 +723,7 @@ L<Mojo::Collection> object, depending on number of children.
 
 =head1 ELEMENT ATTRIBUTES
 
-Direct hash access to element attributes is also possible.
+Direct hash reference access to element attributes is also possible.
 
   say $dom->{foo};
   say $dom->div->{id};

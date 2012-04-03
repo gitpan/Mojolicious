@@ -146,11 +146,10 @@ sub build_start_line {
 
 sub cookie {
   my ($self, $name) = @_;
-  return unless $name;
 
   # Map
   unless ($self->{cookies}) {
-    my $cookies = {};
+    my $cookies = $self->{cookies} = {};
     for my $cookie (@{$self->cookies}) {
       my $cookie_name = $cookie->name;
 
@@ -164,8 +163,6 @@ sub cookie {
       # Cookie
       else { $cookies->{$cookie_name} = $cookie }
     }
-
-    $self->{cookies} = $cookies;
   }
 
   # Multiple
@@ -298,11 +295,10 @@ sub to_string {
 
 sub upload {
   my ($self, $name) = @_;
-  return unless $name;
 
   # Map
   unless ($self->{uploads}) {
-    my $uploads = {};
+    my $uploads = $self->{uploads} = {};
     for my $upload (@{$self->uploads}) {
       my $uname = $upload->name;
 
@@ -316,8 +312,6 @@ sub upload {
       # Upload
       else { $uploads->{$uname} = $upload }
     }
-
-    $self->{uploads} = $uploads;
   }
 
   # Multiple

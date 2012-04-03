@@ -33,7 +33,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Leaf Fluttering In Wind';
-our $VERSION  = '2.70';
+our $VERSION  = '2.71';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -66,8 +66,7 @@ sub new {
   push @{$self->static->paths},   $home->rel_dir('public');
 
   # Default to application namespace
-  my $r = $self->routes;
-  $r->namespace(ref $self);
+  my $r = $self->routes->namespace(ref $self);
 
   # Hide controller attributes/methods and "handler"
   $r->hide(qw/AUTOLOAD DESTROY app cookie finish flash handler on on_finish/);
