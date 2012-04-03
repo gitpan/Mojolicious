@@ -18,7 +18,6 @@ my $START_LINE_RE = qr|
   (?:\s+HTTP/(\d+\.\d+))?                                       # Version
   $
 |x;
-my $HOST_RE = qr/^([^\:]*)\:?(.*)$/;
 
 sub clone {
   my $self = shift;
@@ -57,7 +56,7 @@ sub cookies {
 
 sub fix_headers {
   my $self = shift;
-  $self->SUPER::fix_headers(@_);
+  $self->{fix} ? return $self : $self->SUPER::fix_headers(@_);
 
   # Host header is required in HTTP 1.1 requests
   my $url     = $self->url;
@@ -235,7 +234,7 @@ sub _parse_env {
     if ($name eq 'HOST') {
       my $host = $value;
       my $port;
-      ($host, $port) = ($1, $2) if $host =~ $HOST_RE;
+      ($host, $port) = ($1, $2) if $host =~ /^([^\:]*)\:?(.*)$/;
       $base->host($host)->port($port);
     }
   }

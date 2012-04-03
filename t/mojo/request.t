@@ -2,7 +2,7 @@ use Mojo::Base -strict;
 
 use utf8;
 
-use Test::More tests => 965;
+use Test::More tests => 980;
 
 # "When will I learn?
 #  The answer to life's problems aren't at the bottom of a bottle,
@@ -1191,6 +1191,41 @@ is $req->headers->content_length, '13', 'right "Content-Length" value';
 is $req->body, "Hello World!\n", 'right content';
 ok $finished, 'finish event has been emitted';
 ok $req->is_finished, 'request is finished';
+
+# Build HTTP 1.1 request parts with progress
+$req = Mojo::Message::Request->new;
+my $state;
+$finished = undef;
+$progress = 0;
+$req->on(finish => sub { $finished = shift->is_finished });
+$req->on(
+  progress => sub {
+    my ($req, $part, $offset) = @_;
+    $state = $part;
+    $progress += $offset;
+  }
+);
+$req->method('get');
+$req->url->parse('http://127.0.0.1/foo/bar');
+$req->headers->expect('100-continue');
+$req->body("Hello World!\n");
+ok !$state,    'no state';
+ok !$progress, 'no progress';
+ok !$finished, 'not finished';
+ok $req->build_start_line, 'built start line';
+is $state, 'start_line', 'made progress on start_line';
+ok $progress, 'made progress';
+$progress = 0;
+ok !$finished, 'not finished';
+ok $req->build_headers, 'built headers';
+is $state, 'headers', 'made progress on headers';
+ok $progress, 'made progress';
+$progress = 0;
+ok !$finished, 'not finished';
+ok $req->build_body, 'built body';
+is $state, 'body', 'made progress on headers';
+ok $progress, 'made progress';
+ok $finished, 'finished';
 
 # Build full HTTP 1.1 request (with clone)
 $req      = Mojo::Message::Request->new;
