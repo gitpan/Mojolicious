@@ -24,14 +24,14 @@ sub form {
   $encoding = undef if ref $encoding;
 
   # Parameters
-  my $params = Mojo::Parameters->new;
-  $params->charset($encoding) if defined $encoding;
+  my $p = Mojo::Parameters->new;
+  $p->charset($encoding) if defined $encoding;
   my $multipart;
   for my $name (sort keys %$form) {
     my $value = $form->{$name};
 
     # Array
-    if (ref $value eq 'ARRAY') { $params->append($name, $_) for @$value }
+    if (ref $value eq 'ARRAY') { $p->append($name, $_) for @$value }
 
     # Hash
     elsif (ref $value eq 'HASH') {
@@ -51,11 +51,11 @@ sub form {
         $value->{file} = Mojo::Asset::Memory->new->add_chunk($content);
       }
 
-      push @{$params->params}, $name, $value;
+      push @{$p->params}, $name, $value;
     }
 
     # Single value
-    else { $params->append($name, $value) }
+    else { $p->append($name, $value) }
   }
 
   # New transaction
@@ -66,7 +66,7 @@ sub form {
   # Multipart
   $headers->content_type('multipart/form-data') if $multipart;
   if (($headers->content_type || '') eq 'multipart/form-data') {
-    my $parts = $self->_multipart($encoding, $params->to_hash);
+    my $parts = $self->_multipart($encoding, $p->to_hash);
     $req->content(
       Mojo::Content::MultiPart->new(headers => $headers, parts => $parts));
   }
@@ -74,7 +74,7 @@ sub form {
   # Urlencoded
   else {
     $headers->content_type('application/x-www-form-urlencoded');
-    $req->body($params->to_string);
+    $req->body($p->to_string);
   }
 
   return wantarray ? ($tx, $cb) : $tx;
@@ -279,8 +279,13 @@ implements the following new ones.
   my $tx = $t->form('http://kraih.com' => {a => 'b'} => {DNT => 1});
   my $tx = $t->form('http://kraih.com', 'UTF-8', {a => 'b'}, {DNT => 1});
 
-Versatile L<Mojo::Transaction::HTTP> builder for form requests.
+Versatile L<Mojo::Transaction::HTTP> builder for C<POST> requests with form
+data.
 
+  # Inspect generated request
+  say $t->form('mojolicio.us' => {a => [1, 2, 3]})->req->to_string;
+
+  # Submit form and stream response
   my $tx = $t->form('http://kraih.com/foo' => {a => 'b'});
   $tx->res->body(sub { say $_[1] });
   $ua->start($tx);
@@ -289,6 +294,7 @@ While the "multipart/form-data" content type will be automatically used
 instead of "application/x-www-form-urlencoded" when necessary, you can also
 enforce it by setting the header manually.
 
+  # Force multipart
   my $tx = $t->form(
     'http://kraih.com/foo',
     {a => 'b'},
@@ -324,6 +330,9 @@ or C<307> redirect response if possible.
   my $tx = $t->tx(POST => 'http://kraih.com' => {DNT => 1} => 'Hi!');
 
 Versatile general purpose L<Mojo::Transaction::HTTP> builder for requests.
+
+  # Inspect generated request
+  say $t->tx(GET => 'mojolicio.us' => {DNT => 1} => 'Bye!')->req->to_string;
 
   # Streaming response
   my $tx = $t->tx(GET => 'http://mojolicio.us');
