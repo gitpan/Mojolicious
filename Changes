@@ -1,5 +1,10 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+2.78  2012-04-09
+  - Improved Mojolicious::Routes to allow redispatching controllers.
+  - Improved Mojolicious::Routes logging.
+  - Improved documentation.
+
 2.77  2012-04-09
   - Improved Mojo::Transaction::WebSocket to allow custom message parsers.
   - Improved help command to be less strict.

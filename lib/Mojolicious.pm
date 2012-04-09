@@ -33,7 +33,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Leaf Fluttering In Wind';
-our $VERSION  = '2.77';
+our $VERSION  = '2.78';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -69,8 +69,8 @@ sub new {
   my $r = $self->routes->namespace(ref $self);
 
   # Hide controller attributes/methods and "handler"
-  $r->hide(qw/AUTOLOAD DESTROY app cookie finish flash handler on on_finish/);
-  $r->hide(qw/param redirect_to render render_content render_data/);
+  $r->hide(qw/AUTOLOAD DESTROY app cookie finish flash handler on param/);
+  $r->hide(qw/redirect_to render render_content render_data/);
   $r->hide(qw/render_exception render_json render_not_found render_partial/);
   $r->hide(qw/render_static render_text rendered req res respond_to send/);
   $r->hide(qw/session signed_cookie stash tx ua url_for write write_chunk/);
