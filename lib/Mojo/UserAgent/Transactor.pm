@@ -163,7 +163,7 @@ sub tx {
   ref $url ? $req->url($url) : $req->url->parse($url);
 
   # Body
-  $req->body(pop @_)
+  $req->body(pop)
     if @_ & 1 == 1 && ref $_[0] ne 'HASH' || ref $_[-2] eq 'HASH';
 
   # Headers
@@ -279,9 +279,8 @@ data.
   # Inspect generated request
   say $t->form('mojolicio.us' => {a => [1, 2, 3]})->req->to_string;
 
-  # Submit form and stream response
-  my $tx = $t->form('http://kraih.com/foo' => {a => 'b'});
-  $tx->res->body(sub { say $_[1] });
+  # Streaming multipart file upload
+  my $tx = $t->form('mojolicio.us' => {fun => {file => '/etc/passwd'}});
   $ua->start($tx);
 
 While the "multipart/form-data" content type will be automatically used
