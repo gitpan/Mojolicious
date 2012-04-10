@@ -33,7 +33,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Leaf Fluttering In Wind';
-our $VERSION  = '2.78';
+our $VERSION  = '2.79';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -149,10 +149,7 @@ sub handler {
 
   # Embedded application
   my $stash = {};
-  if (my $sub = $tx->can('stash')) {
-    $stash = $tx->$sub;
-    $tx    = $tx->tx;
-  }
+  if (my $sub = $tx->can('stash')) { ($stash, $tx) = ($tx->$sub, $tx->tx) }
 
   # Build default controller
   my $defaults = $self->defaults;

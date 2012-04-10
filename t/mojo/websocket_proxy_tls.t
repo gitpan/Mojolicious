@@ -13,7 +13,7 @@ plan skip_all => 'set TEST_TLS to enable this test (developer only!)'
   unless $ENV{TEST_TLS};
 plan skip_all => 'IO::Socket::SSL 1.37 required for this test!'
   unless Mojo::IOLoop::Server::TLS;
-plan tests => 15;
+plan tests => 16;
 
 use Mojo::IOLoop;
 use Mojo::Server::Daemon;
@@ -72,8 +72,7 @@ $daemon->listen([$listen])->start;
 
 # Connect proxy server for testing
 my $proxy = Mojo::IOLoop->generate_port;
-my $c     = {};
-my $connected;
+my (%buffer, $connected);
 my ($read, $sent, $fail) = 0;
 my $nf =
     "HTTP/1.1 404 NOT FOUND\x0d\x0a"
@@ -86,13 +85,13 @@ Mojo::IOLoop->server(
     $stream->on(
       read => sub {
         my ($stream, $chunk) = @_;
-        if (my $server = $c->{$client}->{connection}) {
+        if (my $server = $buffer{$client}->{connection}) {
           return Mojo::IOLoop->stream($server)->write($chunk);
         }
-        $c->{$client}->{client} .= $chunk;
-        if ($c->{$client}->{client} =~ /\x0d?\x0a\x0d?\x0a$/) {
-          my $buffer = $c->{$client}->{client};
-          $c->{$client}->{client} = '';
+        $buffer{$client}->{client} .= $chunk;
+        if ($buffer{$client}->{client} =~ /\x0d?\x0a\x0d?\x0a$/) {
+          my $buffer = $buffer{$client}->{client};
+          $buffer{$client}->{client} = '';
           if ($buffer =~ /CONNECT (\S+):(\d+)?/) {
             $connected = "$1:$2";
             $fail = 1 if $2 == $port + 1;
@@ -102,9 +101,9 @@ Mojo::IOLoop->server(
                 my ($loop, $err, $stream) = @_;
                 if ($err) {
                   Mojo::IOLoop->remove($client);
-                  return delete $c->{$client};
+                  return delete $buffer{$client};
                 }
-                $c->{$client}->{connection} = $server;
+                $buffer{$client}->{connection} = $server;
                 $stream->on(
                   read => sub {
                     my ($stream, $chunk) = @_;
@@ -116,7 +115,7 @@ Mojo::IOLoop->server(
                 $stream->on(
                   close => sub {
                     Mojo::IOLoop->remove($client);
-                    delete $c->{$client};
+                    delete $buffer{$client};
                   }
                 );
                 Mojo::IOLoop->stream($client)->write($fail ? $nf : $ok);
@@ -129,9 +128,9 @@ Mojo::IOLoop->server(
     );
     $stream->on(
       close => sub {
-        Mojo::IOLoop->remove($c->{$client}->{connection})
-          if $c->{$client}->{connection};
-        delete $c->{$client};
+        Mojo::IOLoop->remove($buffer{$client}->{connection})
+          if $buffer{$client}->{connection};
+        delete $buffer{$client};
       }
     );
   }
@@ -199,15 +198,19 @@ Mojo::IOLoop->start;
 is $result, 'test1test2', 'right result';
 
 # GET /proxy (proxy request)
-$ua->https_proxy("http://localhost:$proxy");
+$ua->https_proxy("http://sri:secr3t\@localhost:$proxy");
+my $auth;
 $result = undef;
 $ua->get(
   "https://localhost:$port/proxy" => sub {
-    $result = pop->success->body;
+    my ($ua, $tx) = @_;
+    $auth   = $tx->req->headers->proxy_authorization;
+    $result = $tx->success->body;
     Mojo::IOLoop->stop;
   }
 );
 Mojo::IOLoop->start;
+ok !$auth, 'no "Proxy-Authorization" header';
 is $result, "https://localhost:$port/proxy", 'right content';
 
 # GET /proxy (kept alive proxy request)
