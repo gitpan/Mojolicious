@@ -13,7 +13,7 @@ plan skip_all => 'set TEST_TLS to enable this test (developer only!)'
   unless $ENV{TEST_TLS};
 plan skip_all => 'IO::Socket::SSL 1.37 required for this test!'
   unless Mojo::IOLoop::Server::TLS;
-plan tests => 16;
+plan tests => 17;
 
 use Mojo::IOLoop;
 use Mojo::Server::Daemon;
@@ -166,7 +166,7 @@ $result = undef;
 my $works;
 $ua->max_redirects(3)->get(
   "https://localhost:$port/broken_redirect" => sub {
-    my $tx = pop;
+    my ($ua, $tx) = @_;
     $result = $tx->success->body;
     $works  = $tx->res->headers->header('X-Works');
     Mojo::IOLoop->stop;
@@ -199,42 +199,42 @@ is $result, 'test1test2', 'right result';
 
 # GET /proxy (proxy request)
 $ua->https_proxy("http://sri:secr3t\@localhost:$proxy");
-my $auth;
 $result = undef;
+my ($auth, $kept_alive);
 $ua->get(
   "https://localhost:$port/proxy" => sub {
     my ($ua, $tx) = @_;
-    $auth   = $tx->req->headers->proxy_authorization;
-    $result = $tx->success->body;
-    Mojo::IOLoop->stop;
-  }
-);
-Mojo::IOLoop->start;
-ok !$auth, 'no "Proxy-Authorization" header';
-is $result, "https://localhost:$port/proxy", 'right content';
-
-# GET /proxy (kept alive proxy request)
-$result = undef;
-my $kept_alive;
-$ua->get(
-  "https://localhost:$port/proxy" => sub {
-    my $tx = pop;
     $result     = $tx->success->body;
+    $auth       = $tx->req->headers->proxy_authorization;
     $kept_alive = $tx->kept_alive;
     Mojo::IOLoop->stop;
   }
 );
 Mojo::IOLoop->start;
+ok !$auth,       'no "Proxy-Authorization" header';
+ok !$kept_alive, 'connection was not kept alive';
 is $result, "https://localhost:$port/proxy", 'right content';
-ok $kept_alive, 'kept alive';
+
+# GET /proxy (kept alive proxy request)
+($kept_alive, $result) = undef;
+$ua->get(
+  "https://localhost:$port/proxy" => sub {
+    my ($ua, $tx) = @_;
+    $kept_alive = $tx->kept_alive;
+    $result     = $tx->success->body;
+    Mojo::IOLoop->stop;
+  }
+);
+Mojo::IOLoop->start;
+is $result, "https://localhost:$port/proxy", 'right content';
+ok $kept_alive, 'connection was kept alive';
 
 # WebSocket /test (kept alive proxy websocket)
 $ua->https_proxy("http://localhost:$proxy");
-$result     = undef;
-$kept_alive = undef;
+($kept_alive, $result) = undef;
 $ua->websocket(
   "wss://localhost:$port/test" => sub {
-    my $tx = pop;
+    my ($ua, $tx) = @_;
     $kept_alive = $tx->kept_alive;
     $tx->on(finish => sub { Mojo::IOLoop->stop });
     $tx->on(
@@ -248,7 +248,7 @@ $ua->websocket(
   }
 );
 Mojo::IOLoop->start;
-ok $kept_alive, 'kept alive';
+ok $kept_alive, 'connection was kept alive';
 is $connected,  "localhost:$port", 'connected';
 is $result,     'test1test2', 'right result';
 ok $read > 25, 'read enough';
@@ -260,7 +260,7 @@ my $port2 = $port + 1;
 my ($success, $err);
 $ua->websocket(
   "wss://localhost:$port2/test" => sub {
-    my $tx = pop;
+    my ($ua, $tx) = @_;
     $success = $tx->success;
     $err     = $tx->error;
     Mojo::IOLoop->stop;

@@ -6,7 +6,7 @@ BEGIN {
   $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Poll';
 }
 
-use Test::More tests => 9;
+use Test::More tests => 12;
 
 # "I cheated the wrong way!
 #  I wrote the Lisa name and gave the Ralph answers!"
@@ -150,22 +150,47 @@ is $result, 'test1test2', 'right result';
 
 # GET http://kraih.com/proxy (proxy request)
 $ua->http_proxy("http://localhost:$port");
+my $kept_alive;
 $result = undef;
 $ua->get(
   "http://kraih.com/proxy" => sub {
-    $result = pop->success->body;
+    my ($ua, $tx) = @_;
+    $kept_alive = $tx->kept_alive;
+    $result     = $tx->success->body;
     Mojo::IOLoop->stop;
   }
 );
 Mojo::IOLoop->start;
+ok !$kept_alive, 'connection was not kept alive';
 is $result, 'http://kraih.com/proxy', 'right content';
 
+# WebSocket /test (kept alive proxy websocket)
+($kept_alive, $result) = undef;
+$ua->websocket(
+  "ws://localhost:$port/test" => sub {
+    my ($ua, $tx) = @_;
+    $kept_alive = $tx->kept_alive;
+    $tx->on(finish => sub { Mojo::IOLoop->stop });
+    $tx->on(
+      message => sub {
+        my ($tx, $message) = @_;
+        $result = $message;
+        $tx->finish;
+      }
+    );
+    $tx->send('test1');
+  }
+);
+Mojo::IOLoop->start;
+ok $kept_alive, 'connection was kept alive';
+is $result, 'test1test2', 'right result';
+
 # WebSocket /test (proxy websocket)
-$ua->http_proxy("http://localhost:$proxy");
+$ua = Mojo::UserAgent->new(http_proxy => "http://localhost:$proxy");
 $result = undef;
 $ua->websocket(
   "ws://localhost:$port/test" => sub {
-    my $tx = pop;
+    my ($ua, $tx) = @_;
     $tx->on(finish => sub { Mojo::IOLoop->stop });
     $tx->on(
       message => sub {
@@ -189,7 +214,7 @@ my $port2 = $port + 1;
 my ($success, $err);
 $ua->websocket(
   "ws://localhost:$port2/test" => sub {
-    my $tx = pop;
+    my ($ua, $tx) = @_;
     $success = $tx->success;
     $err     = $tx->error;
     Mojo::IOLoop->stop;

@@ -12,6 +12,22 @@ use Mojo::Transaction::WebSocket;
 use Mojo::URL;
 use Mojo::Util qw/encode url_escape/;
 
+sub endpoint {
+  my ($self, $tx) = @_;
+
+  # Basic endpoint
+  my $req    = $tx->req;
+  my $url    = $req->url;
+  my $scheme = $url->scheme || 'http';
+  my $host   = $url->ihost;
+  my $port   = $url->port || ($scheme eq 'https' ? 443 : 80);
+
+  # Proxy for normal HTTP requests
+  return $scheme eq 'http' && lc($req->headers->upgrade || '') ne 'websocket'
+    ? $self->_proxy($tx, $scheme, $host, $port)
+    : ($scheme, $host, $port);
+}
+
 sub form {
   my ($self, $url) = (shift, shift);
 
@@ -81,21 +97,7 @@ sub form {
 #  He organized all the law suits against me into one class action suit."
 sub peer {
   my ($self, $tx) = @_;
-
-  # Peer for transaction
-  my $req    = $tx->req;
-  my $url    = $req->url;
-  my $scheme = $url->scheme || 'http';
-  my $host   = $url->ihost;
-  my $port   = $url->port;
-  if (my $proxy = $req->proxy) {
-    $scheme = $proxy->scheme;
-    $host   = $proxy->ihost;
-    $port   = $proxy->port;
-  }
-  $port ||= $scheme eq 'https' ? 443 : 80;
-
-  return $scheme, $host, $port;
+  return $self->_proxy($tx, $self->endpoint($tx));
 }
 
 # "America's health care system is second only to Japan...
@@ -231,6 +233,19 @@ sub _multipart {
   return \@parts;
 }
 
+sub _proxy {
+  my ($self, $tx, $scheme, $host, $port) = @_;
+
+  # Update with proxy information
+  if (my $proxy = $tx->req->proxy) {
+    $scheme = $proxy->scheme;
+    $host   = $proxy->ihost;
+    $port   = $proxy->port || ($scheme eq 'https' ? 443 : 80);
+  }
+
+  return $scheme, $host, $port;
+}
+
 1;
 __END__
 
@@ -254,6 +269,12 @@ framework used by L<Mojo::UserAgent>.
 
 L<Mojo::UserAgent::Transactor> inherits all methods from L<Mojo::Base> and
 implements the following new ones.
+
+=head2 C<endpoint>
+
+  my ($scheme, $host, $port) = $t->endpoint($tx);
+
+Actual endpoint for transaction.
 
 =head2 C<form>
 
