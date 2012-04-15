@@ -2,8 +2,7 @@ package Mojolicious::Routes::Pattern;
 use Mojo::Base -base;
 
 has [qw/defaults reqs/] => sub { {} };
-has format => sub {qr#\.([^/]+)$#};
-has [qw/pattern regex/];
+has [qw/format pattern regex/];
 has quote_end     => ')';
 has quote_start   => '(';
 has relaxed_start => '.';
@@ -15,29 +14,23 @@ has wildcard_start => '*';
 sub new { shift->SUPER::new->parse(@_) }
 
 sub match {
-  my ($self, $path) = @_;
-  my $result = $self->shape_match(\$path);
-  return $result if !$path || $path eq '/';
-  return;
+  my ($self, $path, $detect) = @_;
+  my $result = $self->shape_match(\$path, $detect);
+  return !$path || $path eq '/' ? $result : undef;
 }
 
 sub parse {
-  my ($self, $pattern) = (shift, shift);
+  my $self = shift;
 
   # Make sure we have a viable pattern
-  return $self if !defined $pattern || $pattern eq '/';
+  my $pattern = @_ % 2 ? (shift || '/') : '/';
   $pattern = "/$pattern" unless $pattern =~ m#^/#;
 
   # Requirements
-  my $reqs = ref $_[0] eq 'HASH' ? $_[0] : {@_};
-  $self->reqs($reqs);
-
-  # Format in pattern
-  $reqs->{format} = quotemeta($self->{strict} = $1)
-    if $pattern =~ m#\.([^/\)]+)$#;
+  $self->reqs({@_});
 
   # Tokenize
-  return $self->pattern($pattern)->_tokenize;
+  return $pattern eq '/' ? $self : $self->pattern($pattern)->_tokenize;
 }
 
 sub render {
@@ -82,8 +75,8 @@ sub shape_match {
   my ($self, $pathref, $detect) = @_;
 
   # Compile on demand
-  my $regex;
-  $regex = $self->_compile unless $regex = $self->regex;
+  my $regex = $self->regex || $self->_compile;
+  my $format = $detect ? ($self->format || $self->_compile_format) : undef;
 
   # Match
   return unless my @captures = $$pathref =~ $regex;
@@ -98,11 +91,9 @@ sub shape_match {
   }
 
   # Format
-  $result->{format} ||= $self->{strict} if $detect && exists $self->{strict};
   my $req = $self->reqs->{format};
-  return $result if defined $req && !$req;
-  my $format = $self->format;
-  if ($detect && $$pathref =~ s|^/?$format||) { $result->{format} ||= $1 }
+  return $result if !$detect || defined $req && !$req;
+  if ($$pathref =~ s|^/?$format||) { $result->{format} = $1 }
   elsif ($req) { return if !$result->{format} }
 
   return $result;
@@ -111,15 +102,8 @@ sub shape_match {
 sub _compile {
   my $self = shift;
 
-  # Compile format regex
-  my $reqs = $self->reqs;
-  if (!exists $reqs->{format} || $reqs->{format}) {
-    my $format =
-      defined $reqs->{format} ? _compile_req($reqs->{format}) : '([^/]+)';
-    $self->format(qr#\.$format$#);
-  }
-
   # Compile tree to regex
+  my $reqs     = $self->reqs;
   my $block    = '';
   my $regex    = '';
   my $optional = 1;
@@ -179,6 +163,20 @@ sub _compile {
   $self->regex($regex);
 
   return $regex;
+}
+
+sub _compile_format {
+  my $self = shift;
+
+  # Default regex
+  my $reqs = $self->reqs;
+  return $self->format(qr#\.([^/]+)#)->format
+    if !exists $reqs->{format} && $reqs->{format};
+
+  # Compile custom regex
+  my $regex =
+    defined $reqs->{format} ? _compile_req($reqs->{format}) : '([^/]+)';
+  return $self->format(qr#\.$regex#)->format;
 }
 
 # "Interesting... Oh no wait, the other thing, tedious."
@@ -304,7 +302,7 @@ Default parameters.
   my $regex = $pattern->format;
   $pattern  = $pattern->format($regex);
 
-Compiled regex for format matching, defaults to C<\.([^/]+)$>.
+Compiled regex for format matching.
 
 =head2 C<pattern>
 
@@ -383,21 +381,25 @@ implements the following ones.
 
 =head2 C<new>
 
-  my $pattern = Mojolicious::Routes::Pattern->new('/:controller/:action',
-    action => qr/\w+/
-  );
+  my $pattern = Mojolicious::Routes::Pattern->new('/:action');
+  my $pattern =
+    Mojolicious::Routes::Pattern->new('/:action', action => qr/\w+/);
+  my $pattern = Mojolicious::Routes::Pattern->new(format => 0);
 
 Construct a new pattern object.
 
 =head2 C<match>
 
   my $result = $pattern->match('/foo/bar');
+  my $result = $pattern->match('/foo/bar', $detect);
 
-Match pattern against a path.
+Match pattern against entire path, format detection is disabled by default.
 
 =head2 C<parse>
 
-  $pattern = $pattern->parse('/:controller/:action', action => qr/\w+/);
+  $pattern = $pattern->parse('/:action');
+  $pattern = $pattern->parse('/:action', action => qr/\w+/);
+  $pattern = $pattern->parse(format => 0);
 
 Parse a raw pattern.
 
@@ -412,7 +414,8 @@ Render pattern into a path with parameters.
   my $result = $pattern->shape_match(\$path);
   my $result = $pattern->shape_match(\$path, $detect);
 
-Match pattern against a path and remove matching parts.
+Match pattern against path and remove matching parts, format detection is
+disabled by default.
 
 =head1 SEE ALSO
 

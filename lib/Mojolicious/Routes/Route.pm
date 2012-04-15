@@ -2,6 +2,7 @@ package Mojolicious::Routes::Route;
 use Mojo::Base -base;
 
 use Carp 'croak';
+use List::Util 'first';
 use Mojolicious::Routes::Pattern;
 use Scalar::Util qw/blessed weaken/;
 
@@ -31,8 +32,16 @@ sub new { shift->SUPER::new->parse(@_) }
 
 sub add_child {
   my ($self, $route) = @_;
+
+  # Connect child
   weaken $route->parent($self)->{parent};
   push @{$self->children}, $route;
+
+  # Inherit format detection from parents
+  $route->pattern->reqs->{format} //= 0
+    if defined first { defined $_ && !$_ }
+    map { $_->pattern->reqs->{format} } @{$self->_parents};
+
   return $self;
 }
 
@@ -53,10 +62,8 @@ sub find {
   while (my $child = shift @children) {
 
     # Match
-    if ($child->name eq $name) {
-      $candidate = $child;
-      return $candidate if $child->has_custom_name;
-    }
+    $candidate = $child->has_custom_name ? return $child : $child
+      if $child->name eq $name;
 
     # Search children too
     push @children, @{$child->children};
@@ -85,9 +92,8 @@ sub has_websocket {
 
 sub is_endpoint {
   my $self = shift;
-  return   if $self->inline;
-  return 1 if $self->block;
-  return !@{$self->children};
+  return if $self->inline;
+  return $self->block ? 1 : !@{$self->children};
 }
 
 sub is_websocket { shift->{websocket} }
@@ -122,9 +128,8 @@ sub over {
 
 sub parse {
   my $self = shift;
-  my $name = $self->pattern->parse(@_)->pattern // '';
-  $name =~ s/\W+//g;
-  $self->{name} = $name;
+  $self->{name} = $self->pattern->parse(@_)->pattern // '';
+  $self->{name} =~ s/\W+//g;
   return $self;
 }
 
@@ -137,31 +142,24 @@ sub render {
 
   # Path prefix
   my $prefix = $self->pattern->render($values);
-  $path = $prefix . $path unless $prefix eq '/';
+  $path = "$prefix$path" unless $prefix eq '/';
 
   # Make sure there is always a root
   my $parent = $self->parent;
   $path = '/' if !$path && !$parent;
 
   # Format
-  if ((my $format = $values->{format}) && !$parent) {
-    $path .= ".$format" unless $path =~ m#\.[^/]+$#;
-  }
+  $path .= ".$values->{format}"
+    if $values->{format} && !$parent && $path !~ m#\.[^/]+$#;
 
   return $parent ? $parent->render($path, $values) : $path;
 }
 
-sub root {
-  my $root = my $parent = shift;
-  while ($parent = $parent->parent) { $root = $parent }
-  return $root;
-}
+sub root { shift->_parents->[-1] }
 
 sub route {
-  my $self  = shift;
-  my $route = $self->new(@_);
-  $self->add_child($route);
-  return $route;
+  my $self = shift;
+  return $self->add_child($self->new(@_))->children->[-1];
 }
 
 sub to {
@@ -271,13 +269,19 @@ sub _generate_route {
   $defaults{cb} = $cb if $cb;
 
   # Create bridge
-  return $self->bridge($pattern, {@constraints})->over(\@conditions)
+  return $self->bridge($pattern, @constraints)->over(\@conditions)
     ->to(\%defaults)->name($name)
     if !ref $methods && $methods eq 'under';
 
   # Create route
-  return $self->route($pattern, {@constraints})->over(\@conditions)
+  return $self->route($pattern, @constraints)->over(\@conditions)
     ->via($methods)->to(\%defaults)->name($name);
+}
+
+sub _parents {
+  my @parents = (shift);
+  while (my $parent = $parents[-1]->parent) { push @parents, $parent }
+  return \@parents;
 }
 
 1;
@@ -375,13 +379,15 @@ also the L<Mojolicious::Lite> tutorial for more argument variations.
 =head2 C<bridge>
 
   my $bridge = $r->bridge;
-  my $bridge = $r->bridge('/:controller/:action');
+  my $bridge = $r->bridge('/:action');
+  my $bridge = $r->bridge('/:action', action => qr/\w+/);
+  my $bridge = $r->bridge(format => 0);
 
 Add a new bridge to this route as a nested child.
 
   my $auth = $r->bridge('/user')->to('user#auth');
-  $auth->route('/show')->to('#show');
-  $auth->route('/create')->to('#create');
+  $auth->get('/show')->to('#show');
+  $auth->post('/create')->to('#create');
 
 =head2 C<delete>
 
@@ -485,11 +491,13 @@ L<Mojolicious::Lite> tutorial for more argument variations.
 Activate conditions for this route. Note that this automatically disables the
 routing cache, since conditions are too complex for caching.
 
-  $r->route('/foo')->over(host => qr/mojolicio\.us/)->to('foo#bar');
+  $r->get('/foo')->over(host => qr/mojolicio\.us/)->to('foo#bar');
 
 =head2 C<parse>
 
-  $r = $r->parse('/:controller/:action');
+  $r = $r->parse('/:action');
+  $r = $r->parse('/:action', action => qr/\w+/);
+  $r = $r->parse(format => 0);
 
 Parse a pattern.
 
@@ -537,7 +545,10 @@ The L<Mojolicious::Routes> object this route is an ancestor of.
 
 =head2 C<route>
 
-  my $route = $r->route('/:c/:a', a => qr/\w+/);
+  my $route = $r->route;
+  my $route = $r->route('/:action');
+  my $route = $r->route('/:action', action => qr/\w+/);
+  my $route = $r->route(format => 0);
 
 Add a new nested child to this route.
 
@@ -589,12 +600,15 @@ restrictions.
 
 =head2 C<waypoint>
 
-  my $r = $r->waypoint('/:c/:a', a => qr/\w+/);
+  my $waypoint = $r->waypoint;
+  my $waypoint = $r->waypoint('/:action');
+  my $waypoint = $r->waypoint('/:action', action => qr/\w+/);
+  my $waypoint = $r->waypoint(format => 0);
 
 Add a waypoint to this route as nested child.
 
   my $foo = $r->waypoint('/foo')->to('example#foo');
-  $foo->route('/bar')->to('#bar');
+  $foo->get('/bar')->to('#bar');
 
 =head2 C<websocket>
 
