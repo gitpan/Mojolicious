@@ -5,7 +5,7 @@ has [qw/defaults reqs/] => sub { {} };
 has [qw/format pattern regex/];
 has quote_end     => ')';
 has quote_start   => '(';
-has relaxed_start => '.';
+has relaxed_start => '#';
 has symbol_start  => ':';
 has [qw/symbols tree/] => sub { [] };
 has wildcard_start => '*';
@@ -34,10 +34,10 @@ sub parse {
 }
 
 sub render {
-  my ($self, $values) = @_;
-  $values ||= {};
+  my ($self, $values, $render) = @_;
 
   # Merge values with defaults
+  my $format = ($values ||= {})->{format};
   $values = {%{$self->defaults}, %$values};
 
   # Turn pattern into path
@@ -68,7 +68,9 @@ sub render {
     $string = "$rendered$string";
   }
 
-  return $string || '/';
+  # Format is optional
+  $string ||= '/';
+  return $render && $format ? "$string.$format" : $string;
 }
 
 sub shape_match {
@@ -94,7 +96,7 @@ sub shape_match {
   my $req = $self->reqs->{format};
   return $result if !$detect || defined $req && !$req;
   if ($$pathref =~ s|^/?$format||) { $result->{format} = $1 }
-  elsif ($req) { return if !$result->{format} }
+  elsif ($req) { return unless $result->{format} }
 
   return $result;
 }
@@ -103,9 +105,8 @@ sub _compile {
   my $self = shift;
 
   # Compile tree to regex
-  my $reqs     = $self->reqs;
-  my $block    = '';
-  my $regex    = '';
+  my $block = my $regex = '';
+  my $reqs = $self->reqs;
   my $optional = 1;
   my $defaults = $self->defaults;
   for my $token (reverse @{$self->tree}) {
@@ -159,10 +160,7 @@ sub _compile {
   $regex = "$block$regex" if $block;
 
   # Compile
-  $regex = qr/^$regex/s;
-  $self->regex($regex);
-
-  return $regex;
+  return $self->regex(qr/^$regex/s)->regex;
 }
 
 sub _compile_format {
@@ -170,13 +168,13 @@ sub _compile_format {
 
   # Default regex
   my $reqs = $self->reqs;
-  return $self->format(qr#\.([^/]+)#)->format
+  return $self->format(qr#\.([^/]+)$#)->format
     if !exists $reqs->{format} && $reqs->{format};
 
   # Compile custom regex
   my $regex =
     defined $reqs->{format} ? _compile_req($reqs->{format}) : '([^/]+)';
-  return $self->format(qr#\.$regex#)->format;
+  return $self->format(qr#\.$regex$#)->format;
 }
 
 # "Interesting... Oh no wait, the other thing, tedious."
@@ -190,11 +188,11 @@ sub _tokenize {
   my $self = shift;
 
   # Token
-  my $quote_end      = $self->quote_end;
-  my $quote_start    = $self->quote_start;
-  my $relaxed_start  = $self->relaxed_start;
-  my $symbol_start   = $self->symbol_start;
-  my $wildcard_start = $self->wildcard_start;
+  my $quote_end   = $self->quote_end;
+  my $quote_start = $self->quote_start;
+  my $relaxed     = $self->relaxed_start;
+  my $symbol      = $self->symbol_start;
+  my $wildcard    = $self->wildcard_start;
 
   # Parse the pattern character wise
   my $pattern = $self->pattern;
@@ -202,8 +200,14 @@ sub _tokenize {
   my (@tree, $quoted);
   while (length(my $char = substr $pattern, 0, 1, '')) {
 
-    # Inside a symbol
-    my $symbol = $state ~~ [qw/relaxed symbol wildcard/];
+    # Inside a placeholder
+    my $placeholder = $state ~~ [qw/relaxed symbol wildcard/];
+
+    # DEPRECATED in Leaf Fluttering In Wind!
+    if ($quoted && $char eq '.' && $state eq 'symbol') {
+      warn "Relaxed placeholders /(.foo) are DEPRECATED in favor of /#foo!\n";
+      $char = $relaxed;
+    }
 
     # Quote start
     if ($char eq $quote_start) {
@@ -213,22 +217,15 @@ sub _tokenize {
     }
 
     # Symbol start
-    elsif ($char eq $symbol_start) {
+    elsif ($char eq $symbol) {
       push @tree, ['symbol', ''] if $state ne 'symbol';
       $state = 'symbol';
     }
 
-    # Relaxed start (needs to be quoted)
-    elsif ($quoted && $char eq $relaxed_start && $state eq 'symbol') {
-      $state = 'relaxed';
-      $tree[-1]->[0] = 'relaxed';
-    }
-
-    # Wildcard start (upgrade when quoted)
-    elsif ($char eq $wildcard_start) {
+    # Relaxed or wildcard start (upgrade when quoted)
+    elsif ($char ~~ [$relaxed, $wildcard]) {
       push @tree, ['symbol', ''] unless $quoted;
-      $state = 'wildcard';
-      $tree[-1]->[0] = 'wildcard';
+      $tree[-1]->[0] = $state = $char eq $relaxed ? 'relaxed' : 'wildcard';
     }
 
     # Quote end
@@ -244,17 +241,14 @@ sub _tokenize {
     }
 
     # Relaxed, symbol or wildcard
-    elsif ($symbol && $char =~ /\w/) { $tree[-1]->[-1] .= $char }
+    elsif ($placeholder && $char =~ /\w/) { $tree[-1]->[-1] .= $char }
 
     # Text
     else {
       $state = 'text';
 
       # New text element
-      unless ($tree[-1]->[0] eq 'text') {
-        push @tree, ['text', $char];
-        next;
-      }
+      push @tree, ['text', $char] and next unless $tree[-1]->[0] eq 'text';
 
       # More text
       $tree[-1]->[-1] .= $char;
@@ -337,7 +331,7 @@ Pattern in compiled regex form.
   my $relaxed = $pattern->relaxed_start;
   $pattern    = $pattern->relaxed_start('*');
 
-Character indicating a relaxed placeholder, defaults to C<.>.
+Character indicating a relaxed placeholder, defaults to C<#>.
 
 =head2 C<reqs>
 
@@ -391,7 +385,7 @@ Construct a new pattern object.
 =head2 C<match>
 
   my $result = $pattern->match('/foo/bar');
-  my $result = $pattern->match('/foo/bar', $detect);
+  my $result = $pattern->match('/foo/bar', 1);
 
 Match pattern against entire path, format detection is disabled by default.
 
@@ -406,13 +400,15 @@ Parse a raw pattern.
 =head2 C<render>
 
   my $path = $pattern->render({action => 'foo'});
+  my $path = $pattern->render({action => 'foo'}, 1);
 
-Render pattern into a path with parameters.
+Render pattern into a path with parameters, format rendering is disabled by
+default.
 
 =head2 C<shape_match>
 
   my $result = $pattern->shape_match(\$path);
-  my $result = $pattern->shape_match(\$path, $detect);
+  my $result = $pattern->shape_match(\$path, 1);
 
 Match pattern against path and remove matching parts, format detection is
 disabled by default.

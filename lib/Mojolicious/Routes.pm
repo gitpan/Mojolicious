@@ -96,10 +96,7 @@ sub dispatch {
 sub hide { push @{shift->hidden}, @_ }
 
 sub route {
-  my $self  = shift;
-  my $route = Mojolicious::Routes::Route->new(@_);
-  $self->add_child($route);
-  return $route;
+  shift->add_child(Mojolicious::Routes::Route->new(@_))->children->[-1];
 }
 
 sub _callback {
@@ -267,11 +264,6 @@ Mojolicious::Routes - Always find your destination with routes
   # Bridges can be used to chain multiple routes
   $r->bridge->to(controller => 'foo', action =>'auth')
     ->route('/blog')->to(action => 'list');
-
-  # Waypoints are similar to bridges and nested routes but can also match
-  # if they are not the actual endpoint of the whole route
-  my $b = $r->waypoint('/books')->to(controller => 'books', action => 'list');
-  $b->route('/:id', id => qr/\d+/)->to(action => 'view');
 
   # Simplified Mojolicious::Lite style route generation is also possible
   $r->get('/')->to(controller => 'blog', action => 'welcome');

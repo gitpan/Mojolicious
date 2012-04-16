@@ -110,10 +110,22 @@ the surrounding text.
   /sebastian23hello  -> /(:name)hello -> {name => 'sebastian23'}
   /sebastian 23hello -> /(:name)hello -> {name => 'sebastian 23'}
 
+=head2 Relaxed placeholders
+
+Relaxed placeholders are just like generic placeholders, but match all
+characters except C</>.
+
+  /hello              -> /#name/hello -> undef
+  /sebastian/23/hello -> /#name/hello -> undef
+  /sebastian.23/hello -> /#name/hello -> {name => 'sebastian.23'}
+  /sebastian/hello    -> /#name/hello -> {name => 'sebastian'}
+  /sebastian23/hello  -> /#name/hello -> {name => 'sebastian23'}
+  /sebastian 23/hello -> /#name/hello -> {name => 'sebastian 23'}
+
 =head2 Wildcard placeholders
 
-Wildcard placeholders are just like generic placeholders, but match
-absolutely everything.
+Wildcard placeholders are just like the two placeholders above, but match
+absolutely everything, including C</> and C<.>.
 
   /hello              -> /*name/hello -> undef
   /sebastian/23/hello -> /*name/hello -> {name => 'sebastian/23'}
@@ -121,18 +133,6 @@ absolutely everything.
   /sebastian/hello    -> /*name/hello -> {name => 'sebastian'}
   /sebastian23/hello  -> /*name/hello -> {name => 'sebastian23'}
   /sebastian 23/hello -> /*name/hello -> {name => 'sebastian 23'}
-
-=head2 Relaxed placeholders
-
-Relaxed placeholders are similar to the two placeholders above, but always
-require parentheses and match all characters except C</>.
-
-  /hello              -> /(.name)/hello -> undef
-  /sebastian/23/hello -> /(.name)/hello -> undef
-  /sebastian.23/hello -> /(.name)/hello -> {name => 'sebastian.23'}
-  /sebastian/hello    -> /(.name)/hello -> {name => 'sebastian'}
-  /sebastian23/hello  -> /(.name)/hello -> {name => 'sebastian23'}
-  /sebastian 23/hello -> /(.name)/hello -> {name => 'sebastian 23'}
 
 =head1 BASICS
 
@@ -516,18 +516,6 @@ will be broken, this makes bridges a very powerful tool for authentication.
     return;
   });
   $foo->route('/bar')->to(controller => 'foo', action => 'bar');
-
-=head2 Waypoints
-
-Waypoints are very similar to normal nested routes but can match even if they
-have children.
-
-  # /foo     -> {controller => 'foo', action => 'baz'}
-  # /foo/bar -> {controller => 'foo', action => 'bar'}
-  my $foo = $r->waypoint('/foo')->to(controller => 'foo', action => 'baz');
-  $foo->route('/bar')->to(action => 'bar');
-
-All children will be ignored if a waypoint matches.
 
 =head2 More convenient routes
 
