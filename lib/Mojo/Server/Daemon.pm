@@ -205,13 +205,13 @@ sub _listen {
       # Events
       $stream->on(
         timeout => sub {
-          $self->_error($id, 'Inactivity timeout.')
+          $self->_error($id => 'Inactivity timeout.')
             if $self->{connections}{$id}{tx};
         }
       );
       $stream->on(close => sub { $self->_close($id) });
-      $stream->on(error => sub { $self->_error($id, pop) });
-      $stream->on(read  => sub { $self->_read($id, pop) });
+      $stream->on(error => sub { $self->_error($id => pop) });
+      $stream->on(read  => sub { $self->_read($id => pop) });
     }
   );
   $self->{listening} ||= [];
@@ -222,8 +222,8 @@ sub _listen {
     my $name = $options->{address} || Sys::Hostname::hostname();
     $p->publish(
       name => "Mojolicious ($name:$options->{port})",
-      type => '_http._tcp',
-      port => $options->{port}
+      port => $options->{port},
+      type => '_http._tcp'
     ) if $options->{port} && !$tls;
   }
 

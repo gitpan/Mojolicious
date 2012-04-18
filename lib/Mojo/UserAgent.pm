@@ -179,32 +179,16 @@ sub _cleanup {
 }
 
 sub _connect {
-  my ($self, $tx, $cb) = @_;
+  my ($self, $scheme, $host, $port, $handle, $cb) = @_;
 
-  # Reuse connection
-  my $id = $tx->connection;
-  my ($scheme, $host, $port) = $self->transactor->endpoint($tx);
-  $id ||= $self->_cache("$scheme:$host:$port");
-  if ($id && !ref $id) {
-    warn "-- Reusing connection ($scheme:$host:$port)\n" if DEBUG;
-    $self->{connections}{$id} = {cb => $cb, tx => $tx};
-    $tx->kept_alive(1) unless $tx->connection;
-    $self->_connected($id);
-    return $id;
-  }
-
-  # CONNECT request to proxy required
-  return if $tx->req->method ne 'CONNECT' && $self->_connect_proxy($tx, $cb);
-
-  # Connect
-  warn "-- Connect ($scheme:$host:$port)\n" if DEBUG;
-  ($scheme, $host, $port) = $self->transactor->peer($tx);
+  # Open connection
   weaken $self;
-  $id = $self->_loop->client(
+  my $id;
+  return $id = $self->_loop->client(
     address       => $host,
-    port          => $port,
-    handle        => $id,
+    handle        => $handle,
     local_address => $self->local_address,
+    port          => $port,
     timeout       => $self->connect_timeout,
     tls           => $scheme eq 'https' ? 1 : 0,
     tls_ca        => $self->ca,
@@ -213,15 +197,20 @@ sub _connect {
     sub {
       my ($loop, $err, $stream) = @_;
 
-      # Events
+      # Connection error
       return $self->_error($id, $err) if $err;
-      $self->_events($stream, $id);
-      $self->_connected($id);
+
+      # Events
+      $stream->on(
+        timeout => sub { $self->_error($id => 'Inactivity timeout.') });
+      $stream->on(close => sub { $self->_handle($id => 1) });
+      $stream->on(error => sub { $self->_error($id, pop, 1) });
+      $stream->on(read => sub { $self->_read($id => pop) });
+
+      # Connection established
+      $cb->();
     }
   );
-  $self->{connections}{$id} = {cb => $cb, tx => $tx};
-
-  return $id;
 }
 
 sub _connect_proxy {
@@ -242,39 +231,20 @@ sub _connect_proxy {
       # Prevent proxy reassignment
       $old->req->proxy(0);
 
-      # TLS upgrade
-      if ($tx->req->url->scheme eq 'https') {
-        return unless my $id = $tx->connection;
-        my $loop   = $self->_loop;
-        my $handle = $loop->stream($id)->steal_handle;
-        my $c      = delete $self->{connections}{$id};
-        $loop->remove($id);
-        weaken $self;
-        $id = $loop->client(
-          handle   => $handle,
-          timeout  => $self->connect_timeout,
-          tls      => 1,
-          tls_ca   => $self->ca,
-          tls_cert => $self->cert,
-          tls_key  => $self->key,
-          sub {
-            my ($loop, $err, $stream) = @_;
-
-            # Events
-            return $self->_error($id, $err) if $err;
-            $self->_events($stream, $id);
-
-            # Start real transaction
-            $old->connection($id);
-            $self->_start($old, $cb);
-          }
-        );
-        return $self->{connections}{$id} = $c;
-      }
-
       # Start real transaction
-      $old->connection($tx->connection);
-      $self->_start($old, $cb);
+      return $self->_start($old->connection($tx->connection), $cb)
+        unless $tx->req->url->scheme eq 'https';
+
+      # TLS upgrade
+      return unless my $id = $tx->connection;
+      my $loop   = $self->_loop;
+      my $handle = $loop->stream($id)->steal_handle;
+      my $c      = delete $self->{connections}{$id};
+      $loop->remove($id);
+      weaken $self;
+      $id = $self->_connect($self->transactor->endpoint($old),
+        $handle, sub { $self->_start($old->connection($id), $cb) });
+      $self->{connections}{$id} = $c;
     }
   );
 }
@@ -299,20 +269,40 @@ sub _connected {
   $self->_write($id);
 }
 
+sub _connection {
+  my ($self, $tx, $cb) = @_;
+
+  # Reuse connection
+  my $id = $tx->connection;
+  my ($scheme, $host, $port) = $self->transactor->endpoint($tx);
+  $id ||= $self->_cache("$scheme:$host:$port");
+  if ($id && !ref $id) {
+    warn "-- Reusing connection ($scheme:$host:$port)\n" if DEBUG;
+    $self->{connections}{$id} = {cb => $cb, tx => $tx};
+    $tx->kept_alive(1) unless $tx->connection;
+    $self->_connected($id);
+    return $id;
+  }
+
+  # CONNECT request to proxy required
+  return if $tx->req->method ne 'CONNECT' && $self->_connect_proxy($tx, $cb);
+
+  # Connect
+  warn "-- Connect ($scheme:$host:$port)\n" if DEBUG;
+  ($scheme, $host, $port) = $self->transactor->peer($tx);
+  weaken $self;
+  $id = $self->_connect(
+    ($scheme, $host, $port, $id) => sub { $self->_connected($id) });
+  $self->{connections}{$id} = {cb => $cb, tx => $tx};
+
+  return $id;
+}
+
 sub _error {
   my ($self, $id, $err, $emit) = @_;
   if (my $tx = $self->{connections}{$id}{tx}) { $tx->res->error($err) }
   $self->emit(error => $err) if $emit;
-  $self->_handle($id, $err);
-}
-
-sub _events {
-  my ($self, $stream, $id) = @_;
-  weaken $self;
-  $stream->on(timeout => sub { $self->_error($id, 'Inactivity timeout.') });
-  $stream->on(close => sub { $self->_handle($id, 1) });
-  $stream->on(error => sub { $self->_error($id, pop, 1) });
-  $stream->on(read => sub { $self->_read($id, pop) });
+  $self->_handle($id => $err);
 }
 
 sub _finish {
@@ -477,16 +467,15 @@ sub _start {
   # Inject cookies
   if (my $jar = $self->cookie_jar) { $jar->inject($tx) }
 
-  # Connect
-  $self->emit(start => $tx);
-  return unless my $id = $self->_connect($tx, $cb);
+  # Connection
+  return unless my $id = $self->emit(start => $tx)->_connection($tx, $cb);
 
   # Request timeout
   if (my $t = $self->request_timeout) {
     weaken $self;
     my $loop = $self->_loop;
     $self->{connections}{$id}{timeout} =
-      $loop->timer($t => sub { $self->_error($id, 'Request timeout.') });
+      $loop->timer($t => sub { $self->_error($id => 'Request timeout.') });
   }
 
   return $id;
@@ -673,7 +662,7 @@ L<Mojo::UserAgent> implements the following attributes.
   $ua    = $ua->ca('/etc/tls/ca.crt');
 
 Path to TLS certificate authority file, defaults to the value of the
-C<MOJO_CA_FILE> environment variable.
+C<MOJO_CA_FILE> environment variable. Also activates hostname verification.
 
   # Show certificate authorities for debugging
   IO::Socket::SSL::set_ctx_defaults(
