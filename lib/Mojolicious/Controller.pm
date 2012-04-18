@@ -104,15 +104,12 @@ sub finish {
 sub flash {
   my $self = shift;
 
-  # Get
-  my $session = $self->stash->{'mojo.session'};
-  if ($_[0] && !defined $_[1] && !ref $_[0]) {
-    return unless ref $session eq 'HASH';
-    return unless my $flash = $session->{flash};
-    return $flash->{$_[0]};
-  }
+  # Check old flash
+  my $session = $self->session;
+  return $session->{flash} ? $session->{flash}{$_[0]} : undef
+    if @_ == 1 && !ref $_[0];
 
-  # Set
+  # Initialize new flash and merge values
   my $flash = $session->{new_flash} ||= {};
   %$flash = (%$flash, %{@_ > 1 ? {@_} : $_[0]});
 
