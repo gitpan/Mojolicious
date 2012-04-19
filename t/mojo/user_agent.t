@@ -133,7 +133,7 @@ like $err, qr/error event works/, 'right error';
 
 # GET / (HTTPS request without TLS support)
 my $tx = $ua->get($ua->app_url->scheme('https'));
-like $tx->error, qr/IO::Socket::SSL/, 'right error';
+ok $tx->error, 'has error';
 
 # GET / (blocking)
 $tx = $ua->get('/');
@@ -341,7 +341,9 @@ is_deeply \@kept_alive, [1, 1], 'connections kept alive';
 # Premature connection close
 my $port = Mojo::IOLoop->generate_port;
 my $id   = Mojo::IOLoop->server(
-  {address => '127.0.0.1', port => $port} => sub { Mojo::IOLoop->remove(pop) }
+  address => '127.0.0.1',
+  port    => $port,
+  sub { Mojo::IOLoop->remove(pop) }
 );
 $tx = $ua->get("http://localhost:$port/");
 ok !$tx->success, 'not successful';

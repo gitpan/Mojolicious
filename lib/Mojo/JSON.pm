@@ -193,13 +193,11 @@ sub _decode_string {
 
         # High surrogate
         ($ord & 0xFC00) == 0xD800
-          or pos($_) = $pos + pos($str),
-          _exception('Missing high-surrogate');
+          or pos($_) = $pos + pos($str), _exception('Missing high-surrogate');
 
         # Low surrogate
         $str =~ m/\G\\u([Dd][C-Fc-f]..)/gc
-          or pos($_) = $pos + pos($str),
-          _exception('Missing low-surrogate');
+          or pos($_) = $pos + pos($str), _exception('Missing low-surrogate');
 
         # Pair
         $ord = 0x10000 + ($ord - 0xD800) * 0x400 + (hex($1) - 0xDC00);
@@ -257,8 +255,7 @@ sub _encode_object {
   my $object = shift;
 
   # Encode pairs
-  my @pairs =
-    map { _encode_string($_) . ':' . _encode_values($object->{$_}) }
+  my @pairs = map { _encode_string($_) . ':' . _encode_values($object->{$_}) }
     keys %$object;
 
   # Stringify
@@ -269,8 +266,7 @@ sub _encode_string {
   my $string = shift;
 
   # Escape string
-  $string
-    =~ s|([\x00-\x1F\x7F\x{2028}\x{2029}\\"/\b\f\n\r\t])|$REVERSE{$1}|gs;
+  $string =~ s|([\x00-\x1F\x7F\x{2028}\x{2029}\\"/\b\f\n\r\t])|$REVERSE{$1}|gs;
 
   # Stringify
   return "\"$string\"";
@@ -352,11 +348,11 @@ Mojo::JSON - Minimalistic JSON
 =head1 DESCRIPTION
 
 L<Mojo::JSON> is a minimalistic and relaxed implementation of RFC 4627. While
-it is possibly the fastest pure-Perl JSON parser available, you should not
-use it for validation.
+it is possibly the fastest pure-Perl JSON parser available, you should not use
+it for validation.
 
-It supports normal Perl data types like C<Scalar>, C<Array> reference,
-C<Hash> reference and will try to stringify blessed references.
+It supports normal Perl data types like C<Scalar>, C<Array> reference, C<Hash>
+reference and will try to stringify blessed references.
 
   [1, -2, 3]     -> [1, -2, 3]
   {"foo": "bar"} -> {foo => 'bar'}

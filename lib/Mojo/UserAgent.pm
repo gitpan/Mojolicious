@@ -2,6 +2,7 @@ package Mojo::UserAgent;
 use Mojo::Base 'Mojo::EventEmitter';
 
 use Carp 'croak';
+use List::Util 'first';
 use Mojo::CookieJar;
 use Mojo::IOLoop;
 use Mojo::Server::Daemon;
@@ -73,18 +74,14 @@ sub detect_proxy {
   # Upper case gets priority
   $self->http_proxy($ENV{HTTP_PROXY}   || $ENV{http_proxy});
   $self->https_proxy($ENV{HTTPS_PROXY} || $ENV{https_proxy});
-  if (my $no = $ENV{NO_PROXY} || $ENV{no_proxy}) {
-    $self->no_proxy([split /,/, $no]);
-  }
+  $self->no_proxy([split /,/, $ENV{NO_PROXY} || $ENV{no_proxy} || '']);
 
   return $self;
 }
 
 sub need_proxy {
   my ($self, $host) = @_;
-  return 1 unless my $no = $self->no_proxy;
-  $host =~ /\Q$_\E$/ and return for @$no;
-  return 1;
+  return !first { $host =~ /\Q$_\E$/ } @{$self->no_proxy || []};
 }
 
 sub post_form {
@@ -421,8 +418,8 @@ sub _server {
 
   # Start test server
   my $loop   = $self->_loop;
-  my $server = $self->{server} =
-    Mojo::Server::Daemon->new(ioloop => $loop, silent => 1);
+  my $server = $self->{server}
+    = Mojo::Server::Daemon->new(ioloop => $loop, silent => 1);
   my $port = $self->{port} = $loop->generate_port;
   die "Couldn't find a free TCP port for testing.\n" unless $port;
   $self->{scheme} = $scheme ||= 'http';
@@ -474,8 +471,8 @@ sub _start {
   if (my $t = $self->request_timeout) {
     weaken $self;
     my $loop = $self->_loop;
-    $self->{connections}{$id}{timeout} =
-      $loop->timer($t => sub { $self->_error($id => 'Request timeout.') });
+    $self->{connections}{$id}{timeout}
+      = $loop->timer($t => sub { $self->_error($id => 'Request timeout.') });
   }
 
   return $id;
@@ -614,10 +611,9 @@ Mojo::UserAgent - Non-blocking I/O HTTP 1.1 and WebSocket user agent
 L<Mojo::UserAgent> is a full featured non-blocking I/O HTTP 1.1 and WebSocket
 user agent with C<IPv6>, C<TLS> and C<libev> support.
 
-Optional modules L<EV>, L<IO::Socket::IP> and L<IO::Socket::SSL> are
-supported transparently and used if installed. Individual features can also
-be disabled with the C<MOJO_NO_IPV6> and C<MOJO_NO_TLS> environment
-variables.
+Optional modules L<EV>, L<IO::Socket::IP> and L<IO::Socket::SSL> are supported
+transparently and used if installed. Individual features can also be disabled
+with the C<MOJO_NO_IPV6> and C<MOJO_NO_TLS> environment variables.
 
 =head1 EVENTS
 
@@ -803,9 +799,9 @@ implements the following new ones.
   $ua     = $ua->app('MyApp');
   $ua     = $ua->app(MyApp->new);
 
-Application relative URLs will be processed with, defaults to the value of
-the C<MOJO_APP> environment variable, which is usually a L<Mojo> or
-L<Mojolicious> object.
+Application relative URLs will be processed with, defaults to the value of the
+C<MOJO_APP> environment variable, which is usually a L<Mojo> or L<Mojolicious>
+object.
 
   say $ua->app->secret;
   $ua->app->log->level('fatal');
@@ -834,6 +830,11 @@ Alias for L<Mojo::UserAgent::Transactor/"form">.
   my $tx = $ua->build_tx(PUT => 'http://kraih.com' => {DNT => 1} => 'Hi!');
 
 Alias for L<Mojo::UserAgent::Transactor/"tx">.
+
+  # Request with cookie
+  my $tx = $ua->build_tx(GET => 'kraih.com');
+  $tx->req->cookies({name => 'foo', value => 'bar'});
+  $ua->start($tx);
 
 =head2 C<build_websocket_tx>
 
@@ -1002,8 +1003,8 @@ transactions non-blocking.
   $ua->websocket('ws://localhost:3000' => sub {...});
   $ua->websocket('ws://localhost:3000' => {DNT => 1} => sub {...});
 
-Open a non-blocking WebSocket connection with transparent handshake, takes
-the exact same arguments as L<Mojo::UserAgent::Transactor/"websocket">.
+Open a non-blocking WebSocket connection with transparent handshake, takes the
+exact same arguments as L<Mojo::UserAgent::Transactor/"websocket">.
 
   $ua->websocket('ws://localhost:3000/echo' => sub {
     my ($ua, $tx) = @_;

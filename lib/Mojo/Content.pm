@@ -65,8 +65,8 @@ sub get_header_chunk {
 
   unless (defined $self->{header_buffer}) {
     my $headers = $self->headers->to_string;
-    $self->{header_buffer} =
-      $headers ? "$headers\x0d\x0a\x0d\x0a" : "\x0d\x0a";
+    $self->{header_buffer}
+      = $headers ? "$headers\x0d\x0a\x0d\x0a" : "\x0d\x0a";
   }
 
   return substr $self->{header_buffer}, $offset, CHUNK_SIZE;
@@ -105,8 +105,7 @@ sub parse {
     my $connection = $headers->connection || '';
     my $len        = $headers->content_length // '';
     $self->relaxed(1)
-      if !length $len
-        && ($connection =~ /close/i || $headers->content_type);
+      if !length $len && ($connection =~ /close/i || $headers->content_type);
   }
 
   # Parse chunked content
@@ -459,8 +458,8 @@ value of the C<MOJO_MAX_LEFTOVER_SIZE> environment variable or C<262144>.
   my $relaxed = $content->relaxed;
   $content    = $content->relaxed(1);
 
-Activate relaxed parsing for HTTP 0.9 and responses that are terminated with
-a connection close.
+Activate relaxed parsing for HTTP 0.9 and responses that are terminated with a
+connection close.
 
 =head1 METHODS
 

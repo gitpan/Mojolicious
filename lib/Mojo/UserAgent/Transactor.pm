@@ -302,7 +302,6 @@ data.
 
   # Streaming multipart file upload
   my $tx = $t->form('mojolicio.us' => {fun => {file => '/etc/passwd'}});
-  $ua->start($tx);
 
 While the "multipart/form-data" content type will be automatically used
 instead of "application/x-www-form-urlencoded" when necessary, you can also
@@ -351,12 +350,10 @@ Versatile general purpose L<Mojo::Transaction::HTTP> builder for requests.
   # Streaming response
   my $tx = $t->tx(GET => 'http://mojolicio.us');
   $tx->res->body(sub { say $_[1] });
-  $ua->start($tx);
 
   # Custom socket
   my $tx = $t->tx(GET => 'http://mojolicio.us');
   $tx->connection($sock);
-  $ua->start($tx);
 
 =head2 C<websocket>
 
