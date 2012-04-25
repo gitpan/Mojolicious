@@ -26,4 +26,4 @@ resources:
   license: http://dev.perl.org/licenses/
   repository: http://github.com/kraih/mojo
   x_MailingList: http://groups.google.com/group/mojolicious
-version: 2.89
+version: 2.90
