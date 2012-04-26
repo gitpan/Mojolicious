@@ -1,6 +1,7 @@
 .perltidyrc
 Changes
 examples/connect-proxy.pl
+examples/entities.pl
 examples/fast.pl
 examples/flash-policy-server.pl
 examples/hello.pl
@@ -26,6 +27,7 @@ lib/Mojo/Date.pm
 lib/Mojo/DOM.pm
 lib/Mojo/DOM/CSS.pm
 lib/Mojo/DOM/HTML.pm
+lib/Mojo/entities.txt
 lib/Mojo/EventEmitter.pm
 lib/Mojo/Exception.pm
 lib/Mojo/Headers.pm
