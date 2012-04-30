@@ -256,6 +256,7 @@ t/mojolicious/json_config_mode_lite_app.testing.json
 t/mojolicious/layouted_lite_app.t
 t/mojolicious/lib/EmbeddedTestApp.pm
 t/mojolicious/lib/MojoliciousTest.pm
+t/mojolicious/lib/MojoliciousTest/Command/test_command.pm
 t/mojolicious/lib/MojoliciousTest/Exceptional.pm
 t/mojolicious/lib/MojoliciousTest/Foo.pm
 t/mojolicious/lib/MojoliciousTest/Foo/Bar.pm

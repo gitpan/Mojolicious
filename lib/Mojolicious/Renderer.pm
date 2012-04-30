@@ -20,17 +20,16 @@ has paths => sub { [] };
 #  In my day Xmas was about bringing people together,
 #  not blowing them apart."
 sub new {
-  my $self = shift->SUPER::new(@_);
 
-  # Data
-  $self->add_handler(
+  # Add "data" handler
+  my $self = shift->SUPER::new(@_)->add_handler(
     data => sub {
       my ($r, $c, $output, $options) = @_;
       $$output = $options->{data};
     }
   );
 
-  # JSON
+  # Add "json" handler
   $self->add_handler(
     json => sub {
       my ($r, $c, $output, $options) = @_;
@@ -38,15 +37,13 @@ sub new {
     }
   );
 
-  # Text
-  $self->add_handler(
+  # Add "text" handler
+  return $self->add_handler(
     text => sub {
       my ($r, $c, $output, $options) = @_;
       $$output = $options->{text};
     }
   );
-
-  return $self;
 }
 
 sub add_handler {
@@ -254,7 +251,6 @@ sub _render_template {
 }
 
 1;
-__END__
 
 =head1 NAME
 
@@ -287,7 +283,7 @@ Renderer cache, defaults to a L<Mojo::Cache> object.
   my $classes = $renderer->classes;
   $renderer   = $renderer->classes(['main']);
 
-Classes to use for finding templates in C<DATA> section, first one has the
+Classes to use for finding templates in C<DATA> sections, first one has the
 highest precedence, defaults to C<main>.
 
   # Add another class with templates in DATA section
@@ -333,12 +329,12 @@ Registered helpers.
 =head2 C<paths>
 
   my $paths = $renderer->paths;
-  $renderer = $renderer->paths(['/foo/bar/templates']);
+  $renderer = $renderer->paths(['/home/sri/templates']);
 
 Directories to look for templates in, first one has the highest precedence.
 
   # Add another "templates" directory
-  push @{$renderer->paths}, '/foo/bar/templates';
+  push @{$renderer->paths}, '/home/sri/templates';
 
 =head1 METHODS
 

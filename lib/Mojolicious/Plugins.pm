@@ -3,8 +3,6 @@ use Mojo::Base 'Mojo::EventEmitter';
 
 use Mojo::Util 'camelize';
 
-# "Who would have thought Hell would really exist?
-#  And that it would be in New Jersey?"
 has namespaces => sub { ['Mojolicious::Plugin'] };
 
 sub emit_hook {
@@ -67,7 +65,6 @@ sub _load {
 }
 
 1;
-__END__
 
 =head1 NAME
 
@@ -93,9 +90,10 @@ L<Mojolicious::Plugins> implements the following attributes.
   my $namespaces = $plugins->namespaces;
   $plugins       = $plugins->namespaces(['Mojolicious::Plugin']);
 
-Namespaces to load plugins from.
+Namespaces to load plugins from, defaults to L<Mojolicious::Plugin>.
 
-  push @{$plugins->namespaces}, 'MyApp::Plugins';
+  # Add another namespace to load plugins from
+  push @{$plugins->namespaces}, 'MyApp::Plugin';
 
 =head1 METHODS
 

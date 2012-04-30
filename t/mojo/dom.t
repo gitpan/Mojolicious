@@ -2,7 +2,7 @@ use Mojo::Base -strict;
 
 use utf8;
 
-use Test::More tests => 725;
+use Test::More tests => 755;
 
 # "Homer gave me a kidney: it wasn't his, I didn't need it,
 #  and it came postage due- but I appreciated the gesture!"
@@ -198,8 +198,14 @@ is $dom->at('[foo=ba]'), undef, 'no result';
 is $dom->at('.tset')->text, 'works', 'right text';
 
 # Already decoded unicode snowman and quotes in selector
-$dom = Mojo::DOM->new->parse('<div id="sno&quot;wman">☃</div>');
-is $dom->at('[id="sno\"wman"]')->text, '☃', 'right text';
+$dom = Mojo::DOM->new->parse('<div id="snowm&quot;an">☃</div>');
+is $dom->at('[id="snowm\"an"]')->text,      '☃', 'right text';
+is $dom->at('[id="snowm\22 an"]')->text,    '☃', 'right text';
+is $dom->at('[id="snowm\000022an"]')->text, '☃', 'right text';
+is $dom->at('[id="snowm\22an"]'),      undef, 'no result';
+is $dom->at('[id="snowm\21 an"]'),     undef, 'no result';
+is $dom->at('[id="snowm\000021an"]'),  undef, 'no result';
+is $dom->at('[id="snowm\000021 an"]'), undef, 'no result';
 
 # Unicode and escaped selectors
 my $unicode = encode 'UTF-8',
@@ -409,6 +415,21 @@ is $dom->at('book nons section')->namespace, undef,         'no namespace';
 is $dom->at('book nons section')->text,      'Nothing',     'right text';
 is $dom->at('book meta number')->namespace,  'uri:isbn-ns', 'right namespace';
 is $dom->at('book meta number')->text, '978-0596000271', 'right text';
+is $dom->children('bk:book')->first->{xmlns}, 'uri:default-ns',
+  'right attribute';
+is $dom->children('k:book')->first, undef, 'no result';
+is $dom->children('book')->first,   undef, 'no result';
+is $dom->children('ook')->first,    undef, 'no result';
+is $dom->at('k\:book'), undef, 'no result';
+is $dom->at('ook'),     undef, 'no result';
+is $dom->at('[xmlns\:bk]')->{'xmlns:bk'}, 'uri:book-ns', 'right attribute';
+is $dom->at('[bk]')->{'xmlns:bk'},        'uri:book-ns', 'right attribute';
+is $dom->at('[bk]')->attrs('xmlns:bk'), 'uri:book-ns', 'right attribute';
+is $dom->at('[bk]')->attrs('s:bk'),     undef,         'no attribute';
+is $dom->at('[bk]')->attrs('bk'),       undef,         'no attribute';
+is $dom->at('[bk]')->attrs('k'),        undef,         'no attribute';
+is $dom->at('[s\:bk]'), undef, 'no result';
+is $dom->at('[k]'),     undef, 'no result';
 
 # Yadis
 $dom = Mojo::DOM->new->parse(<<'EOF');
@@ -432,7 +453,7 @@ is $s->[0]->at('Type')->text, 'http://o.r.g/sso/2.0', 'right text';
 is $s->[0]->namespace, 'xri://$xrd*($v*2.0)', 'right namespace';
 is $s->[1]->at('Type')->text, 'http://o.r.g/sso/1.0', 'right text';
 is $s->[1]->namespace, 'xri://$xrd*($v*2.0)', 'right namespace';
-is $s->[2], undef, 'no text';
+is $s->[2], undef, 'no result';
 is $s->size, 2, 'right number of elements';
 
 # Yadis (roundtrip with namespace)
@@ -470,10 +491,25 @@ is $s->[2]->at('Type')->text, 'http://o.r.g/sso/2.0', 'right text';
 is $s->[2]->namespace, 'xri://$xrd*($v*2.0)', 'right namespace';
 is $s->[3]->at('Type')->text, 'http://o.r.g/sso/1.0', 'right text';
 is $s->[3]->namespace, 'xri://$xrd*($v*2.0)', 'right namespace';
-is $s->[4], undef, 'no text';
+is $s->[4], undef, 'no result';
 is $s->size, 4, 'right number of elements';
 is $dom->at('[Test="23"]')->text, 'http://o.r.g/sso/1.0', 'right text';
 is $dom->at('[test="23"]')->text, 'http://o.r.g/sso/2.0', 'right text';
+is $dom->find('xrds\:Service > Type')->[0]->text, 'http://o.r.g/sso/4.0',
+  'right text';
+is $dom->find('xrds\:Service > Type')->[1], undef, 'no result';
+is $dom->find('xrds\3AService > Type')->[0]->text, 'http://o.r.g/sso/4.0',
+  'right text';
+is $dom->find('xrds\3AService > Type')->[1], undef, 'no result';
+is $dom->find('xrds\3A Service > Type')->[0]->text, 'http://o.r.g/sso/4.0',
+  'right text';
+is $dom->find('xrds\3A Service > Type')->[1], undef, 'no result';
+is $dom->find('xrds\00003AService > Type')->[0]->text, 'http://o.r.g/sso/4.0',
+  'right text';
+is $dom->find('xrds\00003AService > Type')->[1], undef, 'no result';
+is $dom->find('xrds\00003A Service > Type')->[0]->text, 'http://o.r.g/sso/4.0',
+  'right text';
+is $dom->find('xrds\00003A Service > Type')->[1], undef, 'no result';
 is "$dom", $yadis, 'successful roundtrip';
 
 # Result and iterator order
