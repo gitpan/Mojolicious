@@ -700,7 +700,7 @@ $t->get_ok('/inline/exception')->status_is(500)
 $t->get_ok('/data/exception')->status_is(500)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_is(qq/Died at template from DATA section "dies.html.ep" line 2/
+  ->content_is(qq/Died at template "dies.html.ep" from DATA section line 2/
     . qq/, near "123".\n\n/);
 
 # GET /template/exception
@@ -869,25 +869,25 @@ $t->get_ok('/.html')->status_is(200)->header_is(Server => 'Mojolicious (Perl)')
 # GET /0 ("X-Forwarded-For")
 my $source = $t->tx->local_address;
 $t->get_ok('/0', {'X-Forwarded-For' => '192.168.2.2, 192.168.2.1'})
-  ->status_is(200)->content_like(qr#http\://localhost\:\d+/0\-$source\-0#);
+  ->status_is(200)->content_like(qr#http\://localhost\:\d+/0-$source-0#);
 
 # GET /0 ("X-Forwarded-HTTPS")
 $t->get_ok('/0', {'X-Forwarded-HTTPS' => 1})->status_is(200)
-  ->content_like(qr#http\://localhost\:\d+/0\-$source\-0#);
+  ->content_like(qr#http\://localhost\:\d+/0-$source-0#);
 
 # GET /0 (reverse proxy with "X-Forwarded-For")
 {
   local $ENV{MOJO_REVERSE_PROXY} = 1;
   $t->get_ok('/0', {'X-Forwarded-For' => '192.168.2.2, 192.168.2.1'})
     ->status_is(200)
-    ->content_like(qr#http\://localhost\:\d+/0\-192\.168\.2\.1\-0#);
+    ->content_like(qr#http\://localhost\:\d+/0-192\.168\.2\.1-0#);
 }
 
 # GET /0 (reverse proxy with "X-Forwarded-HTTPS")
 {
   local $ENV{MOJO_REVERSE_PROXY} = 1;
   $t->get_ok('/0', {'X-Forwarded-HTTPS' => 1})->status_is(200)
-    ->content_like(qr#https\://localhost\:\d+/0\-$source\-0#);
+    ->content_like(qr#https\://localhost\:\d+/0-$source-0#);
 }
 
 # DELETE /inline/epl

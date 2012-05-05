@@ -1,9 +1,6 @@
 package Mojolicious::Plugin::HeaderCondition;
 use Mojo::Base 'Mojolicious::Plugin';
 
-# "You may have to "metaphorically" make a deal with the "devil".
-#  And by "devil", I mean Robot Devil.
-#  And by "metaphorically", I mean get your coat."
 sub register {
   my ($self, $app) = @_;
 
@@ -82,7 +79,7 @@ L<Mojolicious::Plugin> and implements the following new ones.
 
 =head2 C<register>
 
-  $plugin->register;
+  $plugin->register($app);
 
 Register condition in L<Mojolicious> application.
 

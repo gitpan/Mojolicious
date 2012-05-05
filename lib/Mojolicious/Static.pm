@@ -49,18 +49,6 @@ sub dispatch {
   return $c->rendered;
 }
 
-# DEPRECATED in Leaf Fluttering In Wind!
-sub root {
-  warn <<EOF;
-Mojolicious::Static->root is DEPRECATED in favor of
-Mojolicious::Static->paths!
-EOF
-  my $self = shift;
-  return $self->paths->[0] unless @_;
-  $self->paths->[0] = shift;
-  return $self;
-}
-
 sub serve {
   my ($self, $c, $rel) = @_;
 
@@ -115,7 +103,7 @@ sub serve {
   my $start = 0;
   my $end = $size - 1 >= 0 ? $size - 1 : 0;
   if (my $range = $req_headers->range) {
-    if ($range =~ m/^bytes=(\d+)\-(\d+)?/ && $1 <= $end) {
+    if ($range =~ m/^bytes=(\d+)-(\d+)?/ && $1 <= $end) {
       $start = $1;
       $end = $2 if defined $2 && $2 <= $end;
       $res->code(206);

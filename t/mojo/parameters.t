@@ -2,7 +2,7 @@ use Mojo::Base -strict;
 
 use utf8;
 
-use Test::More tests => 75;
+use Test::More tests => 77;
 
 # "Now that's a wave of destruction that's easy on the eyes."
 use Mojo::Parameters;
@@ -152,12 +152,18 @@ is_deeply $p->to_hash,
 
 # Unicode
 $p = Mojo::Parameters->new;
-$p->parse('input=say%20%22%C2%AB%22;');
-is $p->params->[1], 'say "«"', 'right value';
-is $p->param('input'), 'say "«"', 'right value';
-is "$p", 'input=say+%22%C2%AB%22', 'right result';
+$p->parse('input=say%20%22%C2%AB~%22;');
+is $p->params->[1], 'say "«~"', 'right value';
+is $p->param('input'), 'say "«~"', 'right value';
+is "$p", 'input=say+%22%C2%AB~%22', 'right result';
 
 # Reparse
 $p = Mojo::Parameters->new('foo=bar&baz=23');
 $p->parse('foo=bar&baz=23');
 is "$p", 'foo=bar&baz=23', 'right result';
+
+# Query string
+$p = Mojo::Parameters->new('%AZaz09-._~&;=+');
+is "$p", '%AZaz09-._~&;=+', 'right result';
+$p = Mojo::Parameters->new('foo?bar');
+is "$p", 'foo%3Fbar', 'right result';

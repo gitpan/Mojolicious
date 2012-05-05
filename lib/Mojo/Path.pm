@@ -63,9 +63,8 @@ sub contains {
 
 sub parse {
   my ($self, $path) = @_;
-  $path //= '';
 
-  $path = url_unescape $path;
+  $path = url_unescape $path // '';
   utf8::decode $path;
   $path =~ s|^/|| ? $self->leading_slash(1)  : $self->leading_slash(undef);
   $path =~ s|/$|| ? $self->trailing_slash(1) : $self->trailing_slash(undef);
@@ -87,7 +86,7 @@ sub to_string {
   my $self = shift;
 
   # Escape
-  my $chars = "^$Mojo::URL::UNRESERVED$Mojo::URL::SUBDELIM\:\@";
+  my $chars = "^$Mojo::URL::UNRESERVED$Mojo::URL::SUBDELIM:@";
   my @parts = map { url_escape(encode('UTF-8', $_), $chars) } @{$self->parts};
 
   # Format

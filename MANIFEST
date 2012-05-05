@@ -240,6 +240,7 @@ t/mojolicious/external/my_app.testing.conf
 t/mojolicious/external/myapp.conf
 t/mojolicious/external/myapp.pl
 t/mojolicious/external/myapp.testing.conf
+t/mojolicious/external/myapp2.pl
 t/mojolicious/external/public/index.html
 t/mojolicious/external/script/my_app
 t/mojolicious/external/templates/index.html.ep

@@ -7,8 +7,6 @@ use Mojo::ByteStream;
 use Mojo::Exception;
 use Mojo::Util qw/decode encode/;
 
-use constant CHUNK_SIZE => $ENV{MOJO_CHUNK_SIZE} || 131072;
-
 # "If for any reason you're not completely satisfied, I hate you."
 has [qw/auto_escape compiled/];
 has [qw/append code prepend template/] => '';
@@ -130,8 +128,7 @@ sub compile {
     ->trace->verbose(1)
     if $@;
 
-  $self->compiled($compiled);
-  return;
+  $self->compiled($compiled) and return;
 }
 
 sub interpret {
@@ -173,31 +170,29 @@ sub parse {
   # Precompile
   my $token_re = qr/
     (
-      \Q$tag$replace\E                 # Replace
+      \Q$tag$replace\E                       # Replace
     |
-      \Q$tag$expr$escp\E\s*\Q$cpen\E   # Escaped expression (end)
+      \Q$tag$expr$escp\E\s*\Q$cpen\E(?!\w)   # Escaped expression (end)
     |
-      \Q$tag$expr$escp\E               # Escaped expression
+      \Q$tag$expr$escp\E                     # Escaped expression
     |
-      \Q$tag$expr\E\s*\Q$cpen\E        # Expression (end)
+      \Q$tag$expr\E\s*\Q$cpen\E(?!\w)        # Expression (end)
     |
-      \Q$tag$expr\E                    # Expression
+      \Q$tag$expr\E                          # Expression
     |
-      \Q$tag$cmnt\E\s*\Q$cpen\E        # Comment (end)
+      \Q$tag$cmnt\E                          # Comment
     |
-      \Q$tag$cmnt\E                    # Comment
+      \Q$tag\E\s*\Q$cpen\E(?!\w)             # Code (end)
     |
-      \Q$tag\E\s*\Q$cpen\E             # Code (end)
+      \Q$tag\E                               # Code
     |
-      \Q$tag\E                         # Code
+      (?<!\w)\Q$cpst\E\s*\Q$trim$end\E       # Trim end (start)
     |
-      \Q$cpst\E\s*\Q$trim$end\E        # Trim end (start)
+      \Q$trim$end\E                          # Trim end
     |
-      \Q$trim$end\E                    # Trim end
+      (?<!\w)\Q$cpst\E\s*\Q$end\E            # End (start)
     |
-      \Q$cpst\E\s*\Q$end\E             # End (start)
-    |
-      \Q$end\E                         # End
+      \Q$end\E                               # End
     )
   /x;
   my $cpen_re = qr/^(\Q$tag\E)(?:\Q$expr\E)?(?:\Q$escp\E)?\s*\Q$cpen\E/;
@@ -303,7 +298,7 @@ sub render_file {
   $self->name($path) unless defined $self->{name};
   croak qq/Can't open template "$path": $!/ unless open my $file, '<', $path;
   my $tmpl = '';
-  while ($file->sysread(my $buffer, CHUNK_SIZE, 0)) { $tmpl .= $buffer }
+  while ($file->sysread(my $buffer, 131072, 0)) { $tmpl .= $buffer }
 
   # Decode and render
   if (my $encoding = $self->encoding) {

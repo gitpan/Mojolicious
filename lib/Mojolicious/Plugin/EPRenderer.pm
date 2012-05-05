@@ -9,22 +9,14 @@ use Mojo::Util qw/encode md5_sum/;
 #  Wishful thinking. We have long since evolved beyond the need for asses."
 sub register {
   my ($self, $app, $conf) = @_;
-  $conf ||= {};
-
-  # Config
-  my $name     = $conf->{name}     || 'ep';
-  my $template = $conf->{template} || {};
-
-  # Custom sandbox
-  $template->{namespace} //= 'Mojo::Template::SandBox::'
-    . md5_sum(($ENV{MOJO_EXE} || ref $app) . $$);
 
   # Auto escape by default to prevent XSS attacks
+  my $template = $conf->{template} || {};
   $template->{auto_escape} //= 1;
 
   # Add "ep" handler
   $app->renderer->add_handler(
-    $name => sub {
+    $conf->{name} || 'ep' => sub {
       my ($r, $c, $output, $options) = @_;
 
       # Generate name
@@ -132,7 +124,7 @@ L<Mojolicious::Plugin> and implements the following new ones.
 
 =head2 C<register>
 
-  $plugin->register;
+  $plugin->register($app, $conf);
 
 Register renderer in L<Mojolicious> application.
 

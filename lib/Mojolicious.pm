@@ -34,7 +34,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Leaf Fluttering In Wind';
-our $VERSION  = '2.92';
+our $VERSION  = '2.93';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -42,7 +42,7 @@ sub AUTOLOAD {
   my $self = shift;
 
   # Method
-  my ($package, $method) = our $AUTOLOAD =~ /^([\w\:]+)\:\:(\w+)$/;
+  my ($package, $method) = our $AUTOLOAD =~ /^([\w:]+)\:\:(\w+)$/;
   croak qq/Undefined subroutine &${package}::$method called/
     unless blessed $self && $self->isa(__PACKAGE__);
 
@@ -298,9 +298,8 @@ level from C<debug> to C<info> if it has a value other than C<development>.
   my $plugins = $app->plugins;
   $app        = $app->plugins(Mojolicious::Plugins->new);
 
-The plugin loader, defaults to a L<Mojolicious::Plugins> object. You can
-usually leave this alone, see L<Mojolicious::Plugin> if you want to write a
-plugin or the C<plugin> method below if you want to load a plugin.
+The plugin manager, defaults to a L<Mojolicious::Plugins> object. See the
+C<plugin> method below if you want to load a plugin.
 
   # Add another namespace to load plugins from
   push @{$app->plugins->namespaces}, 'MyApp::Plugin';
@@ -668,8 +667,8 @@ L<http://github.com/kraih/mojo>
 
 =head1 BUNDLED FILES
 
-L<Mojolicious> ships with a few popular static files bundled in the C<public>
-directory.
+The L<Mojolicious> distribution includes a few files with different licenses
+that have been bundled for internal use.
 
 =head2 Mojolicious Artwork
 
@@ -680,7 +679,7 @@ L<http://creativecommons.org/licenses/by-sa/3.0>.
 
 =head2 jQuery
 
-  Copyright 2011, John Resig.
+  Copyright (C) 2011, John Resig.
 
 Licensed under the MIT License, L<http://creativecommons.org/licenses/MIT>.
 
@@ -851,6 +850,8 @@ Maksym Komar
 Maxim Vuets
 
 Michael Harris
+
+Mike Magowan
 
 Mirko Westermeier
 
