@@ -3,9 +3,9 @@ use Mojo::Base -base;
 
 use Carp 'croak';
 use Mojolicious::Routes::Pattern;
-use Scalar::Util qw/blessed weaken/;
+use Scalar::Util qw(blessed weaken);
 
-has [qw/block inline parent partial/];
+has [qw(block inline parent partial)];
 has 'children' => sub { [] };
 has pattern    => sub { Mojolicious::Routes::Pattern->new };
 
@@ -16,11 +16,11 @@ sub AUTOLOAD {
 
   # Method
   my ($package, $method) = our $AUTOLOAD =~ /^([\w:]+)\:\:(\w+)$/;
-  croak qq/Undefined subroutine &${package}::$method called/
+  croak qq[Undefined subroutine &${package}::$method called]
     unless blessed $self && $self->isa(__PACKAGE__);
 
   # Call shortcut
-  croak qq/Can't locate object method "$method" via package "$package"/
+  croak qq{Can't locate object method "$method" via package "$package"}
     unless my $shortcut = $self->root->shortcuts->{$method};
   return $self->$shortcut(@_);
 }
@@ -360,7 +360,8 @@ Construct a new L<Mojolicious::Routes::Route> object.
 
   $r = $r->add_child(Mojolicious::Route->new);
 
-Add a new child to this route.
+Add a new child to this route, it will be automatically removed from its
+current parent if necessary.
 
   # Reattach route
   $r->add_child($r->find('foo'));
@@ -368,7 +369,7 @@ Add a new child to this route.
 =head2 C<any>
 
   my $route = $r->any('/:foo' => sub {...});
-  my $route = $r->any(['GET', 'POST'] => '/:foo' => sub {...});
+  my $route = $r->any([qw(GET POST)] => '/:foo' => sub {...});
 
 Generate route matching any of the listed HTTP request methods or all. See
 also the L<Mojolicious::Lite> tutorial for more argument variations.
@@ -601,13 +602,13 @@ variations.
 
   my $methods = $r->via;
   $r          = $r->via('GET');
-  $r          = $r->via(qw/GET POST/);
-  $r          = $r->via([qw/GET POST/]);
+  $r          = $r->via(qw(GET POST));
+  $r          = $r->via([qw(GET POST)]);
 
 Restrict HTTP methods this route is allowed to handle, defaults to no
 restrictions.
 
-  $r->route('/foo')->via(qw/GET POST/)->to('foo#bar');
+  $r->route('/foo')->via(qw(GET POST))->to('foo#bar');
 
 =head2 C<websocket>
 
@@ -623,7 +624,7 @@ L<Mojolicious::Lite> tutorial for more argument variations.
 In addition to the attributes and methods above you can also call shortcuts
 on L<Mojolicious::Routes::Route> objects.
 
-  $r->add_shortcut(firefox => sub {
+  $r->root->add_shortcut(firefox => sub {
     my ($r, $path) = @_;
     $r->get($path, agent => qr/Firefox/);
   });

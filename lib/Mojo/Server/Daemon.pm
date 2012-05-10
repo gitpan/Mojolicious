@@ -15,7 +15,7 @@ use constant BONJOUR => $ENV{MOJO_NO_BONJOUR}
 
 use constant DEBUG => $ENV{MOJO_DAEMON_DEBUG} || 0;
 
-has [qw/backlog group silent user/];
+has [qw(backlog group silent user)];
 has inactivity_timeout => sub { $ENV{MOJO_INACTIVITY_TIMEOUT} // 15 };
 has ioloop => sub { Mojo::IOLoop->singleton };
 has listen => sub { [split /,/, $ENV{MOJO_LISTEN} || 'http://*:3000'] };
@@ -142,9 +142,9 @@ sub _finish {
 sub _group {
   my $self = shift;
   return unless my $group = $self->group;
-  croak qq/Group "$group" does not exist/
+  croak qq{Group "$group" does not exist}
     unless defined(my $gid = (getgrnam($group))[2]);
-  POSIX::setgid($gid) or croak qq/Can't switch to group "$group": $!/;
+  POSIX::setgid($gid) or croak qq{Can't switch to group "$group": $!};
 }
 
 sub _listen {
@@ -171,7 +171,7 @@ sub _listen {
       my ($loop, $stream, $id) = @_;
 
       # Add new connection
-      $self->{connections}{$id} = {tls => $tls};
+      my $c = $self->{connections}{$id} = {tls => $tls};
       warn "-- Accept (@{[$stream->handle->peerhost]})\n" if DEBUG;
 
       # Inactivity timeout
@@ -186,8 +186,8 @@ sub _listen {
         }
       );
       $stream->on(read => sub { $self->_read($id => pop) });
-      $stream->on(
-        timeout => sub { $self->app->log->debug('Inactivity timeout.') });
+      $stream->on(timeout =>
+          sub { $self->app->log->debug('Inactivity timeout.') if $c->{tx} });
     }
   );
   push @{$self->{listening} ||= []}, $id;
@@ -204,7 +204,7 @@ sub _listen {
 
   # Friendly message
   return if $self->silent;
-  $self->app->log->info(qq/Listening at "$listen"./);
+  $self->app->log->info(qq{Listening at "$listen".});
   $listen =~ s|//\*|//127.0.0.1|i;
   say "Server available at $listen.";
 }
@@ -242,9 +242,9 @@ sub _remove {
 sub _user {
   my $self = shift;
   return unless my $user = $self->user;
-  croak qq/User "$user" does not exist/
+  croak qq{User "$user" does not exist}
     unless defined(my $uid = (getpwnam($self->user))[2]);
-  POSIX::setuid($uid) or croak qq/Can't switch to user "$user": $!/;
+  POSIX::setuid($uid) or croak qq{Can't switch to user "$user": $!};
 }
 
 sub _write {
@@ -371,7 +371,7 @@ List of one or more locations to listen on, defaults to the value of the
 C<MOJO_LISTEN> environment variable or C<http://*:3000>.
 
   # Listen on two ports with HTTP and HTTPS at the same time
-  $daemon->listen(['http://*:3000', 'https://*:4000']);
+  $daemon->listen([qw(http://*:3000 https://*:4000)]);
 
   # Use a custom certificate and key
   $daemon->listen(['https://*:3000?cert=/x/server.crt&key=/y/server.key']);

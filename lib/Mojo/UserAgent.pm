@@ -18,7 +18,7 @@ has ca              => sub { $ENV{MOJO_CA_FILE} };
 has cert            => sub { $ENV{MOJO_CERT_FILE} };
 has connect_timeout => sub { $ENV{MOJO_CONNECT_TIMEOUT} || 10 };
 has cookie_jar      => sub { Mojo::CookieJar->new };
-has [qw/http_proxy https_proxy local_address no_proxy/];
+has [qw(http_proxy https_proxy local_address no_proxy)];
 has inactivity_timeout => sub { $ENV{MOJO_INACTIVITY_TIMEOUT} // 20 };
 has ioloop             => sub { Mojo::IOLoop->new };
 has key                => sub { $ENV{MOJO_KEY_FILE} };
@@ -31,7 +31,7 @@ has transactor => sub { Mojo::UserAgent::Transactor->new };
 # Common HTTP methods
 {
   no strict 'refs';
-  for my $name (qw/DELETE GET HEAD OPTIONS PATCH POST PUT/) {
+  for my $name (qw(DELETE GET HEAD OPTIONS PATCH POST PUT)) {
     *{__PACKAGE__ . '::' . lc($name)} = sub {
       my $self = shift;
       my $cb = ref $_[-1] eq 'CODE' ? pop : undef;
@@ -764,7 +764,7 @@ Value for C<User-Agent> request header, defaults to C<Mojolicious (Perl)>.
 =head2 C<no_proxy>
 
   my $no_proxy = $ua->no_proxy;
-  $ua          = $ua->no_proxy(['localhost', 'intranet.mojolicio.us']);
+  $ua          = $ua->no_proxy([qw(localhost intranet.mojolicio.us)]);
 
 Domains that don't require a proxy server to be used.
 
