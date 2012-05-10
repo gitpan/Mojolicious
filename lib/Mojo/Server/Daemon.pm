@@ -61,8 +61,7 @@ sub _build_tx {
   my ($self, $id, $c) = @_;
 
   # Build transaction
-  my $tx = $self->build_tx;
-  $tx->connection($id);
+  my $tx = $self->build_tx->connection($id);
 
   # Identify
   $tx->res->headers->server('Mojolicious (Perl)');
@@ -96,14 +95,6 @@ sub _build_tx {
   $tx->kept_alive(1) if ++$c->{requests} > 1;
 
   return $tx;
-}
-
-sub _close { shift->_remove(pop) }
-
-sub _error {
-  my ($self, $id, $err) = @_;
-  $self->app->log->error($err);
-  $self->_remove($id);
 }
 
 sub _finish {
@@ -160,21 +151,18 @@ sub _listen {
   my ($self, $listen) = @_;
 
   # Options
-  my $url = Mojo::URL->new($listen);
-  my $options = {port => $url->port};
-  my $tls;
-  $tls = $options->{tls} = 1 if $url->scheme eq 'https';
-  my $address = $url->host;
-  $options->{address} = $address if $address ne '*';
-  my $query = $url->query;
-  my $cert  = $query->param('cert');
-  $options->{tls_cert} = $cert if $cert;
-  my $key = $query->param('key');
-  $options->{tls_key} = $key if $key;
-  my $ca = $query->param('ca');
-  $options->{tls_ca} = $ca if $ca;
-  my $backlog = $self->backlog;
-  $options->{backlog} = $backlog if $backlog;
+  my $url     = Mojo::URL->new($listen);
+  my $query   = $url->query;
+  my $options = {
+    address  => $url->host,
+    backlog  => $self->backlog,
+    port     => $url->port,
+    tls_ca   => scalar $query->param('ca'),
+    tls_cert => scalar $query->param('cert'),
+    tls_key  => scalar $query->param('key')
+  };
+  delete $options->{address} if $options->{address} eq '*';
+  my $tls = $options->{tls} = $url->scheme eq 'https' ? 1 : undef;
 
   # Listen
   weaken $self;
@@ -190,19 +178,19 @@ sub _listen {
       $stream->timeout($self->inactivity_timeout);
 
       # Events
+      $stream->on(close => sub { $self->_remove($id) });
       $stream->on(
-        timeout => sub {
-          $self->_error($id => 'Inactivity timeout.')
-            if $self->{connections}{$id}{tx};
+        error => sub {
+          $self->app->log->error(pop);
+          $self->_remove($id);
         }
       );
-      $stream->on(close => sub { $self->_close($id) });
-      $stream->on(error => sub { $self->_error($id => pop) });
-      $stream->on(read  => sub { $self->_read($id => pop) });
+      $stream->on(read => sub { $self->_read($id => pop) });
+      $stream->on(
+        timeout => sub { $self->app->log->debug('Inactivity timeout.') });
     }
   );
-  $self->{listening} ||= [];
-  push @{$self->{listening}}, $id;
+  push @{$self->{listening} ||= []}, $id;
 
   # Bonjour
   if (BONJOUR && (my $p = Net::Rendezvous::Publish->new)) {

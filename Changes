@@ -1,5 +1,18 @@
 This file documents the revision history for Perl extension Mojolicious.
 
+2.94  2012-05-09
+  - Added support for 308 redirects to Mojo::UserAgent.
+  - Added support for new HTTP status codes.
+  - Improved exception handling of all scripts.
+  - Improved built-in web servers to log inactivity timeouts as debug messages
+    instead of errors.
+  - Improved documentation.
+  - Fixed html_escape to always use entities with semicolon. (OlegG, crab)
+  - Fixed typo in 414 status message.
+  - Fixed small cookie formatting bug.
+  - Fixed small bug in cookie parser.
+  - Fixed small backlog bug in Mojo::Server::Daemon.
+
 2.93  2012-05-05
   - Added remove method to Mojolicious::Routes::Route.
   - Improved 32bit Perl support of Mojo::Transaction::WebSocket.
