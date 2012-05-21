@@ -70,12 +70,12 @@ sub body_params {
 
   # "x-application-urlencoded" and "application/x-www-form-urlencoded"
   my $type = $self->headers->content_type || '';
-  if ($type =~ m#(?:x-application|application/x-www-form)-urlencoded#i) {
+  if ($type =~ m!(?:x-application|application/x-www-form)-urlencoded!i) {
     $p->parse($self->content->asset->slurp);
   }
 
   # "multipart/formdata"
-  elsif ($type =~ m#multipart/form-data#i) {
+  elsif ($type =~ m!multipart/form-data!i) {
     my $formdata = $self->_parse_formdata;
 
     # Formdata
@@ -219,7 +219,7 @@ sub is_dynamic    { shift->content->is_dynamic }
 
 sub is_finished { (shift->{state} || '') eq 'finished' }
 
-sub is_limit_exceeded { ((shift->error)[1] || '') ~~ [413, 431] }
+sub is_limit_exceeded { ((shift->error)[1] || 0) ~~ [413, 431] }
 
 sub is_multipart { shift->content->is_multipart }
 

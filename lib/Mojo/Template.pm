@@ -65,7 +65,7 @@ sub build {
       if ($type eq 'text') {
 
         # Quote and fix line ending
-        $value = quotemeta($value);
+        $value = quotemeta $value;
         $value .= '\n' if $newline;
         $lines[-1] .= "\$_M .= \"" . $value . "\";" if length $value;
       }
@@ -286,9 +286,8 @@ sub parse {
 }
 
 sub render {
-  my $self = shift;
-  my $e    = $self->parse(shift)->build->compile;
-  return $e ? $e : $self->interpret(@_);
+  my $self = shift->parse(shift)->build;
+  return $self->compile || $self->interpret(@_);
 }
 
 sub render_file {
@@ -369,23 +368,31 @@ Mojo::Template - Perl-ish templates!
 
   # Simple
   my $output = $mt->render(<<'EOF');
+  % use Time::Piece;
   <!DOCTYPE html>
   <html>
     <head><title>Simple</title></head>
-    <body>Time: <%= localtime(time) %></body>
+    % my $now = localtime;
+    <body>Time: <%= $now->hms %></body>
   </html>
   EOF
   say $output;
 
-  # More complicated
+  # More advanced
   my $output = $mt->render(<<'EOF', 23, 'foo bar');
-  %= 5 * 5
   % my ($number, $text) = @_;
-  test 123
-  foo <% my $i = $number + 2; %>
-  % for (1 .. 23) {
-  * some text <%= $i++ %>
-  % }
+  %= 5 * 5
+  <!DOCTYPE html>
+  <html>
+    <head><title>More advanced</title></head>
+    <body>
+      test 123
+      foo <% my $i = $number + 2; %>
+      % for (1 .. 23) {
+      * some text <%= $i++ %>
+      % }
+    </body>
+  </html>
   EOF
   say $output;
 
@@ -674,6 +681,11 @@ Compile template.
 
 Interpret template.
 
+  # Reuse template
+  say $mt->render('Hello <%= $_[0] %>!', 'Bender');
+  say $mt->interpret('Fry');
+  say $mt->interpret('Leela');
+
 =head2 C<parse>
 
   $mt = $mt->parse($template);
@@ -687,27 +699,29 @@ Parse template.
 
 Render template.
 
+  say $mt->render('Hello <%= $_[0] %>!', 'Bender');
+
 =head2 C<render_file>
 
-  my $output = $mt->render_file($template_file);
-  my $output = $mt->render_file($template_file, @args);
+  my $output = $mt->render_file('/tmp/foo.mt');
+  my $output = $mt->render_file('/tmp/foo.mt', @args);
 
 Render template file.
 
 =head2 C<render_file_to_file>
 
-  my $exception = $mt->render_file_to_file($template_file, $output_file);
+  my $exception = $mt->render_file_to_file('/tmp/foo.mt', '/tmp/foo.txt');
   my $exception
-    = $mt->render_file_to_file($template_file, $output_file, @args);
+    = $mt->render_file_to_file('/tmp/foo.mt', '/tmp/foo.txt', @args);
 
-Render template file to a specific file.
+Render template file to another file.
 
 =head2 C<render_to_file>
 
-  my $exception = $mt->render_to_file($template, $output_file);
-  my $exception = $mt->render_to_file($template, $output_file, @args);
+  my $exception = $mt->render_to_file($template, '/tmp/foo.txt');
+  my $exception = $mt->render_to_file($template, '/tmp/foo.txt', @args);
 
-Render template to a specific file.
+Render template to a file.
 
 =head1 SEE ALSO
 

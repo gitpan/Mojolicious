@@ -75,7 +75,7 @@ sub _connect {
 
   # TLS
   weaken $self;
-  if ($args->{tls}) {
+  if ($args->{tls} && !$handle->isa('IO::Socket::SSL')) {
 
     # No TLS support
     return $self->emit_safe(
