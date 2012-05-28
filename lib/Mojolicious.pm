@@ -34,7 +34,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Leaf Fluttering In Wind';
-our $VERSION  = '2.96';
+our $VERSION  = '2.97';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -198,18 +198,7 @@ sub plugin {
   $self->plugins->register_plugin(shift, $self, @_);
 }
 
-sub start {
-  my $class = shift;
-
-  # Executable
-  $ENV{MOJO_EXE} ||= (caller)[1];
-
-  # We are the application
-  my $self = $ENV{MOJO_APP} = ref $class ? $class : $class->new;
-
-  # Start!
-  $self->commands->start(@_);
-}
+sub start { ($ENV{MOJO_APP} = shift)->commands->start(@_) }
 
 sub startup { }
 

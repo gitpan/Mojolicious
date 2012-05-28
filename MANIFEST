@@ -36,6 +36,8 @@ lib/Mojo/Home.pm
 lib/Mojo/IOLoop.pm
 lib/Mojo/IOLoop/Client.pm
 lib/Mojo/IOLoop/Delay.pm
+lib/Mojo/IOLoop/server.crt
+lib/Mojo/IOLoop/server.key
 lib/Mojo/IOLoop/Server.pm
 lib/Mojo/IOLoop/Stream.pm
 lib/Mojo/JSON.pm
@@ -188,6 +190,7 @@ t/mojo/headers.t
 t/mojo/home.t
 t/mojo/hypnotoad.t
 t/mojo/ioloop.t
+t/mojo/ioloop_ipv6.t
 t/mojo/ioloop_tls.t
 t/mojo/json.t
 t/mojo/json_pointer.t
@@ -251,6 +254,8 @@ t/mojolicious/i18n_lite_app.t
 t/mojolicious/i18n_shortcut_lite_app.t
 t/mojolicious/json_config_lite_app.json
 t/mojolicious/json_config_lite_app.t
+t/mojolicious/json_config_lite_app_abs.development.json
+t/mojolicious/json_config_lite_app_abs.json
 t/mojolicious/json_config_mode_lite_app.json
 t/mojolicious/json_config_mode_lite_app.t
 t/mojolicious/json_config_mode_lite_app.testing.json
@@ -286,6 +291,7 @@ t/mojolicious/renderer.t
 t/mojolicious/restful_lite_app.t
 t/mojolicious/routes.t
 t/mojolicious/secret.txt
+t/mojolicious/single_file_test_app.conf
 t/mojolicious/tag_helper_lite_app.t
 t/mojolicious/templates/23.html.epl
 t/mojolicious/templates/dies_too.html.ep

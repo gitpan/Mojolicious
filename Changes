@@ -1,4 +1,13 @@
 
+2.97  2012-05-28
+  - Added workaround to make IO::Socket::SSL work with IO::Socket::IP.
+  - Removed Bonjour support.
+  - Improved documentation.
+  - Improved tests.
+  - Fixed bug that prevented Test::Mojo from working with normal Mojolicious
+    applications that use Mojolicious::Plugin::Config.
+  - Fixed a few small unicode bugs in documentation.
+
 2.96  2012-05-21
   - Added merge method to Mojo::Path.
   - Improved documentation.
@@ -259,7 +268,7 @@
   - Fixed small newline capture bug in Mojolicious::Routes::Match.
 
 2.62  2012-03-17
-  - Deprecated Mojolicious::Renderer->default_template_class in favor of 
+  - Deprecated Mojolicious::Renderer->default_template_class in favor of
     Mojolicious::Renderer->classes.
   - Deprecated Mojolicious::Static->default_static_class in favor of
     Mojolicious::Static->classes.

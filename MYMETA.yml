@@ -22,7 +22,7 @@ requires: {}
 resources:
   bugtracker: http://github.com/kraih/mojo/issues
   homepage: http://mojolicio.us
-  license: http://dev.perl.org/licenses/
+  license: http://www.opensource.org/licenses/artistic-license-2.0
   repository: http://github.com/kraih/mojo
   x_MailingList: http://groups.google.com/group/mojolicious
-version: 2.96
+version: 2.97
