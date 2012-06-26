@@ -11,8 +11,8 @@ our @EXPORT_OK = ('b');
 my @UTILS = (
   qw(b64_decode b64_encode camelize decamelize hmac_md5_sum hmac_sha1_sum),
   qw(html_escape html_unescape md5_bytes md5_sum punycode_decode),
-  qw(punycode_encode qp_decode qp_encode quote sha1_bytes sha1_sum trim),
-  qw(unquote url_escape url_unescape xml_escape)
+  qw(punycode_encode quote sha1_bytes sha1_sum slurp trim unquote url_escape),
+  qw(url_unescape xml_escape)
 );
 {
   no strict 'refs';
@@ -66,10 +66,7 @@ sub say {
   say $handle $$self;
 }
 
-sub secure_compare {
-  my ($self, $check) = @_;
-  return Mojo::Util::secure_compare $$self, $check;
-}
+sub secure_compare { Mojo::Util::secure_compare ${shift()}, @_ }
 
 sub size { length ${shift()} }
 
@@ -78,6 +75,7 @@ sub split {
   return Mojo::Collection->new(map { $self->new($_) } split $pattern, $$self);
 }
 
+# "My cat's breath smells like cat food."
 sub to_string { ${shift()} }
 
 1;
@@ -158,7 +156,7 @@ Clone bytestream.
 
   $stream = $stream->decamelize;
 
-Alias for L<Mojo::Util/"b64_decamelize">.
+Alias for L<Mojo::Util/"decamelize">.
 
 =head2 C<decode>
 
@@ -233,18 +231,6 @@ Alias for L<Mojo::Util/"punycode_decode">.
 
 Alias for L<Mojo::Util/"punycode_encode">.
 
-=head2 C<qp_decode>
-
-  $stream = $stream->qp_decode;
-
-Alias for L<Mojo::Util/"qp_decode">.
-
-=head2 C<qp_encode>
-
-  $stream = $stream->qp_encode;
-
-Alias for L<Mojo::Util/"qp_encode">.
-
 =head2 C<quote>
 
   $stream = $stream->quote;
@@ -283,6 +269,14 @@ Alias for L<Mojo::Util/"sha1_sum">.
   my $size = $stream->size;
 
 Size of bytestream.
+
+=head2 C<slurp>
+
+  $stream = $stream->slurp;
+
+Alias for L<Mojo::Util/"slurp">.
+
+  b('/home/sri/myapp.pl')->slurp->split("\n")->shuffle->join("\n")->say;
 
 =head2 C<split>
 

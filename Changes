@@ -1,4 +1,44 @@
 
+3.0  2012-06-25
+  - Code name "Rainbow", this is a major release.
+  - Removed Mojolicious::Plugin::I18N so it can be maintained as a separate
+    distribution.
+  - Removed app_class attribute from Mojo::Server.
+  - Removed qp_decode and qp_encode methods from Mojo::ByteStream.
+  - Removed qp_decode and qp_encode functions from Mojo::Util.
+  - Removed render_to_file and render_file_to_file methods from
+    Mojo::Template.
+  - Renamed Mojo::CookieJar to Mojo::UserAgent::CookieJar.
+  - Renamed Mojo::Command to Mojolicious::Command.
+  - Renamed format, reqs, symbol_start and symbols attributes in
+    Mojolicious::Routes::Pattern to format_regex, constraints,
+    placeholder_start and placeholders.
+  - Merged get_all_data and get_data methods from Mojo::Command into data
+    method in Mojo::Loader.
+  - Moved class_to_file and class_to_path methods from Mojo::Command to
+    Mojo::Util.
+  - Updated IO::Socket::SSL requirement to 1.75 for IO::Socket::IP support.
+  - Switched back from IO::Socket::INET6 to IO::Socket::IP for IPv6 support.
+  - Switched from HMAC-MD5 to HMAC-SHA1 for signed cookies.
+  - Added slurp function to Mojo::Util.
+  - Added slurp method to Mojo::ByteStream.
+  - Added j and r functions to ojo. (sharifulin, sri)
+  - Added accept_interval attribute to Mojo::IOLoop.
+  - Added support for new HTTP status code.
+  - Modernized ".perltidyrc".
+  - Improved Mojo::IOLoop::Server to prioritize RC4 cipher, which mitigates
+    the BEAST attack. (Danny Thomas)
+  - Improved not found page to highlight custom route names.
+  - Improved to method in Mojolicious::Routes::Route to give easier access to
+    default parameters.
+  - Improved message parser performance slightly.
+  - Improved documentation. (ichesnokov, sri)
+  - Improved tests.
+  - Fixed bug that prevented sessions from working in embedded applications.
+  - Fixed JSON Pointer escaping.
+  - Fixed small JSON Pointer bug in get command. (avkhozov)
+  - Fixed small application initialization bug in Mojo::Server.
+
 2.98  2012-05-30
   - Switched from IO::Socket::IP to IO::Socket::INET6 for IPv6 support.
   - Improved IPv6 exception handling in Mojo::IOLoop::Client.
@@ -13,7 +53,7 @@
   - Improved tests.
   - Fixed bug that prevented Test::Mojo from working with normal Mojolicious
     applications that use Mojolicious::Plugin::Config.
-  - Fixed a few small unicode bugs in documentation.
+  - Fixed a few small Unicode bugs in documentation.
 
 2.96  2012-05-21
   - Added merge method to Mojo::Path.
@@ -637,7 +677,7 @@
   - Changed default keep alive timeout of Mojo::UserAgent from 15 to 20
     seconds.
   - Improved documentation.
-  - Improved unicode tests.
+  - Improved Unicode tests.
   - Fixed inline template double encoding bug.
 
 2.36  2011-12-05
@@ -932,7 +972,7 @@
   - Fixed close event bug in Mojo::IOLoop.
   - Fixed small redirect_to bug. (judofyr, sri)
   - Fixed small attribute selector bug in Mojo::DOM::CSS.
-  - Fixed small unicode bug in Mojolicious::Plugin::EPRenderer.
+  - Fixed small Unicode bug in Mojolicious::Plugin::EPRenderer.
   - Fixed a few small route bugs.
   - Fixed Perl 5.8.7 compatibility.
   - Fixed typos.
@@ -955,7 +995,7 @@
   - Fixed small bug that caused exceptions to be logged twice.
 
 1.97  2011-09-03
-  - Improved unicode handling to be more correct and less forgiving.
+  - Improved Unicode handling to be more correct and less forgiving.
   - Fixed typos.
 
 1.96  2011-09-02
@@ -1078,7 +1118,7 @@
   - Improved Mojo::DOM to allow smart whitespace trimming to be disabled.
     (Akron)
   - Improved documentation.
-  - Fixed small unicode bug in get command.
+  - Fixed small Unicode bug in get command.
 
 1.76  2011-08-12
   - Fixed small Mojo::URL escaping bug.
@@ -1899,7 +1939,7 @@
   - Fixed path detection bug in generated scripts. (merlyn)
   - Fixed a small redirect bug in Mojo::Client.
   - Fixed a route callback inheritance bug.
-  - Fixed a security problem in the HMAC MD5 implementation. (vti)
+  - Fixed a security problem in the HMAC-MD5 implementation. (vti)
 
 0.999926  2010-06-07
   - Added version requirement for all optional dependencies.
@@ -1911,8 +1951,8 @@
   - Updated WebSocket implementation to draft 76, NOTE THAT THIS CHANGE IS
     NOT BACKWARDS COMPATIBLE!!!
     (sadly we have no choice when the spec changes)
-  - Increased Perl version requirement to 5.8.7 due to unicode bugs in
-    earlier releases.
+  - Increased Perl version requirement to 5.8.7 due to Unicode bugs in earlier
+    releases.
   - Switched to app->start instead of shagadelic as default way to start
     Mojolicious::Lite apps in the documentation.
   - Made tutorial examples more business friendly.
@@ -2187,7 +2227,7 @@
   - Updated Mojolicious::Lite tutorial.
   - Fixed a case where routes captures got false positives.
   - Fixed literal name handling in Mojo::JSON. (rsp)
-  - Fixed unicode detection in Mojo::JSON. (rsp)
+  - Fixed Unicode detection in Mojo::JSON. (rsp)
   - Fixed multiple small bugs in Mojo::JSON. (rsp)
   - Fixed Mojolicious default app tests. (yuki-kimoto)
   - Fixed Mojo::Server::FCGI compatibility.
