@@ -16,7 +16,7 @@ use Scalar::Util qw(blessed weaken);
 # "Robots don't have any emotions, and sometimes that makes me very sad."
 has commands => sub { Mojolicious::Commands->new };
 has controller_class => 'Mojolicious::Controller';
-has mode => sub { ($ENV{MOJO_MODE} || 'development') };
+has mode => sub { $ENV{MOJO_MODE} || 'development' };
 has plugins  => sub { Mojolicious::Plugins->new };
 has renderer => sub { Mojolicious::Renderer->new };
 has routes   => sub { Mojolicious::Routes->new };
@@ -34,7 +34,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Rainbow';
-our $VERSION  = '3.0';
+our $VERSION  = '3.01';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
