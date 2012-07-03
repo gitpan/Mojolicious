@@ -1,4 +1,14 @@
 
+3.02  2012-07-03
+  - Added pluck and uniq methods to Mojo::Collection.
+  - Added regular expression support to first and grep methods in
+    Mojo::Collection.
+  - Improved documentation.
+  - Improved tests.
+  - Fixed JSON Pointer escaping.
+  - Fixed small text and attribute extraction bugs in Mojo::DOM.
+  - Fixed small inconsistency between routes and static dispatchers.
+
 3.01  2012-07-01
   - Improved CSS of built-in templates.
   - Improved documentation. (diegok, sri)

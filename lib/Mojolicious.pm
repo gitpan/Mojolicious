@@ -34,7 +34,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Rainbow';
-our $VERSION  = '3.01';
+our $VERSION  = '3.02';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -126,11 +126,11 @@ sub dispatch {
   my $plugins = $self->plugins->emit_hook(before_dispatch => $c);
 
   # Try to find a static file
-  $self->static->dispatch($c);
+  my $res = $tx->res;
+  $self->static->dispatch($c) unless $res->code;
   $plugins->emit_hook_reverse(after_static_dispatch => $c);
 
   # Routes
-  my $res = $tx->res;
   return if $res->code;
   if (my $code = ($tx->req->error)[1]) { $res->code($code) }
   elsif ($tx->is_websocket) { $res->code(426) }

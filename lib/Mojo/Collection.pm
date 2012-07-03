@@ -28,7 +28,7 @@ sub each {
 sub first {
   my ($self, $cb) = @_;
   return $self->[0] unless $cb;
-  return List::Util::first { $_->$cb } @$self;
+  return List::Util::first { $_ ~~ $cb } @$self;
 }
 
 # "All right, let's not panic.
@@ -36,7 +36,7 @@ sub first {
 #  I can get by with one."
 sub grep {
   my ($self, $cb) = @_;
-  return $self->new(grep { $_->$cb } @$self);
+  return $self->new(grep { $_ ~~ $cb } @$self);
 }
 
 sub join {
@@ -47,6 +47,11 @@ sub join {
 sub map {
   my ($self, $cb) = @_;
   return $self->new(map { $_->$cb } @$self);
+}
+
+sub pluck {
+  my ($self, $method, @args) = @_;
+  return $self->map(sub { $_->$method(@args) });
 }
 
 sub reverse {
@@ -70,6 +75,12 @@ sub sort {
   my ($self, $cb) = @_;
   return $self->new(sort @$self) unless $cb;
   return $self->new(sort { $a->$cb($b) } @$self);
+}
+
+sub uniq {
+  my $self = shift;
+  my %seen;
+  return $self->grep(sub { !$seen{$_}++ });
 }
 
 1;
@@ -132,21 +143,25 @@ Evaluate closure for each element in collection.
 =head2 C<first>
 
   my $first = $collection->first;
+  my $first = $collection->first(qr/foo/);
   my $first = $collection->first(sub {...});
 
-Evaluate closure for each element in collection and return the first one for
-which the closure returns true.
+Evaluate regular expression or closure for each element in collection and
+return the first one that matched the regular expression, or for which the
+closure returned true.
 
   my $five = $collection->first(sub { $_ == 5 });
 
 =head2 C<grep>
 
+  my $new = $collection->grep(qr/foo/);
   my $new = $collection->grep(sub {...});
 
-Evaluate closure for each element in collection and create a new collection
-with all elements for which the closure returned true.
+Evaluate regular expression or closure for each element in collection and
+create a new collection with all elements that matched the regular expression,
+or for which the closure returned true.
 
-  my $interesting = $collection->grep(sub { /mojo/i });
+  my $interesting = $collection->grep(qr/mojo/i);
 
 =head2 C<join>
 
@@ -164,6 +179,17 @@ Evaluate closure for each element in collection and create a new collection
 from the results.
 
   my $doubled = $collection->map(sub { $_ * 2 });
+
+=head2 C<pluck>
+
+  my $new = $collection->pluck($method);
+  my $new = $collection->pluck($method, @args);
+
+Call method on each element in collection and create a new collection from the
+results.
+
+  # Equal to but more convenient than
+  my $new = $collection->map(sub { $_->$method(@args) });
 
 =head2 C<reverse>
 
@@ -198,6 +224,12 @@ Sort elements based on return value of closure and create a new collection
 from the results.
 
   my $insensitive = $collection->sort(sub { uc(shift) cmp uc(shift) });
+
+=head2 C<uniq>
+
+  my $new = $collection->uniq;
+
+Create a new collection without duplicate elements.
 
 =head1 SEE ALSO
 
