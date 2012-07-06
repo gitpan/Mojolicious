@@ -23,7 +23,7 @@ has routes   => sub { Mojolicious::Routes->new };
 has secret   => sub {
   my $self = shift;
 
-  # Warn developers about unsecure default
+  # Warn developers about insecure default
   $self->log->debug('Your secret passphrase needs to be changed!!!');
 
   # Default to application name
@@ -34,7 +34,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Rainbow';
-our $VERSION  = '3.02';
+our $VERSION  = '3.03';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -332,7 +332,7 @@ startup method to define the url endpoints for your application.
 
 A secret passphrase used for signed cookies and the like, defaults to the
 application name which is not very secure, so you should change it!!! As long
-as you are using the unsecure default there will be debug messages in the log
+as you are using the insecure default there will be debug messages in the log
 file reminding you to change your passphrase.
 
 =head2 C<sessions>
@@ -453,7 +453,7 @@ These hooks are currently available and are emitted in the listed order:
 
 =over 2
 
-=item B<after_build_tx>
+=item C<after_build_tx>
 
 Emitted right after the transaction is built and before the HTTP request gets
 parsed.
@@ -468,7 +468,7 @@ rather advanced features such as upload progress bars possible, just note that
 it will not work for embedded applications. (Passed the transaction and
 application object)
 
-=item B<before_dispatch>
+=item C<before_dispatch>
 
 Emitted right before the static dispatcher and router start their work.
 
@@ -480,7 +480,7 @@ Emitted right before the static dispatcher and router start their work.
 Very useful for rewriting incoming requests and other preprocessing tasks.
 (Passed the default controller object)
 
-=item B<after_static_dispatch>
+=item C<after_static_dispatch>
 
 Emitted in reverse order after the static dispatcher determined if a static
 file should be served and before the router starts its work.
@@ -493,7 +493,7 @@ file should be served and before the router starts its work.
 Mostly used for custom dispatchers and post-processing static file responses.
 (Passed the default controller object)
 
-=item B<after_dispatch>
+=item C<after_dispatch>
 
 Emitted in reverse order after a response has been rendered. Note that this
 hook can trigger before C<after_static_dispatch> due to its dynamic nature.
@@ -506,7 +506,7 @@ hook can trigger before C<after_static_dispatch> due to its dynamic nature.
 Useful for rewriting outgoing responses and other post-processing tasks.
 (Passed the current controller object)
 
-=item B<around_dispatch>
+=item C<around_dispatch>
 
 Emitted right before the C<before_dispatch> hook and wraps around the whole
 dispatch process, so you have to manually forward to the next hook if you want

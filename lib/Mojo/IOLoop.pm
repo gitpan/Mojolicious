@@ -137,9 +137,10 @@ sub server {
       my $id     = $self->stream($stream);
       $self->$cb($stream, $id);
 
-      # Enforce connection limit
+      # Enforce connection limit (randomize to improve load balancing)
       $self->max_connections(0)
-        if defined $self->{accepts} && --$self->{accepts} == 0;
+        if defined $self->{accepts}
+        && ($self->{accepts} -= int(rand 2) + 1) <= 0;
 
       # Stop listening
       $self->_not_listening;
@@ -231,7 +232,7 @@ sub _manage {
           if $c->{finish} && (!$c->{stream} || !$c->{stream}->is_writing);
       }
 
-      # Graceful shutdown
+      # Graceful stop
       $self->_remove(delete $self->{manager})
         unless keys %$connections || keys %{$self->{servers}};
       $self->stop if $self->max_connections == 0 && keys %$connections == 0;
@@ -397,7 +398,8 @@ this callback are not captured.
 The maximum number of connections this loop is allowed to accept before
 shutting down gracefully without interrupting existing connections, defaults
 to C<0>. Setting the value to C<0> will allow this loop to accept new
-connections indefinitely.
+connections indefinitely. Note that half of this value can be subtracted
+randomly to improve load balancing between multiple server processes.
 
 =head2 C<max_connections>
 

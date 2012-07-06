@@ -20,7 +20,7 @@ has match => sub {
 };
 has tx => sub { Mojo::Transaction::HTTP->new };
 
-# Bundled files
+# Bundled templates
 our $H = Mojo::Home->new;
 $H->parse($H->parse($H->mojo_lib_dir)->rel_dir('Mojolicious/templates'));
 our $MOJOBAR = $H->slurp_rel_file('mojobar.html.ep');
@@ -242,33 +242,29 @@ sub render_data { shift->render(data => @_) }
 #  Neat."
 sub render_exception {
   my ($self, $e) = @_;
-  $e = Mojo::Exception->new($e);
 
-  # Recursion
+  # Log exception
   my $app = $self->app;
-  $app->log->error($e);
-  my $stash = $self->stash;
-  return if $stash->{'mojo.exception'};
+  $app->log->error($e = Mojo::Exception->new($e));
 
   # Filtered stash snapshot
+  my $stash = $self->stash;
   my %snapshot = map { $_ => $stash->{$_} }
     grep { !/^mojo\./ and defined $stash->{$_} } keys %$stash;
 
   # Render with fallbacks
   my $mode    = $app->mode;
   my $options = {
-    template         => "exception.$mode",
-    format           => $stash->{format} || 'html',
-    handler          => undef,
-    status           => 500,
-    snapshot         => \%snapshot,
-    exception        => $e,
-    'mojo.exception' => 1
+    exception => $e,
+    snapshot  => \%snapshot,
+    template  => "exception.$mode",
+    format    => $stash->{format} || $app->renderer->default_format,
+    handler   => undef,
+    status    => 500
   };
   my $inline = $mode eq 'development' ? $DEV_EXCEPTION : $EXCEPTION;
-  return if $self->_render_fallbacks($options, 'exception', $inline);
-  $options->{format} = 'html';
-  $self->_render_fallbacks($options, 'exception', $inline);
+  return if $self->_fallbacks($options, 'exception', $inline);
+  $self->_fallbacks({%$options, format => 'html'}, 'exception', $inline);
 }
 
 # "If you hate intolerance and being punched in the face by me,
@@ -282,22 +278,15 @@ sub render_later { shift->stash->{'mojo.rendered'}++ }
 sub render_not_found {
   my $self = shift;
 
-  # Recursion
-  my $stash = $self->stash;
-  return if $stash->{'mojo.exception'} || $stash->{'mojo.not_found'};
-
   # Render with fallbacks
-  my $mode    = $self->app->mode;
-  my $options = {
-    template         => "not_found.$mode",
-    format           => $stash->{format} || 'html',
-    status           => 404,
-    'mojo.not_found' => 1
-  };
+  my $app    = $self->app;
+  my $mode   = $app->mode;
+  my $format = $self->stash->{format} || $app->renderer->default_format;
+  my $options
+    = {template => "not_found.$mode", format => $format, status => 404};
   my $inline = $mode eq 'development' ? $DEV_NOT_FOUND : $NOT_FOUND;
-  return if $self->_render_fallbacks($options, 'not_found', $inline);
-  $options->{format} = 'html';
-  $self->_render_fallbacks($options, 'not_found', $inline);
+  return if $self->_fallbacks($options, 'not_found', $inline);
+  $self->_fallbacks({%$options, format => 'html'}, 'not_found', $inline);
 }
 
 # "You called my thesis a fat sack of barf, and then you stole it?
@@ -522,7 +511,7 @@ sub write_chunk {
   return $self->rendered;
 }
 
-sub _render_fallbacks {
+sub _fallbacks {
   my ($self, $options, $template, $inline) = @_;
 
   # Mode specific template
@@ -817,7 +806,7 @@ of the response, which is C<text/html;charset=UTF-8> by default.
   $c = $c->rendered;
   $c = $c->rendered(302);
 
-Finalize response and run C<after_dispatch> plugin hook, defaults to using a
+Finalize response and emit C<after_dispatch> plugin hook, defaults to using a
 C<200> response code.
 
   # Stream content directly from file
@@ -933,7 +922,8 @@ Non persistent data storage and exchange, application wide default values can
 be set with L<Mojolicious/"defaults">. Many stash values have a special
 meaning and are reserved, the full list is currently C<action>, C<app>, C<cb>,
 C<controller>, C<data>, C<extends>, C<format>, C<handler>, C<json>, C<layout>,
-C<namespace>, C<partial>, C<path>, C<status>, C<template> and C<text>.
+C<namespace>, C<partial>, C<path>, C<status>, C<template> and C<text>. Note
+that all stash values with a C<mojo.*> prefix are reserved for internal use.
 
   # Manipulate stash
   $c->stash->{foo} = 'bar';

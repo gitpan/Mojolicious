@@ -2,7 +2,7 @@ use Mojo::Base -strict;
 
 use utf8;
 
-use Test::More tests => 776;
+use Test::More tests => 783;
 
 # "Homer gave me a kidney: it wasn't his, I didn't need it,
 #  and it came postage due- but I appreciated the gesture!"
@@ -89,7 +89,10 @@ $dom = Mojo::DOM->new->parse(<<EOF);
   more text
 </foo>
 EOF
-is $dom->xml, undef, 'xml mode not detected';
+is $dom->xml,  undef, 'xml mode not detected';
+is $dom->type, '',    'no type';
+is $dom->attrs('foo'), '', 'no attribute';
+is $dom->attrs(foo => 'bar')->attrs('foo'), '', 'no attribute';
 is $dom->tree->[1][0], 'doctype', 'right element';
 is $dom->tree->[1][1], ' foo',    'right doctype';
 is "$dom", <<EOF, 'right result';
@@ -122,19 +125,11 @@ $simple->parent->attrs(bar => 'baz')->attrs({this => 'works', too => 'yea'});
 is $simple->parent->attrs('bar'),  'baz',   'right parent attribute';
 is $simple->parent->attrs('this'), 'works', 'right parent attribute';
 is $simple->parent->attrs('too'),  'yea',   'right parent attribute';
-is $dom->at('test#test')->type,            'test',   'right type';
-is $dom->at('[class$="ing"]')->type,       'simple', 'right type';
-is $dom->at('[class="working"]')->type,    'simple', 'right type';
-is $dom->at('[class$=ing]')->type,         'simple', 'right type';
-is $dom->at('[class=working]')->type,      'simple', 'right type';
-is $dom->at('[class=working]')->namespace, '',       'no namespace';
-is $dom->at('foo')->namespace,             '',       'no namespace';
-is $dom->namespace,   '', 'no namespace';
-is $dom->type,        '', 'no type';
-is $dom->text_before, '', 'no text';
-is $dom->text_after,  '', 'no text';
-is $dom->attrs('foo'), '', 'no attribute';
-is $dom->attrs(foo => 'bar')->attrs('foo'), '', 'no attribute';
+is $dom->at('test#test')->type,         'test',   'right type';
+is $dom->at('[class$="ing"]')->type,    'simple', 'right type';
+is $dom->at('[class="working"]')->type, 'simple', 'right type';
+is $dom->at('[class$=ing]')->type,      'simple', 'right type';
+is $dom->at('[class=working]')->type,   'simple', 'right type';
 
 # Class and ID
 $dom = Mojo::DOM->new->parse('<div id="id" class="class">a</div>');
@@ -215,10 +210,11 @@ is $dom->at('[id="snowm\000021an"]'),  undef, 'no result';
 is $dom->at('[id="snowm\000021 an"]'), undef, 'no result';
 
 # Unicode and escaped selectors
-my $unicode = encode 'UTF-8',
-  qq#<html><div id="☃x">Snowman</div><div class="x ♥">Heart</div></html>#;
+my $chars
+  = qq#<html><div id="☃x">Snowman</div><div class="x ♥">Heart</div></html>#;
+my $bytes = encode 'UTF-8', $chars;
 $dom = Mojo::DOM->new->charset('UTF-8');
-$dom->parse($unicode);
+$dom->parse($bytes);
 is $dom->at("#\\\n\\002603x")->text,                  'Snowman', 'right text';
 is $dom->at('#\\2603 x')->text,                       'Snowman', 'right text';
 is $dom->at("#\\\n\\2603 x")->text,                   'Snowman', 'right text';
@@ -280,7 +276,11 @@ is $dom->at('[class~=x]')->text,                      'Heart',   'right text';
 is $dom->at('div[class~=x]')->text,                   'Heart',   'right text';
 is $dom->at('html div[class~=x]')->text,              'Heart',   'right text';
 is $dom->at('html > div[class~=x]')->text,            'Heart',   'right text';
+is $dom->to_xml,      $bytes, 'XML is encoded';
+is $dom->content_xml, $bytes, 'XML is encoded';
 $dom->charset(undef);
+is $dom->to_xml,      $chars, 'XML is not encoded';
+is $dom->content_xml, $chars, 'XML is not encoded';
 
 # Looks remotely like HTML
 $dom = Mojo::DOM->new->parse(
@@ -423,7 +423,8 @@ $dom = Mojo::DOM->new->parse(<<EOF);
   </meta>
 </bk:book>
 EOF
-is $dom->xml, 1, 'xml mode detected';
+is $dom->xml,       1,  'xml mode detected';
+is $dom->namespace, '', 'no namespace';
 is $dom->at('book comment')->namespace, 'uri:default-ns', 'right namespace';
 is $dom->at('book comment')->text,      'rocks!',         'right text';
 is $dom->at('book nons section')->namespace, '',            'no namespace';
@@ -445,6 +446,22 @@ is $dom->at('[bk]')->attrs('bk'),       '',            'no attribute';
 is $dom->at('[bk]')->attrs('k'),        '',            'no attribute';
 is $dom->at('[s\:bk]'), undef, 'no result';
 is $dom->at('[k]'),     undef, 'no result';
+
+# Namespace with dot
+$dom = Mojo::DOM->new(<<EOF);
+<?xml version="1.0"?>
+<foo xmlns:foo.bar="uri:first">
+  <bar xmlns:fooxbar="uri:second">
+    <foo.bar:baz>First</fooxbar:baz>
+    <fooxbar:yada>Second</foo.bar:yada>
+  </bar>
+</foo>
+EOF
+is $dom->at('foo bar baz')->text,  'First',      'right text';
+is $dom->at('baz')->namespace,     'uri:first',  'right namespace';
+is $dom->at('foo bar yada')->text, 'Second',     'right text';
+is $dom->at('yada')->namespace,    'uri:second', 'right namespace';
+is $dom->at('foo')->namespace,     '',           'no namespace';
 
 # Yadis
 $dom = Mojo::DOM->new->parse(<<'EOF');
@@ -1913,6 +1930,8 @@ is $dom->text(0), "\n", 'right text';
 is $dom->all_text, "looks like\n  it\n    really\n  works", 'right text';
 is $dom->all_text(0), "\n  looks\n  like\n  it\n    really\n  \n  works\n\n",
   'right text';
+is $dom->text_before, '', 'no text';
+is $dom->text_after,  '', 'no text';
 is $dom->div->text, 'looks works', 'right text';
 is $dom->div->text(0), "\n  looks\n  \n  works\n", 'right text';
 is $dom->div->all_text, "looks like\n  it\n    really\n  works", 'right text';

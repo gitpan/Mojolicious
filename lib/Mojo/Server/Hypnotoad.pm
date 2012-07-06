@@ -216,9 +216,9 @@ sub _manage {
     # No heartbeat (graceful stop)
     my $interval = $c->{heartbeat_interval};
     my $timeout  = $c->{heartbeat_timeout};
-    if ($w->{time} + $interval + $timeout <= time) {
+    if (!$w->{graceful} && ($w->{time} + $interval + $timeout <= time)) {
       $self->{log}->info("Worker $pid has no heartbeat, restarting.");
-      $w->{graceful} ||= time;
+      $w->{graceful} = time;
     }
 
     # Graceful stop with timeout
@@ -321,7 +321,7 @@ sub _spawn {
   );
   $loop->unlock(sub { flock $lock, LOCK_UN });
 
-  # Heartbeat
+  # Heartbeat messages (stop sending during graceful stop)
   weaken $self;
   $loop->recurring(
     $c->{heartbeat_interval} => sub {
@@ -460,7 +460,9 @@ L<Mojolicious::Guides::Cookbook/"Hypnotoad"> for examples.
 
 Maximum number of connections a worker is allowed to accept before stopping
 gracefully, defaults to C<1000>. Setting the value to C<0> will allow workers
-to accept new connections indefinitely.
+to accept new connections indefinitely. Note that half of this value can be
+subtracted randomly to improve load balancing, and that worker processes will
+stop sending heartbeat messages once the limit has been reached.
 
 =head2 C<backlog>
 
@@ -481,8 +483,8 @@ performance.
 
   graceful_timeout => 15
 
-Maximum amount of time in seconds a graceful worker stop may take before being
-forced, defaults to C<30>.
+Maximum amount of time in seconds stopping a worker gracefully may take before
+being forced, defaults to C<30>.
 
 =head2 C<group>
 
@@ -501,7 +503,7 @@ Heartbeat interval in seconds, defaults to C<5>.
   heartbeat_timeout => 2
 
 Maximum amount of time in seconds before a worker without a heartbeat will be
-stopped, defaults to C<20>.
+stopped gracefully, defaults to C<20>.
 
 =head2 C<inactivity_timeout>
 
