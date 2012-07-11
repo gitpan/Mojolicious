@@ -6,7 +6,7 @@ BEGIN {
   $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Poll';
 }
 
-use Test::More tests => 82;
+use Test::More tests => 86;
 
 # "The strong must protect the sweet."
 use Mojo::IOLoop;
@@ -289,21 +289,18 @@ is $tx->res->code, 200,          'right status';
 is $tx->res->body, '0123456789', 'right content';
 is $stream, 1, 'no leaking subscribers';
 
-# Nested keep alive
+# GET / (nested non-blocking requests after blocking one, with custom URL)
 my @kept_alive;
 $ua->get(
-  '/',
-  sub {
+  $ua->app_url => sub {
     my ($self, $tx) = @_;
     push @kept_alive, $tx->kept_alive;
     $self->get(
-      '/',
-      sub {
+      '/' => sub {
         my ($self, $tx) = @_;
         push @kept_alive, $tx->kept_alive;
         $self->get(
-          '/',
-          sub {
+          $ua->app_url => sub {
             my ($self, $tx) = @_;
             push @kept_alive, $tx->kept_alive;
             Mojo::IOLoop->stop;
@@ -316,17 +313,15 @@ $ua->get(
 Mojo::IOLoop->start;
 is_deeply \@kept_alive, [undef, 1, 1], 'connections kept alive';
 
-# Simple nested keep alive with timers
+# GET / (simple nested non-blocking requests with timers)
 @kept_alive = ();
 $ua->get(
-  '/',
-  sub {
+  '/' => sub {
     push @kept_alive, pop->kept_alive;
     Mojo::IOLoop->timer(
       0.25 => sub {
         $ua->get(
-          '/',
-          sub {
+          '/' => sub {
             push @kept_alive, pop->kept_alive;
             Mojo::IOLoop->timer(0.25 => sub { Mojo::IOLoop->stop });
           }
@@ -337,6 +332,13 @@ $ua->get(
 );
 Mojo::IOLoop->start;
 is_deeply \@kept_alive, [1, 1], 'connections kept alive';
+
+# GET / (blocking request after non-blocking one, with custom URL)
+$tx = $ua->get($ua->app_url);
+ok $tx->success, 'successful';
+ok !$tx->kept_alive, 'kept connection not alive';
+is $tx->res->code, 200,      'right status';
+is $tx->res->body, 'works!', 'right content';
 
 # Premature connection close
 my $port = Mojo::IOLoop->generate_port;
