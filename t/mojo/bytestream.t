@@ -5,9 +5,10 @@ use utf8;
 # "Homer, we're going to ask you a few simple yes or no questions.
 #  Do you understand?
 #  Yes. *lie dectector blows up*"
-use Test::More tests => 42;
+use Test::More tests => 44;
 
 use File::Spec::Functions qw(catfile splitdir);
+use File::Temp 'tempdir';
 use FindBin;
 use Mojo::ByteStream 'b';
 
@@ -81,8 +82,8 @@ is b('foo bar baz')->sha1_sum, 'c7567e8b39e2428e38bf9c9226ac68de4c67dc39',
   'right sha1 checksum';
 
 # hmac_md5_sum
-is b('Hi there')->hmac_md5_sum(1234567890), 'e3b5fab1b3f5b9d1fe391d09fce7b2ae',
-  'right hmac md5 checksum';
+is b('Hi there')->hmac_md5_sum(1234567890),
+  'e3b5fab1b3f5b9d1fe391d09fce7b2ae', 'right hmac md5 checksum';
 
 # hmac_sha1_sum
 is b('Hi there')->hmac_sha1_sum(1234567890),
@@ -109,8 +110,8 @@ is_deeply [b('')->split(qr/,/)->each], [], 'no elements';
 $stream = b('1/2/3');
 is $stream->split('/')->map(sub { $_->quote })->join(', '), '"1", "2", "3"',
   'right result';
-is $stream->split('/')->map(sub { shift->quote })->join(', '), '"1", "2", "3"',
-  'right result';
+is $stream->split('/')->map(sub { shift->quote })->join(', '),
+  '"1", "2", "3"', 'right result';
 
 # length
 is b('foo bar baz')->size, 11, 'size is 11';
@@ -137,8 +138,14 @@ b(1, 2, 3)->say;
 is $buffer, "test\n123\n", 'right output';
 
 # slurp
-my $file = catfile(splitdir($FindBin::Bin), qw(templates exception.mt));
+my $file = catfile splitdir($FindBin::Bin), qw(templates exception.mt);
 $stream = b($file)->slurp;
 is $stream, "test\n% die;\n123\n", 'right content';
 $stream = b($file)->slurp->split("\n")->grep(qr/die/)->join('');
 is $stream, '% die;', 'right content';
+
+# spurt
+my $dir = tempdir CLEANUP => 1;
+$file = catfile $dir, 'test.txt';
+is b("just\nworks!")->spurt($file)->quote, qq{"just\nworks!"}, 'right result';
+is b($file)->slurp, "just\nworks!", 'successful roundtrip';
