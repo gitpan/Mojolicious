@@ -283,6 +283,7 @@ t/mojolicious/public/hello.txt
 t/mojolicious/public/hello2.txt
 t/mojolicious/public2/hello.txt
 t/mojolicious/public2/hello3.txt
+t/mojolicious/public_dev/another/file
 t/mojolicious/public_dev/hello.txt
 t/mojolicious/rebased_lite_app.t
 t/mojolicious/renderer.t

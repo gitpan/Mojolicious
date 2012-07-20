@@ -201,9 +201,14 @@ sub post_ok  { shift->_request_ok(post  => @_) }
 
 sub post_form_ok {
   my ($self, $url) = (shift, shift);
-  $self->tx($self->ua->post_form($url, @_));
-  return $self->_test('ok', $self->tx->is_finished,
-    encode('UTF-8', "post $url"));
+  my $tx = $self->tx($self->ua->post_form($url, @_))->tx;
+  return $self->_test('ok', $tx->is_finished, encode('UTF-8', "post $url"));
+}
+
+sub post_json_ok {
+  my ($self, $url) = (shift, shift);
+  my $tx = $self->tx($self->ua->post_json($url, @_))->tx;
+  return $self->_test('ok', $tx->is_finished, encode('UTF-8', "post $url"));
 }
 
 # "WHO IS FONZY!?! Don't they teach you anything at school?"
@@ -302,7 +307,7 @@ sub _request_ok {
   $headers = {} if !ref $headers;
 
   # Perform request against application
-  $self->tx($self->ua->$method($url, %$headers, $body));
+  $self->tx($self->ua->$method($url, $headers, $body));
   local $Test::Builder::Level = $Test::Builder::Level + 1;
   my ($err, $code) = $self->tx->error;
   Test::More::diag $err if !(my $ok = !$err || $code) && $err;
@@ -656,11 +661,24 @@ arguments as L<Mojo::UserAgent/"post">.
   $t = $t->post_form_ok('/foo' => {a => 'b'});
   $t = $t->post_form_ok('/foo' => 'UTF-8' => {a => 'b'} => {DNT => 1});
 
-Submit a C<POST> form and check for transport errors, takes the exact same
-arguments as L<Mojo::UserAgent/"post_form">.
+Perform a C<POST> request with form data and check for transport errors, takes
+the exact same arguments as L<Mojo::UserAgent/"post_form">.
 
   # Test file upload
   $t->post_form_ok('/upload' => {foo => {content => 'bar'}})->status_is(200);
+
+=head2 C<post_json_ok>
+
+  $t = $t->post_json_ok('/foo' => {a => 'b'});
+  $t = $t->post_json_ok('/foo' => {a => 'b'} => {DNT => 1});
+
+Perform a C<POST> request with JSON data and check for transport errors, takes
+the exact same arguments as L<Mojo::UserAgent/"post_json">.
+
+  # Test JSON API
+  $t->post_json_ok('/hello.json' => {hello => 'world'})
+    ->status_is(200)
+    ->json_content_is({bye => 'world'});
 
 =head2 C<put_ok>
 

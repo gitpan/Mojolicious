@@ -54,8 +54,8 @@ sub file {
 sub serve {
   my ($self, $c, $rel) = @_;
   return unless my $asset = $self->file($rel);
-  $rel =~ /\.(\w+)$/;
-  $c->res->headers->content_type($c->app->types->type($1) || 'text/plain');
+  my $type = $rel =~ /\.(\w+)$/ ? $c->app->types->type($1) : undef;
+  $c->res->headers->content_type($type || 'text/plain');
   return $self->serve_asset($c, $asset);
 }
 
@@ -126,7 +126,7 @@ sub _get_data_file {
 sub _get_file {
   my ($self, $path) = @_;
   no warnings 'newline';
-  return -r $path ? Mojo::Asset::File->new(path => $path) : undef;
+  return -f $path && -r $path ? Mojo::Asset::File->new(path => $path) : undef;
 }
 
 1;
@@ -189,6 +189,8 @@ Serve static file for L<Mojolicious::Controller> object.
 Get L<Mojo::Asset::File> or L<Mojo::Asset::Memory> object for a file, relative
 to C<paths> or from C<classes>.
 
+  my $content = $static->file('foo/bar.html')->slurp;
+
 =head2 C<serve>
 
   my $success = $static->serve(Mojolicious::Controller->new, 'foo/bar.html');
@@ -199,8 +201,8 @@ Serve a specific file, relative to C<paths> or from C<classes>.
 
   $static->serve_asset(Mojolicious::Controller->new, Mojo::Asset::File->new);
 
-Serve a L<Mojo::Asset::File> or L<Mojo::Asset::Memory> object with range and
-last modified support.
+Serve a L<Mojo::Asset::File> or L<Mojo::Asset::Memory> object with C<Range>
+and C<If-Modified-Since> support.
 
 =head1 SEE ALSO
 
