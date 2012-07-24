@@ -179,6 +179,8 @@ sub prepend_content {
   return $self;
 }
 
+sub remove { shift->replace('') }
+
 sub replace {
   my ($self, $new) = @_;
 
@@ -412,8 +414,8 @@ Mojo::DOM - Minimalistic HTML5/XML DOM parser with CSS3 selectors
   my $dom = Mojo::DOM->new('<div><p id="a">A</p><p id="b">B</p></div>');
 
   # Find
-  my $b = $dom->at('#b');
-  say $b->text;
+  say $dom->at('#b')->text;
+  say $dom->find('p')->pluck('text');
 
   # Walk
   say $dom->div->p->[0]->text;
@@ -572,11 +574,11 @@ selectors from L<Mojo::DOM::CSS> are supported.
 
 Find element namespace.
 
-   # Find namespace for an element with namespace prefix
-   my $namespace = $dom->at('svg > svg\:circle')->namespace;
+  # Find namespace for an element with namespace prefix
+  my $namespace = $dom->at('svg > svg\:circle')->namespace;
 
-   # Find namespace for an element that may or may not have a namespace prefix
-   my $namespace = $dom->at('svg > circle')->namespace;
+  # Find namespace for an element that may or may not have a namespace prefix
+  my $namespace = $dom->at('svg > circle')->namespace;
 
 =head2 C<parent>
 
@@ -610,6 +612,15 @@ Prepend to element content.
 
   # "<div><h2>AB</h2></div>"
   $dom->parse('<div><h2>B</h2></div>')->at('h2')->prepend_content('A')->root;
+
+=head2 C<remove>
+
+  my $old = $dom->remove;
+
+Remove element.
+
+  # "<div></div>"
+  $dom->parse('<div><h1>A</h1></div>')->at('h1')->remove->root;
 
 =head2 C<replace>
 
@@ -686,6 +697,7 @@ is enabled by default.
 =head2 C<to_xml>
 
   my $xml = $dom->to_xml;
+  my $xml = "$dom";
 
 Render this element and its content to XML. Note that the XML will be encoded
 if a C<charset> has been defined.

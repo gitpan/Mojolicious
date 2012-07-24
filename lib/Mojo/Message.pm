@@ -20,8 +20,6 @@ has version          => '1.1';
 # "I'll keep it short and sweet. Family. Religion. Friendship.
 #  These are the three demons you must slay if you wish to succeed in
 #  business."
-sub at_least_version { shift->version >= shift }
-
 sub body {
   my $self = shift;
 
@@ -51,7 +49,7 @@ sub body_params {
   return $self->{body_params} if $self->{body_params};
 
   # Charset
-  my $p = Mojo::Parameters->new;
+  my $p = $self->{body_params} = Mojo::Parameters->new;
   $p->charset($self->content->charset || $self->default_charset);
 
   # "x-application-urlencoded" and "application/x-www-form-urlencoded"
@@ -76,7 +74,7 @@ sub body_params {
     }
   }
 
-  return $self->{body_params} = $p;
+  return $p;
 }
 
 sub body_size { shift->content->body_size }
@@ -91,30 +89,9 @@ sub build_start_line { shift->_build('get_start_line_chunk') }
 
 sub cookie {
   my ($self, $name) = @_;
-
-  # Map
-  unless ($self->{cookies}) {
-    my $cookies = $self->{cookies} = {};
-    for my $cookie (@{$self->cookies}) {
-      my $cookie_name = $cookie->name;
-
-      # Multiple cookies with same name
-      if (exists $cookies->{$cookie_name}) {
-        $cookies->{$cookie_name} = [$cookies->{$cookie_name}]
-          unless ref $cookies->{$cookie_name} eq 'ARRAY';
-        push @{$cookies->{$cookie_name}}, $cookie;
-      }
-
-      # Cookie
-      else { $cookies->{$cookie_name} = $cookie }
-    }
-  }
-
-  # Multiple
-  my $cookies = $self->{cookies}{$name};
-  my @cookies;
-  @cookies = ref $cookies eq 'ARRAY' ? @$cookies : ($cookies) if $cookies;
-
+  $self->{cookies} ||= _nest($self->cookies);
+  return unless my $cookies = $self->{cookies}{$name};
+  my @cookies = ref $cookies eq 'ARRAY' ? @$cookies : ($cookies);
   return wantarray ? @cookies : $cookies[0];
 }
 
@@ -122,10 +99,12 @@ sub cookies { croak 'Method "cookies" not implemented by subclass' }
 
 sub dom {
   my $self = shift;
+
   return if $self->is_multipart;
-  my $dom = Mojo::DOM->new;
-  $dom->charset($self->content->charset);
-  $dom->parse($self->body);
+  my $dom = $self->{dom}
+    ||= Mojo::DOM->new->charset($self->content->charset // undef)
+    ->parse($self->body);
+
   return @_ ? $dom->find(@_) : $dom;
 }
 
@@ -154,10 +133,9 @@ sub error {
 sub fix_headers {
   my $self = shift;
 
-  # Content-Length header or connection close is required in HTTP 1.0
-  # unless the chunked transfer encoding is used
-  return $self
-    if $self->{fix}++ || !$self->at_least_version('1.0') || $self->is_chunked;
+  # Content-Length header or connection close is required unless the chunked
+  # transfer encoding is used
+  return $self if $self->{fix}++ || $self->is_chunked;
   my $headers = $self->headers;
   $self->is_dynamic
     ? $headers->connection('close')
@@ -186,13 +164,7 @@ sub get_body_chunk {
 
 sub get_header_chunk {
   my ($self, $offset) = @_;
-
-  # Progress
   $self->emit(progress => 'headers', $offset);
-
-  # HTTP 0.9 has no headers
-  return '' if $self->version eq '0.9';
-
   return $self->fix_headers->content->get_header_chunk($offset);
 }
 
@@ -218,8 +190,8 @@ sub is_multipart { shift->content->is_multipart }
 sub json {
   my ($self, $pointer) = @_;
   return if $self->is_multipart;
-  my $data = Mojo::JSON->new->decode($self->body);
-  return $pointer ? Mojo::JSON::Pointer->get($data, $pointer) : $data;
+  my $data = $self->{json} ||= Mojo::JSON->new->decode($self->body);
+  return $pointer ? Mojo::JSON::Pointer->new->get($data, $pointer) : $data;
 }
 
 # DEPRECATED in Rainbow!
@@ -232,10 +204,7 @@ sub leftovers { shift->content->leftovers }
 
 sub max_line_size { shift->headers->max_line_size(@_) }
 
-sub param {
-  my $self = shift;
-  return ($self->{body_params} ||= $self->body_params)->param(@_);
-}
+sub param { shift->body_params->param(@_) }
 
 sub parse            { shift->_parse(0, @_) }
 sub parse_until_body { shift->_parse(1, @_) }
@@ -249,30 +218,9 @@ sub to_string {
 
 sub upload {
   my ($self, $name) = @_;
-
-  # Map
-  unless ($self->{uploads}) {
-    my $uploads = $self->{uploads} = {};
-    for my $upload (@{$self->uploads}) {
-      my $uname = $upload->name;
-
-      # Multiple uploads with same name
-      if (exists $uploads->{$uname}) {
-        $uploads->{$uname} = [$uploads->{$uname}]
-          unless ref $uploads->{$uname} eq 'ARRAY';
-        push @{$uploads->{$uname}}, $upload;
-      }
-
-      # Upload
-      else { $uploads->{$uname} = $upload }
-    }
-  }
-
-  # Multiple
-  my $uploads = $self->{uploads}{$name};
-  my @uploads;
-  @uploads = ref $uploads eq 'ARRAY' ? @$uploads : ($uploads) if $uploads;
-
+  $self->{uploads} ||= _nest($self->uploads);
+  return unless my $uploads = $self->{uploads}{$name};
+  my @uploads = ref $uploads eq 'ARRAY' ? @$uploads : ($uploads);
   return wantarray ? @uploads : $uploads[0];
 }
 
@@ -332,6 +280,27 @@ sub _build {
 
 sub _build_start_line {''}
 
+sub _nest {
+  my $array = shift;
+
+  # Turn array of objects into hash
+  my $hash = {};
+  for my $object (@$array) {
+    my $name = $object->name;
+
+    # Multiple objects with same name
+    if (exists $hash->{$name}) {
+      $hash->{$name} = [$hash->{$name}] unless ref $hash->{$name} eq 'ARRAY';
+      push @{$hash->{$name}}, $object;
+    }
+
+    # Single object
+    else { $hash->{$name} = $object }
+  }
+
+  return $hash;
+}
+
 sub _parse {
   my ($self, $until_body, $chunk) = @_;
 
@@ -368,11 +337,6 @@ sub _parse {
     # CGI
     elsif ($self->{state} eq 'body') {
       $self->content($content->parse_body($buffer));
-    }
-
-    # HTTP 0.9
-    elsif ($self->version eq '0.9') {
-      $self->content($content->parse_body_once($buffer));
     }
 
     # Parse
@@ -546,12 +510,6 @@ HTTP version of message.
 L<Mojo::Message> inherits all methods from L<Mojo::EventEmitter> and
 implements the following new ones.
 
-=head2 C<at_least_version>
-
-  my $success = $message->at_least_version('1.1');
-
-Check if message is at least a specific version.
-
 =head2 C<body>
 
   my $string = $message->body;
@@ -574,6 +532,7 @@ C<application/x-www-form-urlencoded> or C<multipart/form-data> message body,
 usually a L<Mojo::Parameters> object. Note that this method caches all data,
 so it should not be called before the entire message body has been received.
 
+  # Get POST parameter value
   say $message->body_params->param('foo');
 
 =head2 C<body_size>
@@ -609,6 +568,7 @@ Access message cookies, usually L<Mojo::Cookie::Request> or
 L<Mojo::Cookie::Response> objects. Note that this method caches all data, so
 it should not be called before all headers have been received.
 
+  # Get cookie value
   say $message->cookie('foo')->value;
 
 =head2 C<cookies>
@@ -623,7 +583,9 @@ Access message cookies, meant to be overloaded in a subclass.
   my $collection = $message->dom('a[href]');
 
 Turns message body into a L<Mojo::DOM> object and takes an optional selector
-to perform a C<find> on it right away, which returns a collection.
+to perform a C<find> on it right away, which returns a L<Mojo::Collection>
+object. Note that this method caches all data, so it should not be called
+before the entire message body has been received.
 
   # Perform "find" right away
   say $message->dom('h1, h2, h3')->pluck('text');
@@ -723,8 +685,10 @@ Alias for L<Mojo::Content/"is_multipart">.
 
 Decode JSON message body directly using L<Mojo::JSON> if possible, returns
 C<undef> otherwise. An optional JSON Pointer can be used to extract a specific
-value with L<Mojo::JSON::Pointer>.
+value with L<Mojo::JSON::Pointer>. Note that this method caches all data, so
+it should not be called before the entire message body has been received.
 
+  # Extract JSON values
   say $message->json->{foo}{bar}[23];
   say $message->json('/foo/bar/23');
 
@@ -759,7 +723,7 @@ Parse message chunk.
 
   $message = $message->parse_until_body('HTTP/1.1 200 OK...');
 
-Parse message chunk until the body is reached.
+Parse message chunk and stop after headers.
 
 =head2 C<start_line_size>
 
@@ -782,6 +746,7 @@ Access C<multipart/form-data> file uploads, usually L<Mojo::Upload> objects.
 Note that this method caches all data, so it should not be called before the
 entire message body has been received.
 
+  # Get content of uploaded file
   say $message->upload('foo')->asset->slurp;
 
 =head2 C<uploads>
@@ -789,8 +754,6 @@ entire message body has been received.
   my $uploads = $message->uploads;
 
 All C<multipart/form-data> file uploads, usually L<Mojo::Upload> objects.
-
-  say $message->uploads->[2]->filename;
 
 =head2 C<write>
 

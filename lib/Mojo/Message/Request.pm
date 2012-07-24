@@ -93,15 +93,12 @@ sub is_xhr {
   (shift->headers->header('X-Requested-With') || '') =~ /XMLHttpRequest/i;
 }
 
-sub param {
-  my $self = shift;
-  return ($self->{params} ||= $self->params)->param(@_);
-}
+sub param { shift->params->param(@_) }
 
 sub params {
   my $self = shift;
-  my $p    = Mojo::Parameters->new;
-  return $p->merge($self->body_params, $self->query_params);
+  return $self->{params}
+    ||= Mojo::Parameters->new->merge($self->body_params, $self->query_params);
 }
 
 sub parse {
@@ -187,12 +184,7 @@ sub _build_start_line {
       || ($url->scheme || '') eq 'https';
   }
 
-  # HTTP 0.9
-  my $version = $self->version;
-  return "$method $path\x0d\x0a" if $version eq '0.9';
-
-  # HTTP 1.0 and above
-  return "$method $path HTTP/$version\x0d\x0a";
+  return "$method $path HTTP/@{[$self->version]}\x0d\x0a";
 }
 
 sub _parse_basic_auth {
@@ -286,16 +278,9 @@ sub _parse_start_line {
   # We have a (hopefully) full request line
   return $self->error('Bad request start line', 400)
     unless $line =~ $START_LINE_RE;
-  $self->method($1);
-  my $url = $self->url;
+  my $url = $self->method($1)->version($3)->url;
   $1 eq 'CONNECT' ? $url->authority($2) : $url->parse($2);
-
-  # HTTP 0.9 is identified by the missing version
   $self->{state} = 'content';
-  return $self->version($3) if defined $3;
-  $self->version('0.9');
-  $self->{state}  = 'finished';
-  $self->{buffer} = '';
 }
 
 1;
@@ -363,7 +348,8 @@ HTTP request method, defaults to C<GET>.
 
 HTTP request URL, defaults to a L<Mojo::URL> object.
 
-  my $foo = $req->url->query->to_hash->{foo};
+  # Get request path
+  say $req->url->path;
 
 =head1 METHODS
 
@@ -383,8 +369,6 @@ Clone request if possible, otherwise return C<undef>.
   $req        = $req->cookies({name => 'foo', value => 'bar'});
 
 Access request cookies, usually L<Mojo::Cookie::Request> objects.
-
-  say $req->cookies->[1]->value;
 
 =head2 C<fix_headers>
 
@@ -417,8 +401,11 @@ so it should not be called before the entire request body has been received.
 
   my $p = $req->params;
 
-All C<GET> and C<POST> parameters, usually a L<Mojo::Parameters> object.
+All C<GET> and C<POST> parameters, usually a L<Mojo::Parameters> object. Note
+that this method caches all data, so it should not be called before the entire
+request body has been received.
 
+  # Get parameter value
   say $req->params->param('foo');
 
 =head2 C<parse>
@@ -446,7 +433,8 @@ Proxy URL for request.
 
 All C<GET> parameters, usually a L<Mojo::Parameters> object.
 
-  say $req->query_params->to_hash->{'foo'};
+  # Turn GET parameters to hash and extract value
+  say $req->query_params->to_hash->{foo};
 
 =head1 SEE ALSO
 
