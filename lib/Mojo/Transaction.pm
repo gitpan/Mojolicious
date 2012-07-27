@@ -28,7 +28,7 @@ sub error {
   return $res->error ? $res->error : undef;
 }
 
-sub is_finished { (shift->{state} || '') eq 'finished' }
+sub is_finished { shift->{state} ~~ 'finished' }
 
 sub is_websocket {undef}
 
@@ -49,8 +49,8 @@ sub remote_address {
   # Reverse proxy
   if ($ENV{MOJO_REVERSE_PROXY}) {
     return $self->{forwarded_for} if $self->{forwarded_for};
-    ($self->req->headers->header('X-Forwarded-For') || '') =~ /([^,\s]+)$/
-      and return $self->{forwarded_for} = $1;
+    my $forwarded = $self->req->headers->header('X-Forwarded-For') || '';
+    $forwarded =~ /([^,\s]+)$/ and return $self->{forwarded_for} = $1;
   }
 
   return $self->{remote_address};
@@ -58,7 +58,7 @@ sub remote_address {
 
 sub resume {
   my $self = shift;
-  if (($self->{state} || '') eq 'paused') { $self->{state} = 'write_body' }
+  if ($self->{state} ~~ 'paused') { $self->{state} = 'write_body' }
   elsif (!$self->is_writing) { $self->{state} = 'write' }
   return $self->emit('resume');
 }

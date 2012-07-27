@@ -58,7 +58,7 @@ sub contains {
     return unless $part eq $try;
   }
 
-  return @$parts ? undef : 1;
+  return !@$parts;
 }
 
 sub merge {
@@ -122,7 +122,7 @@ Mojo::Path - Path
 
   my $path = Mojo::Path->new('/foo%2Fbar%3B/baz.html');
   shift @{$path->parts};
-  say $path;
+  say "$path";
 
 =head1 DESCRIPTION
 

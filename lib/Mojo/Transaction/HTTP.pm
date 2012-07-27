@@ -26,7 +26,7 @@ sub client_read {
   }
 
   # Unexpected 100 Continue
-  if ($self->{state} eq 'finished' && ($res->code || '') eq '100') {
+  if ($self->{state} eq 'finished' && $res->code ~~ 100) {
     $self->res($res->new);
     $self->{state} = $preserved;
   }
@@ -81,7 +81,7 @@ sub keep_alive {
   return 1 if $req_conn eq 'keep-alive' || $res_conn eq 'keep-alive';
 
   # No keep alive for 1.0
-  return $req->version eq '1.0' || $res->version eq '1.0' ? undef : 1;
+  return !($req->version eq '1.0' || $res->version eq '1.0');
 }
 
 sub server_leftovers {
@@ -255,7 +255,23 @@ Mojo::Transaction::HTTP - HTTP 1.1 transaction container
 
   use Mojo::Transaction::HTTP;
 
+  # Client
   my $tx = Mojo::Transaction::HTTP->new;
+  $tx->req->method('GET');
+  $tx->req->url->parse('http://mojolicio.us');
+  $tx->req->headers->accept('application/json');
+  say $tx->res->code;
+  say $tx->res->headers->content_type;
+  say $tx->res->body;
+
+  # Server
+  my $tx = Mojo::Transaction::HTTP->new;
+  say $tx->req->method;
+  say $tx->req->url->to_abs;
+  say $tx->req->headers->accept;
+  $tx->res->code(200);
+  $tx->res->headers->content_type('text/plain');
+  $tx->res->body('Hello World!');
 
 =head1 DESCRIPTION
 

@@ -79,7 +79,7 @@ sub ihost {
     $host;
 }
 
-sub is_abs { shift->scheme }
+sub is_abs { !!shift->scheme }
 
 sub parse {
   my ($self, $url) = @_;
@@ -264,7 +264,7 @@ Mojo::URL - Uniform Resource Locator
   $url->path('baz');
   $url->query->param(foo => 'bar');
   $url->fragment(23);
-  say $url;
+  say "$url";
 
 =head1 DESCRIPTION
 

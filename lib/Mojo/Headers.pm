@@ -78,9 +78,9 @@ sub header {
   return @$headers;
 }
 
-sub is_finished { (shift->{state} || '') eq 'finished' }
+sub is_finished { shift->{state} ~~ 'finished' }
 
-sub is_limit_exceeded { shift->{limit} }
+sub is_limit_exceeded { !!shift->{limit} }
 
 sub leftovers { delete shift->{buffer} }
 
@@ -183,9 +183,15 @@ Mojo::Headers - Headers
 
   use Mojo::Headers;
 
+  # Parse
   my $headers = Mojo::Headers->new;
-  $headers->content_type('text/plain');
   $headers->parse("Content-Type: text/html\n\n");
+  say $headers->content_type;
+
+  # Build
+  my $headers = Mojo::Headers->new;
+  $headers->content_length(9001);
+  say $headers->to_string;
 
 =head1 DESCRIPTION
 

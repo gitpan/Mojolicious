@@ -84,7 +84,7 @@ sub build_frame {
 sub client_challenge {
   my $self = shift;
   return $self->_challenge($self->req->headers->sec_websocket_key) eq
-    $self->res->headers->sec_websocket_accept ? 1 : undef;
+    $self->res->headers->sec_websocket_accept;
 }
 
 sub client_handshake {
@@ -223,8 +223,8 @@ sub server_handshake {
   my $res_headers = $self->res->code(101)->headers;
   $res_headers->upgrade('websocket')->connection('Upgrade');
   my $req_headers = $self->req->headers;
-  ($req_headers->sec_websocket_protocol || '') =~ /^\s*([^,]+)/;
-  $res_headers->sec_websocket_protocol($1) if $1;
+  ($req_headers->sec_websocket_protocol || '') =~ /^\s*([^,]+)/
+    and $res_headers->sec_websocket_protocol($1);
   $res_headers->sec_websocket_accept(
     $self->_challenge($req_headers->sec_websocket_key));
 }
@@ -306,7 +306,13 @@ Mojo::Transaction::WebSocket - WebSocket transaction container
 
   use Mojo::Transaction::WebSocket;
 
+  # Send and receive WebSocket messages
   my $ws = Mojo::Transaction::WebSocket->new;
+  $ws->send('Hello World!');
+  $ws->on(message => sub {
+    my ($ws, $message) = @_;
+    say "Message: $message";
+  });
 
 =head1 DESCRIPTION
 
