@@ -195,7 +195,7 @@ Mojo::Headers - Headers
 
 =head1 DESCRIPTION
 
-L<Mojo::Headers> is a container and parser for HTTP headers.
+L<Mojo::Headers> is a container for HTTP headers.
 
 =head1 ATTRIBUTES
 
@@ -348,6 +348,7 @@ Shortcut for the C<Expires> header.
 =head2 C<from_hash>
 
   $headers = $headers->from_hash({'Content-Type' => 'text/html'});
+  $headers = $headers->from_hash({});
 
 Parse headers from a hash reference.
 
@@ -528,7 +529,7 @@ line values are disabled by default.
 
   my $string = $headers->to_string;
 
-Turn headers into a string, suitable for HTTP 1.1 messages.
+Turn headers into a string, suitable for HTTP messages.
 
 =head2 C<trailer>
 

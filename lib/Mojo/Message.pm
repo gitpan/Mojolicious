@@ -416,7 +416,7 @@ sub _parse_start_line { }
 
 =head1 NAME
 
-Mojo::Message - HTTP 1.1 message base class
+Mojo::Message - HTTP message base class
 
 =head1 SYNOPSIS
 
@@ -424,8 +424,8 @@ Mojo::Message - HTTP 1.1 message base class
 
 =head1 DESCRIPTION
 
-L<Mojo::Message> is an abstract base class for HTTP 1.1 messages as described
-in RFC 2616 and RFC 2388.
+L<Mojo::Message> is an abstract base class for HTTP messages as described in
+RFC 2616 and RFC 2388.
 
 =head1 EVENTS
 
@@ -478,7 +478,7 @@ L<Mojo::Message> implements the following attributes.
   my $message = $message->content;
   $message    = $message->content(Mojo::Content::Single->new);
 
-Content container, defaults to a L<Mojo::Content::Single> object.
+Message content, defaults to a L<Mojo::Content::Single> object.
 
 =head2 C<default_charset>
 

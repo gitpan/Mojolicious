@@ -801,7 +801,7 @@ variable.
 
 =head2 User agent
 
-With L<Mojolicious::Controller/"ua"> there's a full featured HTTP 1.1 and
+With L<Mojolicious::Controller/"ua"> there's a full featured HTTP and
 WebSocket user agent built right in. Especially in combination with
 L<Mojo::JSON> and L<Mojo::DOM> this can be a very powerful tool.
 
@@ -890,10 +890,14 @@ change the application log level directly in your test files.
 
 =head2 Mode
 
-To disable debug messages later in a production setup you can change the
-L<Mojolicious> mode, default will be C<development>.
+To disable debug messages later in a production setup, you can change the
+L<Mojolicious> operating mode with command line options or the C<MOJO_MODE>
+environment variable, the default will usually be C<development>.
 
-  $ ./myapp.pl -m production
+  $ ./myapp.pl daemon -m production
+
+This also affects many other aspects of the framework, such as mode specific
+C<exception> and C<not_found> templates.
 
 =head2 Logging
 
