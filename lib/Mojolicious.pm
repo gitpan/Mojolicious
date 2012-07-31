@@ -34,7 +34,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Rainbow';
-our $VERSION  = '3.15';
+our $VERSION  = '3.16';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -86,14 +86,7 @@ sub new {
   $self->plugin($_) for qw(EPLRenderer EPRenderer RequestTimer PoweredBy);
 
   # Exception handling
-  $self->hook(
-    around_dispatch => sub {
-      my ($next, $c) = @_;
-      local $SIG{__DIE__}
-        = sub { ref $_[0] ? CORE::die($_[0]) : Mojo::Exception->throw(@_) };
-      $c->render_exception($@) unless eval { $next->(); 1 };
-    }
-  );
+  $self->hook(around_dispatch => \&_exception);
 
   # Reduced log output outside of development mode
   $self->log->level('info') unless $mode eq 'development';
@@ -155,15 +148,8 @@ sub handler {
   weaken $c->{tx};
 
   # Dispatcher
-  unless ($self->{dispatch}) {
-    $self->hook(
-      around_dispatch => sub {
-        my ($next, $c) = @_;
-        $c->app->dispatch($c);
-      }
-    );
-    $self->{dispatch}++;
-  }
+  ++$self->{dispatch} and $self->hook(around_dispatch => \&_dispatch)
+    unless $self->{dispatch};
 
   # Process
   unless (eval { $self->plugins->emit_chain(around_dispatch => $c) }) {
@@ -182,7 +168,7 @@ sub helper {
   my $r = $self->renderer;
   $self->log->debug(qq{Helper "$name" already exists, replacing.})
     if exists $r->helpers->{$name};
-  $r->add_helper($name, @_);
+  $r->add_helper($name => @_);
 }
 
 # "He knows when you are sleeping.
@@ -202,6 +188,18 @@ sub plugin {
 sub start { ($ENV{MOJO_APP} = shift)->commands->start(@_) }
 
 sub startup { }
+
+sub _dispatch {
+  my ($next, $c) = @_;
+  $c->app->dispatch($c);
+}
+
+sub _exception {
+  my ($next, $c) = @_;
+  local $SIG{__DIE__}
+    = sub { ref $_[0] ? CORE::die($_[0]) : Mojo::Exception->throw(@_) };
+  $c->render_exception($@) unless eval { $next->(); 1 };
+}
 
 1;
 
@@ -228,7 +226,7 @@ Mojolicious - Real-time web framework
   # Action
   sub hello {
     my $self = shift;
-    $self->render_text('Hello World!');
+    $self->render(text => 'Hello World!');
   }
 
 =head1 DESCRIPTION

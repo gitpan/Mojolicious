@@ -6,6 +6,7 @@ use Cwd 'getcwd';
 use File::Basename 'dirname';
 use File::Path 'mkpath';
 use File::Spec::Functions qw(catdir catfile);
+use Getopt::Long qw(GetOptions :config no_auto_abbrev no_ignore_case);
 use Mojo::Loader;
 use Mojo::Server;
 use Mojo::Template;
@@ -91,6 +92,13 @@ sub write_rel_file {
   $self->write_file($self->rel_file($path), $data);
 }
 
+sub _options {
+  my ($self, $args) = (shift, shift);
+  local @ARGV = @$args;
+  GetOptions @_;
+  @$args = @ARGV;
+}
+
 1;
 
 =head1 NAME
@@ -101,12 +109,7 @@ Mojolicious::Command - Command base class
 
   # Lower case command name
   package Mojolicious::Command::mycommand;
-
-  # Subclass
   use Mojo::Base 'Mojolicious::Command';
-
-  # Take care of command line options
-  use Getopt::Long 'GetOptions';
 
   # Short description
   has description => "My first Mojo command.\n";
@@ -121,11 +124,7 @@ Mojolicious::Command - Command base class
 
   # <suitable Futurama quote here>
   sub run {
-    my $self = shift;
-
-    # Handle options
-    local @ARGV = @_;
-    GetOptions('s|something' => sub { $something = 1 });
+    my ($self, @args) = @_;
 
     # Magic here! :)
   }
