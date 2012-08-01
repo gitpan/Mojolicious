@@ -65,8 +65,7 @@ sub get_header_chunk {
       = $headers ? "$headers\x0d\x0a\x0d\x0a" : "\x0d\x0a";
   }
 
-  return substr $self->{header_buffer}, $offset,
-    $ENV{MOJO_CHUNK_SIZE} || 131072;
+  return substr $self->{header_buffer}, $offset, 131072;
 }
 
 sub has_leftovers { !!length(shift->{buffer} || '') }
@@ -251,7 +250,7 @@ sub _build_chunk {
   return "\x0d\x0a0\x0d\x0a\x0d\x0a" if length $chunk == 0;
 
   # First chunk has no leading CRLF
-  my $crlf = $self->{chunks}++ ? '' : "\x0d\x0a";
+  my $crlf = $self->{chunks}++ ? "\x0d\x0a" : '';
   return $crlf . sprintf('%x', length $chunk) . "\x0d\x0a$chunk";
 }
 
@@ -339,7 +338,12 @@ Mojo::Content - HTTP content base class
 
 =head1 SYNOPSIS
 
+  package Mojo::Content::MyContent;
   use Mojo::Base 'Mojo::Content';
+
+  sub body_contains  {...}
+  sub body_size      {...}
+  sub get_body_chunk {...}
 
 =head1 DESCRIPTION
 
