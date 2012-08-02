@@ -34,7 +34,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Rainbow';
-our $VERSION  = '3.18';
+our $VERSION  = '3.19';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -438,7 +438,8 @@ and the application object, as well as a function in C<ep> templates.
 
   $app->hook(after_dispatch => sub {...});
 
-Extend L<Mojolicious> with hooks.
+Extend L<Mojolicious> with hooks, which allow code to be shared with all
+requests indiscriminately.
 
   # Dispatchers will not run if there's already a response code defined
   $app->hook(before_dispatch => sub {
