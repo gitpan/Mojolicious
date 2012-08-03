@@ -109,12 +109,6 @@ sub dom {
   return @_ ? $dom->find(@_) : $dom;
 }
 
-# DEPRECATED in Rainbow!
-sub dom_class {
-  warn "Mojo::Message->dom_class is DEPRECATED!\n";
-  return @_ > 1 ? shift : 'Mojo::DOM';
-}
-
 sub error {
   my $self = shift;
 
@@ -129,6 +123,10 @@ sub error {
   $self->{state} = 'finished';
 
   return $self;
+}
+
+sub extract_start_line {
+  croak 'Method "extract_start_line" not implemented by subclass';
 }
 
 sub fix_headers {
@@ -170,10 +168,7 @@ sub get_header_chunk {
 }
 
 sub get_start_line_chunk {
-  my ($self, $offset) = @_;
-  $self->emit(progress => 'start_line', $offset);
-  return substr $self->{start_line_buffer} //= $self->_build_start_line,
-    $offset, 131072;
+  croak 'Method "get_start_line_chunk" not implemented by subclass';
 }
 
 sub has_leftovers { shift->content->has_leftovers }
@@ -197,18 +192,13 @@ sub json {
   return $pointer ? Mojo::JSON::Pointer->new->get($data, $pointer) : $data;
 }
 
-# DEPRECATED in Rainbow!
-sub json_class {
-  warn "Mojo::Message->json_class is DEPRECATED!\n";
-  return @_ > 1 ? shift : 'Mojo::JSON';
-}
-
 sub leftovers { shift->content->leftovers }
 
 sub param { shift->body_params->param(@_) }
 
-sub parse            { shift->_parse(0, @_) }
-sub parse_until_body { shift->_parse(1, @_) }
+sub parse { shift->_parse(parse => @_) }
+
+sub parse_until_body { shift->_parse(parse_until_body => @_) }
 
 sub start_line_size { length shift->build_start_line }
 
@@ -268,17 +258,15 @@ sub _build {
     next unless defined(my $chunk = $self->$method($offset));
 
     # End of part
-    last unless length $chunk;
+    last unless my $len = length $chunk;
 
     # Part
-    $offset += length $chunk;
+    $offset += $len;
     $buffer .= $chunk;
   }
 
   return $buffer;
 }
-
-sub _build_start_line {''}
 
 sub _nest {
   my $array = shift;
@@ -302,11 +290,10 @@ sub _nest {
 }
 
 sub _parse {
-  my ($self, $until_body, $chunk) = @_;
+  my ($self, $method, $chunk) = @_;
 
   # Add chunk
-  $chunk //= '';
-  $self->{raw_size} += length $chunk;
+  $self->{raw_size} += length($chunk //= '');
   $self->{buffer} .= $chunk;
 
   # Check message size
@@ -322,26 +309,13 @@ sub _parse {
     return $self->error('Maximum line size exceeded', 431)
       if $len > $self->max_line_size;
 
-    # Parse
-    $self->_parse_start_line;
+    # Extract
+    $self->{state} = 'content' if $self->extract_start_line(\$self->{buffer});
   }
 
   # Content
-  if ($self->{state} ~~ [qw(body content finished)]) {
-
-    # Until body
-    my $content = $self->content;
-    my $buffer  = delete $self->{buffer};
-    if ($until_body) { $self->content($content->parse_until_body($buffer)) }
-
-    # CGI
-    elsif ($self->{state} eq 'body') {
-      $self->content($content->parse_body($buffer));
-    }
-
-    # Parse
-    else { $self->content($content->parse($buffer)) }
-  }
+  $self->content($self->content->$method(delete $self->{buffer}))
+    if $self->{state} ~~ [qw(content finished)];
 
   # Check line size
   return $self->error('Maximum line size exceeded', 431)
@@ -410,11 +384,8 @@ sub _parse_formdata {
   return \@formdata;
 }
 
-sub _parse_start_line { shift->{state} = 'content' }
-
 sub _write {
   my ($self, $method, $chunk, $cb) = @_;
-  ($cb, $chunk) = ($chunk, undef) if ref $chunk eq 'CODE';
   weaken $self;
   $self->content->$method($chunk, sub { shift and $self->$cb(@_) if $cb });
   return $self;
@@ -431,7 +402,9 @@ Mojo::Message - HTTP message base class
   package Mojo::Message::MyMessage;
   use Mojo::Base 'Mojo::Message';
 
-  sub cookies {...}
+  sub cookies              {...}
+  sub extract_start_line   {...}
+  sub get_start_line_chunk {...}
 
 =head1 DESCRIPTION
 
@@ -622,6 +595,12 @@ before the entire message body has been received.
 
 Parser errors and codes.
 
+=head2 C<extract_start_line>
+
+  my $success = $message->extract_start_line(\$string);
+
+Extract start line from string. Meant to be overloaded in a subclass.
+
 =head2 C<fix_headers>
 
   $message = $message->fix_headers;
@@ -644,7 +623,8 @@ Get a chunk of header data, starting from a specific position.
 
   my $string = $message->get_start_line_chunk($offset);
 
-Get a chunk of start line data starting from a specific position.
+Get a chunk of start line data starting from a specific position. Meant to be
+overloaded in a subclass.
 
 =head2 C<has_leftovers>
 

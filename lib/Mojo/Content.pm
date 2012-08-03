@@ -105,8 +105,8 @@ sub parse {
   }
 
   # Parse chunked content
-  $self->{real_size} = 0 unless exists $self->{real_size};
-  if ($self->is_chunked && !($self->{state} ~~ 'headers')) {
+  $self->{real_size} //= 0;
+  if ($self->is_chunked && $self->{state} ne 'headers') {
     $self->_parse_chunked;
     $self->{state} = 'finished' if $self->{chunked_state} ~~ 'finished';
   }
@@ -114,9 +114,9 @@ sub parse {
   # Not chunked, pass through to second buffer
   else {
     $self->{real_size} += length $self->{pre_buffer};
-    $self->{buffer} .= $self->{pre_buffer}
-      unless $self->is_finished
+    my $limit = $self->is_finished
       && length($self->{buffer}) > $self->max_leftover_size;
+    $self->{buffer} .= $self->{pre_buffer} unless $limit;
     $self->{pre_buffer} = '';
   }
 
@@ -128,13 +128,11 @@ sub parse {
 
   # Normal content
   else {
-
     my $len = $headers->content_length || 0;
     $self->{size} ||= 0;
     if ((my $need = $len - $self->{size}) > 0) {
       my $chunk = substr $self->{buffer}, 0, $need, '';
-      $self->{size} += length $chunk;
-      $self->emit(read => $chunk);
+      $self->emit(read => $chunk)->{size} += length $chunk;
     }
 
     # Finished
@@ -154,8 +152,7 @@ sub parse_until_body {
   my ($self, $chunk) = @_;
 
   # Add chunk
-  $chunk //= '';
-  $self->{raw_size} += length $chunk;
+  $self->{raw_size} += length($chunk //= '');
   $self->{pre_buffer} .= $chunk;
 
   # Parser started
@@ -197,6 +194,8 @@ sub write {
 
   # Finish
   $self->{eof} = 1 if defined $chunk && $chunk eq '';
+
+  return $self;
 }
 
 # "Here's to alcohol, the cause of-and solution to-all life's problems."
@@ -211,6 +210,8 @@ sub write_chunk {
 
   # Finish
   $self->{eof} = 1 if defined $chunk && $chunk eq '';
+
+  return $self;
 }
 
 sub _body {
@@ -230,10 +231,10 @@ sub _build {
     next unless defined(my $chunk = $self->$method($offset));
 
     # End of part
-    last unless length $chunk;
+    last unless my $len = length $chunk;
 
     # Part
-    $offset += length $chunk;
+    $offset += $len;
     $buffer .= $chunk;
   }
 
@@ -261,7 +262,7 @@ sub _parse_chunked {
   # New chunk (ignore the chunk extension)
   while ($self->{pre_buffer} =~ /^((?:\x0d?\x0a)?([\da-fA-F]+).*\x0d?\x0a)/) {
     my $header = $1;
-    my $len    = hex($2);
+    my $len    = hex $2;
 
     # Check if we have a whole chunk yet
     last unless length($self->{pre_buffer}) >= (length($header) + $len);
@@ -292,8 +293,7 @@ sub _parse_chunked_trailing_headers {
   my $self = shift;
 
   # Parse
-  my $headers = $self->headers;
-  $headers->parse($self->{pre_buffer});
+  my $headers = $self->headers->parse($self->{pre_buffer});
   $self->{pre_buffer} = '';
 
   # Check if we are finished
@@ -313,8 +313,7 @@ sub _parse_headers {
   my $self = shift;
 
   # Parse
-  my $headers = $self->headers;
-  $headers->parse($self->{pre_buffer});
+  my $headers = $self->headers->parse($self->{pre_buffer});
   $self->{pre_buffer} = '';
 
   # Check if we are finished
@@ -571,16 +570,16 @@ Size of content already received from message in bytes.
 
 =head2 C<write>
 
-  $content->write('Hello!');
-  $content->write('Hello!', sub {...});
+  $content = $content->write('Hello!');
+  $content = $content->write('Hello!', sub {...});
 
 Write dynamic content non-blocking, the optional drain callback will be
 invoked once all data has been written.
 
 =head2 C<write_chunk>
 
-  $content->write_chunk('Hello!');
-  $content->write_chunk('Hello!', sub {...});
+  $content = $content->write_chunk('Hello!');
+  $content = $content->write_chunk('Hello!', sub {...});
 
 Write dynamic content non-blocking with C<chunked> transfer encoding, the
 optional drain callback will be invoked once all data has been written.
