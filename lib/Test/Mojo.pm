@@ -3,6 +3,7 @@ use Mojo::Base -base;
 
 use Mojo::IOLoop;
 use Mojo::Message::Response;
+use Mojo::Server;
 use Mojo::UserAgent;
 use Mojo::Util qw(decode encode);
 use Test::More ();
@@ -17,7 +18,9 @@ $ENV{MOJO_LOG_LEVEL} ||= $ENV{HARNESS_IS_VERBOSE} ? 'debug' : 'fatal';
 #  How come you guys can go to the moon but can't make my shoes smell good?"
 sub new {
   my $self = shift->SUPER::new;
-  return @_ ? $self->app(shift) : $self;
+  return $self unless my $app = shift;
+  return $self->app(
+    ref $app ? $app : Mojo::Server->new->build_app($ENV{MOJO_APP} = $app));
 }
 
 sub app {
@@ -271,18 +274,20 @@ sub text_unlike {
 sub websocket_ok {
   my ($self, $url) = (shift, shift);
 
+  # Establish WebSocket connection
   $self->{messages} = [];
   $self->{finished} = 0;
   $self->ua->websocket(
-    $url, @_,
-    sub {
-      $self->tx(my $tx = pop);
+    $url => @_ => sub {
+      my $tx = pop;
+      $self->tx($tx);
       $tx->on(finish => sub { $self->{finished} = 1 });
       $tx->on(message => sub { push @{$self->{messages}}, pop });
       Mojo::IOLoop->stop;
     }
   );
   Mojo::IOLoop->start;
+
   my $desc = encode 'UTF-8', "websocket $url";
   return $self->_test('ok', $self->tx->res->code eq 101, $desc);
 }

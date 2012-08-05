@@ -6,7 +6,7 @@ BEGIN {
   $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Poll';
 }
 
-use Test::More tests => 92;
+use Test::More tests => 100;
 
 # "The strong must protect the sweet."
 use Mojo::IOLoop;
@@ -105,6 +105,21 @@ post '/echo' => sub {
   $ENV{MOJO_REQUEST_TIMEOUT} = 0;
   is(Mojo::UserAgent->new->request_timeout, 0, 'right value');
 }
+
+# Default application
+is(Mojo::UserAgent->app,      app, 'applications are equal');
+is(Mojo::UserAgent->new->app, app, 'applications are equal');
+Mojo::UserAgent->app(app);
+is(Mojo::UserAgent->app, app, 'applications are equal');
+my $dummy = Mojolicious::Lite->new;
+isnt(Mojo::UserAgent->new->app($dummy)->app, app,
+  'applications are not equal');
+is(Mojo::UserAgent->app, app, 'applications are still equal');
+Mojo::UserAgent->app($dummy);
+isnt(Mojo::UserAgent->app, app, 'applications are not equal');
+is(Mojo::UserAgent->app, $dummy, 'application are equal');
+Mojo::UserAgent->app(app);
+is(Mojo::UserAgent->app, app, 'applications are equal again');
 
 # GET / (non-blocking)
 my $ua = Mojo::UserAgent->new(ioloop => Mojo::IOLoop->singleton);

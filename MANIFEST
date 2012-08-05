@@ -211,7 +211,6 @@ t/mojo/reactor_poll.t
 t/mojo/request.t
 t/mojo/request_cgi.t
 t/mojo/response.t
-t/mojo/server.t
 t/mojo/template.t
 t/mojo/templates/exception.mt
 t/mojo/templates/test.mt

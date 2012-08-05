@@ -45,13 +45,13 @@ sub DESTROY { shift->_cleanup }
 sub app {
   my ($self, $app) = @_;
 
-  # Try to detect application
-  $self->{app} ||= $ENV{MOJO_APP} if ref $ENV{MOJO_APP};
-  return $self->{app} unless $app;
+  # Singleton application
+  state $singleton;
+  return $singleton = $app ? $app : $singleton unless ref $self;
 
-  # Initialize application if necessary
-  $ENV{MOJO_APP} = $app unless ref $app;
-  $self->{app} = ref $app ? $app : $self->_server->app;
+  # Default to singleton application
+  return $self->{app} || $singleton unless $app;
+  $self->{app} = $app;
 
   return $self;
 }
@@ -60,7 +60,7 @@ sub app_url {
   my $self = shift;
 
   # Prepare application for testing
-  $self->_server(@_)->app($self->app);
+  $self->_server(@_);
 
   # Build absolute URL for test server
   return Mojo::URL->new("$self->{scheme}://localhost:$self->{port}/");
@@ -432,16 +432,16 @@ sub _start {
   my ($self, $tx, $cb) = @_;
 
   # Embedded server
+  my $req = $tx->req;
   if ($self->app) {
-    my $req = $tx->req;
     my $url = $req->url->to_abs;
+    $self->_server->app($self->app);
     $req->url($url->base($self->app_url)->to_abs) unless $url->host;
   }
 
   # Proxy
   $self->detect_proxy if $ENV{MOJO_PROXY};
-  my $req    = $tx->req;
-  my $url    = $req->url;
+  my $url = $req->url;
   my $scheme = $url->scheme || '';
   if ($self->need_proxy($url->host)) {
 
@@ -611,12 +611,12 @@ Mojo::UserAgent - Non-blocking I/O HTTP and WebSocket user agent
 =head1 DESCRIPTION
 
 L<Mojo::UserAgent> is a full featured non-blocking I/O HTTP and WebSocket user
-agent with C<IPv6>, C<TLS> and C<libev> support.
+agent, with C<IPv6>, C<TLS> and C<libev> support.
 
 Optional modules L<EV> (4.0+), L<IO::Socket::IP> (0.16+) and
-L<IO::Socket::SSL> (1.75+) are supported transparently and used if installed.
-Individual features can also be disabled with the C<MOJO_NO_IPV6> and
-C<MOJO_NO_TLS> environment variables.
+L<IO::Socket::SSL> (1.75+) are supported transparently through
+L<Mojo::IOLoop>, and used if installed. Individual features can also be
+disabled with the C<MOJO_NO_IPV6> and C<MOJO_NO_TLS> environment variables.
 
 See L<Mojolicious::Guides::Cookbook> for more.
 
@@ -803,12 +803,13 @@ implements the following new ones.
 
 =head2 C<app>
 
+  my $app = Mojo::UserAgent->app;
+            Mojo::UserAgent->app(MyApp->new);
   my $app = $ua->app;
-  $ua     = $ua->app('MyApp');
   $ua     = $ua->app(MyApp->new);
 
-Application relative URLs will be processed with, defaults to the value of the
-C<MOJO_APP> environment variable or a L<Mojo::HelloWorld> object.
+Application relative URLs will be processed with, instance specific
+applications override the global default.
 
   # Introspect
   say $ua->app->secret;
