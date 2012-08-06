@@ -103,7 +103,22 @@ Mojo::UserAgent::CookieJar - Cookie jar for HTTP user agents
 
   use Mojo::UserAgent::CookieJar;
 
+  # Add response cookies
   my $jar = Mojo::UserAgent::CookieJar->new;
+  $jar->add(
+    Mojo::Cookie::Response->new(
+      name   => 'foo',
+      value  => 'bar',
+      domain => 'localhost',
+      path   => '/test'
+    )
+  );
+
+  # Find request cookies
+  for my $cookie ($jar->find(Mojo::URL->new('http://localhost/test'))) {
+    say $cookie->name;
+    say $cookie->value;
+  }
 
 =head1 DESCRIPTION
 
