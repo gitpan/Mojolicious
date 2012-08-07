@@ -44,43 +44,20 @@ Mojo::IOLoop->timer(
 Mojo::IOLoop->start;
 like $err, qr/^Mojo::IOLoop already running/, 'right error';
 
-# Ticks
-my $ticks = 0;
+# Basics
+my $ticks = my $timer = my $hirestimer = 0;
 my $id = $loop->recurring(0 => sub { $ticks++ });
-
-# Timer
-my $flag = 0;
-my $flag2;
 $loop->timer(
   1 => sub {
-    my $self = shift;
-    $self->timer(
-      1 => sub {
-        shift->stop;
-        $flag2 = $flag;
-      }
-    );
-    $flag = 23;
+    shift->timer(0 => sub { shift->stop });
+    $timer++;
   }
 );
-
-# HiRes timer
-my $hiresflag = 0;
-$loop->timer(0.25 => sub { $hiresflag = 42 });
-
-# Start
+$loop->timer(0.25 => sub { $hirestimer++ });
 $loop->start;
-
-# Timer
-is $flag, 23, 'recursive timer works';
-
-# HiRes timer
-is $hiresflag, 42, 'hires timer';
-
-# Another tick
+ok $timer,      'recursive timer works';
+ok $hirestimer, 'hires timer works';
 $loop->one_tick;
-
-# Ticks
 ok $ticks > 2, 'more than two ticks';
 
 # Run again without first tick event handler
@@ -88,7 +65,7 @@ my $before = $ticks;
 my $after  = 0;
 my $id2    = $loop->recurring(0 => sub { $after++ });
 $loop->remove($id);
-$loop->timer(1 => sub { shift->stop });
+$loop->timer(0.5 => sub { shift->stop });
 $loop->start;
 $loop->one_tick;
 $loop->remove($id2);
@@ -97,8 +74,8 @@ is $ticks, $before, 'no additional ticks';
 
 # Recurring timer
 my $count = 0;
-$id = $loop->recurring(0.5 => sub { $count++ });
-$loop->timer(3 => sub { shift->stop });
+$id = $loop->recurring(0.1 => sub { $count++ });
+$loop->timer(0.5 => sub { shift->stop });
 $loop->start;
 $loop->one_tick;
 $loop->remove($id);
@@ -109,9 +86,7 @@ ok $count < 10, 'less than ten recurring events';
 my $port = Mojo::IOLoop->generate_port;
 my $handle;
 $id = $loop->server(
-  address => '127.0.0.1',
-  port    => $port,
-  sub {
+  (address => '127.0.0.1', port => $port) => sub {
     my ($loop, $stream) = @_;
     $handle = $stream->handle;
     $loop->stop;
@@ -130,9 +105,7 @@ $loop->start;
 $port = Mojo::IOLoop->generate_port;
 my $buffer = '';
 Mojo::IOLoop->server(
-  address => '127.0.0.1',
-  port    => $port,
-  sub {
+  (address => '127.0.0.1', port => $port) => sub {
     my ($loop, $stream, $id) = @_;
     $buffer .= 'accepted';
     $stream->on(
