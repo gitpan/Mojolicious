@@ -24,13 +24,13 @@ $reactor = Mojo::IOLoop->singleton->reactor;
 is ref $reactor, 'Mojo::Reactor::EV', 'right object';
 
 # Make sure it stops automatically when not watching for events
-Mojo::IOLoop->one_tick;
 my $triggered;
 Mojo::IOLoop->timer(0.25 => sub { $triggered++ });
 Mojo::IOLoop->start;
 ok $triggered, 'reactor waited for one event';
 my $time = time;
 Mojo::IOLoop->start;
+Mojo::IOLoop->one_tick;
 ok time < ($time + 3), 'stopped automatically';
 
 # Listen
@@ -156,7 +156,7 @@ ok !$writable, 'io event was not triggered again';
 my $reactor2 = Mojo::Reactor::EV->new;
 is ref $reactor2, 'Mojo::Reactor::Poll', 'right object';
 
-# Parallel loops
+# Parallel reactors
 $timer = 0;
 $reactor->recurring(0 => sub { $timer++ });
 my $timer2 = 0;
@@ -216,7 +216,7 @@ $server = $client = '';
 Mojo::IOLoop->server(
   {address => '127.0.0.1', port => $port} => sub {
     my ($loop, $stream) = @_;
-    $stream->write('test', sub { shift->write('321') });
+    $stream->write('test' => sub { shift->write('321') });
     $stream->on(read => sub { $server .= pop });
     $server_running = Mojo::IOLoop->is_running;
     eval { Mojo::IOLoop->start };
@@ -226,7 +226,7 @@ Mojo::IOLoop->server(
 Mojo::IOLoop->client(
   {port => $port} => sub {
     my ($loop, $err, $stream) = @_;
-    $stream->write('tset', sub { shift->write('123') });
+    $stream->write('tset' => sub { shift->write('123') });
     $stream->on(read => sub { $client .= pop });
     $client_running = Mojo::IOLoop->is_running;
     eval { Mojo::IOLoop->start };
