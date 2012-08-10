@@ -20,7 +20,6 @@ sub import {
 
   # No limits!
   no strict 'refs';
-  no warnings 'redefine';
 
   # Base
   if ($flag eq '-base') { $flag = $class }
@@ -72,7 +71,7 @@ sub attr {
       unless $attr =~ /^[a-zA-Z_]\w*$/;
 
     # Header (check arguments)
-    my $code = "sub {\n  if (\@_ == 1) {\n";
+    my $code = "package $class;\nsub $attr {\n  if (\@_ == 1) {\n";
 
     # No default value (return value)
     unless (defined $default) { $code .= "    return \$_[0]{'$attr'};" }
@@ -92,13 +91,12 @@ sub attr {
     $code .= "\n  }\n  \$_[0]{'$attr'} = \$_[1];\n";
 
     # Footer (return invocant)
-    $code .= "  \$_[0];\n};";
+    $code .= "  \$_[0];\n}";
 
     # We compile custom attribute code for speed
     no strict 'refs';
-    no warnings 'redefine';
-    *{"${class}::$attr"} = eval $code or Carp::croak("Mojo::Base error: $@");
     warn "-- Attribute $attr in $class\n$code\n\n" if $ENV{MOJO_BASE_DEBUG};
+    Carp::croak("Mojo::Base error: $@") unless eval "$code;1";
   }
 }
 

@@ -298,10 +298,9 @@ sub render_file {
   my $tmpl = slurp $path;
 
   # Decode and render
-  if (my $encoding = $self->encoding) {
-    croak qq{Template "$path" has invalid encoding.}
-      unless defined($tmpl = decode $encoding, $tmpl);
-  }
+  my $encoding = $self->encoding;
+  croak qq{Template "$path" has invalid encoding.}
+    if $encoding && !defined($tmpl = decode $encoding, $tmpl);
   return $self->render($tmpl, @_);
 }
 
@@ -507,7 +506,7 @@ Keyword indicating the start of a capture block, defaults to C<begin>.
   my $code = $mt->code;
   $mt      = $mt->code($code);
 
-Compiled template code.
+Template code.
 
 =head2 C<comment_mark>
 
@@ -517,6 +516,13 @@ Compiled template code.
 Character indicating the start of a comment, defaults to C<#>.
 
   <%# This is a comment %>
+
+=head2 C<compiled>
+
+  my $compiled = $mt->compiled;
+  $mt          = $mt->compiled($compiled);
+
+Compiled template code.
 
 =head2 C<encoding>
 

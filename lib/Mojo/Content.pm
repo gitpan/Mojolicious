@@ -4,7 +4,7 @@ use Mojo::Base 'Mojo::EventEmitter';
 use Carp 'croak';
 use Mojo::Headers;
 
-has [qw(auto_relax relaxed)] => 0;
+has [qw(auto_relax relaxed skip_body)];
 has headers => sub { Mojo::Headers->new };
 has max_leftover_size => sub { $ENV{MOJO_MAX_LEFTOVER_SIZE} || 262144 };
 
@@ -91,9 +91,15 @@ sub parse {
   my $self = shift;
 
   # Parse headers
-  $self->parse_until_body(@_);
+  $self->_parse_until_body(@_);
   return $self if $self->{state} eq 'headers';
   $self->_body;
+
+  # No content
+  if ($self->skip_body) {
+    $self->{state} = 'finished';
+    return $self;
+  }
 
   # Relaxed parsing
   my $headers = $self->headers;
@@ -146,29 +152,6 @@ sub parse_body {
   my $self = shift;
   $self->{state} = 'body';
   return $self->parse(@_);
-}
-
-sub parse_until_body {
-  my ($self, $chunk) = @_;
-
-  # Add chunk
-  $self->{raw_size} += length($chunk //= '');
-  $self->{pre_buffer} .= $chunk;
-
-  # Parser started
-  unless ($self->{state}) {
-
-    # Update size
-    $self->{header_size} = $self->{raw_size} - length $self->{pre_buffer};
-
-    # Headers
-    $self->{state} = 'headers';
-  }
-
-  # Parse headers
-  $self->_parse_headers if $self->{state} ~~ 'headers';
-
-  return $self;
 }
 
 sub progress {
@@ -326,6 +309,27 @@ sub _parse_headers {
   $self->_body;
 }
 
+sub _parse_until_body {
+  my ($self, $chunk) = @_;
+
+  # Add chunk
+  $self->{raw_size} += length($chunk //= '');
+  $self->{pre_buffer} .= $chunk;
+
+  # Parser started
+  unless ($self->{state}) {
+
+    # Update size
+    $self->{header_size} = $self->{raw_size} - length $self->{pre_buffer};
+
+    # Headers
+    $self->{state} = 'headers';
+  }
+
+  # Parse headers
+  $self->_parse_headers if $self->{state} ~~ 'headers';
+}
+
 1;
 
 =head1 NAME
@@ -402,7 +406,7 @@ L<Mojo::Content> implements the following attributes.
   my $relax = $content->auto_relax;
   $content  = $content->auto_relax(1);
 
-Try to detect broken web servers and turn on relaxed parsing automatically.
+Try to detect when relaxed parsing is necessary.
 
 =head2 C<headers>
 
@@ -426,6 +430,13 @@ value of the C<MOJO_MAX_LEFTOVER_SIZE> environment variable or C<262144>.
 
 Activate relaxed parsing for responses that are terminated with a connection
 close.
+
+=head2 C<skip_body>
+
+  my $skip = $content->skip_body;
+  $content = $content->skip_body(1);
+
+Skip body parsing and finish after headers.
 
 =head1 METHODS
 
@@ -553,14 +564,7 @@ Parse content chunk.
 
   $content = $content->parse_body('Hi!');
 
-Parse body chunk.
-
-=head2 C<parse_until_body>
-
-  $content
-    = $content->parse_until_body("Content-Length: 12\r\n\r\nHello World!");
-
-Parse chunk and stop after headers.
+Parse body chunk and skip headers.
 
 =head2 C<progress>
 
