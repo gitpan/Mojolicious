@@ -38,7 +38,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Rainbow';
-our $VERSION  = '3.28';
+our $VERSION  = '3.29';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -148,8 +148,7 @@ sub handler {
   @{$stash}{keys %$defaults} = values %$defaults;
   my $c
     = $self->controller_class->new(app => $self, stash => $stash, tx => $tx);
-  weaken $c->{app};
-  weaken $c->{tx};
+  weaken $c->{$_} for qw(app tx);
 
   # Dispatcher
   ++$self->{dispatch} and $self->hook(around_dispatch => \&_dispatch)

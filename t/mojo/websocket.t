@@ -61,8 +61,7 @@ get '/something/else' => sub {
 websocket '/socket' => sub {
   my $self = shift;
   $self->send(
-    $self->req->headers->host,
-    sub {
+    $self->req->headers->host => sub {
       my $self = shift;
       $self->send(Mojo::IOLoop->stream($self->tx->connection)->timeout);
       $self->finish;
@@ -295,7 +294,7 @@ $ua->websocket(
     $tx->on(
       finish => sub {
         $finished += 4;
-        $loop->timer(0 => sub { shift->stop });
+        $loop->stop;
       }
     );
   }
@@ -306,10 +305,12 @@ is $result,   'test0test1', 'right result';
 is $finished, 4,            'finished client websocket';
 is $subreq,   1,            'finished server websocket';
 
-# WebSocket /subreq (non-blocking)
-my $running = 2;
-my ($code2, $result2);
+# WebSocket /subreq (parallel)
+my $delay = Mojo::IOLoop->delay;
+$finished = 0;
 ($code, $result) = undef;
+my ($code2, $result2);
+$delay->begin;
 $ua->websocket(
   '/subreq' => sub {
     my $tx = pop;
@@ -319,13 +320,18 @@ $ua->websocket(
       message => sub {
         my ($tx, $message) = @_;
         $result .= $message;
-        $tx->finish and $running-- if $message eq 'test1';
-        $loop->timer(0.25 => sub { $loop->stop }) unless $running;
+        $tx->finish if $message eq 'test1';
       }
     );
-    $tx->on(finish => sub { $finished += 1 });
+    $tx->on(
+      finish => sub {
+        $finished += 1;
+        $delay->end;
+      }
+    );
   }
 );
+$delay->begin;
 $ua->websocket(
   '/subreq' => sub {
     my $tx = pop;
@@ -335,19 +341,23 @@ $ua->websocket(
       message => sub {
         my ($tx, $message) = @_;
         $result2 .= $message;
-        $tx->finish and $running-- if $message eq 'test1';
-        $loop->timer(0.25 => sub { $loop->stop }) unless $running;
+        $tx->finish if $message eq 'test1';
       }
     );
-    $tx->on(finish => sub { $finished += 2 });
+    $tx->on(
+      finish => sub {
+        $finished += 2;
+        $delay->end;
+      }
+    );
   }
 );
-$loop->start;
+$delay->wait;
 is $code,     101,          'right status';
 is $result,   'test0test1', 'right result';
 is $code2,    101,          'right status';
 is $result2,  'test0test1', 'right result';
-is $finished, 7,            'finished client websocket';
+is $finished, 3,            'finished client websocket';
 is $subreq,   3,            'finished server websocket';
 
 # WebSocket /echo (client-side drain callback)
@@ -372,8 +382,7 @@ $ua->websocket(
     );
     $client = 1;
     $tx->send(
-      'hi!',
-      sub {
+      'hi!' => sub {
         shift->send('there!');
         $drain
           += @{Mojo::IOLoop->stream($tx->connection)->subscribers('drain')};
