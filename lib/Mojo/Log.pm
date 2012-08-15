@@ -37,8 +37,8 @@ sub error { shift->log(error => @_) }
 sub fatal { shift->log(fatal => @_) }
 
 sub format {
-  my ($self, $level, @msgs) = @_;
-  return '[' . localtime(time) . "] [$level] " . join("\n", @msgs) . "\n";
+  my ($self, $level, @lines) = @_;
+  return '[' . localtime(time) . "] [$level] " . join("\n", @lines) . "\n";
 }
 
 sub info { shift->log(info => @_) }
@@ -110,7 +110,7 @@ L<Mojo::Log> can emit the following events.
 =head2 C<message>
 
   $log->on(message => sub {
-    my ($log, $level, @messages) = @_;
+    my ($log, $level, @lines) = @_;
     ...
   });
 
@@ -118,8 +118,8 @@ Emitted when a new message gets logged.
 
   $log->unsubscribe('message');
   $log->on(message => sub {
-    my ($log, $level, @messages) = @_;
-    say "$level: ", @messages;
+    my ($log, $level, @lines) = @_;
+    say "$level: ", @lines;
   });
 
 =head1 ATTRIBUTES
