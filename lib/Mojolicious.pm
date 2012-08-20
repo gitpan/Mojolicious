@@ -38,7 +38,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Rainbow';
-our $VERSION  = '3.31';
+our $VERSION  = '3.32';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -167,11 +167,11 @@ sub handler {
 }
 
 sub helper {
-  my ($self, $name) = (shift, shift);
+  my ($self, $name, $cb) = @_;
   my $r = $self->renderer;
   $self->log->debug(qq{Helper "$name" already exists, replacing.})
     if exists $r->helpers->{$name};
-  $r->add_helper($name => @_);
+  $r->add_helper($name => $cb);
 }
 
 # "He knows when you are sleeping.

@@ -1,5 +1,5 @@
 package Mojo::DOM;
-use Mojo::Base -strict;
+use Mojo::Base -base;
 use overload
   '%{}'    => sub { shift->attrs },
   'bool'   => sub {1},
@@ -10,6 +10,7 @@ use Carp 'croak';
 use Mojo::Collection;
 use Mojo::DOM::CSS;
 use Mojo::DOM::HTML;
+use Mojo::Util 'squish';
 use Scalar::Util qw(blessed weaken);
 
 sub AUTOLOAD {
@@ -361,16 +362,7 @@ sub _text {
     }
 
     # Text
-    elsif ($type eq 'text') {
-      $content = $e->[1];
-
-      # Trim whitespace
-      if ($trim) {
-        $content =~ s/^\s*\n+\s*//;
-        $content =~ s/\s*\n+\s*$//;
-        $content =~ s/\s*\n+\s*/\ /g;
-      }
-    }
+    elsif ($type eq 'text') { $content = $trim ? squish($e->[1]) : $e->[1] }
 
     # CDATA or raw text
     elsif ($type eq 'cdata' || $type eq 'raw') { $content = $e->[1] }
@@ -467,14 +459,15 @@ XML detection can also be disabled with the C<xml> method.
 
 =head1 METHODS
 
-L<Mojo::DOM> implements the following methods.
+L<Mojo::DOM> inherits all methods from L<Mojo::Base> and implements the
+following new ones.
 
 =head2 C<new>
 
   my $dom = Mojo::DOM->new;
   my $dom = Mojo::DOM->new('<foo bar="baz">test</foo>');
 
-Construct a new L<Mojo::DOM> object.
+Construct a new array-based L<Mojo::DOM> object.
 
 =head2 C<all_text>
 

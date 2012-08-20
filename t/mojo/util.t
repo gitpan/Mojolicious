@@ -2,7 +2,7 @@ use Mojo::Base -strict;
 
 use utf8;
 
-use Test::More tests => 143;
+use Test::More tests => 148;
 
 use File::Spec::Functions qw(catfile splitdir);
 use File::Temp 'tempdir';
@@ -13,8 +13,8 @@ use Mojo::Util
   qw(b64_decode b64_encode camelize class_to_file class_to_path decamelize),
   qw(decode encode get_line hmac_md5_sum hmac_sha1_sum html_escape),
   qw(html_unescape md5_bytes md5_sum punycode_decode punycode_encode quote),
-  qw(trim unquote secure_compare sha1_bytes sha1_sum slurp spurt url_escape),
-  qw(url_unescape xml_escape);
+  qw(squish trim unquote secure_compare sha1_bytes sha1_sum slurp spurt),
+  qw(url_escape url_unescape xml_escape);
 
 # camelize
 is camelize('foo_bar_baz'), 'FooBarBaz', 'right camelized result';
@@ -31,13 +31,15 @@ is decamelize('FooBB'),       'foo_b_b',     'right decamelized result';
 is decamelize('Foo::BB'),     'foo-b_b',     'right decamelized result';
 
 # class_to_file
-is class_to_file('Foo::Bar'), 'foo_bar', 'right file';
-is class_to_file('FooBar'),   'foo_bar', 'right file';
-is class_to_file('FOOBar'),   'foobar',  'right file';
-is class_to_file('FOOBAR'),   'foobar',  'right file';
-is class_to_file('FOO::Bar'), 'foobar',  'right file';
-is class_to_file('FooBAR'),   'foo_bar', 'right file';
-is class_to_file('Foo::BAR'), 'foo_bar', 'right file';
+is class_to_file('Foo::Bar'),     'foo_bar',     'right file';
+is class_to_file('FooBar'),       'foo_bar',     'right file';
+is class_to_file('FOOBar'),       'foobar',      'right file';
+is class_to_file('FOOBAR'),       'foobar',      'right file';
+is class_to_file('FOO::Bar'),     'foobar',      'right file';
+is class_to_file('FooBAR'),       'foo_bar',     'right file';
+is class_to_file('Foo::BAR'),     'foo_bar',     'right file';
+is class_to_file("Foo'BAR"),      'foo_bar',     'right file';
+is class_to_file("Foo'Bar::Baz"), 'foo_bar_baz', 'right file';
 
 # class_to_path
 is class_to_path('Foo::Bar'),      'Foo/Bar.pm',     'right path';
@@ -273,10 +275,16 @@ is unquote('"foo 23 \"bar"'),     'foo 23 "bar',   'right unquoted result';
 is unquote('"\"foo 23 \"bar\""'), '"foo 23 "bar"', 'right unquoted result';
 
 # trim
-is trim(' la la la '),       'la la la',   'right trimmed result';
-is trim(" \n la la la \n "), 'la la la',   'right trimmed result';
-is trim("\n la\nla la \n"),  "la\nla la",  'right trimmed result';
-is trim(" \nla\nla\nla\n "), "la\nla\nla", 'right trimmed result';
+is trim(' la la  la '),      'la la  la', 'right trimmed result';
+is trim(" \n la la la \n "), 'la la la',  'right trimmed result';
+is trim("\n la\nla la \n"),  "la\nla la", 'right trimmed result';
+is trim(" \nla \n  \t\nla\nla\n "), "la \n  \t\nla\nla",
+  'right trimmed result';
+
+# squish
+is squish(' la la  la '),             'la la la', 'right squished result';
+is squish("\n la\nla la \n"),         'la la la', 'right squished result';
+is squish(" \nla \n  \t\nla\nla\n "), 'la la la', 'right squished result';
 
 # md5_bytes
 is unpack('H*', md5_bytes(encode 'UTF-8', 'foo bar baz ♥')),

@@ -25,9 +25,7 @@ sub new {
 
 sub app {
   my ($self, $app) = @_;
-  return $self->ua->app unless $app;
-  $self->ua->app($app);
-  return $self;
+  return $app ? $self->tap(sub { $_->ua->app($app) }) : $self->ua->app;
 }
 
 sub content_is {
@@ -156,7 +154,7 @@ sub json_has {
   my ($self, $p, $desc) = @_;
   $desc ||= qq{has value for JSON Pointer "$p"};
   return $self->_test('ok',
-    Mojo::JSON::Pointer->new->contains($self->tx->res->json, $p), $desc);
+    !!Mojo::JSON::Pointer->new->contains($self->tx->res->json, $p), $desc);
 }
 
 sub json_hasnt {
@@ -194,8 +192,8 @@ sub message_unlike {
 sub options_ok { shift->_request_ok(options => @_) }
 
 sub or {
-  my ($self, $diag) = @_;
-  $self->$diag unless $self->{latest};
+  my ($self, $cb) = @_;
+  $self->$cb unless $self->{latest};
   return $self;
 }
 

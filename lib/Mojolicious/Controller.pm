@@ -372,8 +372,7 @@ sub session {
   my $self = shift;
 
   # Hash
-  my $stash = $self->stash;
-  my $session = $stash->{'mojo.session'} ||= {};
+  my $session = $self->stash->{'mojo.session'} ||= {};
   return $session unless @_;
 
   # Get
@@ -449,7 +448,8 @@ sub url_for {
   my $target = shift // '';
 
   # Absolute URL
-  return $target if Scalar::Util::blessed($target) ~~ 'Mojo::URL';
+  return $target
+    if Scalar::Util::blessed($target) && $target->isa('Mojo::URL');
   return Mojo::URL->new($target) if $target =~ m!^\w+\://!;
 
   # Base
@@ -508,20 +508,18 @@ sub _fallbacks {
   my ($self, $options, $template, $inline) = @_;
 
   # Mode specific template
-  unless ($self->render($options)) {
+  return 1 if $self->render($options);
 
-    # Template
-    $options->{template} = $template;
-    unless ($self->render($options)) {
+  # Template
+  $options->{template} = $template;
+  return 1 if $self->render($options);
 
-      # Inline template
-      my $stash = $self->stash;
-      return unless $stash->{format} eq 'html';
-      delete $stash->{$_} for qw(extends layout);
-      delete $options->{template};
-      return $self->render(%$options, inline => $inline, handler => 'ep');
-    }
-  }
+  # Inline template
+  my $stash = $self->stash;
+  return unless $stash->{format} eq 'html';
+  delete $stash->{$_} for qw(extends layout);
+  delete $options->{template};
+  return $self->render(%$options, inline => $inline, handler => 'ep');
 }
 
 1;
@@ -908,7 +906,13 @@ and stored in C<HMAC-SHA1> signed cookies. Note that cookies usually have a
   my $foo = $c->session->{foo};
   delete $c->session->{foo};
 
-  # Delete whole session
+  # Expiration date in epoch seconds from now (persists between requests)
+  $c->session(expiration => 604800);
+
+  # Expiration date as absolute epoch time (only valid for one request)
+  $c->session(expires => time + 604800);
+
+  # Delete whole session by setting an expiration date in the past
   $c->session(expires => 1);
 
 =head2 C<signed_cookie>

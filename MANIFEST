@@ -155,8 +155,6 @@ LICENSE
 Makefile.PL
 MANIFEST			This list of files
 MANIFEST.SKIP
-MYMETA.json
-MYMETA.yml
 README.pod
 script/hypnotoad
 script/mojo
@@ -191,14 +189,14 @@ t/mojo/ioloop_ipv6.t
 t/mojo/ioloop_tls.t
 t/mojo/json.t
 t/mojo/json_pointer.t
-t/mojo/lib/BaseTest/Base1.pm
-t/mojo/lib/BaseTest/Base2.pm
-t/mojo/lib/BaseTest/Base3.pm
-t/mojo/lib/LoaderException.pm
-t/mojo/lib/LoaderException2.pm
-t/mojo/lib/LoaderTest/A.pm
-t/mojo/lib/LoaderTest/B.pm
-t/mojo/lib/LoaderTest/C.pm
+t/mojo/lib/Mojo/BaseTest/Base1.pm
+t/mojo/lib/Mojo/BaseTest/Base2.pm
+t/mojo/lib/Mojo/BaseTest/Base3.pm
+t/mojo/lib/Mojo/LoaderException.pm
+t/mojo/lib/Mojo/LoaderException2.pm
+t/mojo/lib/Mojo/LoaderTest/A.pm
+t/mojo/lib/Mojo/LoaderTest/B.pm
+t/mojo/lib/Mojo/LoaderTest/C.pm
 t/mojo/loader.t
 t/mojo/log.t
 t/mojo/morbo.t
@@ -318,5 +316,4 @@ t/mojolicious/upload_stream_lite_app.t
 t/mojolicious/websocket_lite_app.t
 t/pod.t
 t/pod_coverage.t
-META.yml                                 Module YAML meta-data (added by MakeMaker)
-META.json                                Module JSON meta-data (added by MakeMaker)
+META.yml                                 Module meta-data (added by MakeMaker)

@@ -187,7 +187,7 @@ Check or get name of current route.
 
   %= dumper {some => 'data'}
 
-Dump a Perl data structure using L<Data::Dumper>.
+Dump a Perl data structure with L<Data::Dumper>.
 
 =head2 C<extends>
 
