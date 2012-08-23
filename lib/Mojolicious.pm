@@ -38,7 +38,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Rainbow';
-our $VERSION  = '3.32';
+our $VERSION  = '3.33';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -162,7 +162,7 @@ sub handler {
   }
 
   # Delayed
-  $self->log->debug('Nothing has been rendered, assuming delayed response.')
+  $self->log->debug('Nothing has been rendered, expecting delayed response.')
     unless $stash->{'mojo.rendered'} || $tx->is_writing;
 }
 
@@ -627,7 +627,7 @@ startup. Meant to be overloaded in a subclass.
 In addition to the attributes and methods above you can also call helpers on
 L<Mojolicious> objects. This includes all helpers from
 L<Mojolicious::Plugin::DefaultHelpers> and L<Mojolicious::Plugin::TagHelpers>.
-Note that application helpers are always called with a new C<controller_class>
+Note that application helpers are always called with a new default controller
 object, so they can't depend on or change controller state, which includes
 request, response and stash.
 

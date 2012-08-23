@@ -863,7 +863,7 @@ L<Mojolicious::Plugin::EPRenderer> with a custom configuration.
     }
   };
 
-  get '/' => 'index';
+  get '/:name' => {name => 'Anonymous'} => 'index';
 
   app->start;
   __DATA__
@@ -884,25 +884,25 @@ do is add a new C<handler>.
     mine => sub {
       my ($r, $c, $output, $options) = @_;
 
-      # One time use inline template
+      # Check for one time use inline template
       my $inline = $options->{inline};
 
-      # Generate relative template path
-      my $name = $r->template_name($options);
+      # Check for appropriate template in DATA section
+      my $data = $r->get_data_template($options);
 
-      # Try to find appropriate template in DATA section
-      my $content = $r->get_data_template($options, $name);
-
-      # Generate absolute template path
+      # Check for absolute template path
       my $path = $r->template_path($options);
 
       # This part is up to you and your template system :)
       ...
 
+      # Just die or throw a Mojo::Exception object for errors
+      Mojo::Exception->new('Something went wrong')->throw;
+
       # Pass the rendered result back to the renderer
       $$output = 'The rendered result';
 
-      # Return true if rendering succeeded and false if it didn't
+      # Return true if something has been rendered and false otherwise
       return 1;
     }
   );
