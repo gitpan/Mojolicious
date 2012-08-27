@@ -5,6 +5,7 @@ use overload
   '""'     => sub { shift->join("\n") },
   fallback => 1;
 
+# "Sweet Zombie Jesus!"
 use Exporter 'import';
 use List::Util;
 use Mojo::ByteStream;
@@ -50,6 +51,8 @@ sub map {
   return $self->new(map { $_->$cb } @$self);
 }
 
+# "Facts are meaningless.
+#  You could use facts to prove anything that's even remotely true!"
 sub pluck {
   my ($self, $method, @args) = @_;
   return $self->map(sub { $_->$method(@args) });
@@ -60,6 +63,9 @@ sub reverse {
   return $self->new(reverse @$self);
 }
 
+# "You told Bart to kiss that girl?
+#  Why not encourage him to knock her out and drag her to a cave?
+#  Second base? Oh, Bart is a little too young for that."
 sub shuffle {
   my $self = shift;
   return $self->new(List::Util::shuffle @$self);
@@ -78,6 +84,8 @@ sub sort {
   return $self->new(sort { $a->$cb($b) } @$self);
 }
 
+# "Christmas is a time when people of all religions come together to worship
+#  Jesus Christ."
 sub uniq {
   my $self = shift;
   my %seen;
@@ -135,7 +143,7 @@ Construct a new array-based L<Mojo::Collection> object.
   my @elements = $collection->each;
   $collection  = $collection->each(sub {...});
 
-Evaluate closure for each element in collection.
+Evaluate callback for each element in collection.
 
   $collection->each(sub {
     my ($e, $count) = @_;
@@ -148,9 +156,9 @@ Evaluate closure for each element in collection.
   my $first = $collection->first(qr/foo/);
   my $first = $collection->first(sub {...});
 
-Evaluate regular expression or closure for each element in collection and
+Evaluate regular expression or callback for each element in collection and
 return the first one that matched the regular expression, or for which the
-closure returned true.
+callback returned true.
 
   my $five = $collection->first(sub { $_ == 5 });
 
@@ -159,9 +167,9 @@ closure returned true.
   my $new = $collection->grep(qr/foo/);
   my $new = $collection->grep(sub {...});
 
-Evaluate regular expression or closure for each element in collection and
+Evaluate regular expression or callback for each element in collection and
 create a new collection with all elements that matched the regular expression,
-or for which the closure returned true.
+or for which the callback returned true.
 
   my $interesting = $collection->grep(qr/mojo/i);
 
@@ -177,7 +185,7 @@ Turn collection into L<Mojo::ByteStream>.
 
   my $new = $collection->map(sub {...});
 
-Evaluate closure for each element in collection and create a new collection
+Evaluate callback for each element in collection and create a new collection
 from the results.
 
   my $doubled = $collection->map(sub { $_ * 2 });
@@ -222,7 +230,7 @@ Number of elements in collection.
   my $new = $collection->sort;
   my $new = $collection->sort(sub {...});
 
-Sort elements based on return value of closure and create a new collection
+Sort elements based on return value of callback and create a new collection
 from the results.
 
   my $insensitive = $collection->sort(sub { uc(shift) cmp uc(shift) });

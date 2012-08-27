@@ -38,7 +38,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Rainbow';
-our $VERSION  = '3.34';
+our $VERSION  = '3.35';
 
 # "These old doomsday devices are dangerously unstable.
 #  I'll rest easier not knowing where they are."
@@ -75,10 +75,10 @@ sub new {
 
   # Hide controller attributes/methods and "handler"
   $r->hide(qw(AUTOLOAD DESTROY app cookie finish flash handler on param));
-  $r->hide(qw(redirect_to render render_content render_data));
-  $r->hide(qw(render_exception render_json render_not_found render_partial));
-  $r->hide(qw(render_static render_text rendered req res respond_to send));
-  $r->hide(qw(session signed_cookie stash tx ua url_for write write_chunk));
+  $r->hide(qw(redirect_to render render_data render_exception render_json));
+  $r->hide(qw(render_not_found render_partial render_static render_text));
+  $r->hide(qw(rendered req res respond_to send session signed_cookie stash));
+  $r->hide(qw(tx ua url_for write write_chunk));
 
   # Prepare log
   my $mode = $self->mode;
@@ -341,7 +341,7 @@ file reminding you to change your passphrase.
   my $sessions = $app->sessions;
   $app         = $app->sessions(Mojolicious::Sessions->new);
 
-Simple signed cookie based sessions, defaults to a L<Mojolicious::Sessions>
+Signed cookie based session manager, defaults to a L<Mojolicious::Sessions>
 object. You can usually leave this alone, see
 L<Mojolicious::Controller/"session"> for more information about working with
 session data.
@@ -525,7 +525,7 @@ and a call to C<dispatch> the last, yours will be in between.
 
 This is a very powerful hook and should not be used lightly, it allows you to
 customize application wide exception handling for example, consider it the
-sledgehammer in your toolbox. (Passed a closure leading to the next hook and
+sledgehammer in your toolbox. (Passed a callback leading to the next hook and
 the default controller object)
 
 =back

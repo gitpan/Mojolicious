@@ -27,7 +27,7 @@ use Test::Mojo;
 
 # Missing plugin
 eval { plugin 'does_not_exist' };
-is $@, "Plugin \"does_not_exist\" missing, maybe you need to install it?\n",
+is $@, qq{Plugin "does_not_exist" missing, maybe you need to install it?\n},
   'right error';
 
 # Default
@@ -1393,7 +1393,7 @@ Just works!\
 
 @@ layouts/layout.html.epl
 % my $self = shift;
-<%= $self->title %><%= $self->render_content %> with layout
+<%= $self->title %><%= $self->content %> with layout
 
 @@ autostash.html.ep
 % $self->layout('layout');
