@@ -4,9 +4,6 @@ use utf8;
 
 use Test::More tests => 847;
 
-# "When will I learn?
-#  The answer to life's problems aren't at the bottom of a bottle,
-#  they're on TV!"
 use File::Spec::Functions 'catfile';
 use File::Temp 'tempdir';
 use Mojo::Content::Single;
@@ -709,7 +706,7 @@ $req = Mojo::Message::Request->new;
 is $req->content->progress, 0, 'right progress';
 $req->parse("GET /foo/bar/baz.html?foo13#23 HTTP/1.1\x0d\x0a");
 is $req->content->progress, 0, 'right progress';
-$req->parse("Content-Length: 418\x0d\x0a");
+$req->parse("Content-Length: 416\x0d\x0a");
 $req->parse('Content-Type: multipart/form-data; bo');
 is $req->content->progress, 0, 'right progress';
 $req->parse("undary=----------0xKhTmLbOuNdArY\x0d\x0a\x0d\x0a");
@@ -721,7 +718,7 @@ $req->parse("\x0d\x0ahallo welt test123\n");
 $req->parse("\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a");
 $req->parse("Content-Disposition: form-data; name=\"text2\"\x0d\x0a");
 $req->parse("\x0d\x0a\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a");
-$req->parse('Content-Disposition: form-data; name="upload"; file');
+$req->parse('Content-Disposition: form-data;name="upload";file');
 $req->parse("name=\"hello.pl\"\x0d\x0a");
 $req->parse("Content-Type: application/octet-stream\x0d\x0a\x0d\x0a");
 $req->parse("#!/usr/bin/perl\n\n");
@@ -729,7 +726,7 @@ $req->parse("use strict;\n");
 $req->parse("use warnings;\n\n");
 $req->parse("print \"Hello World :)\\n\"\n");
 $req->parse("\x0d\x0a------------0xKhTmLbOuNdArY--");
-is $req->content->progress, 418, 'right progress';
+is $req->content->progress, 416, 'right progress';
 ok $req->is_finished,  'request is finished';
 ok $req->is_multipart, 'multipart content';
 is $req->method,       'GET', 'right method';
@@ -739,7 +736,7 @@ is $req->query_params, 'foo13', 'right parameters';
 is $req->headers->content_type,
   'multipart/form-data; boundary=----------0xKhTmLbOuNdArY',
   'right "Content-Type" value';
-is $req->headers->content_length, 418, 'right "Content-Type" value';
+is $req->headers->content_length, 416, 'right "Content-Length" value';
 isa_ok $req->content->parts->[0], 'Mojo::Content::Single', 'right part';
 isa_ok $req->content->parts->[1], 'Mojo::Content::Single', 'right part';
 isa_ok $req->content->parts->[2], 'Mojo::Content::Single', 'right part';
@@ -801,7 +798,7 @@ is $req->query_params, 'foo13', 'right parameters';
 is $req->headers->content_type,
   'multipart/form-data; boundary=----------0xKhTmLbOuNdArY',
   'right "Content-Type" value';
-is $req->headers->content_length, 418, 'right "Content-Type" value';
+is $req->headers->content_length, 418, 'right "Content-Length" value';
 isa_ok $req->content->parts->[0], 'Mojo::Content::Single', 'right part';
 isa_ok $req->content->parts->[1], 'Mojo::Content::Single', 'right part';
 isa_ok $req->content->parts->[2], 'Mojo::Content::Single', 'right part';
@@ -877,7 +874,7 @@ is $req->query_params, 'foo13', 'right parameters';
 is $req->headers->content_type,
   'multipart/form-data; boundary=----------0xKhTmLbOuNdArY',
   'right "Content-Type" value';
-is $req->headers->content_length, 418, 'right "Content-Type" value';
+is $req->headers->content_length, 418, 'right "Content-Length" value';
 isa_ok $req->content->parts->[0], 'Mojo::Content::Single', 'right part';
 isa_ok $req->content->parts->[1], 'Mojo::Content::Single', 'right part';
 isa_ok $req->content->parts->[2], 'Mojo::Content::Single', 'right part';
@@ -921,7 +918,7 @@ is $req->query_params, 'foo13',                      'right parameters';
 is $req->headers->content_type,
   'multipart/form-data; boundary=----------0xKhTmLbOuNdArY',
   'right "Content-Type" value';
-is $req->headers->content_length, 418, 'right "Content-Type" value';
+is $req->headers->content_length, 418, 'right "Content-Length" value';
 isa_ok $req->content, 'Mojo::Content::Single', 'right content';
 like $req->content->asset->slurp, qr/------------0xKhTmLbOuNdArY--$/,
   'right content';
@@ -955,7 +952,7 @@ is $req->query_params, 'foo13', 'right parameters';
 is $req->headers->content_type,
   'multipart/form-data; boundary=----------0xKhTmLbOuNdArY',
   'right "Content-Type" value';
-is $req->headers->content_length, 418, 'right "Content-Type" value';
+is $req->headers->content_length, 418, 'right "Content-Length" value';
 isa_ok $req->content->parts->[0], 'Mojo::Content::Single', 'right part';
 isa_ok $req->content->parts->[1], 'Mojo::Content::Single', 'right part';
 isa_ok $req->content->parts->[2], 'Mojo::Content::Single', 'right part';

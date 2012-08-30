@@ -6,6 +6,8 @@ use overload
   '""'     => sub { shift->to_xml },
   fallback => 1;
 
+# "Fry: This snow is beautiful. I'm glad global warming never happened.
+#  Leela: Actually, it did. But thank God nuclear winter canceled it out."
 use Carp 'croak';
 use Mojo::Collection;
 use Mojo::DOM::CSS;
@@ -17,7 +19,7 @@ sub AUTOLOAD {
   my $self = shift;
 
   # Method
-  my ($package, $method) = our $AUTOLOAD =~ /^([\w:]+)\:\:(\w+)$/;
+  my ($package, $method) = our $AUTOLOAD =~ /^([\w:]+)::(\w+)$/;
   croak "Undefined subroutine &${package}::$method called"
     unless blessed $self && $self->isa(__PACKAGE__);
 
@@ -29,8 +31,6 @@ sub AUTOLOAD {
 
 sub DESTROY { }
 
-# "How are the kids supposed to get home?
-#  I dunno. Internet?"
 sub new {
   my $class = shift;
   my $self = bless [Mojo::DOM::HTML->new], ref $class || $class;
@@ -73,7 +73,6 @@ sub attrs {
 
 sub charset { shift->_parser(charset => @_) }
 
-# "Oh boy! Sleep! That's when I'm a Viking!"
 sub children {
   my ($self, $type) = @_;
 
@@ -113,7 +112,6 @@ sub content_xml {
   return $result;
 }
 
-# "But I was going to loot you a present."
 sub find {
   my ($self, $selector) = @_;
 
@@ -133,7 +131,7 @@ sub namespace {
 
   # Namespace prefix
   return '' if (my $current = $self->tree)->[0] eq 'root';
-  my $ns = $current->[1] =~ /^(.*?)\:/ ? "xmlns:$1" : undef;
+  my $ns = $current->[1] =~ /^(.*?):/ ? "xmlns:$1" : undef;
 
   # Walk tree
   while ($current) {
@@ -290,7 +288,6 @@ sub type {
   return $self;
 }
 
-# "I want to set the record straight, I thought the cop was a prostitute."
 sub xml { shift->_parser(xml => @_) }
 
 sub _add {

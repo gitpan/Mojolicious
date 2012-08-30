@@ -12,8 +12,6 @@ use Carp ();
 # Only Perl 5.14+ requires it on demand
 use IO::Handle ();
 
-# "Kids, you tried your best and you failed miserably.
-#  The lesson is, never try."
 sub import {
   my $class = shift;
   return unless my $flag = shift;
@@ -130,11 +128,11 @@ Mojo::Base - Minimal base class for Mojo projects
   use Mojo::Base -strict;
 
   my $mew = Cat->new(name => 'Longcat');
-  say $mew->paws;
-  say $mew->paws(5)->ears(4)->paws;
+  say $mew->ears;
+  say $mew->ears(3)->eyes(4)->ears;
 
   my $rawr = Tiger->new(stripes => 23);
-  say $rawr->tap(sub { $_->friend->name('Tacgnol') })->paws;
+  say $rawr->tap(sub { $_->friend->name('Tacgnol') })->ears;
 
 =head1 DESCRIPTION
 
@@ -211,10 +209,12 @@ pass it either a hash or a hash reference with attribute values.
   BaseSubClass->attr([qw(name1 name2 name3)] => 'foo');
   BaseSubClass->attr([qw(name1 name2 name3)] => sub {...});
 
-Create attributes for hash-based objects. An array reference can be used to
-create more than one attribute. Pass an optional second argument to set a
-default value, it should be a constant or a callback. The callback will be
-excuted at accessor read time if there's no set value.
+Create attribute accessor for hash-based objects, an array reference can be
+used to create more than one at a time. Pass an optional second argument to
+set a default value, it should be a constant or a callback. The callback will
+be excuted at accessor read time if there's no set value. Accessors can be
+chained, that means they return their invocant when they are called with an
+argument.
 
 =head2 C<tap>
 

@@ -7,7 +7,6 @@ has captures => sub { {} };
 has [qw(endpoint root)];
 has stack => sub { [] };
 
-# "I'm Bender, baby, please insert liquor!"
 sub new {
   my $self = shift->SUPER::new;
 
@@ -19,7 +18,6 @@ sub new {
   return $self;
 }
 
-# "Life can be hilariously cruel."
 sub match {
   my ($self, $r, $c) = @_;
 
@@ -34,7 +32,7 @@ sub match {
   # Method
   if (my $methods = $r->via) {
     my $method = $self->{method} eq 'HEAD' ? 'GET' : $self->{method};
-    return unless $method ~~ $methods;
+    return unless grep { $_ eq $method } @$methods;
   }
 
   # Conditions

@@ -8,10 +8,6 @@ BEGIN {
 
 use Test::More tests => 32;
 
-# "Marge, you being a cop makes you the man!
-#  Which makes me the woman, and I have no interest in that,
-#  besides occasionally wearing the underwear,
-#  which as we discussed, is strictly a comfort thing."
 use Mojo::IOLoop;
 use Mojo::IOLoop::Client;
 use Mojo::IOLoop::Delay;
@@ -156,9 +152,9 @@ $loop->client(
     $connected = 1;
   }
 );
-like $ENV{MOJO_REUSE}, qr/(?:^|\,)$port\:/, 'file descriptor can be reused';
+like $ENV{MOJO_REUSE}, qr/(?:^|\,)${port}:/, 'file descriptor can be reused';
 $loop->start;
-unlike $ENV{MOJO_REUSE}, qr/(?:^|\,)$port\:/, 'environment is clean';
+unlike $ENV{MOJO_REUSE}, qr/(?:^|\,)${port}:/, 'environment is clean';
 ok $connected, 'connected';
 $err = undef;
 $loop->client(

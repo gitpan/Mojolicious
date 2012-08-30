@@ -1,6 +1,13 @@
 package Test::Mojo;
 use Mojo::Base -base;
 
+# "Amy: He knows when you are sleeping.
+#  Professor: He knows when you're on the can.
+#  Leela: He'll hunt you down and blast your ass from here to Pakistan.
+#  Zoidberg: Oh.
+#  Hermes: You'd better not breathe, you'd better not move.
+#  Bender: You're better off dead, I'm telling you, dude.
+#  Fry: Santa Claus is gunning you down!"
 use Mojo::IOLoop;
 use Mojo::Message::Response;
 use Mojo::Server;
@@ -14,8 +21,6 @@ has ua => sub { Mojo::UserAgent->new->ioloop(Mojo::IOLoop->singleton) };
 # Silent or loud tests
 $ENV{MOJO_LOG_LEVEL} ||= $ENV{HARNESS_IS_VERBOSE} ? 'debug' : 'fatal';
 
-# "Ooh, a graduate student huh?
-#  How come you guys can go to the moon but can't make my shoes smell good?"
 sub new {
   my $self = shift->SUPER::new;
   return $self unless my $app = shift;
@@ -52,9 +57,6 @@ sub content_unlike {
   return $self->_test('unlike', $self->_get_content($self->tx), $regex, $desc);
 }
 
-# "Marge, I can't wear a pink shirt to work.
-#  Everybody wears white shirts.
-#  I'm not popular enough to be different."
 sub content_type_is {
   my ($self, $type, $desc) = @_;
   $desc ||= "Content-Type: $type";
@@ -83,9 +85,6 @@ sub content_type_unlike {
     $regex, $desc);
 }
 
-# "A job's a job. I mean, take me.
-#  If my plant pollutes the water and poisons the town,
-#  by your logic, that would make me a criminal."
 sub delete_ok { shift->_request_ok(delete => @_) }
 
 sub element_exists {
@@ -188,7 +187,6 @@ sub message_unlike {
   return $self->_test('unlike', $self->_message, $regex, $desc);
 }
 
-# "God bless those pagans."
 sub options_ok { shift->_request_ok(options => @_) }
 
 sub or {
@@ -212,7 +210,6 @@ sub post_json_ok {
   return $self->_test('ok', $tx->is_finished, encode('UTF-8', "post $url"));
 }
 
-# "WHO IS FONZY!?! Don't they teach you anything at school?"
 sub put_ok { shift->_request_ok(put => @_) }
 
 sub reset_session {
@@ -222,13 +219,12 @@ sub reset_session {
 }
 
 sub send_ok {
-  my ($self, $message, $desc) = @_;
-  $self->tx->send($message => sub { Mojo::IOLoop->stop });
+  my ($self, $msg, $desc) = @_;
+  $self->tx->send($msg => sub { Mojo::IOLoop->stop });
   Mojo::IOLoop->start;
   return $self->_test('ok', 1, $desc || 'send message');
 }
 
-# "Internet! Is that thing still around?"
 sub status_is {
   my ($self, $status, $desc) = @_;
   $desc ||= "$status " . $self->tx->res->new(code => $status)->default_message;
@@ -254,9 +250,6 @@ sub text_isnt {
   return $self->_test('isnt', $self->_text($selector), $value, $desc);
 }
 
-# "Hello, my name is Barney Gumble, and I'm an alcoholic.
-#  Mr Gumble, this is a girl scouts meeting.
-#  Is it, or is it you girls can't admit that you have a problem?"
 sub text_like {
   my ($self, $selector, $regex, $desc) = @_;
   $desc ||= encode 'UTF-8', qq{similar match for selector "$selector"};
@@ -303,7 +296,6 @@ sub _message {
   return shift @{$self->{messages}};
 }
 
-# "Are you sure this is the Sci-Fi Convention? It's full of nerds!"
 sub _request_ok {
   my ($self, $method, $url, $headers, $body) = @_;
   $body = $headers if !ref $headers && @_ > 3;

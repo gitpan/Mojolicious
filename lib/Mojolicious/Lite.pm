@@ -1,14 +1,11 @@
 package Mojolicious::Lite;
 use Mojo::Base 'Mojolicious';
 
-# "Since when is the Internet all about robbing people of their privacy?
-#  August 6, 1991."
+# "Bender: Bite my shiny metal ass!"
 use File::Basename 'dirname';
 use File::Spec::Functions 'catdir';
 use Mojo::UserAgent;
 
-# "It's the future, my parents, my co-workers, my girlfriend,
-#  I'll never see any of them ever again... YAHOOO!"
 sub import {
   my $class = shift;
 
@@ -824,8 +821,8 @@ WebSocket applications have never been this easy before.
   websocket '/echo' => sub {
     my $self = shift;
     $self->on(message => sub {
-      my ($self, $message) = @_;
-      $self->send("echo: $message");
+      my ($self, $msg) = @_;
+      $self->send("echo: $msg");
     });
   };
 

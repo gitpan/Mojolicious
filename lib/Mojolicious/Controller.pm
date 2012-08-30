@@ -12,7 +12,6 @@ use Mojolicious;
 use Mojolicious::Routes::Match;
 use Scalar::Util ();
 
-# "Scalpel... blood bucket... priest."
 has app => sub { Mojolicious->new };
 has match => sub {
   Mojolicious::Routes::Match->new(GET => '/')->root(shift->app->routes);
@@ -25,13 +24,11 @@ my %RESERVED = map { $_ => 1 } (
   qw(namespace partial path status template text)
 );
 
-# "Is all the work done by the children?
-#  No, not the whipping."
 sub AUTOLOAD {
   my $self = shift;
 
   # Method
-  my ($package, $method) = our $AUTOLOAD =~ /^([\w:]+)\:\:(\w+)$/;
+  my ($package, $method) = our $AUTOLOAD =~ /^([\w:]+)::(\w+)$/;
   Carp::croak("Undefined subroutine &${package}::$method called")
     unless Scalar::Util::blessed($self) && $self->isa(__PACKAGE__);
 
@@ -43,9 +40,6 @@ sub AUTOLOAD {
 
 sub DESTROY { }
 
-# "For the last time, I don't like lilacs!
-#  Your first wife was the one who liked lilacs!
-#  She also liked to shut up!"
 sub cookie {
   my ($self, $name, $value, $options) = @_;
   $options ||= {};
@@ -71,7 +65,6 @@ sub cookie {
   return $cookie->value;
 }
 
-# "Something's wrong, she's not responding to my poking stick."
 sub finish {
   my ($self, $chunk) = @_;
 
@@ -90,7 +83,6 @@ sub finish {
   return $self->write('');
 }
 
-# "You two make me ashamed to call myself an idiot."
 sub flash {
   my $self = shift;
 
@@ -106,7 +98,6 @@ sub flash {
   return $self;
 }
 
-# "My parents may be evil, but at least they're stupid."
 sub on {
   my ($self, $name, $cb) = @_;
   my $tx = $self->tx;
@@ -114,8 +105,6 @@ sub on {
   return $tx->on($name => sub { shift and $self->$cb(@_) });
 }
 
-# "Just make a simple cake. And this time, if someone's going to jump out of
-#  it make sure to put them in *after* you cook it."
 sub param {
   my ($self, $name) = (shift, shift);
 
@@ -152,9 +141,6 @@ sub param {
   return $req->param($name);
 }
 
-# "Is there an app for kissing my shiny metal ass?
-#  Several!
-#  Oooh!"
 sub redirect_to {
   my $self = shift;
 
@@ -164,8 +150,6 @@ sub redirect_to {
   return $self->rendered($res->is_status_class(300) ? undef : 302);
 }
 
-# "Mamma Mia! The cruel meatball of war has rolled onto our laps and ruined
-#  our white pants of peace!"
 sub render {
   my $self = shift;
 
@@ -206,8 +190,6 @@ sub render {
 
 sub render_data { shift->render(data => @_) }
 
-# "The path to robot hell is paved with human flesh.
-#  Neat."
 sub render_exception {
   my ($self, $e) = @_;
 
@@ -237,14 +219,10 @@ sub render_exception {
   $self->_fallbacks({%$options, format => 'html'}, 'exception', $inline);
 }
 
-# "If you hate intolerance and being punched in the face by me,
-#  please support Proposition Infinity."
 sub render_json { shift->render(json => @_) }
 
 sub render_later { shift->stash('mojo.rendered' => 1) }
 
-# "Excuse me, sir, you're snowboarding off the trail.
-#  Lick my frozen metal ass."
 sub render_not_found {
   my $self = shift;
 
@@ -261,8 +239,6 @@ sub render_not_found {
   $self->_fallbacks({%$options, format => 'html'}, 'not_found', $inline);
 }
 
-# "You called my thesis a fat sack of barf, and then you stole it?
-#  Welcome to academia."
 sub render_partial {
   my $self = shift;
   my $template = @_ % 2 ? shift : undef;
@@ -298,7 +274,6 @@ sub rendered {
   return $self;
 }
 
-# "A three month calendar? What is this, Mercury?"
 sub req { shift->tx->req }
 sub res { shift->tx->res }
 
@@ -334,15 +309,14 @@ sub respond_to {
 }
 
 sub send {
-  my ($self, $message, $cb) = @_;
+  my ($self, $msg, $cb) = @_;
   my $tx = $self->tx;
   Carp::croak('No WebSocket connection to send message to')
     unless $tx->is_websocket;
-  $tx->send($message => sub { shift and $self->$cb(@_) if $cb });
+  $tx->send($msg => sub { shift and $self->$cb(@_) if $cb });
   return $self->rendered(101);
 }
 
-# "Why am I sticky and naked? Did I miss something fun?"
 sub session {
   my $self = shift;
 
@@ -394,7 +368,6 @@ sub signed_cookie {
   return wantarray ? @results : $results[0];
 }
 
-# "All this knowledge is giving me a raging brainer."
 sub stash {
   my $self = shift;
 
@@ -425,7 +398,7 @@ sub url_for {
   # Absolute URL
   return $target
     if Scalar::Util::blessed($target) && $target->isa('Mojo::URL');
-  return Mojo::URL->new($target) if $target =~ m!^\w+\://!;
+  return Mojo::URL->new($target) if $target =~ m!^\w+://!;
 
   # Base
   my $url  = Mojo::URL->new;
@@ -454,7 +427,7 @@ sub url_for {
       if (!$target || $target eq 'current') && $req->url->path->trailing_slash;
 
     # Fix scheme for WebSockets
-    $base->scheme($base->scheme ~~ 'https' ? 'wss' : 'ws') if $ws;
+    $base->scheme(($base->scheme // '') eq 'https' ? 'wss' : 'ws') if $ws;
   }
 
   # Make path absolute
@@ -612,8 +585,8 @@ L<Mojo::Transaction::WebSocket> object.
 
   # Emitted when new WebSocket messages arrive
   $c->on(message => sub {
-    my ($c, $message) = @_;
-    $c->app->log->debug("Message: $message");
+    my ($c, $msg) = @_;
+    $c->app->log->debug("Message: $msg");
   });
 
 =head2 C<param>

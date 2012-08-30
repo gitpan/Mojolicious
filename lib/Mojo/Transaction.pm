@@ -9,7 +9,6 @@ has [qw(kept_alive local_address local_port previous remote_port)];
 has req => sub { Mojo::Message::Request->new };
 has res => sub { Mojo::Message::Response->new };
 
-# "Please don't eat me! I have a wife and kids. Eat them!"
 sub client_close { shift->server_close(@_) }
 
 sub client_read  { croak 'Method "client_read" not implemented by subclass' }
@@ -29,13 +28,14 @@ sub error {
   return $res->error ? $res->error : undef;
 }
 
-sub is_finished { shift->{state} ~~ 'finished' }
+sub is_finished { (shift->{state} // '') eq 'finished' }
 
 sub is_websocket {undef}
 
 sub is_writing {
   return 1 unless my $state = shift->{state};
-  return $state ~~ [qw(write write_start_line write_headers write_body)];
+  return !!grep { $_ eq $state }
+    qw(write write_start_line write_headers write_body);
 }
 
 sub remote_address {
@@ -59,7 +59,7 @@ sub remote_address {
 
 sub resume {
   my $self = shift;
-  if ($self->{state} ~~ 'paused') { $self->{state} = 'write_body' }
+  if (($self->{state} // '') eq 'paused') { $self->{state} = 'write_body' }
   elsif (!$self->is_writing) { $self->{state} = 'write' }
   return $self->emit('resume');
 }
@@ -220,8 +220,8 @@ Connection identifier or socket.
 
 =head2 C<error>
 
-  my $message          = $tx->error;
-  my ($message, $code) = $tx->error;
+  my $err          = $tx->error;
+  my ($err, $code) = $tx->error;
 
 Parser errors and codes.
 
@@ -278,8 +278,8 @@ message in C<error>, 400 and 500 responses also a code.
   # Sensible exception handling
   if (my $res = $tx->success) { say $res->body }
   else {
-    my ($message, $code) = $tx->error;
-    say $code ? "$code response: $message" : "Connection error: $message";
+    my ($err, $code) = $tx->error;
+    say $code ? "$code response: $err" : "Connection error: $err";
   }
 
 Error messages can be accessed with the C<error> method of the transaction

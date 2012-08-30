@@ -8,7 +8,6 @@ BEGIN {
 
 use Test::More tests => 48;
 
-# "I can't believe it! Reading and writing actually paid off!"
 use IO::Socket::INET;
 use Mojo::IOLoop;
 use Mojo::Transaction::WebSocket;
@@ -41,9 +40,9 @@ websocket '/' => sub {
   $self->on(finish => sub { $server += 2 });
   $self->on(
     message => sub {
-      my ($self, $message) = @_;
+      my ($self, $msg) = @_;
       my $url = $self->url_for->to_abs;
-      $self->send("${message}test2$url");
+      $self->send("${msg}test2$url");
       $server = 1;
     }
   );
@@ -75,8 +74,8 @@ websocket '/early_start' => sub {
   $self->send('test1');
   $self->on(
     message => sub {
-      my ($self, $message) = @_;
-      $self->send("${message}test2")->finish;
+      my ($self, $msg) = @_;
+      $self->send("${msg}test2")->finish;
     }
   );
 };
@@ -99,8 +98,8 @@ websocket '/subreq' => sub {
       my $tx = pop;
       $tx->on(
         message => sub {
-          my ($tx, $message) = @_;
-          $self->send($message);
+          my ($tx, $msg) = @_;
+          $self->send($msg);
           $tx->finish;
           $self->finish;
         }
@@ -117,8 +116,8 @@ websocket '/echo' => sub {
   my $self = shift;
   $self->on(
     message => sub {
-      my ($self, $message) = @_;
-      $self->send($message);
+      my ($self, $msg) = @_;
+      $self->send($msg);
     }
   );
 };
@@ -128,8 +127,8 @@ my $buffer = '';
 websocket '/double_echo' => sub {
   shift->on(
     message => sub {
-      my ($self, $message) = @_;
-      $self->send($message => sub { shift->send($message) });
+      my ($self, $msg) = @_;
+      $self->send($msg => sub { shift->send($msg) });
     }
   );
 };
@@ -159,7 +158,7 @@ websocket '/timeout' => sub {
 my $ua  = app->ua;
 my $res = $ua->get('/link')->success;
 is $res->code, 200, 'right status';
-like $res->body, qr!ws\://localhost\:\d+/!, 'right content';
+like $res->body, qr!ws://localhost:\d+/!, 'right content';
 
 # GET /socket (plain HTTP request)
 $res = $ua->get('/socket')->res;
@@ -175,8 +174,8 @@ $ua->websocket(
     $tx->on(finish => sub { $loop->stop });
     $tx->on(
       message => sub {
-        my ($tx, $message) = @_;
-        $result = $message;
+        my ($tx, $msg) = @_;
+        $result = $msg;
         $tx->finish;
       }
     );
@@ -184,7 +183,7 @@ $ua->websocket(
   }
 );
 $loop->start;
-like $result, qr!test1test2ws\://localhost\:\d+/!, 'right result';
+like $result, qr!test1test2ws://localhost:\d+/!, 'right result';
 
 # WebSocket /something/else (failed websocket connection)
 my ($code, $body, $ws);
@@ -220,9 +219,9 @@ $ua->start(
     $tx->on(finish => sub { $loop->stop });
     $tx->on(
       message => sub {
-        my ($tx, $message) = @_;
+        my ($tx, $msg) = @_;
         $tx->finish if length $result;
-        $result .= $message;
+        $result .= $msg;
       }
     );
     $local = $loop->stream($tx->connection)->handle->sockport;
@@ -250,8 +249,8 @@ $ua->websocket(
     );
     $tx->on(
       message => sub {
-        my ($tx, $message) = @_;
-        $result = $message;
+        my ($tx, $msg) = @_;
+        $result = $msg;
         $tx->send('test3');
         $client = 1;
       }
@@ -285,9 +284,9 @@ $ua->websocket(
     $result = '';
     $tx->on(
       message => sub {
-        my ($tx, $message) = @_;
-        $result .= $message;
-        $tx->finish if $message eq 'test1';
+        my ($tx, $msg) = @_;
+        $result .= $msg;
+        $tx->finish if $msg eq 'test1';
       }
     );
     $tx->on(
@@ -317,9 +316,9 @@ $ua->websocket(
     $result = '';
     $tx->on(
       message => sub {
-        my ($tx, $message) = @_;
-        $result .= $message;
-        $tx->finish if $message eq 'test1';
+        my ($tx, $msg) = @_;
+        $result .= $msg;
+        $tx->finish if $msg eq 'test1';
       }
     );
     $tx->on(
@@ -338,9 +337,9 @@ $ua->websocket(
     $result2 = '';
     $tx->on(
       message => sub {
-        my ($tx, $message) = @_;
-        $result2 .= $message;
-        $tx->finish if $message eq 'test1';
+        my ($tx, $msg) = @_;
+        $result2 .= $msg;
+        $tx->finish if $msg eq 'test1';
       }
     );
     $tx->on(
@@ -374,8 +373,8 @@ $ua->websocket(
     );
     $tx->on(
       message => sub {
-        my ($tx, $message) = @_;
-        $result .= $message;
+        my ($tx, $msg) = @_;
+        $result .= $msg;
         $tx->finish if ++$counter == 2;
       }
     );
@@ -408,8 +407,8 @@ $ua->websocket(
     );
     $tx->on(
       message => sub {
-        my ($tx, $message) = @_;
-        $result .= $message;
+        my ($tx, $msg) = @_;
+        $result .= $msg;
         $tx->finish if ++$counter == 2;
       }
     );
@@ -423,14 +422,14 @@ is $client, 3,        'finish event has been emitted';
 
 # WebSocket /dead (dies)
 $finished = $code = undef;
-my ($websocket, $message);
+my ($websocket, $msg);
 $ua->websocket(
   '/dead' => sub {
     my $tx = pop;
     $finished  = $tx->is_finished;
     $websocket = $tx->is_websocket;
     $code      = $tx->res->code;
-    $message   = $tx->res->message;
+    $msg       = $tx->res->message;
     $loop->stop;
   }
 );
@@ -438,23 +437,23 @@ $loop->start;
 ok $finished, 'transaction is finished';
 ok !$websocket, 'no websocket';
 is $code, 500, 'right status';
-is $message, 'Internal Server Error', 'right message';
+is $msg, 'Internal Server Error', 'right message';
 
 # WebSocket /foo (forbidden)
-($websocket, $code, $message) = undef;
+($websocket, $code, $msg) = undef;
 $ua->websocket(
   '/foo' => sub {
     my $tx = pop;
     $websocket = $tx->is_websocket;
     $code      = $tx->res->code;
-    $message   = $tx->res->message;
+    $msg       = $tx->res->message;
     $loop->stop;
   }
 );
 $loop->start;
 ok !$websocket, 'no websocket';
-is $code,    403,            'right status';
-is $message, "i'm a teapot", 'right message';
+is $code, 403,            'right status';
+is $msg,  "i'm a teapot", 'right message';
 
 # WebSocket /deadcallback (dies in callback)
 $ua->websocket(
@@ -473,8 +472,8 @@ $ua->websocket(
     $tx->on(finish => sub { $loop->stop });
     $tx->on(
       message => sub {
-        my ($tx, $message) = @_;
-        $result = $message;
+        my ($tx, $msg) = @_;
+        $result = $msg;
         $tx->finish;
       }
     );
@@ -486,14 +485,14 @@ is $result, 'hi!' x 100, 'right result';
 
 # WebSocket /timeout
 my $log = '';
-$message = app->log->on(message => sub { $log .= pop });
+$msg = app->log->on(message => sub { $log .= pop });
 $ua->websocket(
   '/timeout' => sub {
     pop->on(finish => sub { Mojo::IOLoop->stop });
   }
 );
 Mojo::IOLoop->start;
-app->log->unsubscribe(message => $message);
+app->log->unsubscribe(message => $msg);
 is $timeout, 'works!', 'finish event has been emitted';
 like $log, qr/Inactivity timeout\./, 'right log message';
 

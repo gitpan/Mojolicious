@@ -1,8 +1,6 @@
 package Mojo::Transaction::WebSocket;
 use Mojo::Base 'Mojo::Transaction';
 
-# "I'm not calling you a liar but...
-#  I can't think of a way to finish that sentence."
 use Config;
 use Mojo::Transaction::HTTP;
 use Mojo::Util qw(b64_encode decode encode sha1_bytes);
@@ -281,10 +279,9 @@ sub _message {
   return unless $frame->[0];
 
   # Message
-  my $message = delete $self->{message};
-  $message = decode 'UTF-8', $message
-    if $message && delete $self->{op} == TEXT;
-  $self->emit(message => $message);
+  my $msg = delete $self->{message};
+  $msg = decode 'UTF-8', $msg if $msg && delete $self->{op} == TEXT;
+  $self->emit(message => $msg);
 }
 
 sub _xor_mask {
@@ -311,8 +308,8 @@ Mojo::Transaction::WebSocket - WebSocket transaction
   my $ws = Mojo::Transaction::WebSocket->new;
   $ws->send('Hello World!');
   $ws->on(message => sub {
-    my ($ws, $message) = @_;
-    say "Message: $message";
+    my ($ws, $msg) = @_;
+    say "Message: $msg";
   });
   $ws->on(finish => sub {
     my $ws = shift;
@@ -367,15 +364,15 @@ Emitted when a WebSocket frame has been received.
 =head2 C<message>
 
   $ws->on(message => sub {
-    my ($ws, $message) = @_;
+    my ($ws, $msg) = @_;
     ...
   });
 
 Emitted when a complete WebSocket message has been received.
 
   $ws->on(message => sub {
-    my ($ws, $message) = @_;
-    say "Message: $message";
+    my ($ws, $msg) = @_;
+    say "Message: $msg";
   });
 
 =head1 ATTRIBUTES

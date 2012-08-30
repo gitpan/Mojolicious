@@ -1,6 +1,8 @@
 package Mojo::UserAgent;
 use Mojo::Base 'Mojo::EventEmitter';
 
+# "Fry: Since when is the Internet about robbing people of their privacy?
+#  Bender: August 6, 1991."
 use Carp 'croak';
 use List::Util 'first';
 use Mojo::IOLoop;
@@ -13,7 +15,6 @@ use Scalar::Util 'weaken';
 
 use constant DEBUG => $ENV{MOJO_USERAGENT_DEBUG} || 0;
 
-# "You can't let a single bad experience scare you away from drugs."
 has ca              => sub { $ENV{MOJO_CA_FILE} };
 has cert            => sub { $ENV{MOJO_CERT_FILE} };
 has connect_timeout => sub { $ENV{MOJO_CONNECT_TIMEOUT} || 10 };
@@ -216,7 +217,7 @@ sub _connect_proxy {
       my ($self, $tx) = @_;
 
       # CONNECT failed
-      unless ($tx->res->code ~~ 200) {
+      unless (($tx->res->code // '') eq '200') {
         $old->req->error('Proxy connection failed');
         return $self->_finish($old, $cb);
       }
@@ -385,7 +386,7 @@ sub _remove {
 
   # Keep connection alive
   $self->_cache(join(':', $self->transactor->endpoint($tx)), $id)
-    unless $tx->req->method eq 'CONNECT' && $tx->res->code ~~ 200;
+    unless $tx->req->method eq 'CONNECT' && ($tx->res->code // '') eq '200';
 }
 
 sub _redirect {
@@ -472,9 +473,10 @@ sub _upgrade {
   my ($self, $id) = @_;
 
   # Check if connection needs to be upgraded
-  my $c   = $self->{connections}{$id};
-  my $old = $c->{tx};
-  return unless $old->req->headers->upgrade && $old->res->code ~~ 101;
+  my $c    = $self->{connections}{$id};
+  my $old  = $c->{tx};
+  my $code = $old->res->code // '';
+  return unless $old->req->headers->upgrade && $code eq '101';
 
   # Check challenge and upgrade to WebSocket transaction
   my $new = Mojo::Transaction::WebSocket->new(handshake => $old, masked => 1);
@@ -529,8 +531,8 @@ Mojo::UserAgent - Non-blocking I/O HTTP and WebSocket user agent
   my $tx = $ua->post_form('search.cpan.org/search' => {q => 'mojo'});
   if (my $res = $tx->success) { say $res->body }
   else {
-    my ($message, $code) = $tx->error;
-    say $code ? "$code response: $message" : "Connection error: $message";
+    my ($err, $code) = $tx->error;
+    say $code ? "$code response: $err" : "Connection error: $err";
   }
 
   # Quick JSON API request with Basic authentication
@@ -591,8 +593,8 @@ Mojo::UserAgent - Non-blocking I/O HTTP and WebSocket user agent
     my ($ua, $tx) = @_;
     $tx->on(finish  => sub { say 'WebSocket closed.' });
     $tx->on(message => sub {
-      my ($tx, $message) = @_;
-      say "WebSocket message: $message";
+      my ($tx, $msg) = @_;
+      say "WebSocket message: $msg";
       $tx->finish;
     });
     $tx->send('hi there!');
@@ -641,7 +643,7 @@ automatically prepared proxy C<CONNECT> requests and followed redirects.
 
   $ua->on(start => sub {
     my ($ua, $tx) = @_;
-    $tx->req->headers->header('X-Bender', 'Bite my shiny metal ass!');
+    $tx->req->headers->header('X-Bender' => 'Bite my shiny metal ass!');
   });
 
 =head1 ATTRIBUTES
@@ -1042,8 +1044,8 @@ exact same arguments as L<Mojo::UserAgent::Transactor/"websocket">.
   $ua->websocket('ws://localhost:3000/echo' => sub {
     my ($ua, $tx) = @_;
     $tx->on(message => sub {
-      my ($tx, $message) = @_;
-      say $message;
+      my ($tx, $msg) = @_;
+      say $msg;
     });
     $tx->send('Hi!');
   });

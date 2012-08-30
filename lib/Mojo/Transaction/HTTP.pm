@@ -3,8 +3,6 @@ use Mojo::Base 'Mojo::Transaction';
 
 use Mojo::Transaction::WebSocket;
 
-# "What's a wedding?  Webster's dictionary describes it as the act of
-#  removing weeds from one's garden."
 sub client_read {
   my ($self, $chunk) = @_;
 
@@ -21,7 +19,7 @@ sub client_read {
   $self->{state} = 'finished' if $res->is_finished;
 
   # Unexpected 100 Continue
-  if ($self->{state} eq 'finished' && $res->code ~~ 100) {
+  if ($self->{state} eq 'finished' && ($res->code // '') eq '100') {
     $self->res($res->new);
     $self->{state} = $preserved;
   }
@@ -155,12 +153,12 @@ sub server_write {
 }
 
 sub _body {
-  my ($self, $message, $finish) = @_;
+  my ($self, $msg, $finish) = @_;
 
   # Chunk
-  my $buffer = $message->get_body_chunk($self->{offset});
+  my $buffer = $msg->get_body_chunk($self->{offset});
   my $written = defined $buffer ? length $buffer : 0;
-  $self->{write} = $message->is_dynamic ? 1 : ($self->{write} - $written);
+  $self->{write} = $msg->is_dynamic ? 1 : ($self->{write} - $written);
   $self->{offset} = $self->{offset} + $written;
   if (defined $buffer) { delete $self->{delay} }
 
@@ -179,10 +177,10 @@ sub _body {
 }
 
 sub _headers {
-  my ($self, $message, $head) = @_;
+  my ($self, $msg, $head) = @_;
 
   # Chunk
-  my $buffer = $message->get_header_chunk($self->{offset});
+  my $buffer = $msg->get_header_chunk($self->{offset});
   my $written = defined $buffer ? length $buffer : 0;
   $self->{write}  = $self->{write} - $written;
   $self->{offset} = $self->{offset} + $written;
@@ -192,13 +190,13 @@ sub _headers {
     $self->{offset} = 0;
 
     # Response without body
-    $head = $head && ($self->req->method eq 'HEAD' || $message->is_empty);
+    $head = $head && ($self->req->method eq 'HEAD' || $msg->is_empty);
     if ($head) { $self->{state} = 'finished' }
 
     # Body
     else {
       $self->{state} = 'write_body';
-      $self->{write} = $message->is_dynamic ? 1 : $message->body_size;
+      $self->{write} = $msg->is_dynamic ? 1 : $msg->body_size;
     }
   }
 
@@ -206,10 +204,10 @@ sub _headers {
 }
 
 sub _start_line {
-  my ($self, $message) = @_;
+  my ($self, $msg) = @_;
 
   # Chunk
-  my $buffer = $message->get_start_line_chunk($self->{offset});
+  my $buffer = $msg->get_start_line_chunk($self->{offset});
   my $written = defined $buffer ? length $buffer : 0;
   $self->{write}  = $self->{write} - $written;
   $self->{offset} = $self->{offset} + $written;
@@ -217,7 +215,7 @@ sub _start_line {
   # Write headers
   if ($self->{write} <= 0) {
     $self->{state}  = 'write_headers';
-    $self->{write}  = $message->header_size;
+    $self->{write}  = $msg->header_size;
     $self->{offset} = 0;
   }
 
@@ -275,7 +273,7 @@ Emitted when a request is ready and needs to be handled.
 
   $tx->on(request => sub {
     my $tx = shift;
-    $tx->res->headers->header('X-Bender', 'Bite my shiny metal ass!');
+    $tx->res->headers->header('X-Bender' => 'Bite my shiny metal ass!');
   });
 
 =head2 C<upgrade>
@@ -290,7 +288,7 @@ object.
 
   $tx->on(upgrade => sub {
     my ($tx, $ws) = @_;
-    $ws->res->headers->header('X-Bender', 'Bite my shiny metal ass!');
+    $ws->res->headers->header('X-Bender' => 'Bite my shiny metal ass!');
   });
 
 =head1 ATTRIBUTES

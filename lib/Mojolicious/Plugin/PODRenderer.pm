@@ -11,8 +11,6 @@ use Pod::Simple::Search;
 # Paths
 my @PATHS = map { $_, "$_/pods" } @INC;
 
-# "This is my first visit to the Galaxy of Terror and I'd like it to be a
-#  pleasant one."
 sub register {
   my ($self, $app, $conf) = @_;
 
@@ -43,7 +41,7 @@ sub _perldoc {
 
   # Find module
   my $module = $self->param('module');
-  $module =~ s!/!\:\:!g;
+  $module =~ s!/!::!g;
   my $path = Pod::Simple::Search->new->find($module, @PATHS);
 
   # Redirect to CPAN
@@ -61,7 +59,7 @@ sub _perldoc {
     sub {
       my $attrs = shift->attrs;
       $attrs->{href} =~ s!%3A%3A!/!gi
-        if $attrs->{href} =~ s!^http\://search\.cpan\.org/perldoc\?!$perldoc!;
+        if $attrs->{href} =~ s!^http://search\.cpan\.org/perldoc\?!$perldoc!;
     }
   );
 

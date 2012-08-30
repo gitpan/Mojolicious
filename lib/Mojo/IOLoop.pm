@@ -1,6 +1,8 @@
 package Mojo::IOLoop;
 use Mojo::Base -base;
 
+# "Professor: Amy, technology isn't intrinsically good or evil. It's how it's
+#             used. Like the death ray."
 use Carp 'croak';
 use Mojo::IOLoop::Client;
 use Mojo::IOLoop::Delay;
@@ -69,7 +71,6 @@ sub client {
   return $id;
 }
 
-# "I didn't think it was physically possible, but this both sucks and blows."
 sub delay {
   my $self = shift;
   $self = $self->singleton unless ref $self;
@@ -107,8 +108,6 @@ sub remove {
   $self->_remove($id);
 }
 
-# "Fat Tony is a cancer on this fair city!
-#  He is the cancer and I am the... uh... what cures cancer?"
 sub server {
   my ($self, $cb) = (shift, pop);
   $self = $self->singleton unless ref $self;
@@ -208,7 +207,6 @@ sub _id {
   return $id;
 }
 
-# "She is well traveled, and I don't mean she travels a lot."
 sub _manage {
   my $self = shift;
 
@@ -245,10 +243,6 @@ sub _not_accepting {
   $_->stop for values %{$self->{servers} || {}};
 }
 
-# "I am trying to save myself from going to Hell.
-#  Jews don't believe in Hell.
-#  No Hell! Thank you kid, you made my day.
-#  *heads over to the Gaza Strip Club*"
 sub _remove {
   my ($self, $id) = @_;
 
