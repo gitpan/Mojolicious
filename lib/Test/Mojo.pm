@@ -9,7 +9,6 @@ use Mojo::Base -base;
 #  Bender: You're better off dead, I'm telling you, dude.
 #  Fry: Santa Claus is gunning you down!"
 use Mojo::IOLoop;
-use Mojo::Message::Response;
 use Mojo::Server;
 use Mojo::UserAgent;
 use Mojo::Util qw(decode encode);
@@ -30,7 +29,9 @@ sub new {
 
 sub app {
   my ($self, $app) = @_;
-  return $app ? $self->tap(sub { $_->ua->app($app) }) : $self->ua->app;
+  return $self->ua->app unless $app;
+  $self->ua->app($app);
+  return $self;
 }
 
 sub content_is {
@@ -310,9 +311,9 @@ sub _request_ok {
 }
 
 sub _test {
-  my ($self, $name) = (shift, shift);
+  my ($self, $name, @args) = @_;
   local $Test::Builder::Level = $Test::Builder::Level + 2;
-  $self->{latest} = Test::More->can($name)->(@_);
+  $self->{latest} = Test::More->can($name)->(@args);
   return $self;
 }
 

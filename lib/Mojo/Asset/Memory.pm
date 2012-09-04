@@ -15,18 +15,19 @@ sub add_chunk {
   $self->{content} .= $chunk // '';
   return $self
     if !$self->auto_upgrade || $self->size <= $self->max_memory_size;
-  my $file = Mojo::Asset::File->new;
-  $self->emit(upgrade => $file);
 
-  return $file->add_chunk($self->slurp);
+  my $file = Mojo::Asset::File->new;
+  return $file->add_chunk($self->emit(upgrade => $file)->slurp);
 }
 
 sub contains {
-  my $self  = shift;
+  my $self = shift;
+
   my $start = $self->start_range;
-  my $pos   = index $self->{content}, shift, $start;
+  my $pos = index $self->{content}, shift, $start;
   $pos -= $start if $start && $pos >= 0;
   my $end = $self->end_range;
+
   return $end && $pos >= $end ? -1 : $pos;
 }
 
@@ -43,8 +44,8 @@ sub get_chunk {
 }
 
 sub move_to {
-  my ($self, $path) = @_;
-  spurt $self->{content}, $path;
+  my ($self, $to) = @_;
+  spurt $self->{content}, $to;
   return $self;
 }
 

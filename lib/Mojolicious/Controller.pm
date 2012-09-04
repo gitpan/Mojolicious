@@ -270,7 +270,6 @@ sub rendered {
     $app->sessions->store($self);
   }
   $self->tx->resume;
-
   return $self;
 }
 

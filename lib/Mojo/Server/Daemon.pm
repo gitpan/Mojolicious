@@ -242,8 +242,7 @@ sub _write {
   warn "-- Server >>> Client (@{[$tx->req->url->to_abs]})\n$chunk\n" if DEBUG;
 
   # Write chunk
-  my $stream = $self->ioloop->stream($id);
-  $stream->write($chunk);
+  my $stream = $self->ioloop->stream($id)->write($chunk);
 
   # Finish or continue writing
   weaken $self;

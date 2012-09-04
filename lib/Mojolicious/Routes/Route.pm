@@ -88,12 +88,9 @@ sub is_websocket { !!shift->{websocket} }
 
 sub name {
   my $self = shift;
-
-  # Custom names have precedence
   return $self->{name} unless @_;
   $self->{name}   = shift;
   $self->{custom} = 1;
-
   return $self;
 }
 
@@ -108,7 +105,6 @@ sub over {
   return $self unless @$conditions;
   $self->{over} = $conditions;
   $self->root->cache(0);
-
   return $self;
 }
 
@@ -228,8 +224,7 @@ sub via {
 }
 
 sub websocket {
-  my $self  = shift;
-  my $route = $self->get(@_);
+  my $route = shift->get(@_);
   $route->{websocket} = 1;
   return $route;
 }

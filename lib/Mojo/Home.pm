@@ -73,8 +73,7 @@ sub mojo_lib_dir { catdir(dirname(__FILE__), '..') }
 
 sub parse {
   my ($self, $path) = @_;
-  return $self unless defined $path;
-  $self->{parts} = [splitdir $path];
+  $self->{parts} = [splitdir $path] if defined $path;
   return $self;
 }
 

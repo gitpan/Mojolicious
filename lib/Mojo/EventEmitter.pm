@@ -64,14 +64,13 @@ sub subscribers { shift->{events}{shift()} || [] }
 sub unsubscribe {
   my ($self, $name, $cb) = @_;
 
-  # All
-  unless ($cb) {
-    delete $self->{events}{$name};
-    return $self;
+  # One
+  if ($cb) {
+    $self->{events}{$name} = [grep { $cb ne $_ } @{$self->{events}{$name}}];
   }
 
-  # One
-  $self->{events}{$name} = [grep { $cb ne $_ } @{$self->{events}{$name}}];
+  # All
+  else { delete $self->{events}{$name} }
 
   return $self;
 }

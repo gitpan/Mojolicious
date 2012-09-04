@@ -9,7 +9,11 @@ has [qw(kept_alive local_address local_port previous remote_port)];
 has req => sub { Mojo::Message::Request->new };
 has res => sub { Mojo::Message::Response->new };
 
-sub client_close { shift->server_close(@_) }
+sub client_close {
+  my $self = shift;
+  $self->res->finish;
+  return $self->server_close(@_);
+}
 
 sub client_read  { croak 'Method "client_read" not implemented by subclass' }
 sub client_write { croak 'Method "client_write" not implemented by subclass' }
@@ -64,7 +68,11 @@ sub resume {
   return $self->emit('resume');
 }
 
-sub server_close { shift->emit('finish') }
+sub server_close {
+  my $self = shift;
+  $self->{state} = 'finished';
+  return $self->emit('finish');
+}
 
 sub server_read  { croak 'Method "server_read" not implemented by subclass' }
 sub server_write { croak 'Method "server_write" not implemented by subclass' }
@@ -138,15 +146,15 @@ Connection has been kept alive.
 
 =head2 C<local_address>
 
-  my $local_address = $tx->local_address;
-  $tx               = $tx->local_address($address);
+  my $address = $tx->local_address;
+  $tx         = $tx->local_address('127.0.0.1');
 
 Local interface address.
 
 =head2 C<local_port>
 
-  my $local_port = $tx->local_port;
-  $tx            = $tx->local_port($port);
+  my $port = $tx->local_port;
+  $tx      = $tx->local_port(8080);
 
 Local interface port.
 
@@ -160,17 +168,10 @@ Previous transaction that triggered this followup transaction.
   # Path of previous request
   say $tx->previous->req->url->path;
 
-=head2 C<remote_address>
-
-  my $remote_address = $tx->remote_address;
-  $tx                = $tx->remote_address($address);
-
-Remote interface address.
-
 =head2 C<remote_port>
 
-  my $remote_port = $tx->remote_port;
-  $tx             = $tx->remote_port($port);
+  my $port = $tx->remote_port;
+  $tx      = $tx->remote_port(8081);
 
 Remote interface port.
 
@@ -248,6 +249,13 @@ Check if transaction is writing.
   $tx = $tx->resume;
 
 Resume transaction.
+
+=head2 C<remote_address>
+
+  my $address = $tx->remote_address;
+  $tx         = $tx->remote_address('127.0.0.1');
+
+Remote interface address.
 
 =head2 C<server_close>
 

@@ -108,8 +108,7 @@ sub connection { shift->handshake->connection }
 
 sub finish {
   my $self = shift;
-  $self->send([1, 0, 0, 0, CLOSE, '']);
-  $self->{finished} = 1;
+  $self->send([1, 0, 0, 0, CLOSE, ''])->{finished} = 1;
   return $self;
 }
 
@@ -490,13 +489,13 @@ Connection has been kept alive.
 
 =head2 C<local_address>
 
-  my $local_address = $ws->local_address;
+  my $address = $ws->local_address;
 
 Local interface address.
 
 =head2 C<local_port>
 
-  my $local_port = $ws->local_port;
+  my $port = $ws->local_port;
 
 Local interface port.
 
@@ -517,13 +516,13 @@ Parse WebSocket frame.
 
 =head2 C<remote_address>
 
-  my $remote_address = $ws->remote_address;
+  my $address = $ws->remote_address;
 
 Remote interface address.
 
 =head2 C<remote_port>
 
-  my $remote_port = $ws->remote_port;
+  my $port = $ws->remote_port;
 
 Remote interface port.
 

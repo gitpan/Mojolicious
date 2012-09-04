@@ -148,7 +148,9 @@ sub parse {
 }
 
 sub parse_body {
-  shift->tap(sub { $_->{state} = 'body' })->parse(@_);
+  my $self = shift;
+  $self->{state} = 'body';
+  return $self->parse(@_);
 }
 
 sub progress {

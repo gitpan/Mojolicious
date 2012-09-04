@@ -340,7 +340,7 @@ sub _parse {
 sub _parser {
   my ($self, $method) = (shift, shift);
   return $self->[0]->$method unless @_;
-  $self->[0]->$method(shift);
+  $self->[0]->$method(@_);
   return $self;
 }
 
