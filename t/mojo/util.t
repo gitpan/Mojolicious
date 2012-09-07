@@ -2,7 +2,7 @@ use Mojo::Base -strict;
 
 use utf8;
 
-use Test::More tests => 148;
+use Test::More tests => 154;
 
 use File::Spec::Functions qw(catfile splitdir);
 use File::Temp 'tempdir';
@@ -13,7 +13,7 @@ use Mojo::Util
   qw(decode encode get_line hmac_md5_sum hmac_sha1_sum html_escape),
   qw(html_unescape md5_bytes md5_sum punycode_decode punycode_encode quote),
   qw(squish trim unquote secure_compare sha1_bytes sha1_sum slurp spurt),
-  qw(url_escape url_unescape xml_escape);
+  qw(url_escape url_unescape xml_escape xor_encode);
 
 # camelize
 is camelize('foo_bar_baz'), 'FooBarBaz', 'right camelized result';
@@ -365,6 +365,16 @@ ok secure_compare('♥1', '♥1'), 'values are equal';
 ok !secure_compare('♥',   '♥0'),  'values are not equal';
 ok !secure_compare('0♥',  '♥'),   'values are not equal';
 ok !secure_compare('0♥1', '1♥0'), 'values are not equal';
+
+# xor_encode
+is xor_encode('hello', 'foo'), "\x0e\x0a\x03\x0a\x00", 'right result';
+is xor_encode("\x0e\x0a\x03\x0a\x00", 'foo'), 'hello', 'right result';
+is xor_encode('hello world', 'x'),
+  "\x10\x1d\x14\x14\x17\x58\x0f\x17\x0a\x14\x1c", 'right result';
+is xor_encode("\x10\x1d\x14\x14\x17\x58\x0f\x17\x0a\x14\x1c", 'x'),
+  'hello world', 'right result';
+is xor_encode('hello', '123456789'), "\x59\x57\x5f\x58\x5a", 'right result';
+is xor_encode("\x59\x57\x5f\x58\x5a", '123456789'), 'hello', 'right result';
 
 # slurp
 is slurp(catfile(splitdir($FindBin::Bin), qw(templates exception.mt))),

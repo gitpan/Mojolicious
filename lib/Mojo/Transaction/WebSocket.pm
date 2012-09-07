@@ -3,7 +3,7 @@ use Mojo::Base 'Mojo::Transaction';
 
 use Config;
 use Mojo::Transaction::HTTP;
-use Mojo::Util qw(b64_encode decode encode sha1_bytes);
+use Mojo::Util qw(b64_encode decode encode sha1_bytes xor_encode);
 
 use constant DEBUG => $ENV{MOJO_WEBSOCKET_DEBUG} || 0;
 
@@ -73,7 +73,7 @@ sub build_frame {
   # Mask payload
   if ($masked) {
     my $mask = pack 'N', int(rand 9999999);
-    $payload = $mask . _xor_mask($payload, $mask);
+    $payload = $mask . xor_encode($payload, $mask x 128);
   }
 
   return $frame . $payload;
@@ -173,7 +173,7 @@ sub parse_frame {
   my $payload = $len ? substr($clone, 0, $len, '') : '';
 
   # Unmask payload
-  $payload = _xor_mask($payload, substr($payload, 0, 4, '')) if $masked;
+  $payload = xor_encode($payload, substr($payload, 0, 4, '') x 128) if $masked;
   warn "$payload\n" if DEBUG;
   $$buffer = $clone;
 
@@ -281,16 +281,6 @@ sub _message {
   my $msg = delete $self->{message};
   $msg = decode 'UTF-8', $msg if $msg && delete $self->{op} == TEXT;
   $self->emit(message => $msg);
-}
-
-sub _xor_mask {
-  my ($input, $mask) = @_;
-
-  # 512 byte mask
-  $mask = $mask x 128;
-  my $output = '';
-  $output .= $_ ^ $mask while length($_ = substr($input, 0, 512, '')) == 512;
-  return $output .= $_ ^ substr($mask, 0, length, '');
 }
 
 1;
@@ -443,25 +433,25 @@ Build WebSocket frame.
 
   my $success = $ws->client_challenge;
 
-Check WebSocket handshake challenge.
+Check WebSocket handshake challenge client-side.
 
 =head2 C<client_handshake>
 
   $ws->client_handshake;
 
-WebSocket handshake.
+Perform WebSocket handshake client-side.
 
 =head2 C<client_read>
 
   $ws->client_read($data);
 
-Read raw WebSocket data.
+Read and process data client-side.
 
 =head2 C<client_write>
 
   my $chunk = $ws->client_write;
 
-Raw WebSocket data to write.
+Write data client-side.
 
 =head2 C<connection>
 
@@ -548,9 +538,9 @@ Resume C<handshake> transaction.
 
   $ws = $ws->send({binary => $bytes});
   $ws = $ws->send({text   => $bytes});
-  $ws = $ws->send([$fin, $rsv1, $rsv2, $rsv3, $op, $payload]);
-  $ws = $ws->send('Hi there!');
-  $ws = $ws->send('Hi there!' => sub {...});
+  $ws = $ws->send([$fin, $rsv1, $rsv2, $rsv3, $op, $bytes]);
+  $ws = $ws->send($chars);
+  $ws = $ws->send($chars => sub {...});
 
 Send message or frame non-blocking via WebSocket, the optional drain callback
 will be invoked once all data has been written.
@@ -562,19 +552,19 @@ will be invoked once all data has been written.
 
   $ws->server_handshake;
 
-WebSocket handshake.
+Perform WebSocket handshake server-side.
 
 =head2 C<server_read>
 
   $ws->server_read($data);
 
-Read raw WebSocket data.
+Read and process data server-side.
 
 =head2 C<server_write>
 
   my $chunk = $ws->server_write;
 
-Raw WebSocket data to write.
+Write data server-side.
 
 =head1 DEBUGGING
 

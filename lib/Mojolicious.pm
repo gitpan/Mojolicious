@@ -38,7 +38,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Rainbow';
-our $VERSION  = '3.37';
+our $VERSION  = '3.38';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -784,6 +784,8 @@ Dmitriy Shalashov
 
 Dmitry Konstantinov
 
+Dominique Dumont
+
 Douglas Christopher Wilson
 
 Eugene Toropov
@@ -818,7 +820,7 @@ Kazuhiro Shibuya
 
 Kevin Old
 
-KITAMURA Akatsuki
+Kitamura Akatsuki
 
 Lars Balker Rasmussen
 

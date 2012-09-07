@@ -40,7 +40,7 @@ our @EXPORT_OK = (
   qw(decode encode get_line hmac_md5_sum hmac_sha1_sum html_escape),
   qw(html_unescape md5_bytes md5_sum punycode_decode punycode_encode quote),
   qw(secure_compare sha1_bytes sha1_sum slurp spurt squish trim unquote),
-  qw(url_escape url_unescape xml_escape)
+  qw(url_escape url_unescape xml_escape xor_encode)
 );
 
 sub b64_decode { decode_base64(shift) }
@@ -103,8 +103,8 @@ sub get_line {
   return $line;
 }
 
-sub hmac_md5_sum  { _hmac(0, @_) }
-sub hmac_sha1_sum { _hmac(1, @_) }
+sub hmac_md5_sum  { _hmac(\&md5,  @_) }
+sub hmac_sha1_sum { _hmac(\&sha1, @_) }
 
 sub html_escape {
   my ($string, $pattern) = @_;
@@ -117,7 +117,7 @@ sub html_escape {
 sub html_unescape {
   my $string = shift;
   $string
-    =~ s/&(?:\#((?:\d{1,7}|x[0-9A-Fa-f]{1,6}));|(\w+;?))/_decode($1, $2)/ge;
+    =~ s/&(?:\#((?:\d{1,7}|x[[:xdigit:]]{1,6}));|(\w+;?))/_decode($1, $2)/ge;
   return $string;
 }
 
@@ -306,7 +306,7 @@ sub url_escape {
 sub url_unescape {
   my $string = shift;
   return $string if index($string, '%') == -1;
-  $string =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/ge;
+  $string =~ s/%([[:xdigit:]]{2})/chr(hex($1))/ge;
   return $string;
 }
 
@@ -320,6 +320,17 @@ sub xml_escape {
   $string =~ s/'/&#39;/g;
 
   return $string;
+}
+
+sub xor_encode {
+  my ($input, $key) = @_;
+
+  # Encode with variable key length
+  my $len = length $key;
+  my $buffer = my $output = '';
+  $output .= $buffer ^ $key
+    while length($buffer = substr($input, 0, $len, '')) == $len;
+  return $output .= $buffer ^ substr($key, 0, length $buffer, '');
 }
 
 sub _adapt {
@@ -357,10 +368,7 @@ sub _encode {
 }
 
 sub _hmac {
-  my ($sha, $string, $secret) = @_;
-
-  # Hash function
-  my $hash = $sha ? sub { sha1(@_) } : sub { md5(@_) };
+  my ($hash, $string, $secret) = @_;
 
   # Secret
   $secret = $secret ? "$secret" : 'Very insecure!';
@@ -602,6 +610,12 @@ Decode percent encoded characters in string.
 
 Escape only the characters C<&>, C<E<lt>>, C<E<gt>>, C<"> and C<'> in string,
 this is a much faster version of C<html_escape>.
+
+=head2 C<xor_encode>
+
+  my $encoded = xor_encode $string, $key;
+
+XOR encode string.
 
 =head1 SEE ALSO
 

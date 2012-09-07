@@ -42,8 +42,7 @@ sub generate_body_chunk {
     if !delete $self->{delay} && !length $self->{body_buffer};
 
   # Get chunk
-  my $chunk = $self->{body_buffer} // '';
-  $self->{body_buffer} = '';
+  my $chunk = delete $self->{body_buffer} // '';
 
   # EOF or delay
   return $self->{eof} ? '' : undef unless length $chunk;
@@ -242,7 +241,7 @@ sub _parse_chunked {
     if ($self->{chunk_state} // '') eq 'trailing_headers';
 
   # New chunk (ignore the chunk extension)
-  while ($self->{pre_buffer} =~ /^((?:\x0d?\x0a)?([\da-fA-F]+).*\x0d?\x0a)/) {
+  while ($self->{pre_buffer} =~ /^((?:\x0d?\x0a)?([[:xdigit:]]+).*\x0a)/) {
     my $header = $1;
     my $len    = hex $2;
 
@@ -275,10 +274,7 @@ sub _parse_chunked_trailing_headers {
   my $self = shift;
 
   # Parse
-  my $headers = $self->headers->parse($self->{pre_buffer});
-  $self->{pre_buffer} = '';
-
-  # Check if we are finished
+  my $headers = $self->headers->parse(delete $self->{pre_buffer});
   return unless $headers->is_finished;
   $self->{chunk_state} = 'finished';
 
@@ -295,10 +291,7 @@ sub _parse_headers {
   my $self = shift;
 
   # Parse
-  my $headers = $self->headers->parse($self->{pre_buffer});
-  $self->{pre_buffer} = '';
-
-  # Check if we are finished
+  my $headers = $self->headers->parse(delete $self->{pre_buffer});
   return unless $headers->is_finished;
   $self->{state} = 'body';
 
