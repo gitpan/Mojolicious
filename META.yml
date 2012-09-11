@@ -1,29 +1,29 @@
---- #YAML:1.0
-name:               Mojolicious
-version:            3.39
-abstract:           Real-time web framework
+---
+abstract: 'Real-time web framework'
 author:
-    - Sebastian Riedel <sri@cpan.org>
-license:            artistic_2
-distribution_type:  module
-configure_requires:
-    ExtUtils::MakeMaker:  0
+  - 'Sebastian Riedel <sri@cpan.org>'
 build_requires:
-    ExtUtils::MakeMaker:  0
-requires:
-    perl:  5.010001
-resources:
-    bugtracker:   http://github.com/kraih/mojo/issues
-    homepage:     http://mojolicio.us
-    license:      http://www.opensource.org/licenses/artistic-license-2.0
-    MailingList:  http://groups.google.com/group/mojolicious
-    repository:   http://github.com/kraih/mojo
-no_index:
-    directory:
-        - t
-        - inc
-        - t
-generated_by:       ExtUtils::MakeMaker version 6.57_05
+  ExtUtils::MakeMaker: 0
+configure_requires:
+  ExtUtils::MakeMaker: 0
+dynamic_config: 1
+generated_by: 'ExtUtils::MakeMaker version 6.6302, CPAN::Meta::Converter version 2.120921'
+license: artistic_2
 meta-spec:
-    url:      http://module-build.sourceforge.net/META-spec-v1.4.html
-    version:  1.4
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: Mojolicious
+no_index:
+  directory:
+    - t
+    - inc
+    - t
+requires:
+  perl: 5.010001
+resources:
+  bugtracker: http://github.com/kraih/mojo/issues
+  homepage: http://mojolicio.us
+  license: http://www.opensource.org/licenses/artistic-license-2.0
+  repository: http://github.com/kraih/mojo
+  x_MailingList: http://groups.google.com/group/mojolicious
+version: 3.40

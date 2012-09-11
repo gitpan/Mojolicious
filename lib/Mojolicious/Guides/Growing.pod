@@ -644,21 +644,15 @@ Finally C<myapp.pl> can be replaced with a proper L<Mojolicious> script.
   $ touch script/myapp
   $ chmod 744 script/myapp
 
-The library detection code was specifically designed for tricky production
-environments.
+Only a few small details change.
 
   #!/usr/bin/env perl
 
   use strict;
   use warnings;
 
-  use File::Basename 'dirname';
-  use File::Spec::Functions qw(catdir splitdir);
-
-  # Source directory has precedence
-  my @base = (splitdir(dirname(__FILE__)), '..');
-  my $lib = join('/', @base, 'lib');
-  -e catdir(@base, 't') ? unshift(@INC, $lib) : push(@INC, $lib);
+  use FindBin;
+  use lib "$FindBin::Bin/../lib";
 
   # Start commands for application
   require Mojolicious::Commands;
