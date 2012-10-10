@@ -299,6 +299,7 @@ t/mojolicious/templates/exception.html.epl
 t/mojolicious/templates/exception.testing.html.ep
 t/mojolicious/templates/foo/bar.rss.ep
 t/mojolicious/templates/foo/bar/index.html.epl
+t/mojolicious/templates/foo/bar/test.html.ep
 t/mojolicious/templates/foo/index.html.xpl
 t/mojolicious/templates/foo/yada.html.ep
 t/mojolicious/templates/layouts/default.html.epl
