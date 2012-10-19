@@ -22,18 +22,6 @@ has tag_start => '<%';
 has tag_end   => '%>';
 has tree      => sub { [] };
 
-# Escape helper
-my $ESCAPE = <<'EOF';
-no warnings 'redefine';
-sub _escape {
-  return $_[0] if ref $_[0] eq 'Mojo::ByteStream';
-  no warnings 'uninitialized';
-  Mojo::Util::xml_escape "$_[0]";
-}
-use Mojo::Base -strict;
-EOF
-$ESCAPE =~ s/\n//g;
-
 sub build {
   my $self = shift;
 
@@ -105,11 +93,16 @@ sub build {
     }
   }
 
+  # Escape helper
+  my $escape = q[no warnings 'redefine'; sub _escape {];
+  $escape .= q/no warnings 'uninitialized'; ref $_[0] eq 'Mojo::ByteStream'/;
+  $escape .= '? $_[0] : Mojo::Util::xml_escape("$_[0]") }';
+
   # Wrap lines
   my $first = $lines[0] ||= '';
-  $lines[0] = 'package ' . $self->namespace . "; $ESCAPE ";
-  $lines[0]  .= "sub { my \$_M = ''; " . $self->prepend . "; do { $first";
-  $lines[-1] .= $self->append . "; \$_M; } };";
+  $lines[0] = "package @{[$self->namespace]}; $escape use Mojo::Base -strict;";
+  $lines[0]  .= "sub { my \$_M = ''; @{[$self->prepend]}; do { $first";
+  $lines[-1] .= "@{[$self->append]}; \$_M } };";
 
   # Code
   my $code = join "\n", @lines;
@@ -466,7 +459,7 @@ L<Mojo::Template> implements the following attributes.
   my $escape = $mt->auto_escape;
   $mt        = $mt->auto_escape(1);
 
-Activate automatic XML escaping.
+Activate automatic escaping.
 
 =head2 C<append>
 
@@ -504,7 +497,7 @@ Keyword indicating the start of a capture block, defaults to C<begin>.
   my $code = $mt->code;
   $mt      = $mt->code($code);
 
-Template code.
+Perl code for template.
 
 =head2 C<comment_mark>
 
@@ -645,20 +638,20 @@ Construct a new L<Mojo::Template> object.
 
   $mt = $mt->build;
 
-Build template.
+Build Perl code from tree.
 
 =head2 C<compile>
 
   my $exception = $mt->compile;
 
-Compile template.
+Compile Perl code for template.
 
 =head2 C<interpret>
 
   my $output = $mt->interpret;
   my $output = $mt->interpret(@args);
 
-Interpret template.
+Interpret compiled template code.
 
   # Reuse template
   say $mt->render('Hello <%= $_[0] %>!', 'Bender');
@@ -669,7 +662,7 @@ Interpret template.
 
   $mt = $mt->parse($template);
 
-Parse template.
+Parse template into tree.
 
 =head2 C<render>
 
