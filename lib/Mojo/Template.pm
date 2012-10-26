@@ -14,6 +14,7 @@ has capture_end   => 'end';
 has capture_start => 'begin';
 has comment_mark  => '#';
 has encoding      => 'UTF-8';
+has escape        => sub { \&Mojo::Util::xml_escape };
 has [qw(escape_mark expression_mark trim_mark)] => '=';
 has [qw(line_start replace_mark)] => '%';
 has name      => 'template';
@@ -93,21 +94,7 @@ sub build {
     }
   }
 
-  # Escape helper
-  my $escape = q[no warnings 'redefine'; sub _escape {];
-  $escape .= q/no warnings 'uninitialized'; ref $_[0] eq 'Mojo::ByteStream'/;
-  $escape .= '? $_[0] : Mojo::Util::xml_escape("$_[0]") }';
-
-  # Wrap lines
-  my $first = $lines[0] ||= '';
-  $lines[0] = "package @{[$self->namespace]}; $escape use Mojo::Base -strict;";
-  $lines[0]  .= "sub { my \$_M = ''; @{[$self->prepend]}; do { $first";
-  $lines[-1] .= "@{[$self->append]}; \$_M } };";
-
-  # Code
-  my $code = join "\n", @lines;
-  warn "-- Code for @{[$self->name]}\n@{[encode 'UTF-8', $code]}\n\n" if DEBUG;
-  return $self->code($code)->tree([]);
+  return $self->code($self->_wrap(\@lines))->tree([]);
 }
 
 sub compile {
@@ -319,6 +306,30 @@ sub _trim {
   }
 }
 
+sub _wrap {
+  my ($self, $lines) = @_;
+
+  # Escape function
+  no strict 'refs';
+  no warnings 'redefine';
+  my $escape = $self->escape;
+  *{$self->namespace . '::_escape'} = sub {
+    no warnings 'uninitialized';
+    ref $_[0] eq 'Mojo::ByteStream' ? $_[0] : $escape->("$_[0]");
+  };
+
+  # Wrap lines
+  my $first = $lines->[0] ||= '';
+  $lines->[0] = "package @{[$self->namespace]}; use Mojo::Base -strict;";
+  $lines->[0]  .= "sub { my \$_M = ''; @{[$self->prepend]}; do { $first";
+  $lines->[-1] .= "@{[$self->append]}; \$_M } };";
+
+  # Code
+  my $code = join "\n", @$lines;
+  warn "-- Code for @{[$self->name]}\n@{[encode 'UTF-8', $code]}\n\n" if DEBUG;
+  return $code;
+}
+
 1;
 
 =head1 NAME
@@ -522,6 +533,14 @@ Compiled template code.
 
 Encoding used for template files.
 
+=head2 C<escape>
+
+  my $cb = $mt->escape;
+  $mt    = $mt->escape(sub { reverse $_[0] });
+
+A callback used to escape the results of escaped expressions, defaults to
+L<Mojo::Util/"xml_escape">.
+
 =head2 C<escape_mark>
 
   my $mark = $mt->escape_mark;
@@ -563,6 +582,8 @@ this method is attribute and might change without warning!
   $mt           = $mt->namespace('main');
 
 Namespace used to compile templates, defaults to C<Mojo::Template::SandBox>.
+Note that namespaces should only be shared very carefully between templates,
+since functions and global variables will not be cleared automatically.
 
 =head2 C<prepend>
 
