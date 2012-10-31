@@ -85,7 +85,7 @@ lib/Mojolicious/Command/version.pm
 lib/Mojolicious/Commands.pm
 lib/Mojolicious/Controller.pm
 lib/Mojolicious/Guides.pod
-lib/Mojolicious/Guides/CodingGuidelines.pod
+lib/Mojolicious/Guides/Contributing.pod
 lib/Mojolicious/Guides/Cookbook.pod
 lib/Mojolicious/Guides/FAQ.pod
 lib/Mojolicious/Guides/Growing.pod

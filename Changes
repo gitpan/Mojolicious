@@ -1,4 +1,10 @@
 
+3.53  2012-10-31
+  - Replaced Mojolicious::Guides::CodingGuidelines with
+    Mojolicious::Guides::Contributing.
+  - Improved documentation.
+  - Improved tests.
+
 3.52  2012-10-26
   - Added boolean shortcut support to Mojo::JSON.
   - Added escape attribute to Mojo::Template. (jberger)
