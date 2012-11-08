@@ -1,6 +1,7 @@
 use Mojo::Base -strict;
 
 use Test::More;
+use IO::Compress::Gzip 'gzip';
 use Mojo::Asset::File;
 use Mojo::Content::Single;
 use Mojo::Content::MultiPart;
@@ -323,7 +324,9 @@ is $res->headers->content_length, undef, 'right "Content-Length" value';
   $res->parse("Content-Length: 420\x0d\x0a");
   $res->parse('Content-Type: multipart/form-data; bo');
   $res->parse("undary=----------0xKhTmLbOuNdArY\x0d\x0a\x0d\x0a");
+  ok !$res->content->is_limit_exceeded, 'limit is not exceeded';
   $res->parse('a' x 200);
+  ok $res->content->is_limit_exceeded, 'limit is exceeded';
   ok $res->is_finished, 'response is finished';
   ok $res->content->is_finished, 'content is finished';
   is(($res->error)[0], 'Maximum buffer size exceeded', 'right error');
@@ -333,6 +336,28 @@ is $res->headers->content_length, undef, 'right "Content-Length" value';
   is $res->version, '1.1', 'right version';
   ok $res->headers->content_type =~ m!multipart/form-data!,
     'right "Content-Type" value';
+}
+
+# Parse HTTP 1.1 gzip compressed response (garbage bytes exceeding limit)
+{
+  local $ENV{MOJO_MAX_BUFFER_SIZE} = 12;
+  $res = Mojo::Message::Response->new;
+  is $res->content->max_buffer_size, 12, 'right size';
+  $res->parse("HTTP/1.1 200 OK\x0d\x0a");
+  $res->parse("Content-Length: 1000\x0d\x0a");
+  $res->parse("Content-Encoding: gzip\x0d\x0a\x0d\x0a");
+  $res->parse('a' x 5);
+  ok !$res->content->is_limit_exceeded, 'limit is not exceeded';
+  $res->parse('a' x 995);
+  ok $res->content->is_limit_exceeded, 'limit is exceeded';
+  ok $res->is_finished, 'response is finished';
+  ok $res->content->is_finished, 'content is finished';
+  is(($res->error)[0], 'Maximum buffer size exceeded', 'right error');
+  is(($res->error)[1], 400, 'right status');
+  is $res->code,    200,   'right status';
+  is $res->message, 'OK',  'right message';
+  is $res->version, '1.1', 'right version';
+  is $res->body,    '',    'no content';
 }
 
 # Parse HTTP 1.1 chunked response
@@ -351,6 +376,7 @@ is $res->message,     'Internal Server Error', 'right message';
 is $res->version,     '1.1', 'right version';
 is $res->headers->content_type,   'text/plain', 'right "Content-Type" value';
 is $res->headers->content_length, 13,           'right "Content-Length" value';
+is $res->headers->transfer_encoding, undef, 'no "Transfer-Encoding" value';
 is $res->body_size, 13, 'right size';
 
 # Parse HTTP 1.1 multipart response
@@ -412,6 +438,65 @@ ok $res->headers->content_type =~ m!multipart/form-data!,
   'right "Content-Type" value';
 isa_ok $res->content, 'Mojo::Content::Single', 'right content';
 like $res->content->asset->slurp, qr/hallo welt/, 'right content';
+
+# Parse HTTP 1.1 gzip compressed response
+my $uncompressed = 'abc' x 1000;
+gzip \$uncompressed, \my $compressed;
+$res = Mojo::Message::Response->new;
+$res->parse("HTTP/1.1 200 OK\x0d\x0a");
+$res->parse("Content-Type: text/plain\x0d\x0a");
+$res->parse("Content-Length: @{[length $compressed]}\x0d\x0a");
+$res->parse("Content-Encoding: GZip\x0d\x0a\x0d\x0a");
+ok $res->content->is_compressed, 'content is compressed';
+is $res->content->progress, 0, 'right progress';
+$res->parse(substr($compressed, 0, 1));
+is $res->content->progress, 1, 'right progress';
+$res->parse(substr($compressed, 1, length($compressed)));
+is $res->content->progress, length($compressed), 'right progress';
+ok !$res->content->is_compressed, 'content is not compressed anymore';
+ok $res->is_finished, 'response is finished';
+ok !$res->error, 'no error';
+is $res->code,    200,   'right status';
+is $res->message, 'OK',  'right message';
+is $res->version, '1.1', 'right version';
+is $res->headers->content_type, 'text/plain', 'right "Content-Type" value';
+is $res->headers->content_length, length($uncompressed),
+  'right "Content-Length" value';
+is $res->headers->content_encoding, undef, 'no "Content-Encoding" value';
+is $res->body, $uncompressed, 'right content';
+
+# Parse HTTP 1.1 chunked gzip compressed response
+$uncompressed = 'abc' x 1000;
+$compressed   = undef;
+gzip \$uncompressed, \$compressed;
+$res = Mojo::Message::Response->new;
+$res->parse("HTTP/1.1 200 OK\x0d\x0a");
+$res->parse("Content-Type: text/plain\x0d\x0a");
+$res->parse("Content-Encoding: gzip\x0d\x0a");
+$res->parse("Transfer-Encoding: chunked\x0d\x0a\x0d\x0a");
+ok $res->content->is_chunked,    'content is chunked';
+ok $res->content->is_compressed, 'content is compressed';
+$res->parse("1\x0d\x0a");
+$res->parse(substr($compressed, 0, 1));
+$res->parse("\x0d\x0a");
+$res->parse(sprintf('%x', length($compressed) - 1));
+$res->parse("\x0d\x0a");
+$res->parse(substr($compressed, 1, length($compressed) - 1));
+$res->parse("\x0d\x0a");
+$res->parse("0\x0d\x0a\x0d\x0a");
+ok !$res->content->is_chunked,    'content is not chunked anymore';
+ok !$res->content->is_compressed, 'content is not compressed anymore';
+ok $res->is_finished, 'response is finished';
+ok !$res->error, 'no error';
+is $res->code,    200,   'right status';
+is $res->message, 'OK',  'right message';
+is $res->version, '1.1', 'right version';
+is $res->headers->content_type, 'text/plain', 'right "Content-Type" value';
+is $res->headers->content_length, length($uncompressed),
+  'right "Content-Length" value';
+is $res->headers->transfer_encoding, undef, 'no "Transfer-Encoding" value';
+is $res->headers->content_encoding,  undef, 'no "Content-Encoding" value';
+is $res->body, $uncompressed, 'right content';
 
 # Build HTTP 1.1 response start line with minimal headers
 $res = Mojo::Message::Response->new;

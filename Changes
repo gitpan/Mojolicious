@@ -1,4 +1,14 @@
 
+3.55  2012-11-08
+  - Added gzip compression support to Mojo::UserAgent.
+  - Added is_compressed method to Mojo::Content.
+  - Improved documentation.
+  - Improved tests.
+  - Fixed bug that prevented around_dispatch hooks from working correctly in
+    embedded applications.
+  - Fixed small bug where "chunked" would not always be the default transfer
+    encoding.
+
 3.54  2012-11-01
   - Added next and previous methods to Mojo::DOM.
   - Improved documentation.

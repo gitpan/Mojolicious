@@ -452,9 +452,10 @@ sub _start {
       if $https && !defined $req->proxy && $scheme eq 'https';
   }
 
-  # We identify ourselves
+  # We identify ourselves and accept gzip compression
   my $headers = $req->headers;
   $headers->user_agent($self->name) unless $headers->user_agent;
+  $headers->accept_encoding('gzip') unless $headers->accept_encoding;
 
   # Inject cookies
   if (my $jar = $self->cookie_jar) { $jar->inject($tx) }
@@ -607,7 +608,8 @@ Mojo::UserAgent - Non-blocking I/O HTTP and WebSocket user agent
 =head1 DESCRIPTION
 
 L<Mojo::UserAgent> is a full featured non-blocking I/O HTTP and WebSocket user
-agent, with C<IPv6>, C<TLS> and C<libev> support.
+agent, with C<IPv6>, C<TLS>, C<SNI>, C<IDNA>, C<Comet> (long polling), C<gzip>
+compression and multiple event loop support.
 
 Optional modules L<EV> (4.0+), L<IO::Socket::IP> (0.16+) and
 L<IO::Socket::SSL> (1.75+) are supported transparently through

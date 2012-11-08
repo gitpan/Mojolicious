@@ -128,6 +128,7 @@ sub _controller {
       weaken $r->parent($c->match->endpoint)->{parent} unless $r->parent;
     }
     $app->$sub($c);
+    $c->stash->{'mojo.routed'}++;
   }
 
   # Action
@@ -136,9 +137,8 @@ sub _controller {
     $log->debug(qq{Routing to controller "$class" and action "$method".});
 
     # Try to call action
-    my $stash = $c->stash;
     if (my $sub = $app->can($method)) {
-      $stash->{'mojo.routed'}++ unless $staging;
+      $c->stash->{'mojo.routed'}++ unless $staging;
       $continue = $app->$sub;
     }
 
@@ -225,7 +225,7 @@ Mojolicious::Routes - Always find your destination with routes!
 
   use Mojolicious::Routes;
 
-  # New routes tree
+  # New route tree
   my $r = Mojolicious::Routes->new;
 
   # Normal route matching "/articles" with parameters "controller" and
