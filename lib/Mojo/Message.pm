@@ -330,7 +330,7 @@ sub _parse_formdata {
   my @formdata;
   my $content = $self->content;
   return \@formdata unless $content->is_multipart;
-  my $default = $content->charset || $self->default_charset;
+  my $charset = $content->charset || $self->default_charset;
 
   # Walk the tree
   my @parts;
@@ -351,7 +351,6 @@ sub _parse_formdata {
     my $value      = $part;
 
     # Decode
-    my $charset = $part->charset || $default;
     if ($charset) {
       $name     = decode($charset, $name)     // $name     if $name;
       $filename = decode($charset, $filename) // $filename if $filename;
@@ -578,7 +577,7 @@ before the entire message body has been received.
   $msg             = $msg->error('Parser error');
   $msg             = $msg->error('Parser error', 500);
 
-Parser errors and codes.
+Error and code.
 
 =head2 C<extract_start_line>
 

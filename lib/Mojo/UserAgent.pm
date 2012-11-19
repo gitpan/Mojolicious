@@ -303,9 +303,12 @@ sub _error {
 sub _finish {
   my ($self, $tx, $cb, $close) = @_;
 
-  # Common errors
+  # Remove code from parser errors
   my $res = $tx->res;
-  unless ($res->error) {
+  if (my $err = $res->error) { $res->error($err) }
+
+  # Common errors
+  else {
 
     # Premature connection close
     if ($close && !$res->code) { $res->error('Premature connection close') }
@@ -317,7 +320,7 @@ sub _finish {
   }
 
   # Callback
-  $self->$cb($tx) if $cb;
+  $self->$cb($tx);
 }
 
 sub _handle {

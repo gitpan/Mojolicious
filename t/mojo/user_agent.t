@@ -312,6 +312,24 @@ $tx = $ua->get('/timeout?timeout=5');
 ok !$tx->success, 'not successful';
 is $tx->error, 'Inactivity timeout', 'right error';
 
+# GET /echo (response exceeding message size limit)
+$ua->once(
+  start => sub {
+    my ($ua, $tx) = @_;
+    $tx->res->max_message_size(12);
+  }
+);
+$tx = $ua->get('/echo' => 'Hello World!');
+ok !$tx->success, 'not successful';
+is(($tx->error)[0], 'Maximum message size exceeded', 'right error');
+is(($tx->error)[1], undef, 'no code');
+
+# GET /does_not_exist (404 response)
+$tx = $ua->get('/does_not_exist');
+ok !$tx->success, 'not successful';
+is(($tx->error)[0], 'Not Found', 'right error');
+is(($tx->error)[1], 404,         'right code');
+
 # GET / (introspect)
 my $req = my $res = '';
 my $start = $ua->on(

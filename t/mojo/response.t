@@ -334,7 +334,8 @@ is $res->headers->content_length, undef, 'right "Content-Length" value';
   is $res->code,    200,   'right status';
   is $res->message, 'OK',  'right message';
   is $res->version, '1.1', 'right version';
-  ok $res->headers->content_type =~ m!multipart/form-data!,
+  is $res->headers->content_type,
+    'multipart/form-data; boundary=----------0xKhTmLbOuNdArY',
     'right "Content-Type" value';
 }
 
@@ -403,13 +404,108 @@ ok $res->is_finished, 'response is finished';
 is $res->code,        200, 'right status';
 is $res->message,     'OK', 'right message';
 is $res->version,     '1.1', 'right version';
-ok $res->headers->content_type =~ m!multipart/form-data!,
+is $res->headers->content_type,
+  'multipart/form-data; boundary=----------0xKhTmLbOuNdArY',
   'right "Content-Type" value';
 isa_ok $res->content->parts->[0], 'Mojo::Content::Single', 'right part';
 isa_ok $res->content->parts->[1], 'Mojo::Content::Single', 'right part';
 isa_ok $res->content->parts->[2], 'Mojo::Content::Single', 'right part';
 is $res->content->parts->[0]->asset->slurp, "hallo welt test123\n",
   'right content';
+
+# Parse HTTP 1.1 chunked multipart response (at once)
+$res = Mojo::Message::Response->new;
+my $multipart
+  = "HTTP/1.1 200 OK\x0d\x0a"
+  . "Transfer-Encoding: chunked\x0d\x0a"
+  . 'Content-Type: multipart/form-data; bo'
+  . "undary=----------0xKhTmLbOuNdArY\x0d\x0a\x0d\x0a"
+  . "19f\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a"
+  . "Content-Disposition: form-data; name=\"text1\"\x0d\x0a"
+  . "\x0d\x0ahallo welt test123\n"
+  . "\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a"
+  . "Content-Disposition: form-data; name=\"text2\"\x0d\x0a"
+  . "\x0d\x0a\x0d\x0a------------0xKhTmLbOuNdArY\x0d\x0a"
+  . 'Content-Disposition: form-data; name="upload"; file'
+  . "name=\"hello.pl\"\x0d\x0a"
+  . "Content-Type: application/octet-stream\x0d\x0a\x0d\x0a"
+  . "#!/usr/bin/perl\n\n"
+  . "use strict;\n"
+  . "use warnings;\n\n"
+  . "print \"Hello World :)\\n\"\n"
+  . "\x0d\x0a------------0xKhTmLbOuNdA"
+  . "r\x0d\x0a3\x0d\x0aY--\x0d\x0a"
+  . "0\x0d\x0a\x0d\x0a";
+$res->parse($multipart);
+ok $res->is_finished, 'response is finished';
+is $res->code,        200, 'right status';
+is $res->message,     'OK', 'right message';
+is $res->version,     '1.1', 'right version';
+is $res->headers->content_type,
+  'multipart/form-data; boundary=----------0xKhTmLbOuNdArY',
+  'right "Content-Type" value';
+is $res->headers->content_length,    418,   'right "Content-Length" value';
+is $res->headers->transfer_encoding, undef, 'no "Transfer-Encoding" value';
+is $res->body_size, 418, 'right size';
+isa_ok $res->content->parts->[0], 'Mojo::Content::Single', 'right part';
+isa_ok $res->content->parts->[1], 'Mojo::Content::Single', 'right part';
+isa_ok $res->content->parts->[2], 'Mojo::Content::Single', 'right part';
+is $res->content->parts->[0]->asset->slurp, "hallo welt test123\n",
+  'right content';
+is $res->upload('upload')->filename,  'hello.pl',            'right filename';
+isa_ok $res->upload('upload')->asset, 'Mojo::Asset::Memory', 'right file';
+is $res->upload('upload')->asset->size, 69, 'right size';
+is $res->content->parts->[2]->headers->content_type,
+  'application/octet-stream', 'right "Content-Type" value';
+
+# Parse HTTP 1.1 chunked multipart response (in multiple small chunks)
+$res = Mojo::Message::Response->new;
+$res->parse("HTTP/1.1 200 OK\x0d\x0a");
+$res->parse("Transfer-Encoding: chunked\x0d\x0a");
+$res->parse('Content-Type: multipart/parallel; boundary=AAA; charset=utf-8');
+$res->parse("\x0d\x0a\x0d\x0a");
+$res->parse("7\x0d\x0a");
+$res->parse("--AAA\x0d\x0a");
+$res->parse("\x0d\x0a1a\x0d\x0a");
+$res->parse("Content-Type: image/jpeg\x0d\x0a");
+$res->parse("\x0d\x0a16\x0d\x0a");
+$res->parse("Content-ID: 600050\x0d\x0a\x0d\x0a");
+$res->parse("\x0d\x0a6\x0d\x0a");
+$res->parse("abcd\x0d\x0a");
+$res->parse("\x0d\x0a7\x0d\x0a");
+$res->parse("--AAA\x0d\x0a");
+$res->parse("\x0d\x0a1a\x0d\x0a");
+$res->parse("Content-Type: image/jpeg\x0d\x0a");
+$res->parse("\x0d\x0a16\x0d\x0a");
+$res->parse("Content-ID: 600051\x0d\x0a\x0d\x0a");
+$res->parse("\x0d\x0a6\x0d\x0a");
+$res->parse("efgh\x0d\x0a");
+$res->parse("\x0d\x0a7\x0d\x0a");
+$res->parse('--AAA--');
+ok !$res->is_finished, 'response is not finished';
+$res->parse("\x0d\x0a0\x0d\x0a\x0d\x0a");
+ok $res->is_finished, 'response is finished';
+is $res->code,        200, 'right status';
+is $res->message,     'OK', 'right message';
+is $res->version,     '1.1', 'right version';
+is $res->headers->content_type,
+  'multipart/parallel; boundary=AAA; charset=utf-8',
+  'right "Content-Type" value';
+is $res->headers->content_length,    129,   'right "Content-Length" value';
+is $res->headers->transfer_encoding, undef, 'no "Transfer-Encoding" value';
+is $res->body_size, 129, 'right size';
+isa_ok $res->content->parts->[0], 'Mojo::Content::Single', 'right part';
+isa_ok $res->content->parts->[1], 'Mojo::Content::Single', 'right part';
+is $res->content->parts->[0]->asset->slurp, 'abcd', 'right content';
+is $res->content->parts->[0]->headers->content_type, 'image/jpeg',
+  'right "Content-Type" value';
+is $res->content->parts->[0]->headers->header('Content-ID'), 600050,
+  'right "Content-ID" value';
+is $res->content->parts->[1]->asset->slurp, 'efgh', 'right content';
+is $res->content->parts->[1]->headers->content_type, 'image/jpeg',
+  'right "Content-Type" value';
+is $res->content->parts->[1]->headers->header('Content-ID'), 600051,
+  'right "Content-ID" value';
 
 # Parse HTTP 1.1 multipart response with missing boundary
 $res = Mojo::Message::Response->new;
@@ -434,7 +530,7 @@ ok $res->is_finished, 'response is finished';
 is $res->code,        200, 'right status';
 is $res->message,     'OK', 'right message';
 is $res->version,     '1.1', 'right version';
-ok $res->headers->content_type =~ m!multipart/form-data!,
+is $res->headers->content_type, 'multipart/form-data; bo',
   'right "Content-Type" value';
 isa_ok $res->content, 'Mojo::Content::Single', 'right content';
 like $res->content->asset->slurp, qr/hallo welt/, 'right content';
