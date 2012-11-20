@@ -281,6 +281,7 @@ t/mojolicious/pod_renderer_lite_app.t
 t/mojolicious/production_app.t
 t/mojolicious/public/hello.txt
 t/mojolicious/public/hello2.txt
+t/mojolicious/public/hello4.txt
 t/mojolicious/public2/hello.txt
 t/mojolicious/public2/hello3.txt
 t/mojolicious/public_dev/another/file
@@ -291,6 +292,7 @@ t/mojolicious/restful_lite_app.t
 t/mojolicious/routes.t
 t/mojolicious/secret.txt
 t/mojolicious/single_file_test_app.conf
+t/mojolicious/static_lite_app.t
 t/mojolicious/tag_helper_lite_app.t
 t/mojolicious/templates/23.html.epl
 t/mojolicious/templates/dies_too.html.ep
