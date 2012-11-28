@@ -25,4 +25,4 @@ resources:
   license: http://www.opensource.org/licenses/artistic-license-2.0
   repository: http://github.com/kraih/mojo
   x_MailingList: http://groups.google.com/group/mojolicious
-version: 3.62
+version: 3.63
