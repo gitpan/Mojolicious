@@ -1,10 +1,13 @@
 use Mojo::Base -strict;
 
+use utf8;
+
 use Test::More;
 use File::Spec::Functions 'catdir';
 use FindBin;
 use Mojo::URL;
 use Mojo::UserAgent::Transactor;
+use Mojo::Util 'encode';
 
 # Simle GET
 my $t = Mojo::UserAgent::Transactor->new;
@@ -144,6 +147,7 @@ like $tx->req->content->parts->[2]->headers->content_disposition, qr/"test"/,
   'right "Content-Disposition" value';
 is $tx->req->content->parts->[2]->asset->slurp, 3, 'right part';
 is $tx->req->content->parts->[3], undef, 'no more parts';
+is_deeply [$tx->req->param('test')], [1, 2, 3], 'right values';
 
 # Multipart form with real file and custom header
 $tx = $t->form('http://kraih.com/foo',
@@ -183,6 +187,25 @@ like $tx->req->content->parts->[0]->headers->content_disposition,
   qr/foo\.zip/, 'right "Content-Disposition" value';
 is $tx->req->content->parts->[0]->asset->slurp, 'whatever', 'right part';
 is $tx->req->content->parts->[1], undef, 'no more parts';
+is $tx->req->upload('myzip')->filename, 'foo.zip',  'right filename';
+is $tx->req->upload('myzip')->size,     8,          'right size';
+is $tx->req->upload('myzip')->slurp,    'whatever', 'right content';
+
+# Multipart form with filename (UTF-8)
+my $snowman = encode 'UTF-8', '☃';
+$tx = $t->form('http://kraih.com/foo' => 'UTF-8' =>
+    {'☃' => {content => 'snowman', filename => '☃.jpg'}});
+is $tx->req->url->to_abs, 'http://kraih.com/foo', 'right URL';
+is $tx->req->method, 'POST', 'right method';
+is $tx->req->headers->content_type, 'multipart/form-data',
+  'right "Content-Type" value';
+like $tx->req->content->parts->[0]->headers->content_disposition,
+  qr/$snowman/, 'right "Content-Disposition" value';
+is $tx->req->content->parts->[0]->asset->slurp, 'snowman', 'right part';
+is $tx->req->content->parts->[1], undef, 'no more parts';
+is $tx->req->upload('☃')->filename, '☃.jpg', 'right filename';
+is $tx->req->upload('☃')->size,     7,         'right size';
+is $tx->req->upload('☃')->slurp,    'snowman', 'right content';
 
 # Simple endpoint
 $tx = $t->tx(GET => 'mojolicio.us');

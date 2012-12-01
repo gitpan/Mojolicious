@@ -147,7 +147,7 @@ sub redirect_to {
   # Don't override 3xx status
   my $res = $self->res;
   $res->headers->location($self->url_for(@_)->to_abs);
-  return $self->rendered($res->is_status_class(300) ? undef : 302);
+  return $self->rendered($res->is_status_class(300) ? () : 302);
 }
 
 sub render {
@@ -182,9 +182,7 @@ sub render {
   return Mojo::ByteStream->new($output) if $args->{partial};
 
   # Prepare response
-  my $res = $self->res;
-  $res->body($output) unless $res->body;
-  my $headers = $res->headers;
+  my $headers = $self->res->body($output)->headers;
   $headers->content_type($type) unless $headers->content_type;
   return !!$self->rendered($stash->{status});
 }
