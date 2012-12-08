@@ -1,4 +1,12 @@
 
+3.65  2012-12-09
+  - Added upgrade method to Mojo::UserAgent::Transactor.
+  - Added is_range method to Mojo::Asset.
+  - Improved documentation.
+  - Improved tests.
+  - Fixed parameter replacement bug in Mojo::Parameters. (alexbyk, sri)
+  - Fixed small paragraph bug in Mojo::DOM::HTML.
+
 3.64  2012-12-01
   - Improved documentation.
   - Improved tests.

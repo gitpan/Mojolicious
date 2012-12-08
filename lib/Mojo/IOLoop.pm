@@ -107,15 +107,8 @@ sub delay {
 
 sub generate_port { Mojo::IOLoop::Server->generate_port }
 
-sub is_running {
-  my $self = shift;
-  return (ref $self ? $self : $self->singleton)->reactor->is_running;
-}
-
-sub one_tick {
-  my $self = shift;
-  (ref $self ? $self : $self->singleton)->reactor->one_tick;
-}
+sub is_running { (ref $_[0] ? $_[0] : $_[0]->singleton)->reactor->is_running }
+sub one_tick   { (ref $_[0] ? $_[0] : $_[0]->singleton)->reactor->one_tick }
 
 sub recurring {
   my ($self, $after, $cb) = @_;
@@ -168,10 +161,7 @@ sub start {
   (ref $self ? $self : $self->singleton)->reactor->start;
 }
 
-sub stop {
-  my $self = shift;
-  (ref $self ? $self : $self->singleton)->reactor->stop;
-}
+sub stop { (ref $_[0] ? $_[0] : $_[0]->singleton)->reactor->stop }
 
 sub stream {
   my ($self, $stream) = @_;
@@ -541,7 +531,7 @@ into the reactor, so you need to be careful.
 
 =head2 C<recurring>
 
-  my $id = Mojo::IOLoop->recurring(0 => sub {...});
+  my $id = Mojo::IOLoop->recurring(0.5 => sub {...});
   my $id = $loop->recurring(3 => sub {...});
 
 Create a new recurring timer, invoking the callback repeatedly after a given
