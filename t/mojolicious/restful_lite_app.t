@@ -434,6 +434,13 @@ $t->post_ok('/rest.png?format=json')->status_is(201)
 # GET /nothing (does not exist)
 $t->get_ok('/nothing' => {Accept => 'image/png'})->status_is(404);
 
+# GET /rest (Ajax)
+my $ajax = 'text/html;q=0.1,application/xml';
+$t->get_ok(
+  '/rest' => {Accept => $ajax, 'X-Requested-With' => 'XMLHttpRequest'})
+  ->status_is(200)->content_type_is('application/xml')
+  ->text_is(just => 'works');
+
 # GET /rest.html (Internet Explorer 8)
 my $ie
   = 'image/jpeg, application/x-ms-application, image/gif, application/xaml+xml'
@@ -459,5 +466,12 @@ $t->get_ok('/rest.html' => {Accept => $chrome})->status_is(200)
 $t->get_ok('/rest?format=html' => {Accept => $chrome})->status_is(200)
   ->content_type_is('text/html;charset=UTF-8')
   ->text_is('html > body', 'works');
+
+# GET /rest (jQuery 1.8)
+my $jquery = 'application/json, text/javascript, */*; q=0.01';
+$t->get_ok(
+  '/rest' => {Accept => $jquery, 'X-Requested-With' => 'XMLHttpRequest'})
+  ->status_is(200)->content_type_is('application/json')
+  ->json_content_is({just => 'works'});
 
 done_testing();
