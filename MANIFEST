@@ -157,7 +157,7 @@ MANIFEST			This list of files
 MANIFEST.SKIP
 MYMETA.json
 MYMETA.yml
-README.pod
+README.md
 script/hypnotoad
 script/mojo
 script/morbo
