@@ -836,16 +836,15 @@ be easily changed.
   1;
 
 All templates from the C<DATA> section are bound to the encoding of the Perl
-script, so don't forget to use the L<utf8> pragma if necessary.
+script.
 
   use Mojolicious::Lite;
-  use utf8;
 
   get '/heart';
 
   app->start;
-  __DATA__
 
+  __DATA__
   @@ heart.html.ep
   I ♥ Mojolicious!
 

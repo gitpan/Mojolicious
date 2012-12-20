@@ -239,6 +239,18 @@ $t->get_ok('/test8' => {'X-Test' => 'Hi there!'})->status_is(200)
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
   ->content_is("Class works!\n");
 
+# MojoliciousTest3::Bar::index (controller class in development namespace)
+$t->get_ok('/test9')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is('Development namespace works!');
+
+# MojoliciousTest3::Baz::index (controller class precedence)
+$t->get_ok('/test10')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_is('Development namespace has high precedence!');
+
 # 404
 $t->get_ok('/' => {'X-Test' => 'Hi there!'})->status_is(404)
   ->header_is(Server         => 'Mojolicious (Perl)')

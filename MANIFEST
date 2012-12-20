@@ -259,6 +259,7 @@ t/mojolicious/layouted_lite_app.t
 t/mojolicious/lib/EmbeddedTestApp.pm
 t/mojolicious/lib/MojoliciousConfigTest.pm
 t/mojolicious/lib/MojoliciousTest.pm
+t/mojolicious/lib/MojoliciousTest/Baz.pm
 t/mojolicious/lib/MojoliciousTest/Command/test_command.pm
 t/mojolicious/lib/MojoliciousTest/Exceptional.pm
 t/mojolicious/lib/MojoliciousTest/Foo.pm
@@ -267,6 +268,8 @@ t/mojolicious/lib/MojoliciousTest/Plugin/Test/SomePlugin2.pm
 t/mojolicious/lib/MojoliciousTest/Plugin/UPPERCASETestPlugin.pm
 t/mojolicious/lib/MojoliciousTest/SyntaxError.pm
 t/mojolicious/lib/MojoliciousTest2/Foo.pm
+t/mojolicious/lib/MojoliciousTest3/Bar.pm
+t/mojolicious/lib/MojoliciousTest3/Baz.pm
 t/mojolicious/lib/MojoliciousTestController.pm
 t/mojolicious/lib/PluginWithEmbeddedApp.pm
 t/mojolicious/lib/PluginWithTemplate.pm
