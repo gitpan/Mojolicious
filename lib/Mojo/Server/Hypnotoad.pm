@@ -127,7 +127,8 @@ sub _config {
   # Event loop settings
   my $loop = $daemon->ioloop;
   $loop->max_accepts($c->{accepts} // 1000);
-  $loop->multi_accept($c->{multi_accept}) if defined $c->{multi_accept};
+  defined $c->{$_} and $loop->$_($c->{$_})
+    for qw(accept_interval multi_accept);
 }
 
 sub _exit { say shift and exit 0 }
@@ -440,6 +441,14 @@ Stop worker gracefully.
 L<Mojo::Server::Hypnotoad> can be configured with the following settings, see
 L<Mojolicious::Guides::Cookbook/"Hypnotoad"> for examples.
 
+=head2 C<accept_interval>
+
+  accept_interval => 0.5
+
+Interval in seconds for trying to reacquire the accept mutex and connection
+management, defaults to C<0.025>. Note that changing this value can affect
+performance and idle CPU usage.
+
 =head2 C<accepts>
 
   accepts => 100
@@ -566,7 +575,7 @@ Username for worker processes.
   workers => 10
 
 Number of worker processes, defaults to C<4>. A good rule of thumb is two
-worker processes per cpu core.
+worker processes per CPU core.
 
 =head1 METHODS
 
