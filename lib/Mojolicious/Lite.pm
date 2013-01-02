@@ -29,23 +29,24 @@ sub import {
   # Default static and template class
   $app->static->classes->[0] = $app->renderer->classes->[0] = $caller;
 
-  # Export
+  # Functions
   my $root = $routes;
   for my $name (qw(any get options patch post put websocket)) {
     monkey_patch $caller, $name, sub { $routes->$name(@_) };
   }
   monkey_patch $caller, $_, sub {$app}
     for qw(new app);
-  monkey_patch $caller, 'del', sub { $routes->delete(@_) };
-  monkey_patch $caller, 'group', sub (&) {
+  monkey_patch $caller, del => sub { $routes->delete(@_) };
+  monkey_patch $caller, group => sub (&) {
     my $old = $root;
     $_[0]->($root = $routes);
     ($routes, $root) = ($root, $old);
   };
-  monkey_patch $caller, 'helper', sub { $app->helper(@_) };
-  monkey_patch $caller, 'hook',   sub { $app->hook(@_) };
-  monkey_patch $caller, 'plugin', sub { $app->plugin(@_) };
-  monkey_patch $caller, 'under',  sub { $routes = $root->under(@_) };
+  monkey_patch $caller,
+    helper => sub { $app->helper(@_) },
+    hook   => sub { $app->hook(@_) },
+    plugin => sub { $app->plugin(@_) },
+    under  => sub { $routes = $root->under(@_) };
 
   # Make sure there's a default application for testing
   Mojo::UserAgent->app($app) unless Mojo::UserAgent->app;

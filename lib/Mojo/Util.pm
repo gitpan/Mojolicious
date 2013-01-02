@@ -131,10 +131,10 @@ sub md5_bytes { md5(@_) }
 sub md5_sum   { md5_hex(@_) }
 
 sub monkey_patch {
-  my ($class, $name, $cb) = @_;
+  my ($class, %patch) = @_;
   no strict 'refs';
   no warnings 'redefine';
-  *{"${class}::$name"} = $cb;
+  *{"${class}::$_"} = $patch{$_} for keys %patch;
 }
 
 sub punycode_decode {
@@ -542,11 +542,15 @@ Generate MD5 checksum for string.
 
 =head2 C<monkey_patch>
 
-  monkey_patch $package, $name, sub {...};
+  monkey_patch $package, foo => sub {...};
+  monkey_patch $package, foo => sub {...}, bar => sub {...};
 
-Monkey patch function into package.
+Monkey patch functions into package.
 
-  monkey_patch 'MyApp', 'hello', sub { say 'Hello!' };
+  monkey_patch 'MyApp',
+    one   => sub { say 'One!' },
+    two   => sub { say 'Two!' },
+    three => sub { say 'Three!' };
 
 =head2 C<punycode_decode>
 
@@ -640,7 +644,7 @@ this is a much faster version of C<html_escape>.
 
   my $encoded = xor_encode $string, $key;
 
-XOR encode string.
+XOR encode string with variable length key.
 
 =head1 SEE ALSO
 
