@@ -99,17 +99,13 @@ server with support for zero downtime software upgrades (hot deployment).
 
 Transparent CGI and L<PSGI> support out of the box.
 
+=item L<Mojo::IOLoop>
+
+A minimalistic event loop with support for multiple reactor backends.
+
 =item L<Mojo::Template>
 
 Very Perl-ish and minimalistic template system.
-
-=item L<Mojo::ByteStream>
-
-Countless portable and very convenient bytestream manipulation methods.
-
-=item L<Mojolicious::Commands>
-
-Pluggable command line system and the backbone of the L<mojo> script.
 
 =item L<Test::Mojo>
 

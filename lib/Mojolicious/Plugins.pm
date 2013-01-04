@@ -80,6 +80,69 @@ Mojolicious::Plugins - Plugin manager
 
 L<Mojolicious::Plugins> is the plugin manager of L<Mojolicious>.
 
+=head1 PLUGINS
+
+The following plugins are included in the L<Mojolicious> distribution as
+examples.
+
+=over 2
+
+=item L<Mojolicious::Plugin::Charset>
+
+Change the application charset.
+
+=item L<Mojolicious::Plugin::Config>
+
+Perl-ish configuration files.
+
+=item L<Mojolicious::Plugin::DefaultHelpers>
+
+General purpose helper collection, loaded automatically.
+
+=item L<Mojolicious::Plugin::EPLRenderer>
+
+Renderer for plain embedded Perl templates, loaded automatically.
+
+=item L<Mojolicious::Plugin::EPRenderer>
+
+Renderer for more sophisiticated embedded Perl templates, loaded
+automatically.
+
+=item L<Mojolicious::Plugin::HeaderCondition>
+
+Route condition for all kinds of headers, loaded automatically.
+
+=item L<Mojolicious::Plugin::JSONConfig>
+
+JSON configuration files.
+
+=item L<Mojolicious::Plugin::Mount>
+
+Mount whole L<Mojolicious> applications.
+
+=item L<Mojolicious::Plugin::PODRenderer>
+
+Renderer for turning POD into HTML and documentation browser for
+L<Mojolicious::Guides>.
+
+=item L<Mojolicious::Plugin::PoweredBy>
+
+Add an C<X-Powered-By> header to outgoing responses, loaded automatically.
+
+=item L<Mojolicious::Plugin::RequestTimer>
+
+Log timing information, loaded automatically.
+
+=item L<Mojolicious::Plugin::TagHelpers>
+
+Template specific helper collection, loaded automatically.
+
+=back
+
+=head1 EVENTS
+
+L<Mojolicious::Plugins> inherits all events from L<Mojo::EventEmitter>.
+
 =head1 ATTRIBUTES
 
 L<Mojolicious::Plugins> implements the following attributes.

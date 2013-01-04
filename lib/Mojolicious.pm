@@ -38,7 +38,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Rainbow';
-our $VERSION  = '3.71';
+our $VERSION  = '3.72';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -534,71 +534,16 @@ the default controller object)
   $app->plugin('MyApp::Plugin::SomeThing', foo => 23);
   $app->plugin('MyApp::Plugin::SomeThing', {foo => 23});
 
-Load a plugin with L<Mojolicious::Plugins/"register_plugin">.
-
-These plugins are included in the L<Mojolicious> distribution as examples:
-
-=over 2
-
-=item L<Mojolicious::Plugin::Charset>
-
-Change the application charset.
-
-=item L<Mojolicious::Plugin::Config>
-
-Perl-ish configuration files.
-
-=item L<Mojolicious::Plugin::DefaultHelpers>
-
-General purpose helper collection, loaded automatically.
-
-=item L<Mojolicious::Plugin::EPLRenderer>
-
-Renderer for plain embedded Perl templates, loaded automatically.
-
-=item L<Mojolicious::Plugin::EPRenderer>
-
-Renderer for more sophisiticated embedded Perl templates, loaded
-automatically.
-
-=item L<Mojolicious::Plugin::HeaderCondition>
-
-Route condition for all kinds of headers, loaded automatically.
-
-=item L<Mojolicious::Plugin::JSONConfig>
-
-JSON configuration files.
-
-=item L<Mojolicious::Plugin::Mount>
-
-Mount whole L<Mojolicious> applications.
-
-=item L<Mojolicious::Plugin::PODRenderer>
-
-Renderer for turning POD into HTML and documentation browser for
-L<Mojolicious::Guides>.
-
-=item L<Mojolicious::Plugin::PoweredBy>
-
-Add an C<X-Powered-By> header to outgoing responses, loaded automatically.
-
-=item L<Mojolicious::Plugin::RequestTimer>
-
-Log timing information, loaded automatically.
-
-=item L<Mojolicious::Plugin::TagHelpers>
-
-Template specific helper collection, loaded automatically.
-
-=back
+Load a plugin, for a full list of example plugins included in the
+L<Mojolicious> distribution see L<Mojolicious::Plugins/"PLUGINS">.
 
 =head2 C<start>
 
   $app->start;
   $app->start(@ARGV);
 
-Start the command line interface for your application with
-L<Mojolicious::Commands/"start">.
+Start the command line interface for your application, for a full list of
+commands available by default see L<Mojolicious::Commands/"COMMANDS">.
 
   # Always start daemon and ignore @ARGV
   $app->start('daemon', '-l', 'http://*:8080');
