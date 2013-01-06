@@ -19,6 +19,13 @@ plugin 'PluginWithTemplate';
 
 app->renderer->paths->[0] = app->home->rel_dir('does_not_exist');
 
+# Reverse filter
+hook after_render => sub {
+  my ($self, $output, $format) = @_;
+  return unless $self->stash->{reverse};
+  $$output = reverse $$output . $format;
+};
+
 # Default layout for whole application
 app->defaults(layout => 'default');
 
@@ -63,8 +70,11 @@ get '/nested-includes' => sub {
 # GET /localized/include
 get '/localized/include' => sub {
   my $self = shift;
-  $self->render('localized', test => 'foo');
+  $self->render('localized', test => 'foo', reverse => 1);
 };
+
+# GET /plain/reverse
+get '/plain/reverse' => {text => 'Hello!', format => 'foo', reverse => 1};
 
 # GET /outerlayout
 get '/outerlayout' => sub {
@@ -192,7 +202,14 @@ $t->get_ok('/nested-includes')->status_is(200)
 $t->get_ok('/localized/include')->status_is(200)
   ->header_is(Server         => 'Mojolicious (Perl)')
   ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
-  ->content_is("localized1 foo\nlocalized2 321\n\n\nfoo\n\n");
+  ->content_type_is('text/html;charset=UTF-8')
+  ->content_is("lmth\n\noof\n\n\n123 2dezilacol\noof 1dezilacol");
+
+# GET /plain/reverse
+$t->get_ok('/plain/reverse')->status_is(200)
+  ->header_is(Server         => 'Mojolicious (Perl)')
+  ->header_is('X-Powered-By' => 'Mojolicious (Perl)')
+  ->content_type_is('text/plain')->content_is('oof!olleH');
 
 # GET /outerlayout
 $t->get_ok('/outerlayout')->status_is(200)

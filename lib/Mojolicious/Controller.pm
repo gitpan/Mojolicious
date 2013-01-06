@@ -177,13 +177,16 @@ sub render {
   }
 
   # Render
-  my ($output, $type) = $self->app->renderer->render($self, $args);
+  my $app = $self->app;
+  my ($output, $format) = $app->renderer->render($self, $args);
   return undef unless defined $output;
   return Mojo::ByteStream->new($output) if $args->{partial};
 
   # Prepare response
+  $app->plugins->emit_hook(after_render => $self, \$output, $format);
   my $headers = $self->res->body($output)->headers;
-  $headers->content_type($type) unless $headers->content_type;
+  $headers->content_type($app->types->type($format) || 'text/plain')
+    unless $headers->content_type;
   return !!$self->rendered($stash->{status});
 }
 
@@ -652,9 +655,10 @@ Prepare a C<302> redirect response, takes the same arguments as C<url_for>.
   my $success = $c->render('foo/index');
   my $output  = $c->render('foo/index', partial => 1);
 
-Render content using L<Mojolicious::Renderer/"render">, if no template is
+Render content using L<Mojolicious::Renderer/"render"> and emit
+C<after_render> hook unless the result is C<partial>. If no template is
 provided a default one based on controller and action or route name will be
-generated. All additional values get merged into the C<stash>.
+generated, all additional values get merged into the C<stash>.
 
 =head2 C<render_data>
 
@@ -747,8 +751,8 @@ of the response, which is C<text/html;charset=UTF-8> by default.
   $c = $c->rendered;
   $c = $c->rendered(302);
 
-Finalize response and emit C<after_dispatch> plugin hook, defaults to using a
-C<200> response code.
+Finalize response and emit C<after_dispatch> hook, defaults to using a C<200>
+response code.
 
 =head2 C<req>
 
@@ -963,7 +967,7 @@ invoked once all data has been written.
     });
   });
 
-For Comet (C<long polling>) you might also want to increase the inactivity
+For Comet (long polling) you might also want to increase the inactivity
 timeout, which usually defaults to C<15> seconds.
 
   # Increase inactivity timeout for connection to 300 seconds

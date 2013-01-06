@@ -27,17 +27,8 @@ sub new {
   return $self->add_handler(data => \&_data)->add_handler(text => \&_text);
 }
 
-sub add_handler {
-  my ($self, $name, $cb) = @_;
-  $self->handlers->{$name} = $cb;
-  return $self;
-}
-
-sub add_helper {
-  my ($self, $name, $cb) = @_;
-  $self->helpers->{$name} = $cb;
-  return $self;
-}
+sub add_handler { shift->_add(handlers => @_) }
+sub add_helper  { shift->_add(helpers  => @_) }
 
 sub get_data_template {
   my ($self, $options) = @_;
@@ -131,7 +122,7 @@ sub render {
       if !$partial && $options->{encoding} && $output;
   }
 
-  return $output, $c->app->types->type($format) || 'text/plain';
+  return $output, $format;
 }
 
 sub template_name {
@@ -156,6 +147,12 @@ sub template_path {
 
   # Fall back to first path
   return catfile($self->paths->[0], split '/', $name);
+}
+
+sub _add {
+  my ($self, $attr, $name, $cb) = @_;
+  $self->$attr->{$name} = $cb;
+  return $self;
 }
 
 sub _bundled { $TEMPLATES{"@{[pop]}.html.ep"} }
@@ -225,7 +222,7 @@ sub _text {
 
 =head1 NAME
 
-Mojolicious::Renderer - MIME type based renderer
+Mojolicious::Renderer - Generate dynamic content
 
 =head1 SYNOPSIS
 
@@ -268,8 +265,7 @@ highest precedence, defaults to C<main>.
   my $default = $renderer->default_format;
   $renderer   = $renderer->default_format('html');
 
-The default format to render if C<format> is not set in the stash. The
-renderer will use L<Mojolicious/"types"> to look up the content MIME type.
+The default format to render if C<format> is not set in the stash.
 
 =head2 C<default_handler>
 
@@ -313,7 +309,7 @@ Directories to look for templates in, first one has the highest precedence.
 =head1 METHODS
 
 L<Mojolicious::Renderer> inherits all methods from L<Mojo::Base> and
-implements the following ones.
+implements the following new ones.
 
 =head2 C<new>
 
@@ -346,15 +342,13 @@ Get a C<DATA> section template by name, usually used by handlers.
 
 =head2 C<render>
 
-  my ($output, $type) = $renderer->render(Mojolicious::Controller->new);
-  my ($output, $type) = $renderer->render(Mojolicious::Controller->new, {
+  my ($output, $format) = $renderer->render(Mojolicious::Controller->new);
+  my ($output, $format) = $renderer->render(Mojolicious::Controller->new, {
     template => 'foo/bar',
     foo      => 'bar'
   });
 
-Render output through one of the Mojo renderers. This renderer requires some
-configuration, at the very least you will need to have a default C<format> and
-a default C<handler> as well as a C<template> or C<text>/C<json>. See
+Render output through one of the renderers. See
 L<Mojolicious::Controller/"render"> for a more user-friendly interface.
 
 =head2 C<template_name>
