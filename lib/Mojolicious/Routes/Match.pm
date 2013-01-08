@@ -1,20 +1,15 @@
 package Mojolicious::Routes::Match;
 use Mojo::Base -base;
 
-use Mojo::Util qw(decode url_unescape);
-
 has captures => sub { {} };
 has [qw(endpoint root)];
 has stack => sub { [] };
 
 sub new {
   my $self = shift->SUPER::new;
-
-  $self->{method} = uc shift;
-  my $path = url_unescape shift;
-  $self->{path} = decode('UTF-8', $path) // $path;
+  $self->{method}    = uc shift;
+  $self->{path}      = shift;
   $self->{websocket} = shift;
-
   return $self;
 }
 
@@ -134,7 +129,6 @@ sub path_for {
 
   # Render
   my $path = $endpoint->render('', \%values);
-  utf8::downgrade $path, 1;
   return wantarray ? ($path, $endpoint->has_websocket) : $path;
 }
 

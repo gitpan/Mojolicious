@@ -40,7 +40,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Rainbow';
-our $VERSION  = '3.74';
+our $VERSION  = '3.75';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -148,7 +148,8 @@ sub handler {
   weaken $c->{$_} for qw(app tx);
 
   # Dispatcher
-  ++$self->{dispatch} and $self->hook(around_dispatch => \&_dispatch)
+  ++$self->{dispatch}
+    and $self->hook(around_dispatch => sub { $_[1]->app->dispatch($_[1]) })
     unless $self->{dispatch};
 
   # Process
@@ -181,11 +182,6 @@ sub plugin {
 sub start { shift->commands->run(@_ ? @_ : @ARGV) }
 
 sub startup { }
-
-sub _dispatch {
-  my ($next, $c) = @_;
-  $c->app->dispatch($c);
-}
 
 sub _exception {
   my ($next, $c) = @_;
@@ -449,7 +445,7 @@ requests indiscriminately.
   $app->hook(before_dispatch => sub {
     my $c = shift;
     $c->render(text => 'Skipped dispatchers!')
-      if $c->req->url->path->contains('/do_not_dispatch');
+      if $c->req->url->path->to_route =~ /do_not_dispatch/;
   });
 
 These hooks are currently available and are emitted in the listed order:

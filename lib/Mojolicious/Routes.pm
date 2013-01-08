@@ -14,17 +14,8 @@ has [qw(conditions shortcuts)] => sub { {} };
 has hidden     => sub { [qw(attr has new tap)] };
 has namespaces => sub { [] };
 
-sub add_condition {
-  my ($self, $name, $cb) = @_;
-  $self->conditions->{$name} = $cb;
-  return $self;
-}
-
-sub add_shortcut {
-  my ($self, $name, $cb) = @_;
-  $self->shortcuts->{$name} = $cb;
-  return $self;
-}
+sub add_condition { shift->_add(conditions => @_) }
+sub add_shortcut  { shift->_add(shortcuts  => @_) }
 
 sub auto_render {
   my ($self, $c) = @_;
@@ -40,7 +31,7 @@ sub dispatch {
   my $req  = $c->req;
   my $path = $c->stash->{path};
   if (defined $path) { $path = "/$path" if $path !~ m!^/! }
-  else               { $path = $req->url->path->to_abs_string }
+  else               { $path = $req->url->path->to_route }
 
   # Prepare match
   my $method = $req->method;
@@ -96,6 +87,12 @@ EOF
 
 sub route {
   shift->add_child(Mojolicious::Routes::Route->new(@_))->children->[-1];
+}
+
+sub _add {
+  my ($self, $attr, $name, $cb) = @_;
+  $self->$attr->{$name} = $cb;
+  return $self;
 }
 
 sub _callback {
