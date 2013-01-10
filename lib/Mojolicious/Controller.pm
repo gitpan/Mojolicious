@@ -133,9 +133,8 @@ sub param {
     return ref $value eq 'ARRAY' ? wantarray ? @$value : $$value[0] : $value;
   }
 
-  # Upload
-  my $upload = $req->upload($name);
-  return $upload if $upload;
+  # Uploads
+  return $req->upload($name) if $req->upload($name);
 
   # Param values
   return $req->param($name);

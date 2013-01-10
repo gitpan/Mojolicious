@@ -88,12 +88,12 @@ is $tx->req->headers->content_type, 'application/x-www-form-urlencoded',
 is $tx->req->body, 'test=123', 'right content';
 
 # Simple form with multiple values
-$tx = $t->form('http://kraih.com/foo' => {test => [1, 2, 3]});
+$tx = $t->form('http://kraih.com/foo' => {a => [1, 2, 3], b => 4});
 is $tx->req->url->to_abs, 'http://kraih.com/foo', 'right URL';
 is $tx->req->method, 'POST', 'right method';
 is $tx->req->headers->content_type, 'application/x-www-form-urlencoded',
   'right "Content-Type" value';
-is $tx->req->body, 'test=1&test=2&test=3', 'right content';
+is $tx->req->body, 'a=1&a=2&a=3&b=4', 'right content';
 
 # UTF-8 form
 $tx = $t->form('http://kraih.com/foo' => 'UTF-8' => {test => 123});
@@ -129,24 +129,28 @@ is $tx->req->content->parts->[1], undef, 'no more parts';
 
 # Multipart form with multiple values
 $tx = $t->form(
-  'http://kraih.com/foo' => {test => [1, 2, 3]},
+  'http://kraih.com/foo' => {a => [1, 2, 3], b => 4},
   {'Content-Type' => 'multipart/form-data'}
 );
 is $tx->req->url->to_abs, 'http://kraih.com/foo', 'right URL';
 is $tx->req->method, 'POST', 'right method';
 is $tx->req->headers->content_type, 'multipart/form-data',
   'right "Content-Type" value';
-like $tx->req->content->parts->[0]->headers->content_disposition, qr/"test"/,
+like $tx->req->content->parts->[0]->headers->content_disposition, qr/"a"/,
   'right "Content-Disposition" value';
 is $tx->req->content->parts->[0]->asset->slurp, 1, 'right part';
-like $tx->req->content->parts->[1]->headers->content_disposition, qr/"test"/,
+like $tx->req->content->parts->[1]->headers->content_disposition, qr/"a"/,
   'right "Content-Disposition" value';
 is $tx->req->content->parts->[1]->asset->slurp, 2, 'right part';
-like $tx->req->content->parts->[2]->headers->content_disposition, qr/"test"/,
+like $tx->req->content->parts->[2]->headers->content_disposition, qr/"a"/,
   'right "Content-Disposition" value';
 is $tx->req->content->parts->[2]->asset->slurp, 3, 'right part';
-is $tx->req->content->parts->[3], undef, 'no more parts';
-is_deeply [$tx->req->param('test')], [1, 2, 3], 'right values';
+like $tx->req->content->parts->[3]->headers->content_disposition, qr/"b"/,
+  'right "Content-Disposition" value';
+is $tx->req->content->parts->[3]->asset->slurp, 4, 'right part';
+is $tx->req->content->parts->[4], undef, 'no more parts';
+is_deeply [$tx->req->param('a')], [1, 2, 3], 'right values';
+is_deeply [$tx->req->param('b')], [4], 'right values';
 
 # Multipart form with real file and custom header
 $tx = $t->form('http://kraih.com/foo',
@@ -172,6 +176,8 @@ is $tx->req->headers->content_type, 'multipart/form-data',
   'right "Content-Type" value';
 like $tx->req->content->parts->[0]->headers->content_disposition, qr/mytext/,
   'right "Content-Disposition" value';
+ok !$tx->req->content->parts->[0]->headers->header('content'),
+  'no "content" header';
 is $tx->req->content->parts->[0]->asset->slurp, 'lalala', 'right part';
 is $tx->req->content->parts->[1], undef, 'no more parts';
 
@@ -184,6 +190,8 @@ is $tx->req->headers->content_type, 'multipart/form-data',
   'right "Content-Type" value';
 like $tx->req->content->parts->[0]->headers->content_disposition,
   qr/foo\.zip/, 'right "Content-Disposition" value';
+ok !$tx->req->content->parts->[0]->headers->header('filename'),
+  'no "filename" header';
 is $tx->req->content->parts->[0]->asset->slurp, 'whatever', 'right part';
 is $tx->req->content->parts->[1], undef, 'no more parts';
 is $tx->req->upload('myzip')->filename, 'foo.zip',  'right filename';
@@ -205,6 +213,31 @@ is $tx->req->content->parts->[1], undef, 'no more parts';
 is $tx->req->upload('☃')->filename, '☃.jpg', 'right filename';
 is $tx->req->upload('☃')->size,     7,         'right size';
 is $tx->req->upload('☃')->slurp,    'snowman', 'right content';
+
+# Multipart form with multiple uploads sharing the same name
+$tx = $t->form(
+  'http://kraih.com/foo' => {
+    mytext => [
+      {content => 'just',  filename => 'one.txt'},
+      {content => 'works', filename => 'two.txt'}
+    ]
+  }
+);
+is $tx->req->url->to_abs, 'http://kraih.com/foo', 'right URL';
+is $tx->req->method, 'POST', 'right method';
+is $tx->req->headers->content_type, 'multipart/form-data',
+  'right "Content-Type" value';
+like $tx->req->content->parts->[0]->headers->content_disposition, qr/mytext/,
+  'right "Content-Disposition" value';
+like $tx->req->content->parts->[0]->headers->content_disposition,
+  qr/one\.txt/, 'right "Content-Disposition" value';
+is $tx->req->content->parts->[0]->asset->slurp, 'just', 'right part';
+like $tx->req->content->parts->[1]->headers->content_disposition, qr/mytext/,
+  'right "Content-Disposition" value';
+like $tx->req->content->parts->[1]->headers->content_disposition,
+  qr/two\.txt/, 'right "Content-Disposition" value';
+is $tx->req->content->parts->[1]->asset->slurp, 'works', 'right part';
+is $tx->req->content->parts->[2], undef, 'no more parts';
 
 # Simple endpoint
 $tx = $t->tx(GET => 'mojolicio.us');

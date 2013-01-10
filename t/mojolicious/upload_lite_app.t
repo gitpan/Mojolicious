@@ -8,6 +8,8 @@ BEGIN {
 
 use Test::More;
 use Mojo::Asset::File;
+use Mojo::Content::MultiPart;
+use Mojo::Content::Single;
 use Mojolicious::Lite;
 use Test::Mojo;
 
@@ -46,6 +48,16 @@ post '/multi' => sub {
       . $file2->asset->slurp);
 };
 
+# POST /same_name
+post '/same_name' => sub {
+  my $self  = shift;
+  my @files = $self->param('file');
+  $self->render_text($files[0]->filename
+      . $files[0]->asset->slurp
+      . $files[1]->filename
+      . $files[1]->asset->slurp);
+};
+
 my $t = Test::Mojo->new;
 
 # POST /upload (asset and filename)
@@ -69,12 +81,22 @@ $t->post_form_ok('/upload' => {file => $hash, test => 'tset'})->status_is(200)
 
 # POST /multi_reverse
 $t->post_form_ok('/multi_reverse',
-  {file1 => {content => '1111'}, file2 => {content => '11112222'},})
+  {file1 => {content => '1111'}, file2 => {content => '11112222'}})
   ->status_is(200)->content_is('file11111file211112222');
 
 # POST /multi
 $t->post_form_ok('/multi',
-  {file1 => {content => '1111'}, file2 => {content => '11112222'},})
+  {file1 => {content => '1111'}, file2 => {content => '11112222'}})
   ->status_is(200)->content_is('file11111file211112222');
+
+# POST /same_name (multiple file uploads with same name)
+$t->post_form_ok(
+  '/same_name' => {
+    file => [
+      {content => 'just',  filename => 'one.txt'},
+      {content => 'works', filename => 'two.txt'}
+    ]
+  }
+)->status_is(200)->content_is('one.txtjusttwo.txtworks');
 
 done_testing();
