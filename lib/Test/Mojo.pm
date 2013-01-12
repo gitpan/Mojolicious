@@ -9,6 +9,8 @@ use Mojo::Base -base;
 #  Bender: You're better off dead, I'm telling you, dude.
 #  Fry: Santa Claus is gunning you down!"
 use Mojo::IOLoop;
+use Mojo::JSON;
+use Mojo::JSON::Pointer;
 use Mojo::Server;
 use Mojo::UserAgent;
 use Mojo::Util qw(decode encode);
@@ -142,12 +144,6 @@ sub json_content_is {
   return $self->_test('is_deeply', $self->tx->res->json, $data, $desc);
 }
 
-sub json_is {
-  my ($self, $p, $data, $desc) = @_;
-  $desc ||= qq{exact match for JSON Pointer "$p"};
-  return $self->_test('is_deeply', $self->tx->res->json($p), $data, $desc);
-}
-
 sub json_has {
   my ($self, $p, $desc) = @_;
   $desc ||= qq{has value for JSON Pointer "$p"};
@@ -162,28 +158,38 @@ sub json_hasnt {
     !Mojo::JSON::Pointer->new->contains($self->tx->res->json, $p), $desc);
 }
 
+sub json_is {
+  my ($self, $p, $data, $desc) = @_;
+  $desc ||= qq{exact match for JSON Pointer "$p"};
+  return $self->_test('is_deeply', $self->tx->res->json($p), $data, $desc);
+}
+
+sub json_message_is {
+  my ($self, $p, $data, $desc) = @_;
+  my $value = Mojo::JSON::Pointer->new->get(
+    Mojo::JSON->new->decode(@{$self->_next || []}[1]), $p);
+  return $self->_test('is_deeply', $value, $data,
+    $desc || 'exact match for JSON structure');
+}
+
 sub message_is {
   my ($self, $value, $desc) = @_;
-  $desc ||= 'exact match for message';
-  return $self->_test('is', $self->_message, $value, $desc);
+  return $self->_message('is', $value, $desc || 'exact match for message');
 }
 
 sub message_isnt {
   my ($self, $value, $desc) = @_;
-  $desc ||= 'no match for message';
-  return $self->_test('isnt', $self->_message, $value, $desc);
+  return $self->_message('isnt', $value, $desc || 'no match for message');
 }
 
 sub message_like {
   my ($self, $regex, $desc) = @_;
-  $desc ||= 'message is similar';
-  return $self->_test('like', $self->_message, $regex, $desc);
+  return $self->_message('like', $regex, $desc || 'message is similar');
 }
 
 sub message_unlike {
   my ($self, $regex, $desc) = @_;
-  $desc ||= 'message is not similar';
-  return $self->_test('unlike', $self->_message, $regex, $desc);
+  return $self->_message('unlike', $regex, $desc || 'message is not similar');
 }
 
 sub options_ok { shift->_request_ok(options => @_) }
@@ -278,7 +284,8 @@ sub websocket_ok {
       my $tx = pop;
       $self->tx($tx);
       $tx->on(finish => sub { $self->{finished} = 1 });
-      $tx->on(message => sub { push @{$self->{messages}}, pop });
+      $tx->on(binary => sub { push @{$self->{messages}}, [binary => pop] });
+      $tx->on(text   => sub { push @{$self->{messages}}, [text   => pop] });
       Mojo::IOLoop->stop;
     }
   );
@@ -296,6 +303,24 @@ sub _get_content {
 }
 
 sub _message {
+  my ($self, $name, $value, $desc) = @_;
+  local $Test::Builder::Level = $Test::Builder::Level + 1;
+  my ($type, $msg) = @{$self->_next || ['']};
+
+  # Type check
+  if (ref $value eq 'HASH') {
+    my $expect = exists $value->{text} ? 'text' : 'binary';
+    $value = $value->{$expect};
+    $msg = '' unless $type eq $expect;
+  }
+
+  # Decode text frame if there is no type check
+  else { $msg = decode 'UTF-8', $msg if $type eq 'text' }
+
+  return $self->_test($name, $msg // '', $value, $desc);
+}
+
+sub _next {
   my $self = shift;
   Mojo::IOLoop->one_tick while !$self->{finished} && !@{$self->{messages}};
   return shift @{$self->{messages}};
@@ -575,15 +600,6 @@ Opposite of C<header_like>.
 
 Check response content for JSON data.
 
-=head2 json_is
-
-  $t = $t->json_is('/foo' => {bar => [1, 2, 3]});
-  $t = $t->json_is('/foo/bar' => [1, 2, 3]);
-  $t = $t->json_is('/foo/bar/1' => 2, 'right value');
-
-Check the value extracted from JSON response using the given JSON Pointer with
-L<Mojo::JSON::Pointer>.
-
 =head2 json_has
 
   $t = $t->json_has('/foo');
@@ -599,8 +615,28 @@ JSON Pointer with L<Mojo::JSON::Pointer>.
 
 Opposite of C<json_has>.
 
+=head2 json_is
+
+  $t = $t->json_is('/foo' => {bar => [1, 2, 3]});
+  $t = $t->json_is('/foo/bar' => [1, 2, 3]);
+  $t = $t->json_is('/foo/bar/1' => 2, 'right value');
+
+Check the value extracted from JSON response using the given JSON Pointer with
+L<Mojo::JSON::Pointer>.
+
+=head2 json_message_is
+
+  $t = $t->json_message_is('/foo' => {bar => [1, 2, 3]});
+  $t = $t->json_message_is('/foo/bar' => [1, 2, 3]);
+  $t = $t->json_message_is('/foo/bar/1' => 2, 'right value');
+
+Check the value extracted from JSON WebSocket message using the given JSON
+Pointer with L<Mojo::JSON::Pointer>.
+
 =head2 message_is
 
+  $t = $t->message_is({binary => $bytes});
+  $t = $t->message_is({text   => $bytes});
   $t = $t->message_is('working!');
   $t = $t->message_is('working!', 'right message');
 
@@ -608,6 +644,8 @@ Check WebSocket message for exact match.
 
 =head2 message_isnt
 
+  $t = $t->message_isnt({binary => $bytes});
+  $t = $t->message_isnt({text   => $bytes});
   $t = $t->message_isnt('working!');
   $t = $t->message_isnt('working!', 'different message');
 
@@ -615,6 +653,8 @@ Opposite of C<message_is>.
 
 =head2 message_like
 
+  $t = $t->message_like({binary => qr/$bytes/});
+  $t = $t->message_like({text   => qr/$bytes/});
   $t = $t->message_like(qr/working!/);
   $t = $t->message_like(qr/working!/, 'right message');
 
@@ -622,6 +662,8 @@ Check WebSocket message for similar match.
 
 =head2 message_unlike
 
+  $t = $t->message_unlike({binary => qr/$bytes/});
+  $t = $t->message_unlike({text   => qr/$bytes/});
   $t = $t->message_unlike(qr/working!/);
   $t = $t->message_unlike(qr/working!/, 'different message');
 
@@ -718,8 +760,8 @@ Reset user agent session.
   $t = $t->send_ok({binary => $bytes});
   $t = $t->send_ok({text   => $bytes});
   $t = $t->send_ok([$fin, $rsv1, $rsv2, $rsv3, $op, $payload]);
-  $t = $t->send_ok('hello');
-  $t = $t->send_ok('hello', 'sent successfully');
+  $t = $t->send_ok($chars);
+  $t = $t->send_ok($chars, 'sent successfully');
 
 Send message or frame via WebSocket.
 

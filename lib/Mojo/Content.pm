@@ -397,7 +397,7 @@ Emitted once all data has been written.
 =head2 read
 
   $content->on(read => sub {
-    my ($content, $chunk) = @_;
+    my ($content, $bytes) = @_;
     ...
   });
 
@@ -405,8 +405,8 @@ Emitted when a new chunk of content arrives.
 
   $content->unsubscribe('read');
   $content->on(read => sub {
-    my ($content, $chunk) = @_;
-    say "Streaming: $chunk";
+    my ($content, $bytes) = @_;
+    say "Streaming: $bytes";
   });
 
 =head1 ATTRIBUTES
@@ -508,20 +508,20 @@ Clone content if possible, otherwise return C<undef>.
 
 =head2 generate_body_chunk
 
-  my $chunk = $content->generate_body_chunk(0);
+  my $bytes = $content->generate_body_chunk(0);
 
 Generate dynamic content.
 
 =head2 get_body_chunk
 
-  my $chunk = $content->get_body_chunk(0);
+  my $bytes = $content->get_body_chunk(0);
 
 Get a chunk of content starting from a specfic position. Meant to be
 overloaded in a subclass.
 
 =head2 get_header_chunk
 
-  my $chunk = $content->get_header_chunk(13);
+  my $bytes = $content->get_header_chunk(13);
 
 Get a chunk of the headers starting from a specfic position.
 
@@ -606,16 +606,16 @@ Size of content already received from message in bytes.
 
 =head2 write
 
-  $content = $content->write('Hello!');
-  $content = $content->write('Hello!' => sub {...});
+  $content = $content->write($bytes);
+  $content = $content->write($bytes => sub {...});
 
 Write dynamic content non-blocking, the optional drain callback will be
 invoked once all data has been written.
 
 =head2 write_chunk
 
-  $content = $content->write_chunk('Hello!');
-  $content = $content->write_chunk('Hello!' => sub {...});
+  $content = $content->write_chunk($bytes);
+  $content = $content->write_chunk($bytes => sub {...});
 
 Write dynamic content non-blocking with C<chunked> transfer encoding, the
 optional drain callback will be invoked once all data has been written.

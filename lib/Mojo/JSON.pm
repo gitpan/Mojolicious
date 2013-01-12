@@ -2,10 +2,13 @@ package Mojo::JSON;
 use Mojo::Base -base;
 
 use B;
+use Exporter 'import';
 use Mojo::Util;
 use Scalar::Util 'blessed';
 
 has 'error';
+
+our @EXPORT_OK = ('j');
 
 # Literal names
 my $FALSE = bless \(my $false = 0), 'Mojo::JSON::_Bool';
@@ -99,7 +102,14 @@ sub encode {
 }
 
 sub false {$FALSE}
-sub true  {$TRUE}
+
+sub j {
+  my $d = shift;
+  return __PACKAGE__->new->encode($d) if ref $d eq 'ARRAY' || ref $d eq 'HASH';
+  return __PACKAGE__->new->decode($d);
+}
+
+sub true {$TRUE}
 
 sub _decode_array {
   my @array;
@@ -328,11 +338,21 @@ Mojo::JSON - Minimalistic JSON
 
 =head1 SYNOPSIS
 
+  # Encode and decode JSON
   use Mojo::JSON;
-
   my $json  = Mojo::JSON->new;
   my $bytes = $json->encode({foo => [1, 2], bar => 'hello!', baz => \1});
   my $hash  = $json->decode($bytes);
+
+  # Check for errors
+  my $json = Mojo::JSON->new;
+  if (defined(my $hash = $json->decode($bytes))) { say $hash->{message} }
+  else { say 'Error: ', $json->error }
+
+  # Use the alternative interface
+  use Mojo::JSON 'j';
+  my $bytes = j({foo => [1, 2], bar => 'hello!', baz => \1});
+  my $hash  = j($bytes);
 
 =head1 DESCRIPTION
 
@@ -359,6 +379,20 @@ Decoding UTF-16 (LE/BE) and UTF-32 (LE/BE) will be handled transparently,
 encoding will only generate UTF-8. The two Unicode whitespace characters
 C<u2028> and C<u2029> will always be escaped to make JSONP easier.
 
+=head1 FUNCTIONS
+
+L<Mojo::JSON> implements the following functions.
+
+=head2 j
+
+  my $bytes = j([1, 2, 3]);
+  my $bytes = j({foo => 'bar'});
+  my $array = j($bytes);
+  my $hash  = j($bytes);
+
+Encode Perl data structure or decode JSON and return C<undef> if decoding
+fails.
+
 =head1 ATTRIBUTES
 
 L<Mojo::JSON> implements the following attributes.
@@ -380,13 +414,14 @@ following new ones.
   my $array = $json->decode($bytes);
   my $hash  = $json->decode($bytes);
 
-Decode JSON.
+Decode JSON to Perl data structure and return C<undef> if decoding fails.
 
 =head2 encode
 
+  my $bytes = $json->encode([1, 2, 3]);
   my $bytes = $json->encode({foo => 'bar'});
 
-Encode Perl data structure.
+Encode Perl data structure to JSON.
 
 =head2 false
 

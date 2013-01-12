@@ -486,15 +486,15 @@ implements the following new ones.
 
 =head2 body
 
-  my $string = $msg->body;
-  $msg       = $msg->body('Hello!');
-  my $cb     = $msg->body(sub {...});
+  my $bytes = $msg->body;
+  $msg      = $msg->body('Hello!');
+  my $cb    = $msg->body(sub {...});
 
 Access C<content> data or replace all subscribers of the C<read> event.
 
   $msg->body(sub {
-    my ($msg, $chunk) = @_;
-    say "Streaming: $chunk";
+    my ($msg, $bytes) = @_;
+    say "Streaming: $bytes";
   });
 
 =head2 body_params
@@ -517,19 +517,19 @@ Content size in bytes.
 
 =head2 build_body
 
-  my $string = $msg->build_body;
+  my $bytes = $msg->build_body;
 
 Render whole body.
 
 =head2 build_headers
 
-  my $string = $msg->build_headers;
+  my $bytes = $msg->build_headers;
 
 Render all headers.
 
 =head2 build_start_line
 
-  my $string = $msg->build_start_line;
+  my $bytes = $msg->build_start_line;
 
 Render start line.
 
@@ -597,19 +597,19 @@ Make sure message has all required headers.
 
 =head2 get_body_chunk
 
-  my $string = $msg->get_body_chunk($offset);
+  my $bytes = $msg->get_body_chunk($offset);
 
 Get a chunk of body data starting from a specific position.
 
 =head2 get_header_chunk
 
-  my $string = $msg->get_header_chunk($offset);
+  my $bytes = $msg->get_header_chunk($offset);
 
 Get a chunk of header data, starting from a specific position.
 
 =head2 get_start_line_chunk
 
-  my $string = $msg->get_start_line_chunk($offset);
+  my $bytes = $msg->get_start_line_chunk($offset);
 
 Get a chunk of start line data starting from a specific position. Meant to be
 overloaded in a subclass.
@@ -731,16 +731,16 @@ All C<multipart/form-data> file uploads, usually L<Mojo::Upload> objects.
 
 =head2 write
 
-  $msg = $msg->write('Hello!');
-  $msg = $msg->write('Hello!' => sub {...});
+  $msg = $msg->write($bytes);
+  $msg = $msg->write($bytes => sub {...});
 
 Write dynamic content non-blocking, the optional drain callback will be
 invoked once all data has been written.
 
 =head2 write_chunk
 
-  $msg = $msg->write_chunk('Hello!');
-  $msg = $msg->write_chunk('Hello!' => sub {...});
+  $msg = $msg->write_chunk($bytes);
+  $msg = $msg->write_chunk($bytes => sub {...});
 
 Write dynamic content non-blocking with C<chunked> transfer encoding, the
 optional drain callback will be invoked once all data has been written.

@@ -816,10 +816,12 @@ will be invoked once all data has been written.
   $c->send('Hello World!');
 
   # Send JSON object as "Text" frame
-  $c->send({text => Mojo::JSON->new->encode({hello => 'world'})});
+  use Mojo::JSON 'j';
+  $c->send({text => j({hello => 'world'})});
 
   # Send JSON object as "Binary" frame
-  $c->send({binary => Mojo::JSON->new->encode({hello => 'world'})});
+  use Mojo::JSON 'j';
+  $c->send({binary => j({hello => 'world'})});
 
   # Send "Ping" frame
   $c->send([1, 0, 0, 0, 9, 'Hello World!']);
@@ -942,9 +944,9 @@ to inherit query parameters from the current request.
 =head2 write
 
   $c = $c->write;
-  $c = $c->write('Hello!');
+  $c = $c->write($bytes);
   $c = $c->write(sub {...});
-  $c = $c->write('Hello!' => sub {...});
+  $c = $c->write($bytes => sub {...});
 
 Write dynamic content non-blocking, the optional drain callback will be
 invoked once all data has been written.
@@ -974,9 +976,9 @@ timeout, which usually defaults to C<15> seconds.
 =head2 write_chunk
 
   $c = $c->write_chunk;
-  $c = $c->write_chunk('Hello!');
+  $c = $c->write_chunk($bytes);
   $c = $c->write_chunk(sub {...});
-  $c = $c->write_chunk('Hello!' => sub {...});
+  $c = $c->write_chunk($bytes => sub {...});
 
 Write dynamic content non-blocking with C<chunked> transfer encoding, the
 optional drain callback will be invoked once all data has been written.

@@ -3,6 +3,8 @@ use Mojo::Base -strict;
 use Test::More;
 use File::Spec::Functions 'catdir';
 use FindBin;
+use Mojo::Asset::File;
+use Mojo::Asset::Memory;
 use Mojo::Transaction::WebSocket;
 use Mojo::URL;
 use Mojo::UserAgent::Transactor;
@@ -125,6 +127,8 @@ is $tx->req->headers->content_type, 'multipart/form-data',
 like $tx->req->content->parts->[0]->headers->content_disposition, qr/"test"/,
   'right "Content-Disposition" value';
 is $tx->req->content->parts->[0]->asset->slurp, 123, 'right part';
+ok !$tx->req->content->parts->[0]->asset->is_file,      'stored in memory';
+ok !$tx->req->content->parts->[0]->asset->auto_upgrade, 'no upgrade';
 is $tx->req->content->parts->[1], undef, 'no more parts';
 
 # Multipart form with multiple values
@@ -153,8 +157,8 @@ is_deeply [$tx->req->param('a')], [1, 2, 3], 'right values';
 is_deeply [$tx->req->param('b')], [4], 'right values';
 
 # Multipart form with real file and custom header
-$tx = $t->form('http://kraih.com/foo',
-  {mytext => {file => catdir($FindBin::Bin, 'transactor.t'), DNT => 1}});
+my $path = catdir $FindBin::Bin, 'transactor.t';
+$tx = $t->form('http://kraih.com/foo', {mytext => {file => $path, DNT => 1}});
 is $tx->req->url->to_abs, 'http://kraih.com/foo', 'right URL';
 is $tx->req->method, 'POST', 'right method';
 is $tx->req->headers->content_type, 'multipart/form-data',
@@ -164,8 +168,24 @@ like $tx->req->content->parts->[0]->headers->content_disposition,
 like $tx->req->content->parts->[0]->headers->content_disposition,
   qr/"transactor.t"/, 'right "Content-Disposition" value';
 like $tx->req->content->parts->[0]->asset->slurp, qr/mytext/, 'right part';
+ok $tx->req->content->parts->[0]->asset->is_file, 'stored in file';
 ok !$tx->req->content->parts->[0]->headers->header('file'), 'no "file" header';
 is $tx->req->content->parts->[0]->headers->dnt, 1, 'right "DNT" header';
+is $tx->req->content->parts->[1], undef, 'no more parts';
+
+# Multipart form with asset
+$tx = $t->form('http://kraih.com/foo',
+  {mytext => {file => Mojo::Asset::File->new(path => $path)}});
+is $tx->req->url->to_abs, 'http://kraih.com/foo', 'right URL';
+is $tx->req->method, 'POST', 'right method';
+is $tx->req->headers->content_type, 'multipart/form-data',
+  'right "Content-Type" value';
+like $tx->req->content->parts->[0]->headers->content_disposition,
+  qr/"mytext"/, 'right "Content-Disposition" value';
+like $tx->req->content->parts->[0]->headers->content_disposition,
+  qr/"transactor.t"/, 'right "Content-Disposition" value';
+like $tx->req->content->parts->[0]->asset->slurp, qr/mytext/, 'right part';
+ok $tx->req->content->parts->[0]->asset->is_file, 'stored in file';
 is $tx->req->content->parts->[1], undef, 'no more parts';
 
 # Multipart form with in-memory content
@@ -179,6 +199,8 @@ like $tx->req->content->parts->[0]->headers->content_disposition, qr/mytext/,
 ok !$tx->req->content->parts->[0]->headers->header('content'),
   'no "content" header';
 is $tx->req->content->parts->[0]->asset->slurp, 'lalala', 'right part';
+ok !$tx->req->content->parts->[0]->asset->is_file,      'stored in memory';
+ok !$tx->req->content->parts->[0]->asset->auto_upgrade, 'no upgrade';
 is $tx->req->content->parts->[1], undef, 'no more parts';
 
 # Multipart form with filename
@@ -198,10 +220,16 @@ is $tx->req->upload('myzip')->filename, 'foo.zip',  'right filename';
 is $tx->req->upload('myzip')->size,     8,          'right size';
 is $tx->req->upload('myzip')->slurp,    'whatever', 'right content';
 
-# Multipart form with filename (UTF-8)
+# Multipart form with asset and filename (UTF-8)
 my $snowman = encode 'UTF-8', '☃';
-$tx = $t->form('http://kraih.com/foo' => 'UTF-8' =>
-    {'☃' => {content => 'snowman', filename => '☃.jpg'}});
+$tx = $t->form(
+  'http://kraih.com/foo' => 'UTF-8' => {
+    '☃' => {
+      file     => Mojo::Asset::Memory->new->add_chunk('snowman'),
+      filename => '☃.jpg'
+    }
+  }
+);
 is $tx->req->url->to_abs, 'http://kraih.com/foo', 'right URL';
 is $tx->req->method, 'POST', 'right method';
 is $tx->req->headers->content_type, 'multipart/form-data',

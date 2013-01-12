@@ -279,7 +279,11 @@ sub _message {
 
   # Message
   my $msg = delete $self->{message};
-  $msg = decode 'UTF-8', $msg if $msg && delete $self->{op} == TEXT;
+  if (delete $self->{op} == TEXT) {
+    $self->emit(text => $msg);
+    $msg = decode 'UTF-8', $msg if $msg;
+  }
+  else { $self->emit(binary => $msg); }
   $self->emit(message => $msg);
 }
 
@@ -315,6 +319,20 @@ integer support, or they are limited to 32bit.
 
 L<Mojo::Transaction::WebSocket> inherits all events from L<Mojo::Transaction>
 and can emit the following new ones.
+
+=head2 binary
+
+  $ws->on(binary => sub {
+    my ($ws, $bytes) = @_;
+    ...
+  });
+
+Emitted when a complete WebSocket binary message has been received.
+
+  $ws->on(binary => sub {
+    my ($ws, $bytes) = @_;
+    say "Binary: $bytes";
+  });
 
 =head2 drain
 
@@ -357,11 +375,26 @@ Emitted when a WebSocket frame has been received.
     ...
   });
 
-Emitted when a complete WebSocket message has been received.
+Emitted when a complete WebSocket message has been received, text messages
+will be automatically decoded.
 
   $ws->on(message => sub {
     my ($ws, $msg) = @_;
     say "Message: $msg";
+  });
+
+=head2 text
+
+  $ws->on(text => sub {
+    my ($ws, $bytes) = @_;
+    ...
+  });
+
+Emitted when a complete WebSocket text message has been received.
+
+  $ws->on(text => sub {
+    my ($ws, $bytes) = @_;
+    say "Text: $bytes";
   });
 
 =head1 ATTRIBUTES
@@ -450,7 +483,7 @@ Read data client-side, used to implement user agents.
 
 =head2 client_write
 
-  my $chunk = $ws->client_write;
+  my $bytes = $ws->client_write;
 
 Write data client-side, used to implement user agents.
 
@@ -563,7 +596,7 @@ Read data server-side, used to implement web servers.
 
 =head2 server_write
 
-  my $chunk = $ws->server_write;
+  my $bytes = $ws->server_write;
 
 Write data server-side, used to implement web servers.
 

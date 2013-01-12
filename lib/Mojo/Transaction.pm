@@ -200,14 +200,14 @@ Transaction closed client-side, used to implement user agents.
 
 =head2 client_read
 
-  $tx->client_read($chunk);
+  $tx->client_read($bytes);
 
 Read data client-side, used to implement user agents. Meant to be overloaded
 in a subclass.
 
 =head2 client_write
 
-  my $chunk = $tx->client_write;
+  my $bytes = $tx->client_write;
 
 Write data client-side, used to implement user agents. Meant to be overloaded
 in a subclass.
@@ -265,14 +265,14 @@ Transaction closed server-side, used to implement web servers.
 
 =head2 server_read
 
-  $tx->server_read($chunk);
+  $tx->server_read($bytes);
 
 Read data server-side, used to implement web servers. Meant to be overloaded
 in a subclass.
 
 =head2 server_write
 
-  my $chunk = $tx->server_write;
+  my $bytes = $tx->server_write;
 
 Write data server-side, used to implement web servers. Meant to be overloaded
 in a subclass.

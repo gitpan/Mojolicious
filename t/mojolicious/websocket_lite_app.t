@@ -8,22 +8,38 @@ BEGIN {
 
 use Test::More;
 use Mojo::ByteStream 'b';
+use Mojo::JSON 'j';
 use Mojolicious::Lite;
 use Test::Mojo;
 
 # WebSocket /echo
 websocket '/echo' => sub {
   my $self = shift;
+  $self->on(binary => sub { shift->send({binary => shift}) });
   $self->on(
-    message => sub {
-      my ($self, $msg) = @_;
-      $self->send("echo: $msg");
+    text => sub {
+      my ($self, $bytes) = @_;
+      $self->send("echo: $bytes");
     }
   );
 };
 
 # GET /echo
 get '/echo' => {text => 'plain echo!'};
+
+# WebSocket /json
+websocket '/json' => sub {
+  my $self = shift;
+  $self->on(binary => sub { shift->send({binary => j([@{j(shift)}, 4])}) });
+  $self->on(
+    text => sub {
+      my ($self, $json) = @_;
+      my $hash = j($json);
+      $hash->{test} += 1;
+      $self->send({text => j($hash)});
+    }
+  );
+};
 
 # GET /plain
 get '/plain' => {text => 'Nothing to see here!'};
@@ -49,13 +65,12 @@ websocket '/unicode' => sub {
 # WebSocket /bytes
 websocket '/bytes' => sub {
   my $self = shift;
-  $self->tx->on(
+  $self->on(
     frame => sub {
       my ($ws, $frame) = @_;
       $ws->send({$frame->[4] == 2 ? 'binary' : 'text', $frame->[5]});
     }
   );
-  $self->rendered(101);
 };
 
 # WebSocket /once
@@ -81,10 +96,12 @@ under '/nested';
 # WebSocket /nested
 websocket sub {
   my $self = shift;
+  my $echo = $self->cookie('echo') // '';
+  $self->cookie(echo => 'again');
   $self->on(
     message => sub {
       my ($self, $msg) = @_;
-      $self->send("nested echo: $msg");
+      $self->send("nested echo: $msg$echo");
     }
   );
 };
@@ -111,11 +128,25 @@ $t->websocket_ok('/echo', {'Sec-WebSocket-Protocol' => 'foo, bar, baz'})
   ->header_is('Sec-WebSocket-Protocol' => 'foo')->send_ok('hello')
   ->message_is('echo: hello')->finish_ok;
 
+# WebSocket /echo (bytes)
+$t->websocket_ok('/echo')->send_ok({binary => 'bytes!'})
+  ->message_is({binary => 'bytes!'})->send_ok({binary => 'bytes!'})
+  ->message_isnt({text => 'bytes!'})->finish_ok;
+
 # WebSocket /echo (zero)
-$t->websocket_ok('/echo')->send_ok(0)->message_is('echo: 0')->finish_ok;
+$t->websocket_ok('/echo')->send_ok(0)->message_is('echo: 0')->send_ok(0)
+  ->message_like({text => qr/0/})->finish_ok;
 
 # GET /echo (plain alternative)
 $t->get_ok('/echo')->status_is(200)->content_is('plain echo!');
+
+# WebSocket /json
+$t->websocket_ok('/json')
+  ->send_ok({text => j({test => 23, snowman => '☃'})})
+  ->json_message_is('/' => {test => 24, snowman => '☃'})
+  ->send_ok({binary => j([1, 2, 3])})
+  ->json_message_is('/' => [1, 2, 3, 4], 'right content')
+  ->send_ok({binary => j([1, 2, 3])})->json_message_is('/2' => 3)->finish_ok;
 
 # GET /plain
 $t->get_ok('/plain')->status_is(200)->content_is('Nothing to see here!');
@@ -126,7 +157,7 @@ $t->websocket_ok('/push')->message_is('push')->message_is('push')
 
 # WebSocket /push (again)
 $t->websocket_ok('/push')->message_unlike(qr/shift/)->message_isnt('shift')
-  ->message_like(qr/us/)->finish_ok;
+  ->message_like(qr/us/)->message_unlike({binary => qr/push/})->finish_ok;
 
 # GET /plain (again)
 $t->get_ok('/plain')->status_is(200)->content_is('Nothing to see here!');
@@ -180,6 +211,10 @@ $t->websocket_ok('/once')->send_ok('hello')->message_is('ONE: hello')
 # WebSocket /nested
 $t->websocket_ok('/nested')->send_ok('hello')
   ->message_is('nested echo: hello')->finish_ok;
+
+# WebSocket /nested (with cookie)
+$t->websocket_ok('/nested')->send_ok('hello')
+  ->message_is('nested echo: helloagain')->finish_ok;
 
 # GET /nested (plain alternative)
 $t->get_ok('/nested')->status_is(200)->content_is('plain nested!');
