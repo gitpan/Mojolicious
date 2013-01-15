@@ -11,10 +11,11 @@ our @EXPORT_OK = ('b');
 # Turn most functions from Mojo::Util into methods
 my @UTILS = (
   qw(b64_decode b64_encode camelize decamelize hmac_md5_sum hmac_sha1_sum),
-  qw(html_escape html_unescape md5_bytes md5_sum punycode_decode),
-  qw(punycode_encode quote sha1_bytes sha1_sum slurp spurt squish trim),
-  qw(unquote url_escape url_unescape xml_escape xor_encode)
+  qw(html_unescape md5_bytes md5_sum punycode_decode punycode_encode quote),
+  qw(sha1_bytes sha1_sum slurp spurt squish trim unquote url_escape),
+  qw(url_unescape xml_escape xor_encode)
 );
+push @UTILS, 'html_escape';    # DEPRECATED in Rainbow!
 for my $name (@UTILS) {
   my $sub = Mojo::Util->can($name);
   Mojo::Util::monkey_patch __PACKAGE__, $name, sub {
@@ -82,7 +83,7 @@ Mojo::ByteStream - ByteStream
 
   # Use the alternative constructor
   use Mojo::ByteStream 'b';
-  my $stream = b('foobarbaz')->html_escape;
+  my $stream = b('foobarbaz')->b64_encode('')->say;
 
 =head1 DESCRIPTION
 
@@ -174,15 +175,6 @@ Generate HMAC-MD5 checksum for bytestream with L<Mojo::Util/"hmac_md5_sum">.
 Generate HMAC-SHA1 checksum for bytestream with L<Mojo::Util/"hmac_sha1_sum">.
 
   b('foo bar baz')->hmac_sha1_sum('secr3t')->quote->say;
-
-=head2 html_escape
-
-  $stream = $stream->html_escape;
-  $stream = $stream->html_escape('^\n\r\t !#$%(-;=?-~');
-
-Escape unsafe characters in bytestream with L<Mojo::Util/"html_escape">.
-
-  b('<html>')->html_escape->say;
 
 =head2 html_unescape
 
@@ -324,7 +316,7 @@ L<Mojo::Util/"url_escape">.
 Decode percent encoded characters in bytestream with
 L<Mojo::Util/"url_unescape">.
 
-  b('%3Chtml%3E')->url_unescape->html_escape->say;
+  b('%3Chtml%3E')->url_unescape->xml_escape->say;
 
 =head2 xml_escape
 
