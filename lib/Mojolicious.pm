@@ -40,7 +40,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Rainbow';
-our $VERSION  = '3.80';
+our $VERSION  = '3.81';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -626,7 +626,7 @@ L<http://creativecommons.org/licenses/by-sa/3.0>.
 
 =head2 jQuery
 
-  Copyright (C) 2011, John Resig.
+  Copyright (C) 2005, 2012 jQuery Foundation, Inc.
 
 Licensed under the MIT License, L<http://creativecommons.org/licenses/MIT>.
 
@@ -775,6 +775,8 @@ Ilya Chesnokov
 James Duncan
 
 Jan Jona Javorsek
+
+Jan Schmidt
 
 Jaroslav Muhin
 

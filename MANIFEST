@@ -54,6 +54,7 @@ lib/Mojo/Server/CGI.pm
 lib/Mojo/Server/Daemon.pm
 lib/Mojo/Server/Hypnotoad.pm
 lib/Mojo/Server/Morbo.pm
+lib/Mojo/Server/Prefork.pm
 lib/Mojo/Server/PSGI.pm
 lib/Mojo/Template.pm
 lib/Mojo/Transaction.pm
@@ -78,6 +79,7 @@ lib/Mojolicious/Command/generate/makefile.pm
 lib/Mojolicious/Command/generate/plugin.pm
 lib/Mojolicious/Command/get.pm
 lib/Mojolicious/Command/inflate.pm
+lib/Mojolicious/Command/prefork.pm
 lib/Mojolicious/Command/psgi.pm
 lib/Mojolicious/Command/routes.pm
 lib/Mojolicious/Command/test.pm
@@ -204,6 +206,7 @@ t/mojo/log.t
 t/mojo/morbo.t
 t/mojo/parameters.t
 t/mojo/path.t
+t/mojo/prefork.t
 t/mojo/psgi.t
 t/mojo/reactor_ev.t
 t/mojo/reactor_poll.t

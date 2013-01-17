@@ -185,7 +185,7 @@ Upload files to CPAN.
 
   $ ./myapp.pl daemon
 
-Start application with standalone HTTP server backend.
+Start application with standalone HTTP and WebSocket server server.
 
 =head2 eval
 
@@ -245,6 +245,12 @@ Perform requests to remote host or local application.
 
 Turn templates and static files embedded in the C<DATA> sections of your
 application into real files.
+
+=head2 prefork
+
+  $ ./myapp.pl prefork
+
+Start application with standalone preforking HTTP and WebSocket server.
 
 =head2 psgi
 

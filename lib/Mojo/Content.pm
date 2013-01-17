@@ -140,7 +140,8 @@ sub parse {
     my $len = $headers->content_length || 0;
     $self->{size} ||= 0;
     if ((my $need = $len - $self->{size}) > 0) {
-      my $chunk = substr $self->{buffer}, 0, $need, '';
+      my $len = length $self->{buffer};
+      my $chunk = substr $self->{buffer}, 0, $need > $len ? $len : $need, '';
       $self->_uncompress($chunk);
       $self->{size} += length $chunk;
     }
@@ -588,7 +589,8 @@ Get leftover data from content parser.
 
 =head2 parse
 
-  $content = $content->parse("Content-Length: 12\r\n\r\nHello World!");
+  $content
+    = $content->parse("Content-Length: 12\x0d\x0a\x0d\x0aHello World!");
 
 Parse content chunk.
 
