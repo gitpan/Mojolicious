@@ -15,8 +15,6 @@ sub expires {
     ? Mojo::Date->new($self->{expires})
     : $self->{expires}
     unless @_;
-
-  # New expires value
   $self->{expires} = shift;
 
   return $self;
@@ -25,7 +23,6 @@ sub expires {
 sub parse {
   my ($self, $string) = @_;
 
-  # Walk tree
   my @cookies;
   for my $token ($self->_tokenize($string)) {
     for my $i (0 .. $#$token) {

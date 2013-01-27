@@ -1,6 +1,7 @@
 package Mojolicious::Controller;
 use Mojo::Base -base;
 
+# No imports, for security reasons!
 use Carp ();
 use Mojo::ByteStream;
 use Mojo::Cookie::Response;
@@ -29,11 +30,11 @@ sub AUTOLOAD {
 
   # Method
   my ($package, $method) = our $AUTOLOAD =~ /^([\w:]+)::(\w+)$/;
-  Carp::croak("Undefined subroutine &${package}::$method called")
-    unless Scalar::Util::blessed($self) && $self->isa(__PACKAGE__);
+  Carp::croak "Undefined subroutine &${package}::$method called"
+    unless Scalar::Util::blessed $self && $self->isa(__PACKAGE__);
 
   # Call helper
-  Carp::croak(qq{Can't locate object method "$method" via package "$package"})
+  Carp::croak qq{Can't locate object method "$method" via package "$package"}
     unless my $helper = $self->app->renderer->helpers->{$method};
   return $self->$helper(@_);
 }
@@ -59,8 +60,6 @@ sub cookie {
 
   # Request cookies
   return map { $_->value } $self->req->cookie($name) if wantarray;
-
-  # Request cookie
   return undef unless my $cookie = $self->req->cookie($name);
   return $cookie->value;
 }
@@ -157,7 +156,7 @@ sub render {
   my $args = ref $_[0] ? $_[0] : {@_};
   $args->{template} = $template if $template;
 
-  # Template
+  # Detect template name
   my $stash = $self->stash;
   unless ($args->{template} || $stash->{template}) {
 
@@ -194,7 +193,6 @@ sub render_data { shift->render(data => @_) }
 sub render_exception {
   my ($self, $e) = @_;
 
-  # Log exception
   my $app = $self->app;
   $app->log->error($e = Mojo::Exception->new($e));
 
@@ -312,7 +310,7 @@ sub respond_to {
 sub send {
   my ($self, $msg, $cb) = @_;
   my $tx = $self->tx;
-  Carp::croak('No WebSocket connection to send message to')
+  Carp::croak 'No WebSocket connection to send message to'
     unless $tx->is_websocket;
   $tx->send($msg => sub { shift and $self->$cb(@_) if $cb });
   return $self->rendered(101);
@@ -397,8 +395,7 @@ sub url_for {
   my $target = shift // '';
 
   # Absolute URL
-  return $target
-    if Scalar::Util::blessed($target) && $target->isa('Mojo::URL');
+  return $target if Scalar::Util::blessed $target && $target->isa('Mojo::URL');
   return Mojo::URL->new($target) if $target =~ m!^\w+://!;
 
   # Base
@@ -458,7 +455,7 @@ sub _fallbacks {
   # Mode specific template
   return 1 if $self->render($options);
 
-  # Template
+  # Normal template
   $options->{template} = $template;
   return 1 if $self->render($options);
 
@@ -471,6 +468,8 @@ sub _fallbacks {
 }
 
 1;
+
+=encoding utf8
 
 =head1 NAME
 
@@ -577,16 +576,32 @@ Data storage persistent only for the next request, stored in the C<session>.
 Subscribe to events of C<tx>, which is usually a L<Mojo::Transaction::HTTP> or
 L<Mojo::Transaction::WebSocket> object.
 
-  # Emitted when the transaction has been finished
+  # Do something after the transaction has been finished
   $c->on(finish => sub {
     my $c = shift;
     $c->app->log->debug('We are done!');
   });
 
-  # Emitted when new WebSocket messages arrive
+  # Receive WebSocket message
   $c->on(message => sub {
     my ($c, $msg) = @_;
     $c->app->log->debug("Message: $msg");
+  });
+
+  # Receive JSON object via WebSocket "Text" message
+  use Mojo::JSON 'j';
+  $c->on(text => sub {
+    my ($c, $bytes) = @_;
+    my $test = j($bytes)->{test};
+    $c->app->log->debug("Test: $test");
+  });
+
+  # Receive JSON object via WebSocket "Binary" message
+  use Mojo::JSON 'j';
+  $c->on(binary => sub {
+    my ($c, $bytes) = @_;
+    my $test = j($bytes)->{test};
+    $c->app->log->debug("Test: $test");
   });
 
 =head2 param
@@ -812,16 +827,16 @@ is set to the value C<XMLHttpRequest>.
 Send message or frame non-blocking via WebSocket, the optional drain callback
 will be invoked once all data has been written.
 
-  # Send "Text" frame
-  $c->send('Hello World!');
+  # Send "Text" message
+  $c->send('I ♥ Mojolicious!');
 
-  # Send JSON object as "Text" frame
+  # Send JSON object as "Text" message
   use Mojo::JSON 'j';
-  $c->send({text => j({hello => 'world'})});
+  $c->send({text => j({test => 'I ♥ Mojolicious!'})});
 
-  # Send JSON object as "Binary" frame
+  # Send JSON object as "Binary" message
   use Mojo::JSON 'j';
-  $c->send({binary => j({hello => 'world'})});
+  $c->send({binary => j({test => 'I ♥ Mojolicious!'})});
 
   # Send "Ping" frame
   $c->send([1, 0, 0, 0, 9, 'Hello World!']);

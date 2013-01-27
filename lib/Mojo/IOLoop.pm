@@ -42,13 +42,13 @@ sub acceptor {
   # Make sure connection manager is running
   $self->_manager;
 
-  # New acceptor
+  # Connect acceptor with reactor
   my $id = $self->_id;
   $self->{acceptors}{$id} = $acceptor;
   weaken $acceptor->reactor($self->reactor)->{reactor};
   $self->{accepts} = $self->max_accepts if $self->max_accepts;
 
-  # Stop accepting
+  # Stop accepting so new acceptor can get picked up
   $self->_not_accepting;
 
   return $id;
@@ -61,25 +61,22 @@ sub client {
   # Make sure connection manager is running
   $self->_manager;
 
-  # New client
   my $id     = $self->_id;
   my $c      = $self->{connections}{$id} ||= {};
   my $client = $c->{client} = Mojo::IOLoop::Client->new;
   weaken $client->reactor($self->reactor)->{reactor};
 
-  # Connect
   weaken $self;
   $client->on(
     connect => sub {
       my $handle = pop;
 
-      # New stream
+      # Turn handle into stream
       my $c = $self->{connections}{$id};
       delete $c->{client};
       my $stream = $c->{stream} = Mojo::IOLoop::Stream->new($handle);
       $self->_stream($stream => $id);
 
-      # Connected
       $self->$cb(undef, $stream);
     }
   );
@@ -128,14 +125,13 @@ sub server {
   my ($self, $cb) = (shift, pop);
   $self = $self->singleton unless ref $self;
 
-  # New server
   my $server = Mojo::IOLoop::Server->new;
   weaken $self;
   $server->on(
     accept => sub {
       my $handle = pop;
 
-      # Accept
+      # Turn handle into stream
       my $stream = Mojo::IOLoop::Stream->new($handle);
       $self->$cb($stream, $self->stream($stream));
 
@@ -144,7 +140,7 @@ sub server {
         if defined $self->{accepts}
         && ($self->{accepts} -= int(rand 2) + 1) <= 0;
 
-      # Stop accepting
+      # Stop accepting to release accept mutex
       $self->_not_accepting;
     }
   );
@@ -213,7 +209,7 @@ sub _id {
 sub _manage {
   my $self = shift;
 
-  # Start accepting if possible
+  # Try to acquire accept mutex
   $self->_accepting;
 
   # Close connections gracefully
@@ -242,7 +238,6 @@ sub _not_accepting {
   return unless my $cb = $self->unlock;
   $self->$cb;
 
-  # Stop accepting
   $_->stop for values %{$self->{acceptors} || {}};
 }
 
@@ -273,7 +268,7 @@ sub _stream {
   $self->{connections}{$id}{stream} = $stream;
   weaken $stream->reactor($self->reactor)->{reactor};
 
-  # Stream
+  # Start streaming
   weaken $self;
   $stream->on(close => sub { $self->{connections}{$id}{finish} = 1 });
   $stream->start;

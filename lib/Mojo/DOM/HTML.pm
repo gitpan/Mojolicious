@@ -76,11 +76,9 @@ my %INLINE = map { $_ => 1 } (
 sub parse {
   my ($self, $html) = @_;
 
-  # Try to decode
   my $charset = $self->charset;
   $html = decode($charset, $html) // return $self->charset(undef) if $charset;
 
-  # Tokenize
   my $tree    = ['root'];
   my $current = $tree;
   while ($html =~ m/\G$TOKEN_RE/gcs) {
@@ -269,14 +267,10 @@ sub _render {
   # Processing instruction
   return "<?" . $tree->[1] . "?>" if $e eq 'pi';
 
-  # Offset
-  my $start = $e eq 'root' ? 1 : 2;
-
   # Start tag
+  my $start = $e eq 'root' ? 1 : 2;
   my $content = '';
   if ($e eq 'tag') {
-
-    # Offset
     $start = 4;
 
     # Open tag
@@ -305,7 +299,7 @@ sub _render {
     $content .= '>';
   }
 
-  # Walk tree
+  # Render whole tree
   $content .= $self->_render($tree->[$_]) for $start .. $#$tree;
 
   # End tag
@@ -362,7 +356,7 @@ sub _start {
     }
   }
 
-  # New
+  # New tag
   my $new = ['tag', $start, $attrs, $$current];
   weaken $new->[3];
   push @$$current, $new;

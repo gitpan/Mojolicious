@@ -88,7 +88,6 @@ sub client_challenge {
 sub client_handshake {
   my $self = shift;
 
-  # Default headers
   my $headers = $self->req->headers;
   $headers->upgrade('websocket')  unless $headers->upgrade;
   $headers->connection('Upgrade') unless $headers->connection;
@@ -205,12 +204,10 @@ sub send {
   # Text
   elsif (!ref $frame) { $frame = [1, 0, 0, 0, TEXT, encode('UTF-8', $frame)] }
 
-  # Prepare frame
   $self->once(drain => $cb) if $cb;
   $self->{write} .= $self->build_frame(@$frame);
   $self->{state} = 'write';
 
-  # Resume
   return $self->emit('resume');
 }
 
@@ -230,26 +227,22 @@ sub server_handshake {
 sub server_read {
   my ($self, $chunk) = @_;
 
-  # Parse frames
   $self->{read} .= $chunk // '';
   while (my $frame = $self->parse_frame(\$self->{read})) {
     $self->emit(frame => $frame);
   }
 
-  # Resume
   $self->emit('resume');
 }
 
 sub server_write {
   my $self = shift;
 
-  # Drain
   unless (length($self->{write} // '')) {
     $self->{state} = $self->{finished} ? 'finished' : 'read';
     $self->emit('drain');
   }
 
-  # Empty buffer
   return delete $self->{write} // '';
 }
 

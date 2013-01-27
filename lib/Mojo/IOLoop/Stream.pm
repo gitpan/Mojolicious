@@ -24,7 +24,6 @@ sub close {
   return unless my $handle = delete $self->{handle};
   $reactor->remove($handle);
 
-  # Close
   close $handle;
   $self->emit_safe('close');
 }
@@ -65,14 +64,9 @@ sub steal_handle {
 sub write {
   my ($self, $chunk, $cb) = @_;
 
-  # Prepare chunk for writing
   $self->{buffer} .= $chunk;
-
-  # Write with roundtrip
   if ($cb) { $self->once(drain => $cb) }
   else     { return $self unless length $self->{buffer} }
-
-  # Start writing
   $self->reactor->watch($self->{handle}, !$self->{paused}, 1)
     if $self->{handle};
 
@@ -82,10 +76,7 @@ sub write {
 sub _read {
   my $self = shift;
 
-  # Read
   my $read = $self->{handle}->sysread(my $buffer, 131072, 0);
-
-  # Error
   unless (defined $read) {
 
     # Retry
@@ -101,7 +92,6 @@ sub _read {
   # EOF
   return $self->close if $read == 0;
 
-  # Handle read
   $self->emit_safe(read => $buffer)->{active} = time;
 }
 
@@ -118,19 +108,15 @@ sub _startup {
     }
   );
 
-  # Start streaming
   $reactor->io($self->{handle}, sub { pop() ? $self->_write : $self->_read });
 }
 
 sub _write {
   my $self = shift;
 
-  # Write as much as possible
   my $handle = $self->{handle};
   if (length $self->{buffer}) {
     my $written = $handle->syswrite($self->{buffer});
-
-    # Error
     unless (defined $written) {
 
       # Retry
@@ -143,15 +129,11 @@ sub _write {
       return $self->emit_safe(error => $!)->close;
     }
 
-    # Remove written chunk from buffer
     $self->emit_safe(write => substr($self->{buffer}, 0, $written, ''));
     $self->{active} = time;
   }
 
-  # Handle drain
   $self->emit_safe('drain') if !length $self->{buffer};
-
-  # Stop writing
   return if $self->is_writing;
   $self->reactor->watch($handle, !$self->{paused}, 0);
 }

@@ -35,7 +35,7 @@ sub form {
   my $form = ref $encoding ? $encoding : shift;
   $encoding = undef if ref $encoding;
 
-  # New transaction
+  # Start with normal POST transaction
   my $tx = $self->tx(POST => $url, @_);
 
   # Check for uploads and force multipart if necessary
@@ -173,7 +173,6 @@ sub websocket {
 sub _multipart {
   my ($self, $encoding, $form) = @_;
 
-  # Parts
   my @parts;
   for my $name (sort keys %$form) {
     my $values = $form->{$name};

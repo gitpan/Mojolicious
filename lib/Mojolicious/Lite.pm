@@ -9,31 +9,31 @@ use Mojo::Util 'monkey_patch';
 
 sub import {
 
-  # Executable
+  # Remember executable for later
   $ENV{MOJO_EXE} ||= (caller)[1];
 
-  # Home
+  # Reuse home directory if possible
   local $ENV{MOJO_HOME} = catdir(split '/', dirname $ENV{MOJO_EXE})
     unless $ENV{MOJO_HOME};
 
-  # Initialize app
+  # Initialize application class
   my $caller = caller;
   no strict 'refs';
   push @{"${caller}::ISA"}, 'Mojo';
   my $app = shift->new;
 
-  # Moniker
+  # Generate moniker based on filename
   my $moniker = basename $ENV{MOJO_EXE};
   $moniker =~ s/\.(?:pl|pm|t)$//i;
   $app->moniker($moniker);
 
-  # Initialize routes
+  # Initialize routes without namespaces
   my $routes = $app->routes->namespaces([]);
 
   # Default static and template class
   $app->static->classes->[0] = $app->renderer->classes->[0] = $caller;
 
-  # Functions
+  # The Mojolicious::Lite DSL
   my $root = $routes;
   for my $name (qw(any get options patch post put websocket)) {
     monkey_patch $caller, $name, sub { $routes->$name(@_) };

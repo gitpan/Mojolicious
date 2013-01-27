@@ -43,10 +43,7 @@ sub body {
 sub body_params {
   my $self = shift;
 
-  # Cached
   return $self->{body_params} if $self->{body_params};
-
-  # Charset
   my $params = $self->{body_params} = Mojo::Parameters->new;
   $params->charset($self->content->charset || $self->default_charset);
 
@@ -59,15 +56,9 @@ sub body_params {
   # "multipart/formdata"
   elsif ($type =~ m!multipart/form-data!i) {
     my $formdata = $self->_parse_formdata;
-
-    # Formdata
     for my $data (@$formdata) {
       my ($name, $filename, $value) = @$data;
-
-      # File
       next if defined $filename;
-
-      # Form value
       $params->append($name, $value);
     }
   }
@@ -143,14 +134,9 @@ sub fix_headers {
 sub get_body_chunk {
   my ($self, $offset) = @_;
 
-  # Progress
   $self->emit('progress', 'body', $offset);
-
-  # Chunk
   my $chunk = $self->content->get_body_chunk($offset);
   return $chunk if !defined $chunk || length $chunk;
-
-  # Finish
   $self->finish;
 
   return $chunk;
@@ -197,9 +183,10 @@ sub param { shift->body_params->param(@_) }
 sub parse {
   my ($self, $chunk) = @_;
 
-  # Check message size and add chunk
+  # Check message size
   return $self->error('Maximum message size exceeded', 413)
     if ($self->{raw_size} += length($chunk //= '')) > $self->max_message_size;
+
   $self->{buffer} .= $chunk;
 
   # Start line
@@ -211,7 +198,6 @@ sub parse {
     return $self->error('Maximum line size exceeded', 431)
       if $len > $self->max_line_size;
 
-    # Extract
     $self->{state} = 'content' if $self->extract_start_line(\$self->{buffer});
   }
 
@@ -227,7 +213,6 @@ sub parse {
   return $self->error('Maximum buffer size exceeded', 400)
     if $self->content->is_limit_exceeded;
 
-  # Progress
   return $self->emit('progress')->content->is_finished ? $self->finish : $self;
 }
 
@@ -249,11 +234,7 @@ sub upload {
 sub uploads {
   my $self = shift;
 
-  # Only multipart messages have uploads
   my @uploads;
-  return \@uploads unless $self->is_multipart;
-
-  # Extract formdata
   my $formdata = $self->_parse_formdata;
   for my $data (@$formdata) {
     my ($name, $filename, $part) = @$data;
@@ -280,7 +261,6 @@ sub write_chunk { shift->_write(write_chunk => @_) }
 sub _build {
   my ($self, $method) = @_;
 
-  # Build part from chunks
   my $buffer = '';
   my $offset = 0;
   while (1) {
@@ -291,7 +271,6 @@ sub _build {
     # End of part
     last unless my $len = length $chunk;
 
-    # Part
     $offset += $len;
     $buffer .= $chunk;
   }
@@ -323,37 +302,35 @@ sub _nest {
 sub _parse_formdata {
   my $self = shift;
 
-  # Check content
+  # Check for multipart content
   my @formdata;
   my $content = $self->content;
   return \@formdata unless $content->is_multipart;
   my $charset = $content->charset || $self->default_charset;
 
-  # Walk the tree
+  # Check all parts for form data
   my @parts;
   push @parts, $content;
   while (my $part = shift @parts) {
 
-    # Multipart
+    # Nested multipart content
     if ($part->is_multipart) {
       unshift @parts, @{$part->parts};
       next;
     }
 
-    # Content-Disposition header
+    # Extract information from Content-Disposition header
     my $disposition = $part->headers->content_disposition;
     next unless $disposition;
     my ($name)     = $disposition =~ /[; ]name="?([^";]+)"?/;
     my ($filename) = $disposition =~ /[; ]filename="?([^"]*)"?/;
-    my $value      = $part;
-
-    # Decode
     if ($charset) {
       $name     = decode($charset, $name)     // $name     if $name;
       $filename = decode($charset, $filename) // $filename if $filename;
     }
 
-    # Form value
+    # Check for file upload
+    my $value = $part;
     unless (defined $filename) {
       $value = $part->asset->slurp;
       $value = decode($charset, $value) // $value if $charset;

@@ -2,18 +2,12 @@ package Mojolicious::Plugin::Config;
 use Mojo::Base 'Mojolicious::Plugin';
 
 use File::Spec::Functions 'file_name_is_absolute';
+use Mojo::Util qw(decode slurp);
 
 sub load {
   my ($self, $file, $conf, $app) = @_;
   $app->log->debug(qq{Reading config file "$file".});
-
-  # Slurp UTF-8 file
-  open my $handle, "<:encoding(UTF-8)", $file
-    or die qq{Couldn't open config file "$file": $!};
-  my $content = do { local $/; <$handle> };
-
-  # Process
-  return $self->parse($content, $file, $conf, $app);
+  return $self->parse(decode('UTF-8', slurp $file), $file, $conf, $app);
 }
 
 sub parse {
@@ -39,7 +33,6 @@ sub register {
   # Mode specific config file
   my $mode = $file =~ /^(.*)\.([^.]+)$/ ? join('.', $1, $app->mode, $2) : '';
 
-  # Absolute paths
   my $home = $app->home;
   $file = $home->rel_file($file) unless file_name_is_absolute $file;
   $mode = $home->rel_file($mode) if $mode && !file_name_is_absolute $mode;

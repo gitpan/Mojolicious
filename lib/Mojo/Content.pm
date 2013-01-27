@@ -40,14 +40,9 @@ sub clone {
 sub generate_body_chunk {
   my ($self, $offset) = @_;
 
-  # Drain
   $self->emit(drain => $offset)
     if !delete $self->{delay} && !length($self->{body_buffer} // '');
-
-  # Get chunk
   my $chunk = delete $self->{body_buffer} // '';
-
-  # EOF or delay
   return $self->{eof} ? '' : undef unless length $chunk;
 
   return $chunk;
@@ -92,12 +87,12 @@ sub leftovers { shift->{buffer} }
 sub parse {
   my $self = shift;
 
-  # Parse headers
+  # Headers
   $self->_parse_until_body(@_);
   return $self if $self->{state} eq 'headers';
   $self->emit('body') unless $self->{body}++;
 
-  # Parse chunked content
+  # Chunked content
   $self->{real_size} //= 0;
   if ($self->is_chunked && $self->{state} ne 'headers') {
     $self->_parse_chunked;
@@ -145,8 +140,6 @@ sub parse {
       $self->_uncompress($chunk);
       $self->{size} += length $chunk;
     }
-
-    # Finished
     $self->{state} = 'finished' if $len <= $self->progress;
   }
 
@@ -169,19 +162,10 @@ sub progress {
 sub write {
   my ($self, $chunk, $cb) = @_;
 
-  # Dynamic content
   $self->{dynamic} = 1;
-
-  # Add chunk
   if (defined $chunk) { $self->{body_buffer} .= $chunk }
-
-  # Delay
-  else { $self->{delay} = 1 }
-
-  # Drain
+  else                { $self->{delay} = 1 }
   $self->once(drain => $cb) if $cb;
-
-  # Finish
   $self->{eof} = 1 if defined $chunk && $chunk eq '';
 
   return $self;
@@ -189,23 +173,15 @@ sub write {
 
 sub write_chunk {
   my ($self, $chunk, $cb) = @_;
-
-  # Chunked transfer encoding
   $self->headers->transfer_encoding('chunked') unless $self->is_chunked;
-
-  # Write
   $self->write(defined $chunk ? $self->_build_chunk($chunk) : $chunk, $cb);
-
-  # Finish
   $self->{eof} = 1 if defined $chunk && $chunk eq '';
-
   return $self;
 }
 
 sub _build {
   my ($self, $method) = @_;
 
-  # Build part from chunks
   my $buffer = '';
   my $offset = 0;
   while (1) {
@@ -216,7 +192,6 @@ sub _build {
     # End of part
     last unless my $len = length $chunk;
 
-    # Part
     $offset += $len;
     $buffer .= $chunk;
   }
@@ -242,7 +217,6 @@ sub _parse_chunked {
   return $self->_parse_chunked_trailing_headers
     if ($self->{chunk_state} // '') eq 'trailing_headers';
 
-  # Parse chunks
   while (my $len = length $self->{pre_buffer}) {
 
     # Start new chunk (ignore the chunk extension)
@@ -275,7 +249,6 @@ sub _parse_chunked {
 sub _parse_chunked_trailing_headers {
   my $self = shift;
 
-  # Parse
   my $headers = $self->headers->parse(delete $self->{pre_buffer});
   return unless $headers->is_finished;
   $self->{chunk_state} = 'finished';
@@ -288,7 +261,6 @@ sub _parse_chunked_trailing_headers {
 sub _parse_headers {
   my $self = shift;
 
-  # Parse
   my $headers = $self->headers->parse(delete $self->{pre_buffer});
   return unless $headers->is_finished;
   $self->{state} = 'body';
@@ -302,21 +274,13 @@ sub _parse_headers {
 sub _parse_until_body {
   my ($self, $chunk) = @_;
 
-  # Add chunk
   $self->{raw_size} += length($chunk //= '');
   $self->{pre_buffer} .= $chunk;
 
-  # Parser started
   unless ($self->{state}) {
-
-    # Update size
     $self->{header_size} = $self->{raw_size} - length $self->{pre_buffer};
-
-    # Headers
-    $self->{state} = 'headers';
+    $self->{state}       = 'headers';
   }
-
-  # Parse headers
   $self->_parse_headers if ($self->{state} // '') eq 'headers';
 }
 

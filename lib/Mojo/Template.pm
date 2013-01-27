@@ -26,11 +26,8 @@ has tree      => sub { [] };
 sub build {
   my $self = shift;
 
-  # Lines
   my (@lines, $cpst, $multi);
   for my $line (@{$self->tree}) {
-
-    # New line
     push @lines, '';
     for (my $j = 0; $j < @{$line}; $j += 2) {
       my $type    = $line->[$j];
@@ -118,12 +115,11 @@ sub interpret {
     Mojo::Exception->throw(shift, [$self->template, $self->code]);
   };
 
-  # Interpret
   return undef unless my $compiled = $self->compiled;
   my $output = eval { $compiled->(@_) };
   return $output unless $@;
 
-  # Exception
+  # Exception with template context
   return Mojo::Exception->new($@, [$self->template])->verbose(1);
 }
 
@@ -133,7 +129,6 @@ sub parse {
   # Clean start
   delete $self->template($tmpl)->{tree};
 
-  # Token
   my $tag     = $self->tag_start;
   my $replace = $self->replace_mark;
   my $expr    = $self->expression_mark;
@@ -202,7 +197,7 @@ sub parse {
     # Normal line ending
     else { $line .= "\n" }
 
-    # Tokenize
+    # Mixed line
     my @token;
     for my $token (split $token_re, $line) {
 
@@ -270,14 +265,12 @@ sub render {
 sub render_file {
   my ($self, $path) = (shift, shift);
 
-  # Slurp file
   $self->name($path) unless defined $self->{name};
-  my $tmpl = slurp $path;
-
-  # Decode and render
+  my $tmpl     = slurp $path;
   my $encoding = $self->encoding;
   croak qq{Template "$path" has invalid encoding.}
     if $encoding && !defined($tmpl = decode $encoding, $tmpl);
+
   return $self->render($tmpl, @_);
 }
 
@@ -321,7 +314,6 @@ sub _wrap {
   $lines->[0]  .= "sub { my \$_M = ''; @{[$self->prepend]}; do { $first";
   $lines->[-1] .= "@{[$self->append]}; \$_M } };";
 
-  # Code
   my $code = join "\n", @$lines;
   warn "-- Code for @{[$self->name]}\n@{[encode 'UTF-8', $code]}\n\n" if DEBUG;
   return $code;

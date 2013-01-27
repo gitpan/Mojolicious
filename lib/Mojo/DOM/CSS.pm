@@ -36,13 +36,10 @@ my $TOKEN_RE        = qr/
 sub select {
   my $self = shift;
 
-  # Compile selectors
-  my $pattern = $self->_compile(shift);
-
-  # Walk tree
   my @results;
-  my $tree  = $self->tree;
-  my @queue = ($tree);
+  my $pattern = $self->_compile(shift);
+  my $tree    = $self->tree;
+  my @queue   = ($tree);
   while (my $current = shift @queue) {
     my $type = $current->[0];
 
@@ -123,7 +120,6 @@ sub _combinator {
 sub _compile {
   my ($self, $css) = @_;
 
-  # Tokenize
   my $pattern = [[]];
   while ($css =~ /$TOKEN_RE/g) {
     my ($separator, $element, $pc, $attrs, $combinator)
@@ -321,7 +317,6 @@ sub _regex {
 sub _selector {
   my ($self, $selector, $current) = @_;
 
-  # Selectors
   for my $s (@$selector[1 .. $#$selector]) {
     my $type = $s->[0];
 
@@ -348,7 +343,6 @@ sub _selector {
 sub _sibling {
   my ($self, $selectors, $current, $tree, $immediate) = @_;
 
-  # Find preceding elements
   my $parent = $current->[3];
   my $found;
   my $start = $parent->[0] eq 'root' ? 1 : 4;

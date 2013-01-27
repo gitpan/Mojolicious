@@ -76,7 +76,6 @@ sub charset { shift->_html(charset => @_) }
 sub children {
   my ($self, $type) = @_;
 
-  # Walk tree
   my @children;
   my $charset = $self->charset;
   my $xml     = $self->xml;
@@ -107,7 +106,6 @@ sub content_xml {
 sub find {
   my ($self, $selector) = @_;
 
-  # Match selector against tree and upgrade results
   my $charset = $self->charset;
   my $xml     = $self->xml;
   return Mojo::Collection->new(
@@ -118,11 +116,9 @@ sub find {
 sub namespace {
   my $self = shift;
 
-  # Namespace prefix
+  # Extract namespace prefix and search parents
   return '' if (my $current = $self->tree)->[0] eq 'root';
   my $ns = $current->[1] =~ /^(.*?):/ ? "xmlns:$1" : undef;
-
-  # Walk tree
   while ($current) {
     last if $current->[0] eq 'root';
 
@@ -200,7 +196,6 @@ sub replace_content {
 sub root {
   my $self = shift;
 
-  # Find root
   my $root = $self->tree;
   while ($root->[0] eq 'tag') {
     last unless my $parent = $root->[3];
@@ -341,7 +336,6 @@ sub _sibling {
 sub _text {
   my ($elements, $recurse, $trim) = @_;
 
-  # Walk tree
   my $text = '';
   for my $e (@$elements) {
     my $type = $e->[0];

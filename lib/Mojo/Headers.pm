@@ -89,7 +89,6 @@ sub names {
 sub parse {
   my $self = shift;
 
-  # Parse headers with size limit
   $self->{state} = 'headers';
   $self->{buffer} .= shift // '';
   my $headers = $self->{cache} ||= [];
@@ -134,7 +133,6 @@ sub remove {
 sub to_hash {
   my ($self, $multi) = @_;
 
-  # Build
   my %hash;
   for my $header (@{$self->names}) {
     my @headers = $self->header($header);
@@ -163,7 +161,6 @@ sub to_string {
     push @headers, "$name: " . join("\x0d\x0a ", @$_) for $self->header($name);
   }
 
-  # Format headers
   return join "\x0d\x0a", @headers;
 }
 

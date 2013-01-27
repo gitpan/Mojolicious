@@ -78,7 +78,6 @@ sub listen {
   $handle->blocking(0);
   $self->{handle} = $handle;
 
-  # TLS
   return unless $args->{tls};
   croak "IO::Socket::SSL 1.75 required for TLS support" unless TLS;
 
@@ -115,7 +114,6 @@ sub stop { $_[0]->reactor->remove($_[0]->{handle}) }
 sub _accept {
   my $self = shift;
 
-  # Accept
   return unless my $handle = $self->{handle}->accept;
   $handle->blocking(0);
 

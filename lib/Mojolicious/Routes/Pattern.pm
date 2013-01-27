@@ -24,11 +24,8 @@ sub parse {
   # Make sure we have a viable pattern
   my $pattern = @_ % 2 ? (shift || '/') : '/';
   $pattern = "/$pattern" unless $pattern =~ m!^/!;
-
-  # Constraints
   $self->constraints({@_});
 
-  # Tokenize
   return $pattern eq '/' ? $self : $self->pattern($pattern)->_tokenize;
 }
 
@@ -39,7 +36,6 @@ sub render {
   my $format = ($values ||= {})->{format};
   $values = {%{$self->defaults}, %$values};
 
-  # Turn pattern into path
   my $string   = '';
   my $optional = 1;
   for my $token (reverse @{$self->tree}) {
@@ -104,7 +100,6 @@ sub shape_match {
 sub _compile {
   my $self = shift;
 
-  # Compile tree to regex
   my $block = my $regex = '';
   my $constraints = $self->constraints;
   my $optional    = 1;
@@ -152,7 +147,6 @@ sub _compile {
       $compiled .= '?' if $optional;
     }
 
-    # Add to block
     $block = "$compiled$block";
   }
 
@@ -188,14 +182,12 @@ sub _compile_req {
 sub _tokenize {
   my $self = shift;
 
-  # Token
   my $quote_end   = $self->quote_end;
   my $quote_start = $self->quote_start;
   my $placeholder = $self->placeholder_start;
   my $relaxed     = $self->relaxed_start;
   my $wildcard    = $self->wildcard_start;
 
-  # Parse the pattern character wise
   my $pattern = $self->pattern;
   my $state   = 'text';
   my (@tree, $quoted);

@@ -55,11 +55,11 @@ sub cookies {
 }
 
 sub extract_start_line {
-  my ($self, $bufferref) = @_;
+  my ($self, $bufref) = @_;
 
   # Ignore any leading empty lines
-  $$bufferref =~ s/^\s+//;
-  return undef unless defined(my $line = get_line $bufferref);
+  $$bufref =~ s/^\s+//;
+  return undef unless defined(my $line = get_line $bufref);
 
   # We have a (hopefully) full request line
   $self->error('Bad request start line', 400) and return undef
@@ -100,7 +100,6 @@ sub fix_headers {
 sub get_start_line_chunk {
   my ($self, $offset) = @_;
 
-  # Request line
   unless (defined $self->{start_buffer}) {
 
     # Path
@@ -128,10 +127,7 @@ sub get_start_line_chunk {
     $self->{start_buffer} = "$method $path HTTP/@{[$self->version]}\x0d\x0a";
   }
 
-  # Progress
   $self->emit(progress => 'start_line', $offset);
-
-  # Chunk
   return substr $self->{start_buffer}, $offset, 131072;
 }
 

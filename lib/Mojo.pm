@@ -15,7 +15,6 @@ has log  => sub { Mojo::Log->new };
 has ua   => sub {
   my $self = shift;
 
-  # Fresh user agent
   my $ua = Mojo::UserAgent->new->app($self);
   weaken $self;
   $ua->on(error => sub { $self->log->error($_[1]) });
@@ -27,10 +26,8 @@ has ua   => sub {
 sub new {
   my $self = shift->SUPER::new(@_);
 
-  # Detect home directory
+  # Check if we have a log directory
   my $home = $self->home->detect(ref $self);
-
-  # Log directory
   $self->log->path($home->rel_file('log/mojo.log'))
     if -w $home->rel_file('log');
 

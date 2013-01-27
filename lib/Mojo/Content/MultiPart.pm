@@ -23,7 +23,7 @@ sub body_contains {
 sub body_size {
   my $self = shift;
 
-  # Check for Content-Lenght header
+  # Check for existing Content-Lenght header
   my $content_len = $self->headers->content_length;
   return $content_len if $content_len;
 
@@ -78,7 +78,7 @@ sub get_body_chunk {
   my $len          = $boundary_len - 2;
   return substr "--$boundary\x0d\x0a", $offset if $len > $offset;
 
-  # Parts
+  # Prepare content part by part
   my $parts = $self->parts;
   for (my $i = 0; $i < @$parts; $i++) {
     my $part = $parts->[$i];
@@ -150,8 +150,6 @@ sub _parse_multipart_boundary {
   my $end = "\x0d\x0a--$boundary--";
   if ((index $self->{multipart}, $end) == 0) {
     substr $self->{multipart}, 0, length $end, '';
-
-    # Finished
     $self->{multi_state} = 'finished';
   }
 
@@ -174,7 +172,6 @@ sub _parse_multipart_preamble {
 sub _read {
   my ($self, $chunk) = @_;
 
-  # Parse
   $self->{multipart} .= $chunk;
   my $boundary = $self->boundary;
   until (($self->{multi_state} //= 'multipart_preamble') eq 'finished') {

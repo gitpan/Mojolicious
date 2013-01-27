@@ -62,10 +62,8 @@ sub dispatch {
     }
   }
 
-  # No match
-  return undef unless $m && @{$m->stack};
-
   # Dispatch
+  return undef unless $m && @{$m->stack};
   return undef if $self->_walk($c);
   $self->auto_render($c);
   return 1;
@@ -222,7 +220,6 @@ sub _method {
 sub _walk {
   my ($self, $c) = @_;
 
-  # Walk the stack
   my $stack   = $c->match->stack;
   my $stash   = $c->stash;
   my $staging = @$stack;

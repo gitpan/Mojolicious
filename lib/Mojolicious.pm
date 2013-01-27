@@ -40,7 +40,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Rainbow';
-our $VERSION  = '3.82';
+our $VERSION  = '3.83';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -63,7 +63,6 @@ sub DESTROY { }
 sub new {
   my $self = shift->SUPER::new(@_);
 
-  # Paths
   my $home = $self->home;
   push @{$self->renderer->paths}, $home->rel_dir('templates');
   push @{$self->static->paths},   $home->rel_dir('public');
@@ -78,25 +77,22 @@ sub new {
   $r->hide(qw(rendered req res respond_to send session signed_cookie stash));
   $r->hide(qw(tx ua url_for write write_chunk));
 
-  # Prepare log
+  # Check if we have a log directory
   my $mode = $self->mode;
   $self->log->path($home->rel_file("log/$mode.log"))
     if -w $home->rel_file('log');
 
-  # Load default plugins
   $self->plugin($_) for qw(HeaderCondition DefaultHelpers TagHelpers);
   $self->plugin($_) for qw(EPLRenderer EPRenderer RequestTimer PoweredBy);
 
-  # Exception handling
+  # Exception handling should be first in chain
   $self->hook(around_dispatch => \&_exception);
 
   # Reduced log output outside of development mode
   $self->log->level('info') unless $mode eq 'development';
 
-  # Run mode
+  # Run mode before startup
   if (my $sub = $self->can("${mode}_mode")) { $self->$sub(@_) }
-
-  # Startup
   $self->startup(@_);
 
   return $self;
@@ -147,19 +143,19 @@ sub handler {
     = $self->controller_class->new(app => $self, stash => $stash, tx => $tx);
   weaken $c->{$_} for qw(app tx);
 
-  # Dispatcher
+  # Dispatcher has to be last in the chain
   ++$self->{dispatch}
     and $self->hook(around_dispatch => sub { $_[1]->app->dispatch($_[1]) })
     unless $self->{dispatch};
 
-  # Process
+  # Process with chain
   unless (eval { $self->plugins->emit_chain(around_dispatch => $c) }) {
     $self->log->fatal("Processing request failed: $@");
     $tx->res->code(500);
     $tx->resume;
   }
 
-  # Delayed
+  # Delayed response
   $self->log->debug('Nothing has been rendered, expecting delayed response.')
     unless $stash->{'mojo.rendered'} || $tx->is_writing;
 }
@@ -314,12 +310,13 @@ contain more information.
 The router, defaults to a L<Mojolicious::Routes> object. You use this in your
 startup method to define the url endpoints for your application.
 
-  sub startup {
-    my $self = shift;
+  # Add routes
+  my $r = $app->routes;
+  $r->get('/foo/bar')->to('test#foo', title => 'Hello Mojo!');
+  $r->post('/baz')->to('test#baz');
 
-    my $r = $self->routes;
-    $r->get('/:controller/:action')->to('test#welcome');
-  }
+  # Add another namespace to load controllers from
+  push @{$app->routes->namespaces}, 'MyApp::Controller';
 
 =head2 secret
 
