@@ -40,7 +40,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Rainbow';
-our $VERSION  = '3.83';
+our $VERSION  = '3.84';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -117,10 +117,18 @@ sub dispatch {
   my $plugins = $self->plugins->emit_hook(before_dispatch => $c);
 
   # Try to find a static file
-  $self->static->dispatch($c) unless $tx->res->code;
-  $plugins->emit_hook_reverse(after_static_dispatch => $c);
+  $self->static->dispatch($c) and $plugins->emit_hook(after_static => $c)
+    unless $tx->res->code;
+
+  # DEPRECATED in Rainbow!
+  if ($plugins->has_subscribers('after_static_dispatch')) {
+    warn <<EOF and $plugins->emit_hook_reverse(after_static_dispatch => $c);
+after_static_dispatch hook is DEPRECATED in favor of before_routes!!!
+EOF
+  }
 
   # Routes
+  $plugins->emit_hook(before_routes => $c);
   my $res = $tx->res;
   return if $res->code;
   if (my $code = ($tx->req->error)[1]) { $res->code($code) }
@@ -374,7 +382,7 @@ new ones.
 Construct a new L<Mojolicious> application, calling C<${mode}_mode> and
 C<startup> in the process. Will automatically detect your home directory and
 set up logging based on your current operating mode. Also sets up the
-renderer, static dispatcher and a default set of plugins.
+renderer, static file server and a default set of plugins.
 
 =head2 build_tx
 
@@ -466,7 +474,7 @@ application object)
 
 =item before_dispatch
 
-Emitted right before the static dispatcher and router start their work.
+Emitted right before the static file server and router start their work.
 
   $app->hook(before_dispatch => sub {
     my $c = shift;
@@ -476,18 +484,30 @@ Emitted right before the static dispatcher and router start their work.
 Very useful for rewriting incoming requests and other preprocessing tasks.
 (Passed the default controller object)
 
-=item after_static_dispatch
+=item after_static
 
-Emitted in reverse order after the static dispatcher determined if a static
-file should be served and before the router starts its work.
+Emitted after the static file server decided to serve a static file.
 
-  $app->hook(after_static_dispatch => sub {
+  $app->hook(after_static => sub {
     my $c = shift;
     ...
   });
 
-Mostly used for custom dispatchers and post-processing static file responses.
-(Passed the default controller object)
+Mostly used for post-processing static file responses. (Passed the default
+controller object)
+
+=item before_routes
+
+Emitted after the static file server decided if a static file should be served
+and before the router starts its work.
+
+  $app->hook(before_routes => sub {
+    my $c = shift;
+    ...
+  });
+
+Mostly used for custom dispatchers and collecting metrics. (Passed the default
+controller object)
 
 =item after_render
 

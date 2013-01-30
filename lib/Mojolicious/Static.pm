@@ -89,7 +89,6 @@ sub serve_asset {
       ->content_range("bytes $start-$end/$size");
   }
 
-  # Serve asset
   return $res->content->asset($asset->start_range($start)->end_range($end));
 }
 
@@ -136,7 +135,7 @@ Mojolicious::Static - Serve static files
 
 =head1 DESCRIPTION
 
-L<Mojolicious::Static> is a dispatcher for static files with C<Range> and
+L<Mojolicious::Static> is a static file server with C<Range> and
 C<If-Modified-Since> support.
 
 =head1 ATTRIBUTES

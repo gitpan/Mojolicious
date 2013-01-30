@@ -54,19 +54,25 @@ hook before_dispatch => sub {
 };
 
 # Custom dispatcher /custom_too
-hook after_static_dispatch => sub {
+hook before_routes => sub {
   my $self = shift;
   $self->render_text('this works too')
     if $self->req->url->path->contains('/custom_too');
 };
 
 # Cleared response for /res.txt
-hook after_static_dispatch => sub {
+hook before_routes => sub {
   my $self = shift;
   return
     unless $self->req->url->path->contains('/res.txt')
     && $self->param('route');
   $self->tx->res(Mojo::Message::Response->new);
+};
+
+# Set additional headers for static files
+hook after_static => sub {
+  my $self = shift;
+  $self->res->headers->cache_control('max-age=3600, must-revalidate');
 };
 
 # Response generating condition "res" for /res.txt
@@ -97,8 +103,15 @@ get '/res.txt' => (res => 1) => sub {
 
 my $t = Test::Mojo->new;
 
-# Normal request
-$t->get_ok('/')->status_is(200)->content_is('works');
+# Normal route
+$t->get_ok('/')->status_is(200)
+  ->header_isnt('Cache-Control' => 'max-age=3600, must-revalidate')
+  ->content_is('works');
+
+# Normal static file
+$t->get_ok('/test.txt')->status_is(200)
+  ->header_is('Cache-Control' => 'max-age=3600, must-revalidate')
+  ->content_is("Normal static file!\n");
 
 # Override static file
 $t->get_ok('/hello.txt')->status_is(200)
@@ -108,17 +121,24 @@ $t->get_ok('/hello.txt')->status_is(200)
 $t->get_ok('/custom?a=works+too')->status_is(205)->content_is('works too');
 
 # Static file
-$t->get_ok('/res.txt')->status_is(200)->content_is("Static response!\n");
+$t->get_ok('/res.txt')->status_is(200)
+  ->header_is('Cache-Control' => 'max-age=3600, must-revalidate')
+  ->content_is("Static response!\n");
 
 # Custom response
-$t->get_ok('/res.txt?route=1')->status_is(202)->content_is('Custom response!');
+$t->get_ok('/res.txt?route=1')->status_is(202)
+  ->header_isnt('Cache-Control' => 'max-age=3600, must-revalidate')
+  ->content_is('Custom response!');
 
 # Conditional response
 $t->get_ok('/res.txt?route=1&res=1')->status_is(201)
+  ->header_isnt('Cache-Control' => 'max-age=3600, must-revalidate')
   ->content_is('Conditional response!');
 
 # Another custom dispatcher
-$t->get_ok('/custom_too')->status_is(200)->content_is('this works too');
+$t->get_ok('/custom_too')->status_is(200)
+  ->header_isnt('Cache-Control' => 'max-age=3600, must-revalidate')
+  ->content_is('this works too');
 
 # First wrapper
 $t->get_ok('/wrap')->status_is(200)->content_is('Wrapped!');
@@ -137,3 +157,5 @@ done_testing();
 __DATA__
 @@ res.txt
 Static response!
+@@ test.txt
+Normal static file!
