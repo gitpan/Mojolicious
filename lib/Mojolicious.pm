@@ -40,7 +40,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Rainbow';
-our $VERSION  = '3.85';
+our $VERSION  = '3.86';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -346,6 +346,9 @@ object. You can usually leave this alone, see
 L<Mojolicious::Controller/"session"> for more information about working with
 session data.
 
+  # Change name of cookie used for all sessions
+  $app->sessions->cookie_name('mysession');
+
 =head2 static
 
   my $static = $app->static;
@@ -368,6 +371,7 @@ L<Mojolicious::Static> object.
 Responsible for connecting file extensions with MIME types, defaults to a
 L<Mojolicious::Types> object.
 
+  # Add custom MIME type
   $app->types->type(twt => 'text/tweet');
 
 =head1 METHODS
@@ -658,6 +662,11 @@ have been used in the past.
 
 0.999920, C<Snowman> (u2603)
 
+=head1 SPONSORS
+
+Some of the work on this distribution has been sponsored by
+L<The Perl Foundation|http://www.perlfoundation.org>, thank you!
+
 =head1 PROJECT FOUNDER
 
 Sebastian Riedel, C<sri@cpan.org>
@@ -671,6 +680,8 @@ Current members of the core team in alphabetical order:
 Abhijit Menon-Sen, C<ams@cpan.org>
 
 Glen Hinkle, C<tempire@cpan.org>
+
+Joel Berger, C<jberger@cpan.org>
 
 Marcus Ramberg, C<mramberg@cpan.org>
 
@@ -754,6 +765,8 @@ Dmitriy Shalashov
 
 Dmitry Konstantinov
 
+Dominik Jarmulowicz
+
 Dominique Dumont
 
 Douglas Christopher Wilson
@@ -779,8 +792,6 @@ Jan Schmidt
 Jaroslav Muhin
 
 Jesse Vincent
-
-Joel Berger
 
 Johannes Plunien
 
@@ -877,8 +888,6 @@ Stephane Este-Gracias
 Tatsuhiko Miyagawa
 
 Terrence Brannon
-
-The Perl Foundation
 
 Tomas Znamenacek
 
