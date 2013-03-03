@@ -1,4 +1,11 @@
 
+3.88  2013-03-03
+  - Improved Mojo::Path to delay normalization as long as possible.
+  - Improved Mojo::Path performance.
+  - Improved documentation.
+  - Improved tests.
+  - Fixed small domain detection bug in Mojo::UserAgent::CookieJar.
+
 3.87  2013-02-23
   - Added deprecated function to Mojo::Util. (marcus)
   - Removed deprecated render_content helper.

@@ -157,8 +157,6 @@ LICENSE
 Makefile.PL
 MANIFEST			This list of files
 MANIFEST.SKIP
-MYMETA.json
-MYMETA.yml
 README.md
 script/hypnotoad
 script/mojo
@@ -196,6 +194,7 @@ t/mojo/json_pointer.t
 t/mojo/lib/Mojo/BaseTest/Base1.pm
 t/mojo/lib/Mojo/BaseTest/Base2.pm
 t/mojo/lib/Mojo/BaseTest/Base3.pm
+t/mojo/lib/Mojo/DeprecationTest.pm
 t/mojo/lib/Mojo/LoaderException.pm
 t/mojo/lib/Mojo/LoaderException2.pm
 t/mojo/lib/Mojo/LoaderTest/A.pm
