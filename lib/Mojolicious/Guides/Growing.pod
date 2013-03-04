@@ -641,7 +641,8 @@ Finally C<myapp.pl> can be replaced with a proper L<Mojolicious> script.
   $ touch script/myapp
   $ chmod 744 script/myapp
 
-Only a few small details change.
+Only a few small details change, since installable scripts can't use L<lib>
+without breaking updated dual-life modules.
 
   #!/usr/bin/env perl
 
@@ -649,7 +650,7 @@ Only a few small details change.
   use warnings;
 
   use FindBin;
-  use lib "$FindBin::Bin/../lib";
+  BEGIN { unshift @INC, "$FindBin::Bin/../lib" }
 
   # Start command line interface for application
   require Mojolicious::Commands;
