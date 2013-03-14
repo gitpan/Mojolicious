@@ -1,5 +1,6 @@
 .perltidyrc
 Changes
+CONTRIBUTING.md
 examples/connect-proxy.pl
 examples/entities.pl
 examples/fast.pl

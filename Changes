@@ -1,4 +1,15 @@
 
+3.90  2013-03-14
+  - Added direct array access for parsed parameters to Mojo::Parameters.
+  - Added direct array access for path parts to Mojo::Path.
+  - Improved dumper helper to sort hash keys.
+  - Improved documentation.
+  - Improved tests.
+  - Fixed bug in Mojo::Headers that prevented multiline headers from being
+    parsed correctly.
+  - Fixed multiline header support in hash representation of Mojo::Headers.
+  - Fixed cloning bug in Mojo::Headers.
+
 3.89  2013-03-04
   - Improved documentation.
   - Improved tests.
