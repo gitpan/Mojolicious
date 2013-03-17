@@ -1,4 +1,13 @@
 
+3.91  2013-03-17
+  - Improved bad charset handling in Mojo::DOM::HTML.
+  - Improved documentation.
+  - Improved tests.
+  - Fixed HTTPS proxy support for blocking requests in Mojo::UserAgent.
+  - Fixed support for RFC 2817 in Mojo::Message::Request.
+  - Fixed whitespace bug in Mojo::DOM::HTML.
+  - Fixed proxy detection bug in get command.
+
 3.90  2013-03-14
   - Added direct array access for parsed parameters to Mojo::Parameters.
   - Added direct array access for path parts to Mojo::Path.
