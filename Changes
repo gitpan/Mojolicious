@@ -1,4 +1,18 @@
 
+3.92  2013-04-03
+  - Added monotonic clock support to make Mojolicious more resilient to time
+    jumps.
+  - Added steady_time function to Mojo::Util.
+  - Removed deprecated namespace method from Mojolicious::Routes.
+  - Removed deprecated base_tag helper.
+  - Improved WebSocket send method to stringify objects. (jberger)
+  - Improved version command to show required versions of optional
+    dependencies.
+  - Improved documentation.
+  - Improved tests.
+  - Fixed RFC 6901 compliance of Mojo::JSON::Pointer. (jberger, sri)
+  - Fixed a few small Unicode bugs in get command.
+
 3.91  2013-03-17
   - Improved bad charset handling in Mojo::DOM::HTML.
   - Improved documentation.

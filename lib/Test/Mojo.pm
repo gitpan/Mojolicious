@@ -302,7 +302,7 @@ sub websocket_ok {
   $self->{finished} = 0;
   $self->ua->websocket(
     $url => @_ => sub {
-      my $tx = pop;
+      my ($ua, $tx) = @_;
       $self->tx($tx);
       $tx->on(finish => sub { $self->{finished} = 1 });
       $tx->on(binary => sub { push @{$self->{messages}}, [binary => pop] });
@@ -463,14 +463,17 @@ User agent used for testing, defaults to a L<Mojo::UserAgent> object.
   # Allow redirects
   $t->ua->max_redirects(10);
 
+  # Use absolute URL for request with Basic authentication
+  my $url = $t->ua->app_url->userinfo('sri:secr3t')->path('/secrets.json');
+  $t->post_ok($url => json => {limit => 10})
+    ->status_is(200)
+    ->json_is('/1/content', 'Mojo rocks!');
+
   # Customize all transactions (including followed redirects)
   $t->ua->on(start => sub {
     my ($ua, $tx) = @_;
     $tx->req->headers->accept_language('en-US');
   });
-
-  # Request with Basic authentication
-  $t->get_ok($t->ua->app_url->userinfo('sri:secr3t')->path('/secrets'));
 
 =head1 METHODS
 
@@ -671,7 +674,7 @@ Opposite of C<json_has>.
 
 =head2 json_is
 
-  $t = $t->json_is('/' => {foo => [1, 2, 3]});
+  $t = $t->json_is('' => {foo => [1, 2, 3]});
   $t = $t->json_is('/foo' => [1, 2, 3]);
   $t = $t->json_is('/foo/1' => 2, 'right value');
 
@@ -817,6 +820,10 @@ arguments as L<Mojo::UserAgent/"put">.
   $t = $t->request_ok(Mojo::Transaction::HTTP->new, 'request successful');
 
 Perform request and check for transport errors.
+
+  # Request with custom method
+  my $tx = $t->ua->build_tx(FOO => '/test.json' => json => {foo => 1});
+  $t->request_ok($tx)->status_is(200)->json_content_is({success => 1});
 
 =head2 reset_session
 

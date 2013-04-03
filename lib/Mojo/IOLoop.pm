@@ -9,9 +9,8 @@ use Mojo::IOLoop::Delay;
 use Mojo::IOLoop::Server;
 use Mojo::IOLoop::Stream;
 use Mojo::Reactor::Poll;
-use Mojo::Util 'md5_sum';
+use Mojo::Util qw(md5_sum steady_time);
 use Scalar::Util 'weaken';
-use Time::HiRes 'time';
 
 use constant DEBUG => $ENV{MOJO_IOLOOP_DEBUG} || 0;
 
@@ -201,7 +200,7 @@ sub _accepting {
 sub _id {
   my $self = shift;
   my $id;
-  do { $id = md5_sum('c' . time . rand 999) }
+  do { $id = md5_sum('c' . steady_time . rand 999) }
     while $self->{connections}{$id} || $self->{acceptors}{$id};
   return $id;
 }
@@ -334,9 +333,11 @@ L<IO::Socket::SSL> (1.75+) are supported transparently, and used if installed.
 Individual features can also be disabled with the MOJO_NO_IPV6 and MOJO_NO_TLS
 environment variables.
 
-A TLS certificate and key are also built right in, to make writing test
-servers as easy as possible. Also note that for convenience the C<PIPE> signal
-will be set to C<IGNORE> when L<Mojo::IOLoop> is loaded.
+The event loop will be resilient to time jumps if a monotonic clock is
+available through L<Time::HiRes>. A TLS certificate and key are also built
+right in, to make writing test servers as easy as possible. Also note that for
+convenience the C<PIPE> signal will be set to C<IGNORE> when L<Mojo::IOLoop>
+is loaded.
 
 See L<Mojolicious::Guides::Cookbook> for more.
 
