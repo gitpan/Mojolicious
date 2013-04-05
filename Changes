@@ -1,4 +1,13 @@
 
+3.93  2013-04-05
+  - Deprecated Mojo::IOLoop::Delay::end in favor of generated callbacks.
+  - Improved Mojo::IOLoop::Delay to be able to generate callbacks that can
+    capture all arguments.
+  - Improved prefork command to allow -a and -L values below 1 second.
+  - Improved documentation.
+  - Improved tests.
+  - Fixed multiple timing bugs in Mojo::IOLoop::Delay.
+
 3.92  2013-04-03
   - Added monotonic clock support to make Mojolicious more resilient to time
     jumps.

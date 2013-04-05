@@ -258,7 +258,7 @@ is $result, 'test3test2', 'right result';
 is $client, 3,            'finish event has been emitted';
 
 # Connection denied
-$code = $ws = undef;
+($code, $ws) = ();
 $ua->websocket(
   '/denied' => sub {
     my ($ua, $tx) = @_;
@@ -306,7 +306,7 @@ my $delay = Mojo::IOLoop->delay;
 $finished = 0;
 ($code, $result) = ();
 my ($code2, $result2);
-$delay->begin;
+my $end = $delay->begin;
 $ua->websocket(
   '/subreq' => sub {
     my ($ua, $tx) = @_;
@@ -321,12 +321,12 @@ $ua->websocket(
     $tx->on(
       finish => sub {
         $finished += 1;
-        $delay->end;
+        $end->();
       }
     );
   }
 );
-$delay->begin;
+my $end2 = $delay->begin;
 $ua->websocket(
   '/subreq' => sub {
     my ($ua, $tx) = @_;
@@ -341,7 +341,7 @@ $ua->websocket(
     $tx->on(
       finish => sub {
         $finished += 2;
-        $delay->end;
+        $end2->();
       }
     );
   }
@@ -436,7 +436,7 @@ Mojo::IOLoop->start;
 is $result, 'foo bar', 'right result';
 
 # Dies
-$finished = $code = undef;
+($finished, $code) = ();
 my ($websocket, $msg);
 $ua->websocket(
   '/dead' => sub {

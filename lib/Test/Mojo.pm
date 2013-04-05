@@ -387,6 +387,8 @@ sub _wait {
 
 1;
 
+=encoding utf8
+
 =head1 NAME
 
 Test::Mojo - Testing Mojo!
@@ -577,7 +579,7 @@ Opposite of C<content_type_like>.
   $t = $t->delete_ok('/foo' => {DNT => 1} => json => {a => 'b'});
 
 Perform a C<DELETE> request and check for transport errors, takes the same
-arguments as L<Mojo::UserAgent/"delete">.
+arguments as L<Mojo::UserAgent/"delete">, except for the callback.
 
 =head2 element_exists
 
@@ -609,7 +611,7 @@ Finish C<WebSocket> connection.
   $t = $t->get_ok('/foo' => {DNT => 1} => json => {a => 'b'});
 
 Perform a C<GET> request and check for transport errors, takes the same
-arguments as L<Mojo::UserAgent/"get">.
+arguments as L<Mojo::UserAgent/"get">, except for the callback.
 
 =head2 head_ok
 
@@ -619,7 +621,7 @@ arguments as L<Mojo::UserAgent/"get">.
   $t = $t->head_ok('/foo' => {DNT => 1} => json => {a => 'b'});
 
 Perform a C<HEAD> request and check for transport errors, takes the same
-arguments as L<Mojo::UserAgent/"head">.
+arguments as L<Mojo::UserAgent/"head">, except for the callback.
 
 =head2 header_is
 
@@ -698,7 +700,7 @@ Opposite of C<json_message_has>.
 
 =head2 json_message_is
 
-  $t = $t->json_message_is('/' => {foo => [1, 2, 3]});
+  $t = $t->json_message_is('' => {foo => [1, 2, 3]});
   $t = $t->json_message_is('/foo' => [1, 2, 3]);
   $t = $t->json_message_is('/foo/1' => 2, 'right value');
 
@@ -763,7 +765,7 @@ Opposite of C<message_like>.
   $t = $t->options_ok('/foo' => {DNT => 1} => json => {a => 'b'});
 
 Perform a C<OPTIONS> request and check for transport errors, takes the same
-arguments as L<Mojo::UserAgent/"options">.
+arguments as L<Mojo::UserAgent/"options">, except for the callback.
 
 =head2 or
 
@@ -783,7 +785,7 @@ Invoke callback if previous test failed.
   $t = $t->patch_ok('/foo' => {DNT => 1} => json => {a => 'b'});
 
 Perform a C<PATCH> request and check for transport errors, takes the same
-arguments as L<Mojo::UserAgent/"patch">.
+arguments as L<Mojo::UserAgent/"patch">, except for the callback.
 
 =head2 post_ok
 
@@ -793,7 +795,7 @@ arguments as L<Mojo::UserAgent/"patch">.
   $t = $t->post_ok('/foo' => {DNT => 1} => json => {a => 'b'});
 
 Perform a C<POST> request and check for transport errors, takes the same
-arguments as L<Mojo::UserAgent/"post">.
+arguments as L<Mojo::UserAgent/"post">, except for the callback.
 
   # Test file upload
   $t->post_ok('/upload' => form => {foo => {content => 'bar'}})
@@ -812,7 +814,7 @@ arguments as L<Mojo::UserAgent/"post">.
   $t = $t->put_ok('/foo' => {DNT => 1} => json => {a => 'b'});
 
 Perform a C<PUT> request and check for transport errors, takes the same
-arguments as L<Mojo::UserAgent/"put">.
+arguments as L<Mojo::UserAgent/"put">, except for the callback.
 
 =head2 request_ok
 
@@ -840,6 +842,14 @@ Reset user agent session.
   $t = $t->send_ok($chars, 'sent successfully');
 
 Send message or frame via WebSocket.
+
+  # Send JSON object as "Text" message
+  use Mojo::JSON 'j';
+  $t->websocket_ok('/echo.json')
+    ->send_ok({text => j({test => 'I ♥ Mojolicious!'})})
+    ->message_ok
+    ->json_message_is('/test' => 'I ♥ Mojolicious!')
+    ->finish_ok;
 
 =head2 status_is
 
@@ -891,7 +901,7 @@ Opposite of C<text_like>.
   $t = $t->websocket_ok('/echo' => {DNT => 1});
 
 Open a C<WebSocket> connection with transparent handshake, takes the same
-arguments as L<Mojo::UserAgent/"websocket">.
+arguments as L<Mojo::UserAgent/"websocket">, except for the callback.
 
 =head1 SEE ALSO
 
