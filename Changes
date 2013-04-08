@@ -1,4 +1,12 @@
 
+3.94  2013-04-08
+  - Added is_hidden method to Mojolicious::Routes.
+  - Removed deprecated start method from Mojolicious::Commands.
+  - Improved documentation.
+  - Improved tests.
+  - Fixed small selector bug in get command.
+  - Fixed small anchor bug in Mojolicious::Plugin::PODRenderer.
+
 3.93  2013-04-05
   - Deprecated Mojo::IOLoop::Delay::end in favor of generated callbacks.
   - Improved Mojo::IOLoop::Delay to be able to generate callbacks that can
