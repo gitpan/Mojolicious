@@ -11,7 +11,7 @@ use constant DEBUG => $ENV{MOJO_WEBSOCKET_DEBUG} || 0;
 use constant MODERN =>
   (($Config{use64bitint} // '') eq 'define' || $Config{longsize} >= 8);
 
-# Unique value from the spec
+# Unique value from RFC 6455
 use constant GUID => '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
 # Opcodes
@@ -108,7 +108,13 @@ sub connection { shift->handshake->connection }
 
 sub finish {
   my $self = shift;
-  $self->send([1, 0, 0, 0, CLOSE, ''])->{finished} = 1;
+
+  my $close = $self->{close} = [@_];
+  my $payload = $close->[0] ? pack('n', $close->[0]) : '';
+  $payload .= encode 'UTF-8', $close->[1] if defined $close->[1];
+  $close->[0] //= 1005;
+  $self->send([1, 0, 0, 0, CLOSE, $payload])->{finished} = 1;
+
   return $self;
 }
 
@@ -160,7 +166,7 @@ sub parse_frame {
   }
 
   # Check message size
-  $self->finish and return undef if $len > $self->max_websocket_size;
+  $self->finish(1009) and return undef if $len > $self->max_websocket_size;
 
   # Check if whole packet has arrived
   my $masked = vec($head, 1, 8) & 0b10000000;
@@ -212,10 +218,15 @@ sub send {
   return $self->emit('resume');
 }
 
+sub server_close {
+  my $self = shift;
+  $self->{state} = 'finished';
+  return $self->emit(finish => $self->{close} ? (@{$self->{close}}) : 1006);
+}
+
 sub server_handshake {
   my $self = shift;
 
-  # WebSocket handshake
   my $res_headers = $self->res->code(101)->headers;
   $res_headers->upgrade('websocket')->connection('Upgrade');
   my $req_headers = $self->req->headers;
@@ -260,22 +271,26 @@ sub _message {
   return if $op == PONG;
 
   # Close
-  return $self->finish if $op == CLOSE;
+  if ($op == CLOSE) {
+    return $self->finish unless length $frame->[5] >= 2;
+    return $self->finish(unpack('n', substr($frame->[5], 0, 2, '')),
+      decode('UTF-8', $frame->[5]));
+  }
 
   # Append chunk and check message size
   $self->{op} = $op unless exists $self->{op};
   $self->{message} .= $frame->[5];
-  $self->finish and last
+  return $self->finish(1009)
     if length $self->{message} > $self->max_websocket_size;
 
   # No FIN bit (Continuation)
   return unless $frame->[0];
 
-  # Message
+  # Whole message
   my $msg = delete $self->{message};
   if (delete $self->{op} == TEXT) {
     $self->emit(text => $msg);
-    $msg = decode 'UTF-8', $msg if $msg;
+    $msg = decode 'UTF-8', $msg;
   }
   else { $self->emit(binary => $msg); }
   $self->emit(message => $msg);
@@ -299,8 +314,8 @@ Mojo::Transaction::WebSocket - WebSocket transaction
     say "Message: $msg";
   });
   $ws->on(finish => sub {
-    my $ws = shift;
-    say 'WebSocket closed.';
+    my ($ws, $code, $reason) = @_;
+    say "WebSocket closed with status $code.";
   });
 
 =head1 DESCRIPTION
@@ -341,6 +356,15 @@ Emitted once all data has been sent.
     my $ws = shift;
     $ws->send(time);
   });
+
+=head2 finish
+
+  $ws->on(finish => sub {
+    my ($ws, $code, $reason) = @_;
+    ...
+  });
+
+Emitted when transaction is finished.
 
 =head2 frame
 
@@ -438,14 +462,14 @@ C<CLOSE> frames automatically.
 
 Build WebSocket frame.
 
-  # Continuation frame with FIN bit and payload
-  say $ws->build_frame(1, 0, 0, 0, 0, 'World!');
-
-  # Text frame with payload
-  say $ws->build_frame(0, 0, 0, 0, 1, 'Hello');
-
   # Binary frame with FIN bit and payload
   say $ws->build_frame(1, 0, 0, 0, 2, 'Hello World!');
+
+  # Text frame with payload but without FIN bit
+  say $ws->build_frame(0, 0, 0, 0, 1, 'Hello ');
+
+  # Continuation frame with FIN bit and payload
+  say $ws->build_frame(1, 0, 0, 0, 0, 'World!');
 
   # Close frame with FIN bit and without payload
   say $ws->build_frame(1, 0, 0, 0, 8, '');
@@ -490,8 +514,10 @@ Connection identifier or socket.
 =head2 finish
 
   $ws = $ws->finish;
+  $ws = $ws->finish(1000);
+  $ws = $ws->finish(1003 => 'Cannot accept data!');
 
-Finish the WebSocket connection gracefully.
+Close WebSocket connection gracefully.
 
 =head2 is_websocket
 
@@ -576,6 +602,12 @@ will be invoked once all data has been written.
 
   # Send "Ping" frame
   $ws->send([1, 0, 0, 0, 9, 'Hello World!']);
+
+=head2 server_close
+
+  $ws->server_close;
+
+Transaction closed server-side, used to implement web servers.
 
 =head2 server_handshake
 

@@ -102,10 +102,16 @@ sub element_exists_not {
 }
 
 sub finish_ok {
-  my ($self, $desc) = @_;
-  $self->tx->finish;
+  my $self = shift;
+  $self->tx->finish(@_);
   Mojo::IOLoop->one_tick while !$self->{finished};
-  return $self->_test('ok', 1, $desc || 'finished websocket');
+  return $self->_test('ok', 1, 'finished websocket');
+}
+
+sub finished_ok {
+  my ($self, $code) = @_;
+  Mojo::IOLoop->one_tick while !$self->{finished};
+  return $self->_test('is', $self->{finished}[0], $code, 'finished websocket');
 }
 
 sub get_ok  { shift->_request_ok(get  => @_) }
@@ -199,7 +205,7 @@ sub message_like {
 
 sub message_ok {
   my ($self, $desc) = @_;
-  return $self->_test('ok', !!$self->_wait(1), $desc, 'message received');
+  return $self->_test('ok', !!$self->_wait, $desc || 'message received');
 }
 
 sub message_unlike {
@@ -299,12 +305,12 @@ sub websocket_ok {
 
   # Establish WebSocket connection
   $self->{messages} = [];
-  $self->{finished} = 0;
+  $self->{finished} = undef;
   $self->ua->websocket(
     $url => @_ => sub {
       my ($ua, $tx) = @_;
       $self->tx($tx);
-      $tx->on(finish => sub { $self->{finished} = 1 });
+      $tx->on(finish => sub { shift; $self->{finished} = [@_] });
       $tx->on(binary => sub { push @{$self->{messages}}, [binary => pop] });
       $tx->on(text   => sub { push @{$self->{messages}}, [text   => pop] });
       Mojo::IOLoop->stop;
@@ -326,13 +332,13 @@ sub _get_content {
 sub _json {
   my ($self, $method, $p) = @_;
   return Mojo::JSON::Pointer->new->$method(
-    Mojo::JSON->new->decode(@{$self->_wait || []}[1]), $p);
+    Mojo::JSON->new->decode(@{$self->message}[1]), $p);
 }
 
 sub _message {
   my ($self, $name, $value, $desc) = @_;
   local $Test::Builder::Level = $Test::Builder::Level + 1;
-  my ($type, $msg) = @{$self->_wait || ['']};
+  my ($type, $msg) = @{$self->message};
 
   # Type check
   if (ref $value eq 'HASH') {
@@ -371,16 +377,7 @@ sub _text {
 }
 
 sub _wait {
-  my ($self, $wait) = @_;
-
-  # DEPRECATED in Rainbow!
-  my $new = $self->{new} //= $wait;
-  deprecated
-    'Testing WebSocket messages without Test::Mojo::message_ok is DEPRECATED'
-    unless $new;
-  return $self->message if $new && !$wait;
-
-  # Wait for message
+  my $self = shift;
   Mojo::IOLoop->one_tick while !$self->{finished} && !@{$self->{messages}};
   return $self->message(shift @{$self->{messages}})->message;
 }
@@ -599,9 +596,16 @@ Opposite of C<element_exists>.
 =head2 finish_ok
 
   $t = $t->finish_ok;
-  $t = $t->finish_ok('finished successfully');
+  $t = $t->finish_ok(1000);
+  $t = $t->finish_ok(1003 => 'Cannot accept data!');
 
-Finish C<WebSocket> connection.
+Close WebSocket connection gracefully.
+
+=head2 finished_ok
+
+  $t = $t->finished_ok(1000);
+
+Wait for WebSocket connection to be closed gracefully and check status.
 
 =head2 get_ok
 
@@ -900,7 +904,7 @@ Opposite of C<text_like>.
   $t = $t->websocket_ok('/echo');
   $t = $t->websocket_ok('/echo' => {DNT => 1});
 
-Open a C<WebSocket> connection with transparent handshake, takes the same
+Open a WebSocket connection with transparent handshake, takes the same
 arguments as L<Mojo::UserAgent/"websocket">, except for the callback.
 
 =head1 SEE ALSO

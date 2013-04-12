@@ -1,6 +1,7 @@
 .perltidyrc
 Changes
 CONTRIBUTING.md
+examples/.DS_Store
 examples/connect-proxy.pl
 examples/entities.pl
 examples/fast.pl
@@ -159,6 +160,7 @@ Makefile.PL
 MANIFEST			This list of files
 MANIFEST.SKIP
 README.md
+script/.DS_Store
 script/hypnotoad
 script/mojo
 script/morbo

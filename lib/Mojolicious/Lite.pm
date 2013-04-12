@@ -845,9 +845,11 @@ L<Mojo::JSON> and L<Mojo::DOM> this can be a very powerful tool.
 
   use Mojolicious::Lite;
 
-  get '/test' => sub {
+  get '/headers' => sub {
     my $self = shift;
-    $self->render(data => $self->ua->get('http://mojolicio.us')->res->body);
+    my $url  = $self->param('url') || 'http://mojolicio.us';
+    my $dom  = $self->ua->get($url)->res->dom;
+    $self->render(json => [$dom->find('h1, h2, h3')->pluck('text')->each]);
   };
 
   app->start;
@@ -930,11 +932,7 @@ L<Test::Mojo>.
 Run all unit tests with the C<test> command.
 
   $ ./myapp.pl test
-
-To make your tests more noisy and show you all log messages you can also
-change the application log level directly in your test files.
-
-  $t->app->log->level('debug');
+  $ ./myapp.pl test -v
 
 =head2 More
 
@@ -1041,7 +1039,7 @@ more argument variations.
   my $route = websocket '/:foo' => sub {...};
 
 Generate route with L<Mojolicious::Routes::Route/"websocket">, matching only
-C<WebSocket> handshakes. See also the tutorial above for more argument
+WebSocket handshakes. See also the tutorial above for more argument
 variations.
 
 =head1 ATTRIBUTES

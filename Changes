@@ -1,4 +1,16 @@
 
+3.95  2013-04-12
+  - Added finished_ok method to Test::Mojo.
+  - Removed deprecated slurp_rel_file method from Mojo::Home.
+  - Removed deprecated html_escape function from Mojo::Util.
+  - Improved Mojo::Transaction::WebSocket with support for status codes and
+    reasons.
+  - Improved documentation. (jberger, sri)
+  - Improved tests.
+  - Fixed message size limit bug in Mojo::Transaction::WebSocket.
+  - Fixed a few small timing bugs in Mojo::Server::Daemon.
+  - Fixed small description bug in Test::Mojo.
+
 3.94  2013-04-08
   - Added is_hidden method to Mojolicious::Routes.
   - Removed deprecated start method from Mojolicious::Commands.
