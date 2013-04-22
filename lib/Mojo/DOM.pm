@@ -489,8 +489,9 @@ Append to element content.
 
   my $result = $dom->at('html title');
 
-Find a single element with CSS selectors. All selectors from L<Mojo::DOM::CSS>
-are supported.
+Find first element matching the CSS selector and return it as a L<Mojo::DOM>
+object or return C<undef> if none could be found. All selectors from
+L<Mojo::DOM::CSS> are supported.
 
   # Find first element with "svg" namespace definition
   my $namespace = $dom->at('[xmlns\:svg]')->{'xmlns:svg'};
@@ -516,8 +517,8 @@ Charset used for decoding and encoding HTML/XML.
   my $collection = $dom->children;
   my $collection = $dom->children('div');
 
-Return a L<Mojo::Collection> object containing the children of this element,
-similar to C<find>.
+Return a L<Mojo::Collection> object containing the children of this element as
+L<Mojo::DOM> objects, similar to C<find>.
 
   # Show type of random child element
   say $dom->children->shuffle->first->type;
@@ -536,8 +537,9 @@ C<charset> has been defined.
 
   my $collection = $dom->find('html title');
 
-Find elements with CSS selectors and return a L<Mojo::Collection> object. All
-selectors from L<Mojo::DOM::CSS> are supported.
+Find all elements matching the CSS selector and return a L<Mojo::Collection>
+object containing these elements as L<Mojo::DOM> objects. All selectors from
+L<Mojo::DOM::CSS> are supported.
 
   # Find a specific element and extract information
   my $id = $dom->find('div')->[23]{id};
@@ -561,7 +563,8 @@ Find element namespace.
 
   my $sibling = $dom->next;
 
-Next sibling of element.
+Return L<Mojo::DOM> object for next sibling of element or C<undef> if there
+are no more siblings.
 
   # "<h2>B</h2>"
   $dom->parse('<div><h1>A</h1><h2>B</h2></div>')->at('h1')->next;
@@ -570,7 +573,8 @@ Next sibling of element.
 
   my $parent = $dom->parent;
 
-Parent of element.
+Return L<Mojo::DOM> object for parent of element or C<undef> if this element
+has no parent.
 
 =head2 parse
 
@@ -603,7 +607,8 @@ Prepend to element content.
 
   my $sibling = $dom->previous;
 
-Previous sibling of element.
+Return L<Mojo::DOM> object for previous sibling of element or C<undef> if
+there are no more siblings.
 
   # "<h1>A</h1>"
   $dom->parse('<div><h1>A</h1><h2>B</h2></div>')->at('h2')->previous;
@@ -612,7 +617,7 @@ Previous sibling of element.
 
   my $old = $dom->remove;
 
-Remove element.
+Remove element and return it as a L<Mojo::DOM> object.
 
   # "<div></div>"
   $dom->parse('<div><h1>A</h1></div>')->at('h1')->remove->root;
@@ -621,7 +626,7 @@ Remove element.
 
   my $old = $dom->replace('<div>test</div>');
 
-Replace element.
+Replace element and return the replaced element as a L<Mojo::DOM> object.
 
   # "<div><h2>B</h2></div>"
   $dom->parse('<div><h1>A</h1></div>')->at('h1')->replace('<h2>B</h2>')->root;
@@ -645,7 +650,7 @@ Replace element content.
 
   my $root = $dom->root;
 
-Find root node.
+Return L<Mojo::DOM> object for root node.
 
 =head2 text
 
@@ -705,7 +710,8 @@ if a C<charset> has been defined.
   my $tree = $dom->tree;
   $dom     = $dom->tree(['root', [qw(text lalala)]]);
 
-Document Object Model.
+Document Object Model. Note that this structure should only be used very
+carefully since it is very dynamic.
 
 =head2 type
 

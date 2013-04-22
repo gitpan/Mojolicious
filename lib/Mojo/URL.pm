@@ -44,7 +44,8 @@ sub authority {
 sub clone {
   my $self = shift;
 
-  my $clone = Mojo::URL->new;
+  my $clone = $self->new;
+  $clone->{data} = $self->{data};
   $clone->$_($self->$_) for qw(scheme userinfo host port fragment);
   $clone->path($self->path->clone);
   $clone->query($self->query->clone);
@@ -66,7 +67,7 @@ sub ihost {
   return lc $host unless $host =~ /[^\x00-\x7f]/;
 
   # Encode
-  return join '.',
+  return lc join '.',
     map { /[^\x00-\x7f]/ ? ('xn--' . punycode_encode $_) : $_ } split /\./,
     $host;
 }
@@ -79,11 +80,17 @@ sub parse {
 
   # Official regex
   $url =~ m!(?:([^:/?#]+):)?(?://([^/?#]*))?([^?#]*)(?:\?([^#]*))?(?:#(.*))?!;
-  $self->scheme($1);
-  $self->authority($2);
-  $self->path->parse($3);
-  $self->query($4);
-  $self->fragment($5);
+
+  # Supported scheme
+  my $proto = $self->scheme($1)->protocol;
+  if (!$proto || grep { $proto eq $_ } qw(http https ws wss)) {
+    $self->authority($2);
+    $self->path->parse($3);
+    $self->query($4)->fragment($5);
+  }
+
+  # Preserve scheme data
+  else { $self->{data} = $url }
 
   return $self;
 }
@@ -196,6 +203,9 @@ sub to_rel {
 sub to_string {
   my $self = shift;
 
+  # Scheme data
+  return $self->{data} if defined $self->{data};
+
   # Protocol
   my $url = '';
   if (my $proto = $self->protocol) { $url .= "$proto://" }
@@ -238,7 +248,7 @@ Mojo::URL - Uniform Resource Locator
 
   # Parse
   my $url
-    = Mojo::URL->new('http://sri:foobar@kraih.com:3000/foo/bar?foo=bar#23');
+    = Mojo::URL->new('http://sri:foobar@example.com:3000/foo/bar?foo=bar#23');
   say $url->scheme;
   say $url->userinfo;
   say $url->host;
@@ -251,7 +261,7 @@ Mojo::URL - Uniform Resource Locator
   my $url = Mojo::URL->new;
   $url->scheme('http');
   $url->userinfo('sri:foobar');
-  $url->host('kraih.com');
+  $url->host('example.com');
   $url->port(3000);
   $url->path('/foo/bar');
   $url->path('baz');
@@ -355,7 +365,17 @@ Check if URL is absolute.
 
   $url = $url->parse('http://127.0.0.1:3000/foo/bar?fo=o&baz=23#foo');
 
-Parse URL.
+Parse relative or absolute URL for the C<http>, C<https>, C<ws> as well as
+C<wss> schemes and preserve scheme data for all unknown ones.
+
+  # "/test/123"
+  $url->parse('/test/123?foo=bar')->path;
+
+  # "example.com"
+  $url->parse('http://example.com/test/123?foo=bar')->host;
+
+  # "mailto:sri@example.com"
+  $url->parse('mailto:sri@example.com')->to_string;
 
 =head2 path
 
@@ -417,14 +437,14 @@ appended, defaults to a L<Mojo::Parameters> object.
 =head2 to_abs
 
   my $abs = $url->to_abs;
-  my $abs = $url->to_abs(Mojo::URL->new('http://kraih.com/foo'));
+  my $abs = $url->to_abs(Mojo::URL->new('http://example.com/foo'));
 
 Clone relative URL and turn it into an absolute one.
 
 =head2 to_rel
 
   my $rel = $url->to_rel;
-  my $rel = $url->to_rel(Mojo::URL->new('http://kraih.com/foo'));
+  my $rel = $url->to_rel(Mojo::URL->new('http://example.com/foo'));
 
 Clone absolute URL and turn it into a relative one.
 

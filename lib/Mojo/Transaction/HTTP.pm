@@ -8,7 +8,7 @@ sub client_read {
 
   # Skip body for HEAD request
   my $res = $self->res;
-  $res->content->skip_body(1) if $self->req->method eq 'HEAD';
+  $res->content->skip_body(1) if uc $self->req->method eq 'HEAD';
   return unless $res->parse($chunk)->is_finished;
 
   # Unexpected 1xx reponse
@@ -30,10 +30,10 @@ sub keep_alive {
   my $res_conn = lc($res->headers->connection // '');
   return undef if $req_conn eq 'close' || $res_conn eq 'close';
 
-  # Keep alive
+  # Keep-alive
   return 1 if $req_conn eq 'keep-alive' || $res_conn eq 'keep-alive';
 
-  # No keep alive for 1.0
+  # No keep-alive for 1.0
   return !($req->version eq '1.0' || $res->version eq '1.0');
 }
 
@@ -91,7 +91,7 @@ sub _headers {
     $self->{offset} = 0;
 
     # Response without body
-    $head = $head && ($self->req->method eq 'HEAD' || $msg->is_empty);
+    $head = $head && (uc $self->req->method eq 'HEAD' || $msg->is_empty);
     if ($head) { $self->{state} = 'finished' }
 
     # Body

@@ -23,9 +23,10 @@
     recommended, and optional CPAN modules will be used to provide advanced
     functionality if they are installed).
   * Full stack HTTP and WebSocket client/server implementation with IPv6, TLS,
-    SNI, IDNA, Comet (long polling) and gzip compression support.
-  * Built-in non-blocking I/O web server, supporting multiple event loops and
-    hot deployment, perfect for embedding.
+    SNI, IDNA, Comet (long polling), keep-alive, connection pooling, timeout,
+    cookie, multipart, proxy, and gzip compression support.
+  * Built-in non-blocking I/O web server, supporting multiple event loops as
+    well as optional preforking and hot deployment, perfect for embedding.
   * Automatic CGI and [PSGI](http://plackperl.org) detection.
   * JSON and HTML/XML parser with CSS selector support.
   * Fresh code based upon years of experience developing
@@ -84,7 +85,8 @@
     post '/title' => sub {
       my $self = shift;
       my $url  = $self->param('url') || 'http://mojolicio.us';
-      $self->render_text($self->ua->get($url)->res->dom->at('title')->text);
+      $self->render(
+        text => $self->ua->get($url)->res->dom->at('title')->text);
     };
 
     # WebSocket echo service

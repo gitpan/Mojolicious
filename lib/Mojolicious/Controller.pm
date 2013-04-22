@@ -691,7 +691,9 @@ be encoded. All additional values get merged into the C<stash>.
   $c->render_exception(Mojo::Exception->new('Oops!'));
 
 Render the exception template C<exception.$mode.$format.*> or
-C<exception.$format.*> and set the response status code to C<500>.
+C<exception.$format.*> and set the response status code to C<500>. Also sets
+the stash values C<exception> to a L<Mojo::Exception> object and C<snapshot>
+to a copy of the C<stash> for use in the templates.
 
 =head2 render_json
 
@@ -917,7 +919,7 @@ Get L<Mojo::UserAgent> object from L<Mojo/"ua">.
 
   # Blocking
   my $tx = $c->ua->get('http://mojolicio.us');
-  my $tx = $c->ua->post('http://kraih.com/login' => form => {user => 'mojo'});
+  my $tx = $c->ua->post('example.com/login' => form => {user => 'mojo'});
 
   # Non-blocking
   $c->ua->get('http://mojolicio.us' => sub {

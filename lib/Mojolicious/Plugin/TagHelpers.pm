@@ -353,7 +353,7 @@ Generate file input element.
     %= text_field 'first_name'
     %= submit_button
   % end
-  %= form_for 'http://kraih.com/login' => (method => 'POST') => begin
+  %= form_for 'http://example.com/login' => (method => 'POST') => begin
     %= text_field 'first_name'
     %= submit_button
   % end
@@ -373,7 +373,7 @@ but not C<GET>, a C<method> attribute will be automatically added.
     <input name="first_name" />
     <input value="Ok" type="submit" />
   </form>
-  <form action="http://kraih.com/login" method="POST">
+  <form action="http://example.com/login" method="POST">
     <input name="first_name" />
     <input value="Ok" type="submit" />
   </form>
@@ -432,6 +432,7 @@ Generate portable script tag for C<Javascript> asset.
   %= link_to index => {format => 'txt'} => (class => 'links') => begin
     Home
   % end
+  %= link_to Contact => Mojo::URL->new('mailto:sri@example.com')
   <%= link_to index => begin %>Home<% end %>
   <%= link_to '/path/to/file' => begin %>File<% end %>
   <%= link_to 'http://mojolicio.us' => begin %>Mojolicious<% end %>
@@ -445,6 +446,7 @@ capitalized link target as content.
   <a class="links" href="/path/to/index.txt">
     Home
   </a>
+  <a href="mailto:sri@example.com">Contact</a>
   <a href="/path/to/index">Home</a>
   <a href="/path/to/file">File</a>
   <a href="http://mojolicio.us">Mojolicious</a>
