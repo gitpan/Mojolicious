@@ -10,7 +10,7 @@ use Mojo::Path;
 use Mojo::Util qw(punycode_decode punycode_encode url_escape url_unescape);
 
 has base => sub { Mojo::URL->new };
-has [qw(fragment host port scheme userinfo)];
+has [qw(data fragment host port scheme userinfo)];
 
 sub new { shift->SUPER::new->parse(@_) }
 
@@ -45,8 +45,7 @@ sub clone {
   my $self = shift;
 
   my $clone = $self->new;
-  $clone->{data} = $self->{data};
-  $clone->$_($self->$_) for qw(scheme userinfo host port fragment);
+  $clone->$_($self->$_) for qw(scheme data userinfo host port fragment);
   $clone->path($self->path->clone);
   $clone->query($self->query->clone);
   $clone->base($self->base->clone) if $self->{base};
@@ -90,7 +89,7 @@ sub parse {
   }
 
   # Preserve scheme data
-  else { $self->{data} = $url }
+  else { $self->data(substr($url, length($proto) + 1)) }
 
   return $self;
 }
@@ -204,7 +203,8 @@ sub to_string {
   my $self = shift;
 
   # Scheme data
-  return $self->{data} if defined $self->{data};
+  my $data = $self->data;
+  return join ':', $self->scheme, $data if defined $data;
 
   # Protocol
   my $url = '';
@@ -285,6 +285,16 @@ L<Mojo::URL> implements the following attributes.
 
 Base of this URL.
 
+=head2 data
+
+  my $data = $url->data;
+  $url     = $url->data('foo')
+
+Data preserved for unknown schemes.
+
+  # "sri@example.com"
+  Mojo::URL->new('mailto:sri@example.com')->data;
+
 =head2 fragment
 
   my $fragment = $url->fragment;
@@ -330,7 +340,7 @@ following new ones.
   my $url = Mojo::URL->new;
   my $url = Mojo::URL->new('http://127.0.0.1:3000/foo?f=b&baz=2#foo');
 
-Construct a new L<Mojo::URL> object.
+Construct a new L<Mojo::URL> object and C<parse> URL if necessary.
 
 =head2 authority
 
