@@ -1,6 +1,5 @@
 use Mojo::Base -strict;
 
-# Disable IPv6 and libev
 BEGIN {
   $ENV{MOJO_NO_IPV6} = 1;
   $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Poll';
@@ -28,13 +27,12 @@ get '/echo' => {text => 'plain echo!'};
 
 websocket '/json' => sub {
   my $self = shift;
-  $self->on(binary => sub { shift->send({binary => j([@{j(shift)}, 4])}) });
   $self->on(
-    text => sub {
+    json => sub {
       my ($self, $json) = @_;
-      my $hash = j($json);
-      $hash->{test} += 1;
-      $self->send({text => j($hash)});
+      return $self->send({json => [@$json, 4]}) if ref $json eq 'ARRAY';
+      $json->{test} += 1;
+      $self->send({json => $json});
     }
   );
 };
@@ -149,12 +147,13 @@ $t->websocket_ok('/echo')->send_ok([0, 0, 0, 0, 2, 'c' x 100000])
 $t->get_ok('/echo')->status_is(200)->content_is('plain echo!');
 
 # JSON roundtrips
-$t->websocket_ok('/json')
-  ->send_ok({text => j({test => 23, snowman => '☃'})})
+$t->websocket_ok('/json')->send_ok({json => {test => 23, snowman => '☃'}})
   ->message_ok->json_message_is('' => {test => 24, snowman => '☃'})
+  ->json_message_is('' => {test => 24, snowman => '☃'}, 'right content')
   ->json_message_has('/test')->json_message_hasnt('/test/2')
   ->send_ok({binary => j([1, 2, 3])})
-  ->message_ok->json_message_is('' => [1, 2, 3, 4], 'right content')
+  ->message_ok->json_message_is([1, 2, 3, 4])
+  ->json_message_is([1, 2, 3, 4], 'right content')
   ->send_ok({binary => j([1, 2, 3])})
   ->message_ok->json_message_has('/2', 'has two elements')
   ->json_message_is('/2' => 3)->json_message_hasnt('/5', 'not five elements')

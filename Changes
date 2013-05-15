@@ -1,4 +1,75 @@
 
+4.0  2013-05-15
+  - Code name "Top Hat", this is a major release.
+  - Added simple JSON serialization and deserialization support to
+    Mojo::Transaction::WebSocket.
+  - Added json event to Mojo::Transaction::WebSocket.
+  - Added render_maybe method to Mojolicious::Controller.
+  - Added again method to Mojo::Reactor, Mojo::Reactor::Poll and
+    Mojo::Reactor::EV.
+  - Added is_empty method to Mojo::Transaction::HTTP.
+  - Added close_gracefully method to Mojo::IOLoop::Stream.
+  - Changed Mojolicious default secret to the application moniker to make it
+    slightly more secure.
+  - Changed types in Mojolicious::Types to consistently use arrays.
+  - Changed heuristics for number detection in Mojo::JSON to better line up
+    with user expectations.
+  - Changed render and render_static methods in Mojolicious::Controller to
+    call render_not_found if no response could be generated.
+  - Removed callback support from body method in Mojo::Message.
+  - Removed Mojolicious::Plugin::PoweredBy and
+    Mojolicious::Plugin::RequestTimer.
+  - Removed pair_separator attribute from Mojolicious::Parameters.
+  - Removed data attribute from Mojo::URL.
+  - Removed captures attribute from Mojolicious::Routes::Match.
+  - Removed charset attribute from Mojo::DOM::HTML.
+  - Removed charset method from Mojo::DOM.
+  - Removed render_data, render_json, render_partial and render_text methods
+    from Mojolicious::Controller.
+  - Removed json_content_is method from Test::Mojo.
+  - Removed has_leftovers method from Mojo::Content.
+  - Removed is_chunked, is_dynamic, is_multipart, has_leftovers, leftovers,
+    write and write_chunk methods from Mojo::Message.
+  - Removed hmac_md5_sum method from Mojo::ByteStream.
+  - Removed hmac_md5_sum function from Mojo::Util.
+  - Removed memorize helper.
+  - Removed deprecated end method from Mojo::IOLoop::Delay.
+  - Removed deprecated build_form_tx, build_json_tx, post_form and post_json
+    methods from Mojo::UserAgent.
+  - Removed deprecated form and json methods from Mojo::UserAgent::Transactor.
+  - Removed deprecated post_form_ok and post_json_ok methods from Test::Mojo.
+  - Removed deprecated f and n functions from ojo.
+  - Removed deprecated after_static_dispatch hook.
+  - Renamed shape_match method in Mojolicious::Routes::Pattern to
+    match_partial.
+  - Reduced idle CPU usage of Mojo::IOLoop.
+  - Increased default lock_timeout from 0.5 to 1 second in
+    Mojo::Server::Prefork and Mojo::Server::Hypnotoad.
+  - Improved Mojo::IOLoop performance significantly and reduced CPU usage when
+    managing more than 10k concurrent connections.
+  - Improved Mojolicious to be able to detect the current operating mode from
+    the PLACK_ENV environment variable.
+  - Improved Mojolicious to not trap exceptions if the default exception
+    handling has been deactivated.
+  - Improved json_is and json_message_is methods in Test::Mojo by making the
+    JSON Pointer optional. (jberger)
+  - Improved renderer performance.
+  - Improved Mojo::DOM::HTML performance.
+  - Improved Mojo::Reactor::Poll performance.
+  - Improved html_unescape performance in Mojo::Util.
+  - Improved Mojolicious::Plugin::EPLRenderer to cache templates more
+    efficiently.
+  - Improved documentation.
+  - Improved tests.
+  - Fixed Perl 5.17.11+ compatibility.
+  - Fixed Mojo::JSON to encode "inf" and "nan" values as strings. (chansen)
+  - Fixed a few authority and rendering bugs in Mojo::URL.
+  - Fixed layout bugs in Mojolicious::Renderer.
+  - Fixed support for HEAD request method in Mojo::Server::CGI and
+    Mojo::Server::PSGI.
+  - Fixed small line directive bug in Mojo::Template.
+  - Fixed small limit bug in Mojo::Message.
+
 3.97  2013-04-25
   - Added data attribute to Mojo::URL.
   - Improved compatibility with IO::Socket::SSL 1.87.

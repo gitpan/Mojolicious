@@ -58,7 +58,7 @@ sub build {
       if ($type eq 'code' || $multi) { $lines[-1] .= "$value" }
 
       # Expression
-      if (grep { $_ eq $type } qw(expr escp)) {
+      if ($type eq 'expr' || $type eq 'escp') {
 
         # Start
         unless ($multi) {
@@ -99,7 +99,9 @@ sub compile {
 
   # Compile with line directive
   return undef unless my $code = $self->code;
-  my $compiled = eval qq{#line 1 "@{[$self->name]}"\n$code};
+  my $name = $self->name;
+  $name =~ s/"//g;
+  my $compiled = eval qq{#line 1 "$name"\n$code};
   $self->compiled($compiled) and return undef unless $@;
 
   # Use local stacktrace for compile exceptions
@@ -275,7 +277,7 @@ sub _trim {
   for (my $j = @$line - 4; $j >= 0; $j -= 2) {
 
     # Skip captures
-    next if grep { $_ eq $line->[$j] } qw(cpst cpen);
+    next if $line->[$j] eq 'cpst' || $line->[$j] eq 'cpen';
 
     # Only trim text
     return unless $line->[$j] eq 'text';
@@ -338,14 +340,14 @@ Mojo::Template - Perl-ish templates!
 
   # More advanced
   my $output = $mt->render(<<'EOF', 23, 'foo bar');
-  % my ($number, $text) = @_;
+  % my ($num, $text) = @_;
   %= 5 * 5
   <!DOCTYPE html>
   <html>
     <head><title>More advanced</title></head>
     <body>
       test 123
-      foo <% my $i = $number + 2; %>
+      foo <% my $i = $num + 2; %>
       % for (1 .. 23) {
       * some text <%= $i++ %>
       % }

@@ -106,8 +106,6 @@ lib/Mojolicious/Plugin/HeaderCondition.pm
 lib/Mojolicious/Plugin/JSONConfig.pm
 lib/Mojolicious/Plugin/Mount.pm
 lib/Mojolicious/Plugin/PODRenderer.pm
-lib/Mojolicious/Plugin/PoweredBy.pm
-lib/Mojolicious/Plugin/RequestTimer.pm
 lib/Mojolicious/Plugin/TagHelpers.pm
 lib/Mojolicious/Plugins.pm
 lib/Mojolicious/public/favicon.ico
@@ -242,7 +240,6 @@ t/mojo/websocket_frames.t
 t/mojo/websocket_proxy.t
 t/mojo/websocket_proxy_tls.t
 t/mojolicious/app.t
-t/mojolicious/caching_lite_app.t
 t/mojolicious/charset_lite_app.t
 t/mojolicious/command.t
 t/mojolicious/commands.t

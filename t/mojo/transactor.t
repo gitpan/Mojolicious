@@ -124,6 +124,7 @@ is $tx->req->url->to_abs, 'http://example.com/foo', 'right URL';
 is $tx->req->method, 'POST', 'right method';
 is $tx->req->headers->content_type, 'application/x-www-form-urlencoded',
   'right "Content-Type" value';
+ok !$tx->is_empty, 'transaction is not empty';
 is $tx->req->body, 'a=1&a=2&a=3&b=4', 'right content';
 
 # Existing query string (lowercase HEAD)
@@ -132,6 +133,7 @@ is $tx->req->url->to_abs, 'http://example.com?foo=bar&baz=1&baz=2',
   'right URL';
 is $tx->req->method, 'head', 'right method';
 is $tx->req->headers->content_type, undef, 'no "Content-Type" value';
+ok $tx->is_empty, 'transaction is empty';
 is $tx->req->body, '', 'no content';
 
 # UTF-8 form
@@ -490,7 +492,7 @@ is $tx->res->headers->location, undef, 'no "Location" value';
 $tx = $t->tx(POST => 'http://mojolicio.us/foo');
 $tx->res->code(302);
 $tx->res->headers->location('http://example.com/bar');
-$tx->req->write_chunk('whatever' => sub { shift->finish });
+$tx->req->content->write_chunk('whatever' => sub { shift->finish });
 $tx = $t->redirect($tx);
 is $tx->req->method, 'GET', 'right method';
 is $tx->req->url->to_abs, 'http://example.com/bar', 'right URL';
@@ -520,7 +522,7 @@ is $tx->res->headers->location, undef, 'no "Location" value';
 $tx = $t->tx(POST => 'http://mojolicio.us/foo');
 $tx->res->code(303);
 $tx->res->headers->location('http://example.com/bar');
-$tx->req->write_chunk('whatever' => sub { shift->finish });
+$tx->req->content->write_chunk('whatever' => sub { shift->finish });
 $tx = $t->redirect($tx);
 is $tx->req->method, 'GET', 'right method';
 is $tx->req->url->to_abs, 'http://example.com/bar', 'right URL';
@@ -594,7 +596,7 @@ is $tx->res->headers->location, undef, 'no "Location" value';
 $tx = $t->tx(POST => 'http://mojolicio.us/foo');
 $tx->res->code(301);
 $tx->res->headers->location('http://example.com/bar');
-$tx->req->write_chunk('whatever' => sub { shift->finish });
+$tx->req->content->write_chunk('whatever' => sub { shift->finish });
 is $t->redirect($tx), undef, 'unsupported redirect';
 
 # Simple 307 redirect
@@ -633,7 +635,7 @@ is $tx->res->headers->location, undef, 'no "Location" value';
 $tx = $t->tx(POST => 'http://mojolicio.us/foo');
 $tx->res->code(307);
 $tx->res->headers->location('http://example.com/bar');
-$tx->req->write_chunk('whatever' => sub { shift->finish });
+$tx->req->content->write_chunk('whatever' => sub { shift->finish });
 is $t->redirect($tx), undef, 'unsupported redirect';
 
 # 307 redirect (additional headers)
@@ -700,7 +702,7 @@ is $tx->res->headers->location, undef, 'no "Location" value';
 $tx = $t->tx(POST => 'http://mojolicio.us/foo');
 $tx->res->code(308);
 $tx->res->headers->location('http://example.com/bar');
-$tx->req->write_chunk('whatever' => sub { shift->finish });
+$tx->req->content->write_chunk('whatever' => sub { shift->finish });
 is $t->redirect($tx), undef, 'unsupported redirect';
 
 # 309 redirect (unsupported)

@@ -1,6 +1,5 @@
 use Mojo::Base -strict;
 
-# Disable IPv6 and libev
 BEGIN {
   $ENV{MOJO_NO_IPV6} = 1;
   $ENV{MOJO_REACTOR} = 'Mojo::Reactor::Poll';
@@ -91,7 +90,7 @@ $app->routes->post(
     $local_port     = $self->tx->local_port;
     $remote_address = $self->tx->remote_address;
     $remote_port    = $self->tx->remote_port;
-    $self->render_data($self->req->upload('file')->slurp);
+    $self->render(data => $self->req->upload('file')->slurp);
   }
 );
 
