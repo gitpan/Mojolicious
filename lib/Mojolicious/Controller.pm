@@ -600,8 +600,8 @@ L<Mojo::Transaction::WebSocket> object.
 
 Access GET/POST parameters, file uploads and route placeholder values that are
 not reserved stash values. Note that this method is context sensitive in some
-cases and therefore needs to be used with care, every GET/POST parameter can
-have multiple values, which might have unexpected consequences.
+cases and therefore needs to be used with care, there can always be multiple
+values, which might have unexpected consequences.
 
   # List context is ambiguous and should be avoided
   my $hash = {foo => $self->param('foo')};
@@ -837,10 +837,10 @@ discarded.
 
 =head2 stash
 
-  my $stash = $c->stash;
-  my $foo   = $c->stash('foo');
-  $c        = $c->stash({foo => 'bar'});
-  $c        = $c->stash(foo => 'bar');
+  my $hash = $c->stash;
+  my $foo  = $c->stash('foo');
+  $c       = $c->stash({foo => 'bar'});
+  $c       = $c->stash(foo => 'bar');
 
 Non persistent data storage and exchange, application wide default values can
 be set with L<Mojolicious/"defaults">. Many stash values have a special
@@ -849,10 +849,8 @@ C<controller>, C<data>, C<extends>, C<format>, C<handler>, C<json>, C<layout>,
 C<namespace>, C<partial>, C<path>, C<status>, C<template> and C<text>. Note
 that all stash values with a C<mojo.*> prefix are reserved for internal use.
 
-  # Manipulate stash
-  $c->stash->{foo} = 'bar';
-  my $foo = $c->stash->{foo};
-  delete $c->stash->{foo};
+  # Remove value
+  my $foo = delete $c->stash->{foo};
 
 =head2 ua
 

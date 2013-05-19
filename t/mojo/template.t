@@ -25,8 +25,8 @@ my $capture = 'no warnings "redefine"; sub capture { shift->(@_) }';
 
 # Consistent scalar context
 my $mt = Mojo::Template->new;
-$mt->prepend('my @foo = (3, 4);');
-my $output = $mt->render('<%= @foo %>:<%== @foo %>');
+$mt->prepend('my @foo = (3, 4);')->parse('<%= @foo %>:<%== @foo %>');
+my $output = $mt->build->compile || $mt->interpret;
 is $output, "2:2\n", 'same context';
 
 # Trim tag
@@ -557,10 +557,8 @@ EOF
 is $output, " \n    2\n\n    3\n\n    4\n", 'block loop';
 
 # Strict
-$mt     = Mojo::Template->new;
-$output = $mt->render(<<'EOF');
-% $foo = 1;
-EOF
+$mt = Mojo::Template->new;
+$output = $mt->parse('% $foo = 1;')->build->compile || $mt->interpret;
 isa_ok $output, 'Mojo::Exception', 'right exception';
 like $output->message, qr/^Global symbol "\$foo" requires/, 'right message';
 
