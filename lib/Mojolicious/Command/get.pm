@@ -55,12 +55,10 @@ sub run {
   my %headers;
   /^\s*([^:]+)\s*:\s*(.+)$/ and $headers{$1} = $2 for @headers;
 
-  my $ua = Mojo::UserAgent->new(ioloop => Mojo::IOLoop->singleton);
-  $ua->max_redirects(10) if $redirect;
-
   # Detect proxy for absolute URLs
-  if   ($url !~ m!^/!) { $ua->detect_proxy }
-  else                 { $ua->app($self->app) }
+  my $ua = Mojo::UserAgent->new(ioloop => Mojo::IOLoop->singleton);
+  $url !~ m!^/! ? $ua->detect_proxy : $ua->app($self->app);
+  $ua->max_redirects(10) if $redirect;
 
   my $buffer = '';
   $ua->on(
@@ -71,14 +69,8 @@ sub run {
       weaken $tx;
       $tx->res->content->on(
         body => sub {
-
-          # Request
-          my $req = $tx->req;
-          warn $req->$_ for qw(build_start_line build_headers);
-
-          # Response
-          my $res = $tx->res;
-          warn $res->$_ for qw(build_start_line build_headers);
+          warn $tx->req->$_ for qw(build_start_line build_headers);
+          warn $tx->res->$_ for qw(build_start_line build_headers);
         }
       ) if $verbose;
 
