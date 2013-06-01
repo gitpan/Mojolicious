@@ -1,4 +1,7 @@
 
+4.10  2013-06-01
+  - Added link and vary methods to Mojo::Headers.
+
 4.09  2013-05-31
   - Updated jQuery to version 2.0.2.
   - Increased default max_message_size from 5MB to 10MB in Mojo::Message.
@@ -2494,7 +2497,7 @@
   - Added referrer method to Mojo::Headers. (esskar)
   - Added finish_cb callback to Mojo::Message.
   - Added render_data method to Mojolicious::Controller.
-  - Added formdata tests for multiple browsers. (koban)
+  - Added form-data tests for multiple browsers. (koban)
   - Changed Mojolicious default secret to a slightly more secure value.
     (xantus)
   - Allow parser errors to be handled by frameworks.
@@ -2747,7 +2750,7 @@
   - Fixed a few cases where exceptions and not found events would result in
     empty pages.
   - Fixed layouts with partial templates.
-  - Fixed encoding of non utf8 form data.
+  - Fixed encoding of non utf8 form-data.
   - Fixed body callbacks to get automatic buffering.
   - Fixed a case where Mojo::Server::Daemon and Mojo::Client were too
     defensive and made them in turn 20 times faster.

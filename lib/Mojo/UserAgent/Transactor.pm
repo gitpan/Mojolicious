@@ -268,7 +268,7 @@ Mojo::UserAgent::Transactor - User agent transactor
   # PATCH request with "Do Not Track" header and content
   say $t->tx(PATCH => 'example.com' => {DNT => 1} => 'Hi!')->req->to_string;
 
-  # POST request with form data
+  # POST request with form-data
   say $t->tx(POST => 'example.com' => form => {a => 'b'})->req->to_string;
 
   # PUT request with JSON data
@@ -394,8 +394,8 @@ requests, with support for content generators.
   });
 
 The C<form> content generator will automatically use query parameters for
-C<GET>/C<HEAD> requests and the "application/x-www-form-urlencoded" content
-type for everything else. Both get upgraded automatically to using the
+GET/HEAD requests and the "application/x-www-form-urlencoded" content type for
+everything else. Both get upgraded automatically to using the
 "multipart/form-data" content type when necessary or when the header has been
 set manually.
 

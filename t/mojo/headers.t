@@ -68,6 +68,7 @@ is $headers->expires('foo')->expires,                     'foo', 'right value';
 is $headers->host('foo')->host,                           'foo', 'right value';
 is $headers->if_modified_since('foo')->if_modified_since, 'foo', 'right value';
 is $headers->last_modified('foo')->last_modified,         'foo', 'right value';
+is $headers->link('foo')->link,                           'foo', 'right value';
 is $headers->location('foo')->location,                   'foo', 'right value';
 is $headers->origin('foo')->origin,                       'foo', 'right value';
 is $headers->proxy_authenticate('foo')->proxy_authenticate, 'foo',
@@ -92,6 +93,7 @@ is $headers->trailer('foo')->trailer,                     'foo', 'right value';
 is $headers->transfer_encoding('foo')->transfer_encoding, 'foo', 'right value';
 is $headers->upgrade('foo')->upgrade,                     'foo', 'right value';
 is $headers->user_agent('foo')->user_agent,               'foo', 'right value';
+is $headers->vary('foo')->vary,                           'foo', 'right value';
 is $headers->www_authenticate('foo')->www_authenticate,   'foo', 'right value';
 
 # Clone
