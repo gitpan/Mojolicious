@@ -12,8 +12,8 @@ use Mojo::Util
   qw(b64_decode b64_encode camelize class_to_file class_to_path decamelize),
   qw(decode encode get_line hmac_sha1_sum html_unescape md5_bytes md5_sum),
   qw(monkey_patch punycode_decode punycode_encode quote secure_compare),
-  qw(sha1_bytes sha1_sum slurp spurt squish steady_time trim unquote),
-  qw(url_escape url_unescape xml_escape xor_encode);
+  qw(sha1_bytes sha1_sum slurp split_header spurt squish steady_time trim),
+  qw(unquote url_escape url_unescape xml_escape xor_encode);
 
 # camelize
 is camelize('foo_bar_baz'), 'FooBarBaz', 'right camelized result';
@@ -57,6 +57,39 @@ is $buffer, "yada\x0d\x0a", 'right buffer content';
 is get_line(\$buffer), 'yada', 'right line';
 is $buffer, '', 'no buffer content';
 is get_line(\$buffer), undef, 'no line';
+
+# split_header
+is_deeply split_header(''), [], 'right result';
+is_deeply split_header('foo=b=a=r'), [['foo', 'b=a=r']], 'right result';
+is_deeply split_header(',,foo,, ,bar'), [['foo', undef], ['bar', undef]],
+  'right result';
+is_deeply split_header(';;foo; ; ;bar'), [['foo', undef, 'bar', undef]],
+  'right result';
+is_deeply split_header('foo=;bar=""'), [['foo', '', 'bar', '']],
+  'right result';
+is_deeply split_header('foo=bar baz=yada'), [['foo', 'bar', 'baz', 'yada']],
+  'right result';
+is_deeply split_header('foo,bar,baz'),
+  [['foo', undef], ['bar', undef], ['baz', undef]], 'right result';
+is_deeply split_header('f "o" o , ba  r'),
+  [['f', undef, '"o"', undef, 'o', undef], ['ba', undef, 'r', undef]],
+  'right result';
+is_deeply split_header('foo="b,; a\" r\"\\\\"'), [['foo', 'b,; a" r"\\']],
+  'right result';
+is_deeply split_header('foo = "b a\" r\"\\\\"'), [['foo', 'b a" r"\\']],
+  'right result';
+my $header = q{</foo/bar>; rel="x"; t*=UTF-8'de'a%20b};
+my $tree = [['</foo/bar>', undef, 'rel', 'x', 't*', 'UTF-8\'de\'a%20b']];
+is_deeply split_header($header), $tree, 'right result';
+$header = 'a=b c; A=b.c; D=/E; a-b=3; F=Thu, 07 Aug 2008 07:07:59 GMT; Ab;';
+$tree   = [
+  ['a', 'b', 'c', undef, 'A', 'b.c', 'D', '/E', 'a-b', '3', 'F', 'Thu'],
+  [
+    '07',       undef, 'Aug', undef, '2008', undef,
+    '07:07:59', undef, 'GMT', undef, 'Ab',   undef
+  ]
+];
+is_deeply split_header($header), $tree, 'right result';
 
 # b64_encode
 is b64_encode('foobar$%^&3217'), "Zm9vYmFyJCVeJjMyMTc=\n",

@@ -8,7 +8,7 @@ use Mojo::Cookie::Response;
 my $cookie = Mojo::Cookie::Request->new;
 $cookie->name('foo');
 $cookie->value('ba =r');
-is $cookie->to_string, 'foo=ba =r', 'right format';
+is $cookie->to_string, 'foo="ba =r"', 'right format';
 
 # Request cookie without value as string
 $cookie = Mojo::Cookie::Request->new;
@@ -125,7 +125,7 @@ is $cookies->[1], undef, 'no more cookies';
 
 # Parse multiple cookie request (RFC 2965)
 $cookies = Mojo::Cookie::Request->parse(
-  '$Version=1; foo=bar; $Path=/test; baz=la la; $Path=/tset');
+  '$Version=1; foo=bar; $Path=/test; baz="la la"; $Path=/tset');
 is $cookies->[0]->name,  'foo',   'right name';
 is $cookies->[0]->value, 'bar',   'right value';
 is $cookies->[1]->name,  'baz',   'right name';
@@ -137,7 +137,7 @@ $cookie = Mojo::Cookie::Response->new;
 $cookie->name('foo');
 $cookie->value('ba r');
 $cookie->path('/test');
-is $cookie->to_string, 'foo=ba r; path=/test', 'right format';
+is $cookie->to_string, 'foo="ba r"; path=/test', 'right format';
 
 # Response cookie without value as string
 $cookie = Mojo::Cookie::Response->new;
@@ -161,7 +161,7 @@ $cookie->expires(1218092879);
 $cookie->secure(1);
 $cookie->httponly(1);
 is $cookie->to_string,
-  'foo=ba r; expires=Thu, 07 Aug 2008 07:07:59 GMT; domain=example.com;'
+  'foo="ba r"; expires=Thu, 07 Aug 2008 07:07:59 GMT; domain=example.com;'
   . ' path=/test; secure; Max-Age=60; HttpOnly', 'right format';
 
 # Empty response cookie
@@ -170,7 +170,7 @@ is_deeply(Mojo::Cookie::Response->parse, [], 'no cookies');
 # Parse response cookie (RFC 6265)
 $cookies
   = Mojo::Cookie::Response->parse(
-      'foo=ba r; Domain=example.com; Path=/test; Max-Age=60;'
+      'foo="ba r"; Domain=example.com; Path=/test; Max-Age=60;'
     . ' Expires=Thu, 07 Aug 2008 07:07:59 GMT; Secure;');
 is $cookies->[0]->name,    'foo',         'right name';
 is $cookies->[0]->value,   'ba r',        'right value';
@@ -185,7 +185,7 @@ is $cookies->[1], undef, 'no more cookies';
 # Parse response cookie with invalid flag (RFC 6265)
 $cookies
   = Mojo::Cookie::Response->parse(
-      'foo=ba r; Domain=example.com; Path=/test; Max-Age=60;'
+      'foo="ba r"; Domain=example.com; Path=/test; Max-Age=60;'
     . ' Expires=Thu, 07 Aug 2008 07:07:59 GMT; InSecure;');
 is $cookies->[0]->name,    'foo',         'right name';
 is $cookies->[0]->value,   'ba r',        'right value';
@@ -359,6 +359,16 @@ is $cookies->[0]->secure, 1, 'right secure flag';
 is $cookies->[0]->to_string,
   'foo=; expires=Thu, 07 Aug 2008 07:07:59 GMT; domain=example.com;'
   . ' path=/test; secure; Max-Age=60', 'right result';
+is $cookies->[1], undef, 'no more cookies';
+
+# Parse response cookie with broken Expires value
+$cookies = Mojo::Cookie::Response->parse('foo="ba r"; Expires=Th');
+is $cookies->[0]->name,  'foo',  'right name';
+is $cookies->[0]->value, 'ba r', 'right value';
+is $cookies->[1], undef, 'no more cookies';
+$cookies = Mojo::Cookie::Response->parse('foo="ba r"; Expires=Th; Path=/test');
+is $cookies->[0]->name,  'foo',  'right name';
+is $cookies->[0]->value, 'ba r', 'right value';
 is $cookies->[1], undef, 'no more cookies';
 
 # Response cookie with Max-Age 0 and Expires 0

@@ -40,8 +40,8 @@ our @EXPORT_OK = (
   qw(b64_decode b64_encode camelize class_to_file class_to_path decamelize),
   qw(decode deprecated encode get_line hmac_sha1_sum html_unescape md5_bytes),
   qw(md5_sum monkey_patch punycode_decode punycode_encode quote),
-  qw(secure_compare sha1_bytes sha1_sum slurp spurt squish steady_time trim),
-  qw(unquote url_escape url_unescape xml_escape xor_encode)
+  qw(secure_compare sha1_bytes sha1_sum slurp split_header spurt squish),
+  qw(steady_time trim unquote url_escape url_unescape xml_escape xor_encode)
 );
 
 sub b64_decode { decode_base64($_[0]) }
@@ -242,6 +242,26 @@ sub slurp {
   my $content = '';
   while ($file->sysread(my $buffer, 131072, 0)) { $content .= $buffer }
   return $content;
+}
+
+sub split_header {
+  my $str = shift;
+
+  my (@tree, @token);
+  while ($str =~ s/^[,;\s]*([^=;, ]+)\s*//) {
+    push @token, $1, undef;
+    $token[-1] = unquote($1)
+      if $str =~ s/^=\s*("(?:\\\\|\\"|[^"])*"|[^;, ]*)\s*//;
+
+    # Separator
+    $str =~ s/^;\s*//;
+    next unless $str =~ s/^,\s*//;
+    push @tree, [@token];
+    @token = ();
+  }
+
+  # Take care of final token
+  return [@token ? (@tree, \@token) : @tree];
 }
 
 sub spurt {
@@ -538,6 +558,21 @@ Generate SHA1 checksum for string.
   my $content = slurp '/etc/passwd';
 
 Read all data at once from file.
+
+=head2 split_header
+
+   my $tree = split_header 'foo="bar baz"; test=123, yada';
+
+Split HTTP header value.
+
+  # "one"
+  split_header('one; two="three four", five=six')->[0][0];
+
+  # "three four"
+  split_header('one; two="three four", five=six')->[0][3];
+
+  # "five"
+  split_header('one; two="three four", five=six')->[1][0];
 
 =head2 spurt
 

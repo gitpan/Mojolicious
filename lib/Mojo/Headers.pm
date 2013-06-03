@@ -8,7 +8,7 @@ has max_line_size => sub { $ENV{MOJO_MAX_LINE_SIZE} || 10240 };
 # Common headers
 my @HEADERS = (
   qw(Accept Accept-Charset Accept-Encoding Accept-Language Accept-Ranges),
-  qw(Authorization Cache-Control Connection Content-Disposition),
+  qw(Allow Authorization Cache-Control Connection Content-Disposition),
   qw(Content-Encoding Content-Length Content-Range Content-Type Cookie DNT),
   qw(Date ETag Expect Expires Host If-Modified-Since Last-Modified Link),
   qw(Location Origin Proxy-Authenticate Proxy-Authorization Range),
@@ -36,6 +36,12 @@ sub add {
   push @{$self->{headers}{$key}}, map { ref $_ eq 'ARRAY' ? $_ : [$_] } @_;
 
   return $self;
+}
+
+sub append {
+  my ($self, $name, $value) = @_;
+  my $old = $self->header($name);
+  return $self->header($name => defined $old ? "$old, $value" : $value);
 }
 
 sub clone {
@@ -234,6 +240,29 @@ Shortcut for the C<Accept-Ranges> header.
 
 Add one or more header values with one or more lines.
 
+  # "Vary: Accept"
+  # "Vary: Accept-Encoding"
+  $headers->vary('Accept')->add(Vary => 'Accept-Encoding')->to_string;
+
+=head2 allow
+
+  my $allow = $headers->allow;
+  $headers  = $headers->allow('GET, POST');
+
+Shortcut for the C<Allow> header.
+
+=head2 append
+
+  $headers = $headers->append(Vary => 'Accept-Encoding');
+
+Append value to header and flatten it if necessary.
+
+  # "Vary: Accept"
+  $headers->append(Vary => 'Accept')->to_string;
+
+  # "Vary: Accept, Accept-Encoding"
+  $headers->vary('Accept')->append(Vary => 'Accept-Encoding')->to_string;
+
 =head2 authorization
 
   my $authorization = $headers->authorization;
@@ -408,7 +437,7 @@ Get leftover data from header parser.
   my $link = $headers->link;
   $headers = $headers->link('<http://127.0.0.1/foo/3>; rel="next"');
 
-Shortcut for the C<Link> header.
+Shortcut for the C<Link> header from RFC 5988.
 
 =head2 location
 

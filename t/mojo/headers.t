@@ -50,6 +50,7 @@ is $headers->accept_charset('foo')->accept_charset,   'foo', 'right value';
 is $headers->accept_encoding('foo')->accept_encoding, 'foo', 'right value';
 is $headers->accept_language('foo')->accept_language, 'foo', 'right value';
 is $headers->accept_ranges('foo')->accept_ranges,     'foo', 'right value';
+is $headers->allow('foo')->allow,                     'foo', 'right value';
 is $headers->authorization('foo')->authorization,     'foo', 'right value';
 is $headers->connection('foo')->connection,           'foo', 'right value';
 is $headers->cache_control('foo')->cache_control,     'foo', 'right value';
@@ -182,6 +183,24 @@ is_deeply $headers->to_hash,
 # Remove all headers
 $headers->from_hash({});
 is_deeply $headers->to_hash, {}, 'right structure';
+
+# Append values
+$headers = Mojo::Headers->new;
+$headers->vary('Accept');
+$headers->append(Vary => 'Accept-Encoding');
+is $headers->vary, 'Accept, Accept-Encoding', 'right value';
+$headers = Mojo::Headers->new;
+$headers->append(Vary => 'Accept');
+is $headers->vary, 'Accept', 'right value';
+$headers->append(Vary => 'Accept-Encoding');
+is $headers->vary, 'Accept, Accept-Encoding', 'right value';
+$headers = Mojo::Headers->new;
+$headers->add(Vary => 'Accept', 'Accept-Encoding');
+is_deeply $headers->to_hash(1), {Vary => [['Accept'], ['Accept-Encoding']]},
+  'right structure';
+$headers->append(Vary => 'Accept-Language');
+is_deeply $headers->to_hash(1),
+  {Vary => [['Accept, Accept-Encoding, Accept-Language']]}, 'right structure';
 
 # Multiline
 $headers = Mojo::Headers->new;
