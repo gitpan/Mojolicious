@@ -255,11 +255,17 @@ Since reverse proxies generally don't pass along information about path
 prefixes your application might be deployed under, rewriting the base path of
 incoming requests is also quite common.
 
-  # Move first part from path to base path in production mode
+  # Move first part and slash from path to base path in production mode
   app->hook(before_dispatch => sub {
     my $self = shift;
-    push @{$self->req->url->base->path}, shift @{$self->req->url->path};
+    push @{$self->req->url->base->path->trailing_slash(1)},
+      shift @{$self->req->url->path->leading_slash(0)};
   }) if app->mode eq 'production';
+
+L<Mojo::URL> objects are very easy to manipulate, just make sure that the URL
+(C<foo/bar?baz=yada>), which represents the routing destination, is always
+relative to the base URL (C<http://example.com/myapp/>), which represents the
+deployment location of your application.
 
 =head2 Application embedding
 

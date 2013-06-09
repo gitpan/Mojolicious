@@ -374,15 +374,13 @@ sub stash {
   return $self;
 }
 
-sub ua { shift->app->ua }
-
 sub url_for {
   my $self = shift;
   my $target = shift // '';
 
   # Absolute URL
   return $target if Scalar::Util::blessed $target && $target->isa('Mojo::URL');
-  return Mojo::URL->new($target) if $target =~ m!^\w+://!;
+  return Mojo::URL->new($target) if $target =~ m!^(?:[^:/?#]+:|//)!;
 
   # Base
   my $url  = Mojo::URL->new;
@@ -629,8 +627,8 @@ For more control you can also access request information directly.
 
   $c = $c->redirect_to('named', foo => 'bar');
   $c = $c->redirect_to('named', {foo => 'bar'});
-  $c = $c->redirect_to('/path');
-  $c = $c->redirect_to('http://127.0.0.1/foo/bar');
+  $c = $c->redirect_to('/perldoc');
+  $c = $c->redirect_to('http://mojolicio.us/perldoc');
 
 Prepare a C<302> redirect response, takes the same arguments as C<url_for>.
 
@@ -860,38 +858,6 @@ that all stash values with a C<mojo.*> prefix are reserved for internal use.
   # Remove value
   my $foo = delete $c->stash->{foo};
 
-=head2 ua
-
-  my $ua = $c->ua;
-
-Get L<Mojo::UserAgent> object from L<Mojo/"ua">.
-
-  # Longer version
-  my $ua = $c->app->ua;
-
-  # Blocking
-  my $tx = $c->ua->get('http://example.com');
-  my $tx = $c->ua->post('example.com/login' => form => {user => 'mojo'});
-
-  # Non-blocking
-  $c->ua->get('http://example.com' => sub {
-    my ($ua, $tx) = @_;
-    $c->render(data => $tx->res->body);
-  });
-
-  # Parallel non-blocking
-  my $delay = Mojo::IOLoop->delay(sub {
-    my ($delay, @titles) = @_;
-    $c->render(json => \@titles);
-  });
-  for my $url ('http://mojolicio.us', 'https://metacpan.org') {
-    my $end = $delay->begin(0);
-    $c->ua->get($url => sub {
-      my ($ua, $tx) = @_;
-      $end->($tx->res->dom->html->head->title->text);
-    });
-  }
-
 =head2 url_for
 
   my $url = $c->url_for;
@@ -900,7 +866,9 @@ Get L<Mojo::UserAgent> object from L<Mojo/"ua">.
   my $url = $c->url_for('test', name => 'sebastian');
   my $url = $c->url_for('test', {name => 'sebastian'});
   my $url = $c->url_for('/perldoc');
+  my $url = $c->url_for('//mojolicio.us/perldoc');
   my $url = $c->url_for('http://mojolicio.us/perldoc');
+  my $url = $c->url_for('mailto:sri@example.com');
 
 Generate a portable L<Mojo::URL> object with base for a route, path or URL.
 
