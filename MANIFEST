@@ -325,7 +325,7 @@ t/mojolicious/templates/not_found.testing.html.ep
 t/mojolicious/templates/simple.html.pod
 t/mojolicious/templates/syntaxerror.html.epl
 t/mojolicious/templates/withblock.txt.epl
-t/mojolicious/templates/withlayout.html.epl
+t/mojolicious/templates/WithGreenLayout.html.epl
 t/mojolicious/templates2/42.html.ep
 t/mojolicious/templates2/foo/yada.html.epl
 t/mojolicious/testing_app.t
