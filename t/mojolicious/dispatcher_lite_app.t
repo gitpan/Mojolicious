@@ -6,6 +6,10 @@ BEGIN {
 }
 
 use Test::More;
+
+use FindBin;
+use lib "$FindBin::Bin/lib";
+
 use Mojo::Message::Response;
 use Mojolicious::Lite;
 use Test::Mojo;
@@ -74,6 +78,22 @@ hook after_static => sub {
   $self->res->headers->cache_control('max-age=3600, must-revalidate');
 };
 
+# Make controller available as $_
+hook around_action => sub {
+  my ($next, $c) = @_;
+  local $_ = $c;
+  return $next->();
+};
+
+# Plugin for rendering return values
+plugin 'AroundPlugin';
+
+# Pass argument to action
+hook around_action => sub {
+  my ($next, $c, $action) = @_;
+  return $c->$action('works');
+};
+
 # Response generating condition "res" for /res.txt
 app->routes->add_condition(
   res => sub {
@@ -86,19 +106,20 @@ app->routes->add_condition(
   }
 );
 
-get '/' => sub { shift->render(text => 'works') };
-
 # Never called if custom dispatchers work
 get '/custom' => sub { shift->render(text => 'does not work') };
 
 # Custom response
 get '/res.txt' => (res => 1) => sub {
-  my $self = shift;
-  my $res
-    = Mojo::Message::Response->new(code => 202)->body('Custom response!');
-  $self->tx->res($res);
-  $self->rendered;
+  $_->tx->res(
+    Mojo::Message::Response->new(code => 202)->body('Custom response!'));
+  $_->rendered;
 };
+
+# Allow rendering of return value
+under '/' => {return => 1} => sub {1};
+
+get sub { return pop };
 
 my $t = Test::Mojo->new;
 

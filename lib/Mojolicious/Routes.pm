@@ -59,7 +59,6 @@ sub dispatch {
     }
   }
 
-  # Dispatch
   return undef unless $self->_walk($c);
   $self->auto_render($c);
   return 1;
@@ -85,6 +84,8 @@ sub route {
   shift->add_child(Mojolicious::Routes::Route->new(@_))->children->[-1];
 }
 
+sub _action { shift->plugins->emit_chain(around_action => @_) }
+
 sub _add {
   my ($self, $attr, $name, $cb) = @_;
   $self->$attr->{$name} = $cb;
@@ -94,9 +95,9 @@ sub _add {
 sub _callback {
   my ($self, $c, $field, $nested) = @_;
   $c->stash->{'mojo.routed'}++;
-  $c->app->log->debug('Routing to a callback.');
-  my $continue = $field->{cb}->($c);
-  return !$nested || $continue ? 1 : undef;
+  my $app = $c->app;
+  $app->log->debug('Routing to a callback.');
+  return _action($app, $c, $field->{cb}, $nested) || $nested;
 }
 
 sub _class {
@@ -140,26 +141,26 @@ sub _class {
 }
 
 sub _controller {
-  my ($self, $c, $field, $nested) = @_;
+  my ($self, $old, $field, $nested) = @_;
 
   # Load and instantiate controller/application
-  my $app;
-  unless ($app = $self->_class($c, $field)) { return defined $app ? 1 : undef }
+  my $new;
+  unless ($new = $self->_class($old, $field)) { return !!defined $new }
 
   # Application
-  my $continue;
-  my $class = ref $app;
-  my $log   = $c->app->log;
-  if (my $sub = $app->can('handler')) {
+  my $class = ref $new;
+  my $app   = $old->app;
+  my $log   = $app->log;
+  if (my $sub = $new->can('handler')) {
     $log->debug(qq{Routing to application "$class".});
 
     # Try to connect routes
-    if (my $sub = $app->can('routes')) {
-      my $r = $app->$sub;
-      weaken $r->parent($c->match->endpoint)->{parent} unless $r->parent;
+    if (my $sub = $new->can('routes')) {
+      my $r = $new->$sub;
+      weaken $r->parent($old->match->endpoint)->{parent} unless $r->parent;
     }
-    $app->$sub($c);
-    $c->stash->{'mojo.routed'}++;
+    $new->$sub($old);
+    $old->stash->{'mojo.routed'}++;
   }
 
   # Action
@@ -167,9 +168,9 @@ sub _controller {
     if (!$self->is_hidden($method)) {
       $log->debug(qq{Routing to controller "$class" and action "$method".});
 
-      if (my $sub = $app->can($method)) {
-        $c->stash->{'mojo.routed'}++ unless $nested;
-        $continue = $app->$sub;
+      if (my $sub = $new->can($method)) {
+        $old->stash->{'mojo.routed'}++ if $nested;
+        return 1 if _action($app, $new, $sub, $nested);
       }
 
       else { $log->debug('Action not found in controller.') }
@@ -177,7 +178,7 @@ sub _controller {
     else { $log->debug(qq{Action "$method" is not allowed.}) }
   }
 
-  return !$nested || $continue ? 1 : undef;
+  return $nested;
 }
 
 sub _load {
@@ -206,11 +207,10 @@ sub _walk {
     my @keys = keys %$field;
     @{$stash}{@keys} = @{$stash->{'mojo.captures'}}{@keys} = values %$field;
 
-    # Dispatch
     my $continue
       = $field->{cb}
-      ? $self->_callback($c, $field, $nested)
-      : $self->_controller($c, $field, $nested);
+      ? $self->_callback($c, $field, !$nested)
+      : $self->_controller($c, $field, !$nested);
 
     # Break the chain
     return undef if $nested && !$continue;

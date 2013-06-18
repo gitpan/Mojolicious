@@ -179,21 +179,21 @@ sub _spawn {
     sub {
 
       # Blocking ("ualarm" can't be imported on Windows)
-      my $l;
+      my $lock;
       if ($_[1]) {
         eval {
           local $SIG{ALRM} = sub { die "alarm\n" };
           my $old = Time::HiRes::ualarm $self->lock_timeout * 1000000;
-          $l = flock $handle, LOCK_EX;
+          $lock = flock $handle, LOCK_EX;
           Time::HiRes::ualarm $old;
         };
-        if ($@) { $l = $@ eq "alarm\n" ? 0 : die($@) }
+        if ($@) { $lock = $@ eq "alarm\n" ? 0 : die($@) }
       }
 
       # Non blocking
-      else { $l = flock $handle, LOCK_EX | LOCK_NB }
+      else { $lock = flock $handle, LOCK_EX | LOCK_NB }
 
-      return $l;
+      return $lock;
     }
   );
   $loop->unlock(sub { flock $handle, LOCK_UN });
@@ -256,16 +256,16 @@ Mojo::Server::Prefork - Preforking non-blocking I/O HTTP and WebSocket server
 
 L<Mojo::Server::Prefork> is a full featured, UNIX optimized, preforking
 non-blocking I/O HTTP and WebSocket server, built around the very well tested
-and reliable L<Mojo::Server::Daemon>, with C<IPv6>, C<TLS>, C<Comet> (long
-polling), C<keep-alive>, connection pooling, timeout, cookie, multipart and
-multiple event loop support. Note that the server uses signals for process
-management, so you should avoid modifying signal handlers in your
-applications.
+and reliable L<Mojo::Server::Daemon>, with IPv6, TLS, Comet (long polling),
+keep-alive, connection pooling, timeout, cookie, multipart and multiple event
+loop support. Note that the server uses signals for process management, so you
+should avoid modifying signal handlers in your applications.
 
-Optional modules L<EV> (4.0+), L<IO::Socket::IP> (0.16+) and
-L<IO::Socket::SSL> (1.75+) are supported transparently through
-L<Mojo::IOLoop>, and used if installed. Individual features can also be
-disabled with the MOJO_NO_IPV6 and MOJO_NO_TLS environment variables.
+For better scalability (epoll, kqueue) and to provide IPv6 as well as TLS
+support, the optional modules L<EV> (4.0+), L<IO::Socket::IP> (0.16+) and
+L<IO::Socket::SSL> (1.75+) will be used automatically by L<Mojo::IOLoop> if
+they are installed. Individual features can also be disabled with the
+MOJO_NO_IPV6 and MOJO_NO_TLS environment variables.
 
 See L<Mojolicious::Guides::Cookbook> for more.
 

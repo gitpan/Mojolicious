@@ -303,8 +303,9 @@ L<Mojo::IOLoop> is a very minimalistic event loop based on L<Mojo::Reactor>,
 it has been reduced to the absolute minimal feature set required to build
 solid and scalable non-blocking TCP clients and servers.
 
-Optional modules L<EV> (4.0+), L<IO::Socket::IP> (0.16+) and
-L<IO::Socket::SSL> (1.75+) are supported transparently, and used if installed.
+For better scalability (epoll, kqueue) and to provide IPv6 as well as TLS
+support, the optional modules L<EV> (4.0+), L<IO::Socket::IP> (0.16+) and
+L<IO::Socket::SSL> (1.75+) will be used automatically if they are installed.
 Individual features can also be disabled with the MOJO_NO_IPV6 and MOJO_NO_TLS
 environment variables.
 
@@ -448,6 +449,7 @@ event, and multiple ones as a chain of steps.
       $end->();
     });
   }
+  $delay->wait unless Mojo::IOLoop->is_running;
 
   # Sequentialize multiple events
   my $delay = Mojo::IOLoop->delay(
@@ -470,8 +472,6 @@ event, and multiple ones as a chain of steps.
     # Third step (the end)
     sub { say 'And done after 5 seconds total.' }
   );
-
-  # Wait for events if necessary
   $delay->wait unless Mojo::IOLoop->is_running;
 
 =head2 generate_port

@@ -268,6 +268,7 @@ t/mojolicious/json_config_mode_lite_app.json
 t/mojolicious/json_config_mode_lite_app.t
 t/mojolicious/json_config_mode_lite_app.testing.json
 t/mojolicious/layouted_lite_app.t
+t/mojolicious/lib/AroundPlugin.pm
 t/mojolicious/lib/EmbeddedTestApp.pm
 t/mojolicious/lib/MojoliciousConfigTest.pm
 t/mojolicious/lib/MojoliciousTest.pm

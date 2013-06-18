@@ -114,7 +114,7 @@ surrounding text.
 The colon prefix is optional for generic placeholders that are surrounded by
 parentheses.
 
-  /sebastian/hello -> /(name)/hello -> {name => 'sebastian'}
+  /i♥mojolicious -> /(one)♥(two) -> {one => 'i', two => 'mojolicious'}
 
 =head2 Relaxed placeholders
 
@@ -528,6 +528,11 @@ additional information.
 
   1;
 
+The connection gets established when you respond to the WebSocket handshake
+request with a C<101> response status, which happens automatically if you
+subscribe to an event with L<Mojolicious::Controller/"on"> or send a message
+with L<Mojolicious::Controller/"send"> right away.
+
 =head2 Bridges
 
 Bridge routes can be used to share code with multiple nested routes, because
@@ -650,6 +655,15 @@ Same for monitoring tasks.
     my $self = shift;
     return unless my $e = $self->stash('exception');
     $self->ua->post('https://example.com/bugs' => form => {exception => $e});
+  });
+
+You can even extend much of the core functionality.
+
+  # Make controller object available to actions as $_
+  $self->hook(around_action => sub {
+    my ($next, $c, $action, $last) = @_;
+    local $_ = $c;
+    return $next->();
   });
 
 For a full list of available hooks see L<Mojolicious/"hook">.

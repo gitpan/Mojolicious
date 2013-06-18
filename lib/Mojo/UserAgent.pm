@@ -494,15 +494,14 @@ Mojo::UserAgent - Non-blocking I/O HTTP and WebSocket user agent
   }
 
   # Quick JSON API request with Basic authentication
-  say $ua->get('https://sri:s3cret@search.twitter.com/search.json?q=perl')
-    ->res->json('/results/0/text');
+  say $ua->get('https://sri:s3cret@example.com/search.json?q=perl')
+    ->res->json('/results/0/title');
 
   # Extract data from HTML and XML resources
-  say $ua->get('mojolicio.us')->res->dom->html->head->title->text;
+  say $ua->get('www.perl.org')->res->dom->html->head->title->text;
 
   # Scrape the latest headlines from a news site
-  say $ua->max_redirects(5)->get('www.reddit.com/r/perl/')
-    ->res->dom('p.title > a.title')->pluck('text')->shuffle;
+  say $ua->get('perlnews.org')->res->dom('h2 > a')->pluck('text')->shuffle;
 
   # IPv6 PUT request with content
   my $tx
@@ -514,7 +513,7 @@ Mojo::UserAgent - Non-blocking I/O HTTP and WebSocket user agent
 
   # TLS certificate authentication and JSON POST
   my $tx = $ua->cert('tls.crt')->key('tls.key')
-    ->post('https://mojolicio.us' => json => {top => 'secret'});
+    ->post('https://example.com' => json => {top => 'secret'});
 
   # Blocking parallel requests (does not work inside a running event loop)
   my $delay = Mojo::IOLoop->delay;
@@ -557,14 +556,15 @@ Mojo::UserAgent - Non-blocking I/O HTTP and WebSocket user agent
 =head1 DESCRIPTION
 
 L<Mojo::UserAgent> is a full featured non-blocking I/O HTTP and WebSocket user
-agent, with C<IPv6>, C<TLS>, C<SNI>, C<IDNA>, C<Comet> (long polling),
-C<keep-alive>, connection pooling, timeout, cookie, multipart, proxy, C<gzip>
-compression and multiple event loop support.
+agent, with IPv6, TLS, SNI, IDNA, Comet (long polling), keep-alive, connection
+pooling, timeout, cookie, multipart, proxy, gzip compression and multiple
+event loop support.
 
-Optional modules L<EV> (4.0+), L<IO::Socket::IP> (0.16+) and
-L<IO::Socket::SSL> (1.75+) are supported transparently through
-L<Mojo::IOLoop>, and used if installed. Individual features can also be
-disabled with the MOJO_NO_IPV6 and MOJO_NO_TLS environment variables.
+For better scalability (epoll, kqueue) and to provide IPv6 as well as TLS
+support, the optional modules L<EV> (4.0+), L<IO::Socket::IP> (0.16+) and
+L<IO::Socket::SSL> (1.75+) will be used automatically by L<Mojo::IOLoop> if
+they are installed. Individual features can also be disabled with the
+MOJO_NO_IPV6 and MOJO_NO_TLS environment variables.
 
 See L<Mojolicious::Guides::Cookbook> for more.
 
