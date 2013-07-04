@@ -11,7 +11,7 @@ use Mojo::Util qw(decode encode);
 use Scalar::Util 'weaken';
 
 has description => "Perform HTTP request.\n";
-has usage       => <<"EOF";
+has usage       => <<EOF;
 usage: $0 get [OPTIONS] URL [SELECTOR|JSON-POINTER] [COMMANDS]
 
   mojo get /
@@ -147,6 +147,8 @@ sub _select {
 }
 
 1;
+
+=encoding utf8
 
 =head1 NAME
 

@@ -90,6 +90,8 @@ sub _url_with {
 
 1;
 
+=encoding utf8
+
 =head1 NAME
 
 Mojolicious::Plugin::DefaultHelpers - Default helpers plugin
@@ -218,7 +220,7 @@ Alias for L<Mojolicious::Controller/"session">.
 
 Alias for L<Mojolicious::Controller/"stash">.
 
-  %= stash 'name' // 'Somebody'
+  %= stash('name') // 'Somebody'
 
 =head2 title
 

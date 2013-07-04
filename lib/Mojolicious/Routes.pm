@@ -68,8 +68,8 @@ sub hide { push @{shift->hidden}, @_ }
 
 sub is_hidden {
   my ($self, $method) = @_;
-  my $hiding = $self->{hiding} ||= {map { $_ => 1 } @{$self->hidden}};
-  return !!($hiding->{$method} || index($method, '_') == 0);
+  my $h = $self->{hiding} ||= {map { $_ => 1 } @{$self->hidden}};
+  return !!($h->{$method} || index($method, '_') == 0 || $method !~ /[a-z]/);
 }
 
 sub lookup {
@@ -220,6 +220,8 @@ sub _walk {
 }
 
 1;
+
+=encoding utf8
 
 =head1 NAME
 

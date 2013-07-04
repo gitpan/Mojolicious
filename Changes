@@ -1,4 +1,11 @@
 
+4.17  2013-07-04
+  - Updated jQuery to version 2.0.3.
+  - Improved Mojo::IOLoop::Server to use Perfect Forward Secrecy for TLS.
+  - Fixed Mojo::Transaction::WebSocket to generate RFC 6455 compliant
+    Sec-WebSocket-Key headers. (josh)
+  - Fixed bug where not all uppercase methods were hidden from the router.
+
 4.16  2013-06-19
   - Improved Perl 5.10.x and 5.12.x compatibility. (trinitum)
 
@@ -1657,7 +1664,7 @@
     Mojolicious::Plugin::PODRenderer.
 
 1.79  2011-08-17
-  - Added support for upper case relative plugin names. (lammel)
+  - Added support for uppercase relative plugin names. (lammel)
 
 1.78  2011-08-16
   - Added EXPERIMENTAL modules Mojolicious::Command::Cpanify and
@@ -2665,7 +2672,7 @@
     decoding.
   - Fixed format detection bug. (marcus)
   - Fixed named url_for. (marcus)
-  - Fixed decamelize of multiple upper case characters.
+  - Fixed decamelize of multiple uppercase characters.
   - Fixed plugins and commands to work with multiple namespaces and
     reloading.
   - Fixed multiple process calls in Mojo::Client.
