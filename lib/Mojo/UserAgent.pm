@@ -196,19 +196,19 @@ sub _connect_proxy {
     $new => sub {
       my ($self, $tx) = @_;
 
-      # CONNECT failed
-      unless (($tx->res->code // '') eq '200') {
+      # CONNECT failed (connection needs to be kept alive)
+      unless ($tx->keep_alive && $tx->res->is_status_class(200)) {
         $old->req->error('Proxy connection failed');
         return $self->_finish($old, $cb);
       }
 
       # Prevent proxy reassignment and start real transaction
       $old->req->proxy(0);
-      return $self->_start($old->connection($tx->connection), $cb)
+      my $id = $tx->connection;
+      return $self->_start($old->connection($id), $cb)
         unless $tx->req->url->protocol eq 'https';
 
       # TLS upgrade
-      return unless my $id = $tx->connection;
       my $loop   = $self->_loop;
       my $handle = $loop->stream($id)->steal_handle;
       my $c      = delete $self->{connections}{$id};
@@ -354,14 +354,14 @@ sub _remove {
 
   # Close connection
   my $tx = (delete($self->{connections}{$id}) || {})->{tx};
-  unless (!$close && $tx && $tx->keep_alive && !$tx->error) {
+  if ($close || !$tx || !$tx->keep_alive || $tx->error) {
     $self->_cache($id);
     return $self->_loop->remove($id);
   }
 
-  # Keep connection alive
+  # Keep connection alive (CONNECT requests get upgraded)
   $self->_cache(join(':', $self->transactor->endpoint($tx)), $id)
-    unless uc $tx->req->method eq 'CONNECT' && ($tx->res->code // '') eq '200';
+    unless uc $tx->req->method eq 'CONNECT';
 }
 
 sub _redirect {
