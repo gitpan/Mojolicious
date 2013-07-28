@@ -158,20 +158,9 @@ sub remove { shift->replace('') }
 
 sub replace {
   my ($self, $new) = @_;
-
   my $tree = $self->tree;
-  if   ($tree->[0] eq 'root') { return $self->xml(undef)->parse($new) }
-  else                        { $new = $self->_parse("$new") }
-
-  my $parent = $tree->[3];
-  my $i = $parent->[0] eq 'root' ? 1 : 4;
-  for my $e (@$parent[$i .. $#$parent]) {
-    last if $e == $tree;
-    $i++;
-  }
-  splice @$parent, $i, 1, @{_parent($new, $parent)};
-
-  return $self;
+  return $self->xml(undef)->parse($new) if $tree->[0] eq 'root';
+  return $self->_replace($tree, $self->_parse("$new"));
 }
 
 sub replace_content {
@@ -192,6 +181,13 @@ sub root {
   }
 
   return $self->new->tree($root)->xml($self->xml);
+}
+
+sub strip {
+  my $self = shift;
+  my $tree = $self->tree;
+  return $self if $tree->[0] eq 'root';
+  return $self->_replace($tree, ['root', @$tree[4 .. $#$tree]]);
 }
 
 sub text {
@@ -299,6 +295,20 @@ sub _parent {
 
 sub _parse { Mojo::DOM::HTML->new(xml => shift->xml)->parse(shift)->tree }
 
+sub _replace {
+  my ($self, $tree, $new) = @_;
+
+  my $parent = $tree->[3];
+  my $i = $parent->[0] eq 'root' ? 1 : 4;
+  for my $e (@$parent[$i .. $#$parent]) {
+    last if $e == $tree;
+    $i++;
+  }
+  splice @$parent, $i, 1, @{_parent($new, $parent)};
+
+  return $self->parent;
+}
+
 sub _sibling {
   my ($self, $next) = @_;
 
@@ -394,6 +404,7 @@ Mojo::DOM - Minimalistic HTML/XML DOM parser with CSS selectors
 
   # Modify
   $dom->div->p->[1]->append('<p id="c">C</p>');
+  $dom->find(':not(p)')->pluck('strip');
 
   # Render
   say "$dom";
@@ -596,22 +607,22 @@ there are no more siblings.
 
 =head2 remove
 
-  my $old = $dom->remove;
+  my $parent = $dom->remove;
 
-Remove element and return it as a L<Mojo::DOM> object.
+Remove element and return L<Mojo::DOM> object for parent of element.
 
   # "<div></div>"
-  $dom->parse('<div><h1>A</h1></div>')->at('h1')->remove->root;
+  $dom->parse('<div><h1>A</h1></div>')->at('h1')->remove;
 
 =head2 replace
 
-  my $old = $dom->replace('<div>test</div>');
+  my $parent = $dom->replace('<div>test</div>');
 
-Replace element with HTML/XML and return the replaced element as a
-L<Mojo::DOM> object.
+Replace element with HTML/XML and return L<Mojo::DOM> object for parent of
+element.
 
   # "<div><h2>B</h2></div>"
-  $dom->parse('<div><h1>A</h1></div>')->at('h1')->replace('<h2>B</h2>')->root;
+  $dom->parse('<div><h1>A</h1></div>')->at('h1')->replace('<h2>B</h2>');
 
   # "<div></div>"
   $dom->parse('<div><h1>A</h1></div>')->at('h1')->replace('')->root;
@@ -633,6 +644,16 @@ Replace element content with HTML/XML.
   my $root = $dom->root;
 
 Return L<Mojo::DOM> object for root node.
+
+=head2 strip
+
+  my $parent = $dom->strip;
+
+Remove element while preserving its content and return L<Mojo::DOM> object for
+parent of element.
+
+  # "<div>A</div>"
+  $dom->parse('<div><h1>A</h1></div>')->at('h1')->strip;
 
 =head2 text
 
