@@ -46,7 +46,7 @@ sub append { shift->_add(1, @_) }
 sub append_content {
   my ($self, $new) = @_;
   my $tree = $self->tree;
-  push @$tree, @{_parent($self->_parse("$new"), $tree)};
+  push @$tree, _link($self->_parse("$new"), $tree);
   return $self;
 }
 
@@ -79,9 +79,8 @@ sub children {
   my ($self, $type) = @_;
 
   my @children;
-  my $xml  = $self->xml;
-  my $tree = $self->tree;
-  for my $e (@$tree[($tree->[0] eq 'root' ? 1 : 4) .. $#$tree]) {
+  my $xml = $self->xml;
+  for my $e (@{_elements($self->tree)}) {
 
     # Make sure child is the right type
     next if $e->[0] ne 'tag' || (defined $type && $e->[1] ne $type);
@@ -93,13 +92,8 @@ sub children {
 
 sub content_xml {
   my $self = shift;
-
-  # Render children individually
-  my $tree = $self->tree;
   my $xml  = $self->xml;
-  return join '',
-    map { Mojo::DOM::HTML->new(tree => $_, xml => $xml)->render }
-    @$tree[($tree->[0] eq 'root' ? 1 : 4) .. $#$tree];
+  return join '', map { _render($_, $xml) } @{_elements($self->tree)};
 }
 
 sub find {
@@ -113,8 +107,9 @@ sub find {
 sub namespace {
   my $self = shift;
 
-  # Extract namespace prefix and search parents
   return '' if (my $current = $self->tree)->[0] eq 'root';
+
+  # Extract namespace prefix and search parents
   my $ns = $current->[1] =~ /^(.*?):/ ? "xmlns:$1" : undef;
   while ($current->[0] ne 'root') {
 
@@ -125,7 +120,6 @@ sub namespace {
     # Namespace attribute
     elsif (defined $attrs->{xmlns}) { return $attrs->{xmlns} }
 
-    # Parent
     $current = $current->[3];
   }
 
@@ -147,8 +141,7 @@ sub prepend { shift->_add(0, @_) }
 sub prepend_content {
   my ($self, $new) = @_;
   my $tree = $self->tree;
-  splice @$tree, $tree->[0] eq 'root' ? 1 : 4, 0,
-    @{_parent($self->_parse("$new"), $tree)};
+  splice @$tree, _offset($tree), 0, _link($self->_parse("$new"), $tree);
   return $self;
 }
 
@@ -166,8 +159,7 @@ sub replace {
 sub replace_content {
   my ($self, $new) = @_;
   my $tree = $self->tree;
-  splice @$tree, $tree->[0] eq 'root' ? 1 : 4, $#$tree,
-    @{_parent($self->_parse("$new"), $tree)};
+  splice @$tree, _offset($tree), $#$tree, _link($self->_parse("$new"), $tree);
   return $self;
 }
 
@@ -187,7 +179,7 @@ sub strip {
   my $self = shift;
   my $tree = $self->tree;
   return $self if $tree->[0] eq 'root';
-  return $self->_replace($tree, ['root', @$tree[4 .. $#$tree]]);
+  return $self->_replace($tree, ['root', @{_elements($tree)}]);
 }
 
 sub text {
@@ -198,8 +190,8 @@ sub text {
 sub text_after {
   my ($self, $trim) = @_;
 
-  # Find following text elements
   return '' if (my $tree = $self->tree)->[0] eq 'root';
+
   my (@elements, $started);
   for my $e (@{_elements($tree->[3])}) {
     ++$started and next if $e eq $tree;
@@ -214,8 +206,8 @@ sub text_after {
 sub text_before {
   my ($self, $trim) = @_;
 
-  # Find preceding text elements
   return '' if (my $tree = $self->tree)->[0] eq 'root';
+
   my @elements;
   for my $e (@{_elements($tree->[3])}) {
     last if $e eq $tree;
@@ -232,14 +224,9 @@ sub tree { shift->_html(tree => @_) }
 
 sub type {
   my ($self, $type) = @_;
-
-  # Get
   return '' if (my $tree = $self->tree)->[0] eq 'root';
   return $tree->[1] unless $type;
-
-  # Set
   $tree->[1] = $type;
-
   return $self;
 }
 
@@ -248,26 +235,18 @@ sub xml { shift->_html(xml => @_) }
 sub _add {
   my ($self, $offset, $new) = @_;
 
-  # Not a tag
   return $self if (my $tree = $self->tree)->[0] eq 'root';
 
-  # Find parent
   my $parent = $tree->[3];
-  my $i = $parent->[0] eq 'root' ? 1 : 4;
-  for my $e (@$parent[$i .. $#$parent]) {
-    last if $e == $tree;
-    $i++;
-  }
-
-  # Add children
-  splice @$parent, $i + $offset, 0, @{_parent($self->_parse("$new"), $parent)};
+  splice @$parent, _parent($parent, $tree) + $offset, 0,
+    _link($self->_parse("$new"), $parent);
 
   return $self;
 }
 
 sub _elements {
   return [] unless my $e = shift;
-  return [@$e[($e->[0] eq 'root' ? 1 : 4) .. $#$e]];
+  return [@$e[_offset($e) .. $#$e]];
 }
 
 sub _html {
@@ -277,35 +256,44 @@ sub _html {
   return $self;
 }
 
-sub _parent {
+sub _link {
   my ($children, $parent) = @_;
 
   # Link parent to children
   my @new;
   for my $e (@$children[1 .. $#$children]) {
-    if ($e->[0] eq 'tag') {
-      $e->[3] = $parent;
-      weaken $e->[3];
-    }
     push @new, $e;
+    next unless $e->[0] eq 'tag';
+    $e->[3] = $parent;
+    weaken $e->[3];
   }
 
-  return \@new;
+  return @new;
+}
+
+sub _offset { $_[0][0] eq 'root' ? 1 : 4 }
+
+sub _parent {
+  my ($parent, $child) = @_;
+
+  # Find parent offset for child
+  my $i = _offset($parent);
+  for my $e (@$parent[$i .. $#$parent]) {
+    last if $e == $child;
+    $i++;
+  }
+
+  return $i;
 }
 
 sub _parse { Mojo::DOM::HTML->new(xml => shift->xml)->parse(shift)->tree }
 
+sub _render { Mojo::DOM::HTML->new(tree => shift, xml => shift)->render }
+
 sub _replace {
   my ($self, $tree, $new) = @_;
-
   my $parent = $tree->[3];
-  my $i = $parent->[0] eq 'root' ? 1 : 4;
-  for my $e (@$parent[$i .. $#$parent]) {
-    last if $e == $tree;
-    $i++;
-  }
-  splice @$parent, $i, 1, @{_parent($new, $parent)};
-
+  splice @$parent, _parent($parent, $tree), 1, _link($new, $parent);
   return $self->parent;
 }
 
@@ -389,6 +377,7 @@ Mojo::DOM - Minimalistic HTML/XML DOM parser with CSS selectors
   # Find
   say $dom->at('#b')->text;
   say $dom->find('p')->pluck('text');
+  say $dom->find('[id]')->pluck(attr => 'id');
 
   # Walk
   say $dom->div->p->[0]->text;
