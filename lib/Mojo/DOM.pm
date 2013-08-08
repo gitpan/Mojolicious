@@ -38,6 +38,8 @@ sub new {
 
 sub all_text { shift->_content(1, @_) }
 
+sub ancestors { $_[0]->_collection(_ancestors($_[0]->tree)) }
+
 sub append { shift->_add(1, @_) }
 
 sub append_content {
@@ -94,11 +96,9 @@ sub content_xml {
 }
 
 sub find {
-  my ($self, $selector) = @_;
-  my $xml = $self->xml;
-  my $results = Mojo::DOM::CSS->new(tree => $self->tree)->select($selector);
-  return Mojo::Collection->new(map { $self->new->tree($_)->xml($xml) }
-      @$results);
+  my $self = shift;
+  my $results = Mojo::DOM::CSS->new(tree => $self->tree)->select(@_);
+  return $self->_collection(@$results);
 }
 
 sub namespace {
@@ -162,14 +162,8 @@ sub replace_content {
 
 sub root {
   my $self = shift;
-
-  my $root = $self->tree;
-  while ($root->[0] eq 'tag') {
-    last unless my $parent = $root->[3];
-    $root = $parent;
-  }
-
-  return $self->new->tree($root)->xml($self->xml);
+  return $self unless my $tree = _ancestors($self->tree, 1);
+  return $self->new->tree($tree)->xml($self->xml);
 }
 
 sub strip {
@@ -236,6 +230,20 @@ sub _add {
     _link($self->_parse("$new"), $parent);
 
   return $self;
+}
+
+sub _ancestors {
+  my ($tree, $root) = @_;
+  my @ancestors;
+  push @ancestors, $tree while ($tree->[0] eq 'tag') && ($tree = $tree->[3]);
+  return $root ? $ancestors[-1] : @ancestors[0 .. $#ancestors - 1];
+}
+
+sub _collection {
+  my $self = shift;
+  my $xml  = $self->xml;
+  return Mojo::Collection->new(@_)
+    ->map(sub { $self->new->tree($_)->xml($xml) });
 }
 
 sub _content {
@@ -453,6 +461,16 @@ enabled by default.
 
   # "foo\nbarbaz\n"
   $dom->parse("<div>foo\n<p>bar</p>baz\n</div>")->div->all_text(0);
+
+=head2 ancestors
+
+  my $collection = $dom->ancestors;
+
+Return a L<Mojo::Collection> object containing the ancestors of this element
+as L<Mojo::DOM> objects, similar to C<children>.
+
+  # List types of ancestor elements
+  say $dom->ancestors->pluck('type');
 
 =head2 append
 

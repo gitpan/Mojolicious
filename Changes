@@ -1,4 +1,8 @@
 
+4.24  2013-08-08
+  - Added ancestors method to Mojo::DOM.
+  - Fixed bug where Mojo::IOLoop::Stream timeout was not always available.
+
 4.23  2013-08-01
   - Added redirects method to Mojo::Transaction::HTTP.
 

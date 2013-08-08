@@ -132,6 +132,9 @@ is $dom->next,     undef, 'no siblings';
 is $dom->previous, undef, 'no siblings';
 is $dom->at('foo > a')->next,          undef, 'no next sibling';
 is $dom->at('foo > simple')->previous, undef, 'no previous sibling';
+is_deeply [$dom->at('simple')->ancestors->pluck('type')->each], ['foo'],
+  'right results';
+ok !$dom->at('simple')->ancestors->first->xml, 'XML mode not active';
 
 # Class and ID
 $dom = Mojo::DOM->new->parse('<div id="id" class="class">a</div>');
@@ -172,6 +175,10 @@ $dom->find('p')->each(sub { push @p, $_->attr('id') });
 is_deeply \@p, [qw(foo bar)], 'found all p elements';
 my $ids = [qw(container header logo buttons buttons content)];
 is_deeply \@div, $ids, 'found all div elements';
+is_deeply [$dom->at('p')->ancestors->pluck('type')->each],
+  [qw(div div div body html)], 'right results';
+is_deeply [$dom->at('html')->ancestors->each], [], 'no results';
+is_deeply [$dom->ancestors->each],             [], 'no results';
 
 # Script tag
 $dom = Mojo::DOM->new->parse(<<EOF);
@@ -411,6 +418,8 @@ $dom = Mojo::DOM->new->parse(<<EOF);
 EOF
 ok $dom->xml, 'XML mode detected';
 is $dom->find('rss')->[0]->attr('version'), '2.0', 'right version';
+is_deeply [$dom->at('title')->ancestors->pluck('type')->each],
+  [qw(channel rss)], 'right results';
 is $dom->at('extension')->attr('foo:id'), 'works', 'right id';
 like $dom->at('#works')->text,       qr/\[awesome\]\]/, 'right text';
 like $dom->at('[id="works"]')->text, qr/\[awesome\]\]/, 'right text';
@@ -424,6 +433,7 @@ ok $dom->at('rss')->xml,             'XML mode active';
 ok $dom->at('extension')->parent->xml, 'XML mode active';
 ok $dom->at('extension')->root->xml,   'XML mode active';
 ok $dom->children('rss')->first->xml,  'XML mode active';
+ok $dom->at('title')->ancestors->first->xml, 'XML mode active';
 
 # Namespace
 $dom = Mojo::DOM->new->parse(<<EOF);
@@ -1803,7 +1813,7 @@ $dom->find('b')->each(
 );
 is_deeply \@results, [qw(baz yada)], 'right results';
 
-# Autoload children in XML mode
+# AUTOLOAD children in XML mode
 $dom = Mojo::DOM->new->xml(1)->parse(<<EOF);
 <a id="one">
   <B class="two" test>
@@ -1820,7 +1830,7 @@ is $dom->a->B->c->[1]->text, 'baz', 'right text';
 is $dom->a->B->c->[2], undef, 'no result';
 is $dom->a->B->c->size, 2, 'right number of elements';
 
-# Autoload children in HTML mode
+# AUTOLOAD children in HTML mode
 $dom = Mojo::DOM->new(<<EOF);
 <a id="one">
   <B class="two" test>
@@ -1836,6 +1846,13 @@ is $dom->a->b->c->[0]->text, 'bar', 'right text';
 is $dom->a->b->c->[1]->text, 'baz', 'right text';
 is $dom->a->b->c->[2], undef, 'no result';
 is $dom->a->b->c->size, 2, 'right number of elements';
+
+# Missing method and function (AUTOLOAD)
+eval { Mojo::DOM->new->missing };
+like $@, qr/^Can't locate object method "missing" via package "Mojo::DOM"/,
+  'right error';
+eval { Mojo::DOM::missing() };
+like $@, qr/^Undefined subroutine &Mojo::DOM::missing called/, 'right error';
 
 # Direct hash access to attributes in XML mode
 $dom = Mojo::DOM->new->xml(1)->parse(<<EOF);
