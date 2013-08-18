@@ -7,7 +7,7 @@ build_requires:
 configure_requires:
   ExtUtils::MakeMaker: 0
 dynamic_config: 1
-generated_by: 'ExtUtils::MakeMaker version 6.72, CPAN::Meta::Converter version 2.132140'
+generated_by: 'ExtUtils::MakeMaker version 6.68, CPAN::Meta::Converter version 2.112621'
 license: artistic_2
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -21,9 +21,9 @@ no_index:
 requires:
   perl: 5.010001
 resources:
-  MailingList: http://groups.google.com/group/mojolicious
   bugtracker: http://github.com/kraih/mojo/issues
   homepage: http://mojolicio.us
   license: http://www.opensource.org/licenses/artistic-license-2.0
   repository: http://github.com/kraih/mojo
-version: 4.25
+  x_MailingList: http://groups.google.com/group/mojolicious
+version: 4.26
