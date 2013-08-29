@@ -24,6 +24,28 @@ sub auto_render {
   $c->render_maybe or $stash->{'mojo.routed'} or $c->render_not_found;
 }
 
+sub continue {
+  my ($self, $c) = @_;
+
+  my $match   = $c->match;
+  my $stack   = $match->stack;
+  my $current = $match->current;
+  return 1 unless my $field = $stack->[$current];
+  my $last = !$stack->[++$current];
+
+  # Merge captures into stash
+  my @keys  = keys %$field;
+  my $stash = $c->stash;
+  @{$stash}{@keys} = @{$stash->{'mojo.captures'}}{@keys} = values %$field;
+
+  my $continue;
+  if (my $cb = $field->{cb}) { $continue = $self->_callback($c, $cb, $last) }
+  else { $continue = $self->_controller($c, $field, $last) }
+  $match->current($current);
+
+  return $last || $continue ? $self->continue($c) : undef;
+}
+
 sub dispatch {
   my ($self, $c) = @_;
 
@@ -59,8 +81,8 @@ sub dispatch {
     }
   }
 
-  return undef unless $self->_walk($c);
-  $self->auto_render($c);
+  return undef unless @{$c->match->stack};
+  $self->auto_render($c) if $self->continue($c);
   return 1;
 }
 
@@ -93,11 +115,11 @@ sub _add {
 }
 
 sub _callback {
-  my ($self, $c, $field, $last) = @_;
-  $c->stash->{'mojo.routed'}++;
+  my ($self, $c, $cb, $last) = @_;
+  $c->stash->{'mojo.routed'}++ if $last;
   my $app = $c->app;
   $app->log->debug('Routing to a callback.');
-  return _action($app, $c, $field->{cb}, $last);
+  return _action($app, $c, $cb, $last);
 }
 
 sub _class {
@@ -191,32 +213,6 @@ sub _load {
   # Check base classes
   return 0 unless first { $app->isa($_) } @{$self->base_classes};
   return ++$self->{loaded}{$app};
-}
-
-sub _walk {
-  my ($self, $c) = @_;
-
-  my $stack = $c->match->stack;
-  return undef unless my $nested = @$stack;
-  my $stash = $c->stash;
-  $stash->{'mojo.captures'} ||= {};
-  for my $field (@$stack) {
-    $nested--;
-
-    # Merge captures into stash
-    my @keys = keys %$field;
-    @{$stash}{@keys} = @{$stash->{'mojo.captures'}}{@keys} = values %$field;
-
-    my $continue
-      = $field->{cb}
-      ? $self->_callback($c, $field, !$nested)
-      : $self->_controller($c, $field, !$nested);
-
-    # Break the chain
-    return undef if $nested && !$continue;
-  }
-
-  return 1;
 }
 
 1;
@@ -324,6 +320,12 @@ Add a new shortcut.
   $r->auto_render(Mojolicious::Controller->new);
 
 Automatic rendering.
+
+=head2 continue
+
+  $r->continue(Mojolicious::Controller->new);
+
+Continue dispatch chain.
 
 =head2 dispatch
 
