@@ -1,4 +1,8 @@
 
+4.29  2013-08-31
+  - Fixed automatic rendering to work after non-blocking operations have been
+    performed in bridges.
+
 4.28  2013-08-29
   - Added support for non-blocking operations in bridges to
     Mojolicious::Routes.

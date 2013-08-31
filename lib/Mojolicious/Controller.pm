@@ -520,7 +520,7 @@ implements the following new ones.
 
 =head2 continue
 
-  my $success = $c->continue;
+  $c->continue;
 
 Continue dispatch chain.
 
@@ -779,7 +779,6 @@ is set to the value C<XMLHttpRequest>.
   $c = $c->send({text   => $bytes});
   $c = $c->send({json   => {test => [1, 2, 3]}});
   $c = $c->send([$fin, $rsv1, $rsv2, $rsv3, $op, $bytes]);
-  $c = $c->send(Mojo::ByteStream->new($chars));
   $c = $c->send($chars);
   $c = $c->send($chars => sub {...});
 
