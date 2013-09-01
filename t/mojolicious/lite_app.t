@@ -165,11 +165,10 @@ get '/stream' => sub {
   $self->rendered;
 };
 
-my $finished;
 get '/finished' => sub {
   my $self = shift;
-  $self->on(finish => sub { $finished += 2 });
-  $finished = 1;
+  $self->on(finish => sub { shift->stash->{finished} *= 2 });
+  $self->stash->{finished} = 1;
   $self->render(text => 'so far so good!');
 };
 
@@ -444,6 +443,11 @@ my $t = Test::Mojo->new;
 is $t->app->test_helper2, 'Mojolicious::Controller', 'right class';
 is $t->app, app->commands->app, 'applications are equal';
 is $t->app->moniker, 'lite_app', 'right moniker';
+my $log = '';
+my $cb = $t->app->log->on(message => sub { $log .= pop });
+is $t->app->secret, $t->app->moniker, 'secret defaults to moniker';
+like $log, qr/Your secret passphrase needs to be changed!!!/, 'right message';
+$t->app->log->unsubscribe(message => $cb);
 
 # Unicode snowman
 $t->get_ok('/☃')->status_is(200)
@@ -661,9 +665,11 @@ $t->get_ok('/maybe/ajax' => {'X-Requested-With' => 'XMLHttpRequest'})
   ->content_is('is ajax');
 
 # With finish event
+my $stash;
+$t->app->plugins->once(before_dispatch => sub { $stash = shift->stash });
 $t->get_ok('/finished')->status_is(200)
   ->header_is(Server => 'Mojolicious (Perl)')->content_is('so far so good!');
-is $finished, 3, 'finished';
+is $stash->{finished}, 2, 'finish event has been emitted once';
 
 # IRI
 $t->get_ok('/привет/мир')->status_is(200)
@@ -728,8 +734,13 @@ $t->get_ok('/source')->status_is(200)->header_isnt('X-Missing' => 1)
   ->content_like(qr!get_ok\('/source!);
 
 # File does not exist
+$log = '';
+$cb = $t->app->log->on(message => sub { $log .= pop });
 $t->get_ok('/source?fail=1')->status_is(404)->header_is('X-Missing' => 1)
   ->content_is("Oops!\n");
+like $log, qr/File "does_not_exist.txt" not found, public directory missing\?/,
+  'right message';
+$t->app->log->unsubscribe(message => $cb);
 
 # With body and max message size
 {
