@@ -1,4 +1,7 @@
 
+4.32  2013-09-06
+  - Added error event to Mojo::IOLoop::Delay.
+
 4.31  2013-09-04
   - Deprecated mode specific methods in application class.
       sub production_mode {...}
@@ -2439,7 +2442,7 @@
   - Added EXPERIMENTAL attribute partial to MojoX::Routes.
   - Added EXPERIMENTAL CSS3 selector tests to Test::Mojo.
   - Added EXPERIMENTAL method test_server to Mojo::Client.
-  - Added EXPERIMENTAL oneliner module ojo.
+  - Added EXPERIMENTAL one-liner module ojo.
   - Added EXPERIMENTAL support for static files in the DATA section of
     Mojolicious applications.
   - Added EXPERIMENTAL Bonjour support.
