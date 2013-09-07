@@ -1,4 +1,7 @@
 
+4.33  2013-09-07
+  - Fixed portability bug in Mojo::IOLoop::Delay.
+
 4.32  2013-09-06
   - Added error event to Mojo::IOLoop::Delay.
 
