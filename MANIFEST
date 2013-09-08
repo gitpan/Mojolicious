@@ -171,7 +171,6 @@ README.md
 script/hypnotoad
 script/mojo
 script/morbo
-t/mojo/app.t
 t/mojo/asset.t
 t/mojo/base.t
 t/mojo/bytestream.t
@@ -190,6 +189,7 @@ t/mojo/collection.t
 t/mojo/content.t
 t/mojo/cookie.t
 t/mojo/cookiejar.t
+t/mojo/daemon.t
 t/mojo/date.t
 t/mojo/delay.t
 t/mojo/dom.t
