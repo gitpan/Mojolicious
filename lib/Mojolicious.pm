@@ -4,7 +4,7 @@ use Mojo::Base 'Mojo';
 # "Fry: Shut up and take my money!"
 use Carp 'croak';
 use Mojo::Exception;
-use Mojo::Util 'decamelize';
+use Mojo::Util qw(decamelize deprecated);
 use Mojolicious::Commands;
 use Mojolicious::Controller;
 use Mojolicious::Plugins;
@@ -41,7 +41,7 @@ has static   => sub { Mojolicious::Static->new };
 has types    => sub { Mojolicious::Types->new };
 
 our $CODENAME = 'Top Hat';
-our $VERSION  = '4.34';
+our $VERSION  = '4.35';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -90,7 +90,7 @@ sub new {
 
   # DEPRECATED in Top Hat!
   if (my $sub = $self->can("${mode}_mode")) {
-    warn qq{"sub ${mode}_mode {...}" in application class is DEPRECATED.\n};
+    deprecated qq{"sub ${mode}_mode {...}" in application class is DEPRECATED};
     $self->$sub(@_);
   }
 
@@ -166,7 +166,7 @@ sub handler {
 
   # Delayed response
   $self->log->debug('Nothing has been rendered, expecting delayed response.')
-    unless $stash->{'mojo.rendered'} || $tx->is_writing;
+    unless $tx->is_writing;
 }
 
 sub helper {

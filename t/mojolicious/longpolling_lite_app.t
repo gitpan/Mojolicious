@@ -173,17 +173,10 @@ get '/longpoll/nolength/delayed' => sub {
 get '/longpoll/static/delayed' => sub {
   my $self = shift;
   $self->on(finish => sub { shift->stash->{finished}++ });
-  Mojo::IOLoop->timer(0.25 => sub { $self->render_static('hello.txt') });
-};
-
-get '/longpoll/static/delayed_too' => sub {
-  my $self = shift;
-  $self->on(finish => sub { shift->stash->{finished}++ });
   $self->cookie(bar => 'baz');
   $self->session(foo => 'bar');
-  $self->render_later;
   Mojo::IOLoop->timer(0.25 => sub { $self->render_static('hello.txt') });
-} => 'delayed_too';
+};
 
 get '/longpoll/dynamic/delayed' => sub {
   my $self = shift;
@@ -216,7 +209,8 @@ get '/finish' => sub {
   my $self   = shift;
   my $stream = Mojo::IOLoop->stream($self->tx->connection);
   $self->on(finish => sub { shift->stash->{writing} = $stream->is_writing });
-  $self->render(text => 'Finish!');
+  $self->render_later;
+  Mojo::IOLoop->timer(0 => sub { $self->render(msg => 'Finish!') });
 };
 
 get '/too_long' => sub {
@@ -231,6 +225,8 @@ get '/too_long' => sub {
 my $t = Test::Mojo->new;
 
 # Stream without delay and finish
+my $log = '';
+my $cb = $t->app->log->on(message => sub { $log .= pop });
 my $stash;
 $t->app->plugins->once(before_dispatch => sub { $stash = shift->stash });
 $t->get_ok('/shortpoll')->status_is(200)
@@ -240,6 +236,9 @@ ok !$t->tx->kept_alive, 'connection was not kept alive';
 ok !$t->tx->keep_alive, 'connection will not be kept alive';
 is $stash->{finished}, 1, 'finish event has been emitted once';
 ok $stash->{destroyed}, 'controller has been destroyed';
+unlike $log, qr/Nothing has been rendered, expecting delayed response\./,
+  'right message';
+$t->app->log->unsubscribe(message => $cb);
 
 # Stream without delay and content length
 $stash = undef;
@@ -369,26 +368,12 @@ $t->get_ok('/longpoll/nolength/delayed')->status_is(200)
 is $stash->{finished}, 1, 'finish event has been emitted once';
 ok $stash->{destroyed}, 'controller has been destroyed';
 
-# Delayed static file (with log message)
-my $log = '';
-my $cb = $t->app->log->on(message => sub { $log .= pop });
-$stash = undef;
-$t->app->plugins->once(before_dispatch => sub { $stash = shift->stash });
-$t->get_ok('/longpoll/static/delayed')->status_is(200)
-  ->header_is(Server => 'Mojolicious (Perl)')->content_type_is('text/plain')
-  ->content_is("Hello Mojo from a static file!\n");
-is $stash->{finished}, 1, 'finish event has been emitted once';
-ok $stash->{destroyed}, 'controller has been destroyed';
-like $log, qr/Nothing has been rendered, expecting delayed response\./,
-  'right message';
-$t->app->log->unsubscribe(message => $cb);
-
-# Delayed static file with cookies and session (without log message)
+# Delayed static file with cookies and session
 $log   = '';
 $cb    = $t->app->log->on(message => sub { $log .= pop });
 $stash = undef;
 $t->app->plugins->once(before_dispatch => sub { $stash = shift->stash });
-$t->get_ok('/longpoll/static/delayed_too')->status_is(200)
+$t->get_ok('/longpoll/static/delayed')->status_is(200)
   ->header_is(Server => 'Mojolicious (Perl)')
   ->header_like('Set-Cookie' => qr/bar=baz/)
   ->header_like('Set-Cookie' => qr/mojolicious=/)
@@ -396,7 +381,7 @@ $t->get_ok('/longpoll/static/delayed_too')->status_is(200)
   ->content_is("Hello Mojo from a static file!\n");
 is $stash->{finished}, 1, 'finish event has been emitted once';
 ok $stash->{destroyed}, 'controller has been destroyed';
-unlike $log, qr/Nothing has been rendered, expecting delayed response\./,
+like $log, qr/Nothing has been rendered, expecting delayed response\./,
   'right message';
 $t->app->log->unsubscribe(message => $cb);
 
@@ -417,7 +402,7 @@ $t->get_ok('/stream')->status_is(200)
 is $stash->{subscribers}, 0, 'no leaking subscribers';
 ok $stash->{destroyed}, 'controller has been destroyed';
 
-# Finish event timing
+# Finish event timing and delayed rendering of template
 $stash = undef;
 $t->app->plugins->once(before_dispatch => sub { $stash = shift->stash });
 $t->get_ok('/finish')->status_is(200)
@@ -455,3 +440,7 @@ is $tx->error, 'Inactivity timeout', 'right error';
 is $buffer, 'how', 'right content';
 
 done_testing();
+
+__DATA__
+@@ finish.html.ep
+<%= $msg %>\
