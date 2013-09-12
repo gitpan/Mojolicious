@@ -114,7 +114,8 @@ lib/Mojolicious/public/mojo/logo-black.png
 lib/Mojolicious/public/mojo/logo-white.png
 lib/Mojolicious/public/mojo/noraptor.png
 lib/Mojolicious/public/mojo/notfound.png
-lib/Mojolicious/public/mojo/pinstripe.gif
+lib/Mojolicious/public/mojo/pinstripe-dark.png
+lib/Mojolicious/public/mojo/pinstripe-light.png
 lib/Mojolicious/public/mojo/prettify/lang-apollo.js
 lib/Mojolicious/public/mojo/prettify/lang-basic.js
 lib/Mojolicious/public/mojo/prettify/lang-clj.js
@@ -143,7 +144,8 @@ lib/Mojolicious/public/mojo/prettify/lang-vhdl.js
 lib/Mojolicious/public/mojo/prettify/lang-wiki.js
 lib/Mojolicious/public/mojo/prettify/lang-xq.js
 lib/Mojolicious/public/mojo/prettify/lang-yaml.js
-lib/Mojolicious/public/mojo/prettify/prettify-mojo.css
+lib/Mojolicious/public/mojo/prettify/prettify-mojo-dark.css
+lib/Mojolicious/public/mojo/prettify/prettify-mojo-light.css
 lib/Mojolicious/public/mojo/prettify/prettify.css
 lib/Mojolicious/public/mojo/prettify/prettify.js
 lib/Mojolicious/public/mojo/prettify/run_prettify.js
