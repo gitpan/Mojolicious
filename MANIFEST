@@ -149,6 +149,7 @@ lib/Mojolicious/public/mojo/prettify/prettify-mojo-light.css
 lib/Mojolicious/public/mojo/prettify/prettify.css
 lib/Mojolicious/public/mojo/prettify/prettify.js
 lib/Mojolicious/public/mojo/prettify/run_prettify.js
+lib/Mojolicious/public/mojo/stripes.png
 lib/Mojolicious/Renderer.pm
 lib/Mojolicious/Routes.pm
 lib/Mojolicious/Routes/Match.pm
