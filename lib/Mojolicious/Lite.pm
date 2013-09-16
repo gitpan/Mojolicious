@@ -216,13 +216,19 @@ full access to all HTTP features and information.
 
   use Mojolicious::Lite;
 
-  # Access request and response information
+  # Access request information
   get '/agent' => sub {
     my $self = shift;
     my $host = $self->req->url->to_abs->host;
     my $ua   = $self->req->headers->user_agent;
-    $self->res->headers->header('X-Bender' => 'Bite my shiny metal ass!');
     $self->render(text => "Request by $ua reached $host.");
+  };
+
+  # Echo the request body and send custom header with response
+  get '/echo' => sub {
+    my $self = shift;
+    $self->res->headers->header('X-Bender' => 'Bite my shiny metal ass!');
+    $self->render(data => $self->req->body);
   };
 
   app->start;
@@ -282,6 +288,9 @@ L<Mojolicious::Plugin::DefaultHelpers/"content">.
     <head><title><%= title %></title></head>
     <body><%= content %></body>
   </html>
+
+The stash or helpers like L<Mojolicious::Plugin::DefaultHelpers/"title"> can
+be used to pass additional information to the layout.
 
 =head2 Blocks
 
