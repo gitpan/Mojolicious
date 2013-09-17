@@ -49,31 +49,30 @@ my $TOKEN_RE = qr/
   )??
 /xis;
 
-# Optional HTML elements
-my %OPTIONAL = map { $_ => 1 }
-  qw(body colgroup dd head li optgroup option p rt rp tbody td tfoot th);
-
 # Elements that break HTML paragraphs
 my %PARAGRAPH = map { $_ => 1 } (
   qw(address article aside blockquote dir div dl fieldset footer form h1 h2),
-  qw(h3 h4 h5 h6 header hgroup hr menu nav ol p pre section table ul)
+  qw(h3 h4 h5 h6 header hr main menu nav ol p pre section table ul)
 );
 
 # HTML table elements
 my %TABLE = map { $_ => 1 } qw(col colgroup tbody td th thead tr);
 
-# HTML void elements
+# HTML elements without end tags
 my %VOID = map { $_ => 1 } (
-  qw(area base br col command embed hr img input keygen link meta param),
+  qw(area base br col embed hr img input keygen link menuitem meta param),
   qw(source track wbr)
 );
 
-# HTML inline elements
-my %INLINE = map { $_ => 1 } (
-  qw(a abbr acronym applet b basefont bdo big br button cite code del dfn em),
-  qw(font i iframe img ins input kbd label map object q s samp script select),
-  qw(small span strike strong sub sup textarea tt u var)
+# HTML elements categorized as phrasing content (and obsolete inline elements)
+my @PHRASING = (
+  qw(a abbr area audio b bdo br button canvas cite code data datalist del),
+  qw(dfn em embed i iframe img input ins kbd keygen label link map mark math),
+  qw(meta meter noscript object output progress q ruby s samp script select),
+  qw(small span strong sub sup svg template textarea time u var video wbr)
 );
+my @OBSOLETE = qw(acronym applet basefont big font strike tt);
+my %PHRASING = map { $_ => 1 } @OBSOLETE, @PHRASING;
 
 sub parse {
   my ($self, $html) = @_;
@@ -178,8 +177,8 @@ sub _end {
     # Right tag
     ++$found and last if $next->[1] eq $end;
 
-    # Inline elements can only cross other inline elements
-    return if !$self->xml && $INLINE{$end} && !$INLINE{$next->[1]};
+    # Phrasing content can only cross phrasing content
+    return if !$self->xml && $PHRASING{$end} && !$PHRASING{$next->[1]};
 
     $next = $next->[3];
   }
@@ -194,9 +193,6 @@ sub _end {
 
     # Match
     if ($end eq $$current->[1]) { return $$current = $$current->[3] }
-
-    # Optional elements
-    elsif ($OPTIONAL{$$current->[1]}) { $self->_end($$current->[1], $current) }
 
     # Table
     elsif ($end eq 'table') { $self->_close($current) }
