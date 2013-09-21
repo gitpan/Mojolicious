@@ -8,9 +8,6 @@ use Mojo::Util qw(slurp url_escape);
 use Pod::Simple::HTML;
 use Pod::Simple::Search;
 
-# Paths to search
-my @PATHS = map { $_, "$_/pods" } @INC;
-
 sub register {
   my ($self, $app, $conf) = @_;
 
@@ -31,27 +28,16 @@ sub register {
 
   # Perldoc browser
   return if $conf->{no_perldoc};
+  my $defaults = {module => 'Mojolicious/Guides', format => 'html'};
   return $app->routes->any(
-    '/perldoc/*module' => {module => 'Mojolicious/Guides'} => \&_perldoc);
+    '/perldoc/:module' => $defaults => [module => qr/[^.]+/] => \&_perldoc);
 }
 
-sub _perldoc {
-  my $self = shift;
-
-  # Find module or redirect to CPAN
-  my $module = $self->param('module');
-  $module =~ s!/!::!g;
-  my $path = Pod::Simple::Search->new->find($module, @PATHS);
-  return $self->redirect_to("http://metacpan.org/module/$module")
-    unless $path && -r $path;
-
-  # Source
-  my $source = slurp $path;
-  return $self->render(data => $source, format => 'txt')
-    if $self->param('source');
+sub _html {
+  my ($self, $src) = @_;
 
   # Rewrite links
-  my $dom     = Mojo::DOM->new(_pod_to_html($source));
+  my $dom     = Mojo::DOM->new(_pod_to_html($src));
   my $perldoc = $self->url_for('/perldoc/');
   for my $e ($dom->find('a[href]')->each) {
     my $attrs = $e->attr;
@@ -96,7 +82,21 @@ sub _perldoc {
   $self->content_for(perldoc => "$dom");
   my $template = $self->app->renderer->_bundled('perldoc');
   $self->render(inline => $template, title => $title, parts => \@parts);
-  $self->res->headers->content_type('text/html;charset="UTF-8"');
+}
+
+sub _perldoc {
+  my $self = shift;
+
+  # Find module or redirect to CPAN
+  my $module = $self->param('module');
+  $module =~ s!/!::!g;
+  my $path
+    = Pod::Simple::Search->new->find($module, map { $_, "$_/pods" } @INC);
+  return $self->redirect_to("http://metacpan.org/module/$module")
+    unless $path && -r $path;
+
+  my $src = slurp $path;
+  $self->respond_to(txt => {data => $src}, html => sub { _html($self, $src) });
 }
 
 sub _pod_to_html {
