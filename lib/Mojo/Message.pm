@@ -67,13 +67,8 @@ sub cookies { croak 'Method "cookies" not implemented by subclass' }
 
 sub dom {
   my $self = shift;
-
   return undef if $self->content->is_multipart;
-  my $html    = $self->body;
-  my $charset = $self->content->charset;
-  $html = decode($charset, $html) // $html if $charset;
-  my $dom = $self->{dom} ||= Mojo::DOM->new($html);
-
+  my $dom = $self->{dom} ||= Mojo::DOM->new($self->text);
   return @_ ? $dom->find(@_) : $dom;
 }
 
@@ -192,6 +187,13 @@ sub parse {
 }
 
 sub start_line_size { length shift->build_start_line }
+
+sub text {
+  my $self    = shift;
+  my $body    = $self->body;
+  my $charset = $self->content->charset;
+  return $charset ? decode($charset, $body) // $body : $body;
+}
 
 sub to_string {
   my $self = shift;
@@ -412,7 +414,8 @@ implements the following new ones.
   my $bytes = $msg->body;
   $msg      = $msg->body('Hello!');
 
-Slurp or replace C<content>.
+Slurp or replace C<content>, L<Mojo::Content::MultiPart> will be automatically
+downgraded to L<Mojo::Content::Single>.
 
 =head2 body_params
 
@@ -598,6 +601,13 @@ Parse message chunk.
   my $size = $msg->start_line_size;
 
 Size of the start line in bytes.
+
+=head2 text
+
+  my $str = $msg->text;
+
+Retrieve C<body> and try to decode it if a charset could be extracted with
+L<Mojo::Content/"charset">.
 
 =head2 to_string
 

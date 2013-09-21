@@ -120,7 +120,7 @@ sub namespace {
   return '';
 }
 
-sub next { shift->_sibling(1) }
+sub next { shift->_siblings->[1][0] }
 
 sub parent {
   my $self = shift;
@@ -139,7 +139,7 @@ sub prepend_content {
   return $self;
 }
 
-sub previous { shift->_sibling(0) }
+sub previous { shift->_siblings->[0][-1] }
 
 sub remove { shift->replace('') }
 
@@ -162,6 +162,8 @@ sub root {
   return $self unless my $tree = _ancestors($self->tree, 1);
   return $self->new->tree($tree)->xml($self->xml);
 }
+
+sub siblings { _select(Mojo::Collection->new(@{_siblings($_[0], 1)}), $_[1]) }
 
 sub strip {
   my $self = shift;
@@ -308,26 +310,30 @@ sub _select {
   return defined $selector ? $self->grep(sub { $_->match($selector) }) : $self;
 }
 
-sub _sibling {
-  my ($self, $next) = @_;
+sub _siblings {
+  my ($self, $merge) = @_;
 
-  # Make sure we have a parent
-  return undef unless my $parent = $self->parent;
+  return $merge ? [] : [[], []] unless my $parent = $self->parent;
 
-  # Find previous or next sibling
-  my ($previous, $current);
+  my $tree = $self->tree;
+  my (@before, @after, $match);
   for my $child ($parent->children->each) {
-    ++$current and next if $child->tree eq $self->tree;
-    return $next ? $child : $previous if $current;
-    $previous = $child;
+    ++$match and next if $child->tree eq $tree;
+    $match ? push @after, $child : push @before, $child;
   }
 
-  # No siblings
-  return undef;
+  return $merge ? [@before, @after] : [\@before, \@after];
 }
 
 sub _text {
   my ($nodes, $recurse, $trim) = @_;
+
+  # Merge successive text nodes
+  my $i = 0;
+  while (my $next = $nodes->[$i + 1]) {
+    ++$i and next unless $nodes->[$i][0] eq 'text' && $next->[0] eq 'text';
+    splice @$nodes, $i, 2, ['text', $nodes->[$i][1] . $next->[1]];
+  }
 
   my $text = '';
   for my $n (@$nodes) {
@@ -448,7 +454,7 @@ L<Mojo::DOM> implements the following methods.
   my $dom = Mojo::DOM->new;
   my $dom = Mojo::DOM->new('<foo bar="baz">test</foo>');
 
-Construct a new array-based L<Mojo::DOM> object and C<parse> HTML/XML document
+Construct a new array-based L<Mojo::DOM> object and C<parse> HTML/XML fragment
 if necessary.
 
 =head2 all_text
@@ -481,7 +487,7 @@ All selectors from L<Mojo::DOM::CSS> are supported.
 
   $dom = $dom->append('<p>Hi!</p>');
 
-Append HTML/XML to element.
+Append HTML/XML fragment to element.
 
   # "<div><h1>A</h1><h2>B</h2></div>"
   $dom->parse('<div><h1>A</h1></div>')->at('h1')->append('<h2>B</h2>')->root;
@@ -490,7 +496,7 @@ Append HTML/XML to element.
 
   $dom = $dom->append_content('<p>Hi!</p>');
 
-Append HTML/XML to element content.
+Append HTML/XML fragment to element content.
 
   # "<div><h1>AB</h1></div>"
   $dom->parse('<div><h1>A</h1></div>')->at('h1')->append_content('B')->root;
@@ -595,7 +601,7 @@ has no parent.
 
   $dom = $dom->parse('<foo bar="baz">test</foo>');
 
-Parse HTML/XML document with L<Mojo::DOM::HTML>.
+Parse HTML/XML fragment with L<Mojo::DOM::HTML>.
 
   # Parse XML
   my $dom = Mojo::DOM->new->xml(1)->parse($xml);
@@ -604,7 +610,7 @@ Parse HTML/XML document with L<Mojo::DOM::HTML>.
 
   $dom = $dom->prepend('<p>Hi!</p>');
 
-Prepend HTML/XML to element.
+Prepend HTML/XML fragment to element.
 
   # "<div><h1>A</h1><h2>B</h2></div>"
   $dom->parse('<div><h2>B</h2></div>')->at('h2')->prepend('<h1>A</h1>')->root;
@@ -613,7 +619,7 @@ Prepend HTML/XML to element.
 
   $dom = $dom->prepend_content('<p>Hi!</p>');
 
-Prepend HTML/XML to element content.
+Prepend HTML/XML fragment to element content.
 
   # "<div><h2>AB</h2></div>"
   $dom->parse('<div><h2>B</h2></div>')->at('h2')->prepend_content('A')->root;
@@ -641,8 +647,8 @@ Remove element and return L<Mojo::DOM> object for parent of element.
 
   my $parent = $dom->replace('<div>test</div>');
 
-Replace element with HTML/XML and return L<Mojo::DOM> object for parent of
-element.
+Replace element with HTML/XML fragment and return L<Mojo::DOM> object for
+parent of element.
 
   # "<div><h2>B</h2></div>"
   $dom->parse('<div><h1>A</h1></div>')->at('h1')->replace('<h2>B</h2>');
@@ -654,7 +660,7 @@ element.
 
   $dom = $dom->replace_content('<p>test</p>');
 
-Replace element content with HTML/XML.
+Replace element content with HTML/XML fragment.
 
   # "<div><h1>B</h1></div>"
   $dom->parse('<div><h1>A</h1></div>')->at('h1')->replace_content('B')->root;
@@ -667,6 +673,18 @@ Replace element content with HTML/XML.
   my $root = $dom->root;
 
 Return L<Mojo::DOM> object for root node.
+
+=head2 siblings
+
+  my $collection = $dom->siblings;
+  my $collection = $dom->siblings('div');
+
+Find all siblings of this element matching the CSS selector and return a
+L<Mojo::Collection> object containing these elements as L<Mojo::DOM> objects.
+All selectors from L<Mojo::DOM::CSS> are supported.
+
+  # List types of sibling elements
+  say $dom->siblings->type;
 
 =head2 strip
 
