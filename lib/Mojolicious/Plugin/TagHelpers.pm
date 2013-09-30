@@ -23,10 +23,10 @@ sub register {
   $app->helper(image => sub { _tag('img', src => shift->url_for(shift), @_) });
   $app->helper(input_tag => sub { _input(@_) });
   $app->helper(javascript => \&_javascript);
+  $app->helper(label_for  => \&_label_for);
   $app->helper(link_to    => \&_link_to);
 
-  $app->helper(password_field =>
-      sub { shift; _tag('input', name => shift, @_, type => 'password') });
+  $app->helper(password_field => \&_password_field);
   $app->helper(radio_button =>
       sub { _input(shift, shift, value => shift, @_, type => 'radio') });
 
@@ -82,12 +82,9 @@ sub _input {
 
     # Others
     else { $attrs{value} = $values[0] }
-
-    return _tag('input', name => $name, %attrs);
   }
 
-  # Empty tag
-  return _tag('input', name => $name, %attrs);
+  return _validation($self, $name, 'input', %attrs, name => $name);
 }
 
 sub _javascript {
@@ -95,8 +92,7 @@ sub _javascript {
 
   # CDATA
   my $cb = sub {''};
-  if (ref $_[-1] eq 'CODE') {
-    my $old = pop;
+  if (ref $_[-1] eq 'CODE' && (my $old = pop)) {
     $cb = sub { "//<![CDATA[\n" . $old->() . "\n//]]>" }
   }
 
@@ -106,12 +102,18 @@ sub _javascript {
   return _tag('script', @_, $src ? (src => $src) : (), $cb);
 }
 
+sub _label_for {
+  my ($self, $name) = (shift, shift);
+  my $content = ref $_[-1] eq 'CODE' ? pop : shift;
+  return _validation($self, $name, 'label', for => $name, @_, $content);
+}
+
 sub _link_to {
   my ($self, $content) = (shift, shift);
   my @url = ($content);
 
   # Content
-  unless (defined $_[-1] && ref $_[-1] eq 'CODE') {
+  unless (ref $_[-1] eq 'CODE') {
     @url = (shift);
     push @_, $content;
   }
@@ -122,47 +124,45 @@ sub _link_to {
   return _tag('a', href => $self->url_for(@url), @_);
 }
 
+sub _option {
+  my ($values, $pair) = @_;
+  $pair = [$pair => $pair] unless ref $pair eq 'ARRAY';
+
+  # Attributes
+  my %attrs = (value => $pair->[1]);
+  $attrs{selected} = 'selected' if exists $values->{$pair->[1]};
+  %attrs = (%attrs, @$pair[2 .. $#$pair]);
+
+  return _tag('option', %attrs, sub { xml_escape $pair->[0] });
+}
+
+sub _password_field {
+  my ($self, $name) = (shift, shift);
+  return _validation($self, $name, 'input', @_, name => $name,
+    type => 'password');
+}
+
 sub _select_field {
   my ($self, $name, $options, %attrs) = (shift, shift, shift, @_);
 
-  # "option" callback
   my %values = map { $_ => 1 } $self->param($name);
-  my $option = sub {
 
-    # Pair
-    my $pair = shift;
-    $pair = [$pair => $pair] unless ref $pair eq 'ARRAY';
+  my $groups = '';
+  for my $group (@$options) {
 
-    # Attributes
-    my %attrs = (value => $pair->[1]);
-    $attrs{selected} = 'selected' if exists $values{$pair->[1]};
-    %attrs = (%attrs, @$pair[2 .. $#$pair]);
-
-    return _tag('option', %attrs, sub { xml_escape $pair->[0] });
-  };
-
-  # "optgroup" callback
-  my $optgroup = sub {
-
-    # Parts
-    my $parts = '';
-    for my $group (@$options) {
-
-      # "optgroup" tag
-      if (ref $group eq 'HASH') {
-        my ($label, $values) = each %$group;
-        my $content = join '', map { $option->($_) } @$values;
-        $parts .= _tag('optgroup', label => $label, sub {$content});
-      }
-
-      # "option" tag
-      else { $parts .= $option->($group) }
+    # "optgroup" tag
+    if (ref $group eq 'HASH') {
+      my ($label, $values) = each %$group;
+      my $content = join '', map { _option(\%values, $_) } @$values;
+      $groups .= _tag('optgroup', label => $label, sub {$content});
     }
 
-    return $parts;
-  };
+    # "option" tag
+    else { $groups .= _option(\%values, $group) }
+  }
 
-  return _tag('select', name => $name, %attrs, $optgroup);
+  return _validation($self, $name, 'select', %attrs, name => $name,
+    sub {$groups});
 }
 
 sub _stylesheet {
@@ -170,8 +170,7 @@ sub _stylesheet {
 
   # CDATA
   my $cb;
-  if (ref $_[-1] eq 'CODE') {
-    my $old = pop;
+  if (ref $_[-1] eq 'CODE' && (my $old = pop)) {
     $cb = sub { "/*<![CDATA[*/\n" . $old->() . "\n/*]]>*/" }
   }
 
@@ -199,17 +198,13 @@ sub _tag {
 
   # Attributes
   my %attrs = @_;
-  for my $key (sort keys %attrs) {
-    $tag .= qq{ $key="} . xml_escape($attrs{$key} // '') . '"';
-  }
-
-  # End tag
-  if ($cb || defined $content) {
-    $tag .= '>' . ($cb ? $cb->() : xml_escape($content)) . "</$name>";
-  }
+  $tag .= qq{ $_="} . xml_escape($attrs{$_} // '') . '"' for sort keys %attrs;
 
   # Empty element
-  else { $tag .= ' />' }
+  unless ($cb || defined $content) { $tag .= ' />' }
+
+  # End tag
+  else { $tag .= '>' . ($cb ? $cb->() : xml_escape($content)) . "</$name>" }
 
   # Prevent escaping
   return Mojo::ByteStream->new($tag);
@@ -218,16 +213,21 @@ sub _tag {
 sub _text_area {
   my ($self, $name) = (shift, shift);
 
-  # Content
+  # Make sure content is wrapped
   my $cb = ref $_[-1] eq 'CODE' ? pop : sub {''};
   my $content = @_ % 2 ? shift : undef;
+  $cb = sub { xml_escape $content }
+    if defined($content = $self->param($name) // $content);
 
-  # Make sure content is wrapped
-  if (defined($content = $self->param($name) // $content)) {
-    $cb = sub { xml_escape $content }
-  }
+  return _validation($self, $name, 'textarea', @_, name => $name, $cb);
+}
 
-  return _tag('textarea', name => $name, @_, $cb);
+sub _validation {
+  my ($self, $name, $tag) = (shift, shift, shift);
+  my ($content, %attrs) = (@_ % 2 ? pop : undef, @_);
+  $attrs{class} .= $attrs{class} ? ' field-with-error' : 'field-with-error'
+    if $self->validation->has_error($name);
+  return _tag($tag, %attrs, defined $content ? $content : ());
 }
 
 1;
@@ -260,6 +260,12 @@ necessary attributes always be generated automatically.
   <%= radio_button country => 'germany' %> Germany
   <%= radio_button country => 'france'  %> France
   <%= radio_button country => 'uk'      %> UK
+
+For fields that failed validation with L<Mojolicious::Controller/"validation">
+the C<field-with-error> class will be automatically added to make styling with
+CSS easier.
+
+  <input class="field-with-error" name="age" type="text" value="250" />
 
 This is a core plugin, that means it is always enabled and its code a good
 example for learning how to build new plugins, you're welcome to fork it.
@@ -426,6 +432,29 @@ Generate portable script tag for C<Javascript> asset.
   <script><![CDATA[
     var a = 'b';
   ]]></script>
+
+=head2 label_for
+
+  %= label_for first_name => 'First name'
+  %= label_for first_name => 'First name, class => 'labels'
+  %= label_for first_name => begin
+    First name
+  % end
+  %= label_for first_name => (class => 'labels') => begin
+    First name
+  % end
+
+Generate label. Note that this helper is EXPERIMENTAL and might change without
+warning!
+
+  <label for="first_name">First name</label>
+  <label class="labels" for="first_name">First name</label>
+  <label for="first_name">
+    First name
+  </label>
+  <label class="labels" for="first_name">
+    First name
+  </label>
 
 =head2 link_to
 

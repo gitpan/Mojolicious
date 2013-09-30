@@ -8,7 +8,7 @@ sub register {
   my ($self, $app) = @_;
 
   # Controller alias helpers
-  for my $name (qw(app flash param stash session url_for)) {
+  for my $name (qw(app flash param stash session url_for validation)) {
     $app->helper($name => sub { shift->$name(@_) });
   }
 
@@ -250,6 +250,13 @@ Does the same as C<url_for>, but inherits query parameters from the current
 request.
 
   %= url_with->query([page => 2])
+
+=head2 validation
+
+  %= validation->errors('description')
+
+Alias for L<Mojolicious::Controller/"validation">. Note that this helper is
+EXPERIMENTAL and might change without warning!
 
 =head1 METHODS
 

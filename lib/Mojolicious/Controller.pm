@@ -415,6 +415,12 @@ sub url_for {
   return $url;
 }
 
+sub validation {
+  my $self = shift;
+  return $self->stash->{'mojo.validation'}
+    ||= $self->app->validator->validation->input($self->req->params->to_hash);
+}
+
 sub write {
   my ($self, $chunk, $cb) = @_;
   ($cb, $chunk) = ($chunk, undef) if ref $chunk eq 'CODE';
@@ -491,6 +497,9 @@ defaults to a L<Mojolicious> object.
   # Use application logger
   $c->app->log->debug('Hello Mojo!');
 
+  # Generate path
+  my $path = $c->app->home->rel_file('templates/foo/bar.html.ep');
+
 =head2 match
 
   my $m = $c->match;
@@ -501,6 +510,7 @@ L<Mojolicious::Routes::Match> object.
 
   # Introspect
   my $foo = $c->match->endpoint->pattern->defaults->{foo};
+  my $bar = $c->match->stack->[-1]{bar};
 
 =head2 tx
 
@@ -508,10 +518,14 @@ L<Mojolicious::Routes::Match> object.
   $c     = $c->tx(Mojo::Transaction::HTTP->new);
 
 The transaction that is currently being processed, usually a
-L<Mojo::Transaction::HTTP> or L<Mojo::Transaction::WebSocket> object.
+L<Mojo::Transaction::HTTP> or L<Mojo::Transaction::WebSocket> object. Note
+that this reference is usually weakened, so the object needs to be referenced
+elsewhere as well when you're performing non-blocking operations and the
+underlying connection might get closed early.
 
   # Check peer information
   my $address = $c->tx->remote_address;
+  my $port    = $c->tx->remote_port;
 
 =head1 METHODS
 
@@ -894,6 +908,17 @@ to inherit query parameters from the current request.
 
   # "/list?q=mojo&page=2" if current request was for "/list?q=mojo&page=1"
   $c->url_with->query([page => 2]);
+
+=head2 validation
+
+  my $validation = $c->validation;
+
+Get L<Mojolicious::Validator::Validation> object for current request. Note
+that this method is EXPERIMENTAL and might change without warning!
+
+  my $validation = $c->validation;
+  $validation->required('title')->size(3, 50);
+  my $title = $validation->param('title');
 
 =head2 write
 

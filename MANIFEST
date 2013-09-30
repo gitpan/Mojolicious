@@ -164,6 +164,8 @@ lib/Mojolicious/templates/not_found.development.html.ep
 lib/Mojolicious/templates/not_found.html.ep
 lib/Mojolicious/templates/perldoc.html.ep
 lib/Mojolicious/Types.pm
+lib/Mojolicious/Validator.pm
+lib/Mojolicious/Validator/Validation.pm
 lib/ojo.pm
 lib/Test/Mojo.pm
 LICENSE
@@ -339,6 +341,7 @@ t/mojolicious/twinkle_lite_app.t
 t/mojolicious/types.t
 t/mojolicious/upload_lite_app.t
 t/mojolicious/upload_stream_lite_app.t
+t/mojolicious/validation_lite_app.t
 t/mojolicious/websocket_lite_app.t
 t/pod.t
 t/pod_coverage.t

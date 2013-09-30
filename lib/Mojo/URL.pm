@@ -413,14 +413,40 @@ appended, defaults to a L<Mojo::Parameters> object.
   my $abs = $url->to_abs;
   my $abs = $url->to_abs(Mojo::URL->new('http://example.com/foo'));
 
-Clone relative URL and turn it into an absolute one.
+Clone relative URL and turn it into an absolute one using C<base> or provided
+base URL.
+
+  # "http://example.com/foo/baz.xml?test=123"
+  Mojo::URL->new('baz.xml?test=123')
+    ->to_abs(Mojo::URL->new('http://example.com/foo/bar.html'));
+
+  # "http://example.com/baz.xml?test=123"
+  Mojo::URL->new('/baz.xml?test=123')
+    ->to_abs(Mojo::URL->new('http://example.com/foo/bar.html'));
+
+  # "http://example.com/foo/baz.xml?test=123"
+  Mojo::URL->new('//example.com/foo/baz.xml?test=123')
+    ->to_abs(Mojo::URL->new('http://example.com/foo/bar.html'));
 
 =head2 to_rel
 
   my $rel = $url->to_rel;
   my $rel = $url->to_rel(Mojo::URL->new('http://example.com/foo'));
 
-Clone absolute URL and turn it into a relative one.
+Clone absolute URL and turn it into a relative one using C<base> or provided
+base URL.
+
+  # "foo/bar.html?test=123"
+  Mojo::URL->new('http://example.com/foo/bar.html?test=123')
+    ->to_rel(Mojo::URL->new('http://example.com'));
+
+  # "bar.html?test=123"
+  Mojo::URL->new('http://example.com/foo/bar.html?test=123')
+    ->to_rel(Mojo::URL->new('http://example.com/foo/'));
+
+  # "//example.com/foo/bar.html?test=123"
+  Mojo::URL->new('http://example.com/foo/bar.html?test=123')
+    ->to_rel(Mojo::URL->new('http://'));
 
 =head2 to_string
 

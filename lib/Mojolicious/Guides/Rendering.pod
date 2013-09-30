@@ -327,7 +327,7 @@ header you can use L<Mojolicious/"types">.
   $self->respond_to(
     json => {json => {hello => 'world'}},
     html => sub {
-      $self->content_for(head => '<meta name="author" content="sri" />');
+      $self->content_for(head => '<meta name="author" content="sri">');
       $self->render(template => 'hello', message => 'world')
     }
   );
@@ -613,6 +613,129 @@ template with named blocks that child templates can override.
   % end
 
 This chain could go on and on to allow a very high level of template reuse.
+
+=head2 Form validation
+
+You can use L<Mojolicious::Controller/"validation"> to validate GET/POST
+parameters submitted to your application. All unknown fields will be ignored
+by default, so you have to decide which should be required or optional before
+you can perform checks on their values. Every check is performed right away,
+so you can use the results immediately to build more advanced validation logic
+with methods like L<Mojolicious::Validator::Validation/"is_valid">.
+
+  use Mojolicious::Lite;
+
+  get '/' => sub {
+    my $self = shift;
+
+    # Check if parameters have been submitted
+    my $validation = $self->validation;
+    return $self->render unless $validation->has_data;
+
+    # Validate parameters ("pass_again" depends on "pass")
+    $validation->required('user')->regex(qr/^[e-t]+$/);
+    $validation->required('pass_again')->equal_to('pass')
+      if $validation->optional('pass')->size(7, 500)->is_valid;
+
+    # Render confirmation if validation was successful
+    $self->render('thanks') unless $validation->has_error;
+  } => 'index';
+
+  app->start;
+  __DATA__
+
+  @@ index.html.ep
+  <!DOCTYPE html>
+  <html>
+    <head>
+      %= stylesheet begin
+        label.field-with-error { color: #dd7e5e }
+        input.field-with-error { background-color: #fd9e7e }
+      % end
+    </head>
+    <body>
+      %= form_for index => begin
+        %= label_for user => 'Username (required, only characters e-t)'
+        <br>
+        %= text_field 'user'
+        %= submit_button
+        <br>
+        %= label_for pass => 'Password (optional, 7-500 characters long)'
+        <br>
+        %= password_field 'pass'
+        <br>
+        %= label_for pass_again => 'Password again (equal to the value above)'
+        <br>
+        %= password_field 'pass_again'
+      % end
+    </html>
+  </html>
+
+  @@ thanks.html.ep
+  <!DOCTYPE html>
+  <html><body>Thank you <%= validation->param('user') %>.</body></html>
+
+Form elements generated with tag helpers from
+L<Mojolicious::Plugin::TagHelpers> will automatically remember their previous
+values and add the class C<field-with-error> for fields that failed validation
+to make styling with CSS easier.
+
+  <label class="field-with-error" for="user">
+    Username (required, only characters e-t)
+  </label>
+  <input class="field-with-error" type="text" name="user" value="sri" />
+
+For a full list of available checks see also
+L<Mojolicious::Validator/"CHECKS">.
+
+=head2 Adding form validation checks
+
+There are two parts to every validation check, the check itself, returning
+true or false, and an optional generator for dynamic error messages. Both look
+very similar and can be registered with L<Mojolicious::Validator/"add_check">
+and L<Mojolicious::Validator/"add_error">.
+
+  use Mojolicious::Lite;
+
+  # Add "range" check
+  app->validator->add_check(range => sub {
+    my ($validation, $name, $value, $min, $max) = @_;
+    return $value >= $min && $value <= $max;
+  });
+
+  # Add "range" error generator
+  app->validator->add_error(range => sub {
+    my ($validation, $name, $value, $min, $max) = @_;
+    return "Value needs to be between $min and $max.";
+  });
+
+  get '/' => sub {
+    my $self = shift;
+
+    my $validation = $self->validation;
+    return $self->render unless $validation->has_data;
+
+    $validation->required('test')->range(3, 23);
+
+    $self->render(text => 'Success!') unless $validation->has_error;
+  } => 'index';
+
+  app->start;
+  __DATA__
+
+  @@ index.html.ep
+  <!DOCTYPE html>
+  <html>
+    <body>
+      %= form_for index => begin
+        % if (validation->has_error('test')) {
+          <p><%= validation->errors('test') %></p>
+        % }
+        %= text_field 'test'
+        %= submit_button
+      % end
+    </html>
+  </html>
 
 =head2 Adding helpers
 
