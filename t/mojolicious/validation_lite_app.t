@@ -11,7 +11,6 @@ use Test::Mojo;
 
 # Custom check
 app->validator->add_check(two => sub { length $_[2] == 2 });
-app->validator->add_error(two => sub {'My error.'});
 
 get '/' => sub {
   my $self = shift;
@@ -19,7 +18,7 @@ get '/' => sub {
   my $validation = $self->validation;
   return $self->render unless $validation->has_data;
 
-  $validation->required('foo')->two;
+  $validation->required('foo')->two->in('☃☃');
   $validation->optional('bar')->two;
   $validation->optional('baz')->two;
   $validation->optional('yada')->two;
@@ -47,8 +46,7 @@ ok !$validation->has_error, 'no error';
 ok !$validation->required('does_not_exist')->is_valid, 'not valid';
 is_deeply $validation->output, {foo => 'bar', baz => 'yada'}, 'right result';
 ok $validation->has_error, 'has error';
-is_deeply [$validation->errors('does_not_exist')->each],
-  ['Value is required.'], 'right error';
+is_deeply $validation->error('does_not_exist'), ['required'], 'right error';
 
 # Equal to
 $validation = $t->app->validation;
@@ -60,13 +58,12 @@ ok !$validation->optional('baz')->equal_to('does_not_exist')->is_valid,
   'not valid';
 is_deeply $validation->output, {foo => 'bar'}, 'right result';
 ok $validation->has_error, 'has error';
-is_deeply [$validation->errors('baz')->each], ['Values are not equal.'],
+is_deeply $validation->error('baz'), [qw(equal_to does_not_exist)],
   'right error';
 ok !$validation->optional('yada')->equal_to('foo')->is_valid, 'not valid';
 is_deeply $validation->output, {foo => 'bar'}, 'right result';
 ok $validation->has_error, 'has error';
-is_deeply [$validation->errors('yada')->each], ['Values are not equal.'],
-  'right error';
+is_deeply $validation->error('yada'), [qw(equal_to foo)], 'right error';
 
 # In
 $validation = $t->app->validation;
@@ -77,8 +74,7 @@ ok !$validation->has_error, 'no error';
 ok !$validation->required('baz')->in(qw(yada whatever))->is_valid, 'not valid';
 is_deeply $validation->output, {foo => [qw(bar whatever)]}, 'right result';
 ok $validation->has_error, 'has error';
-is_deeply [$validation->errors('baz')->each], ['Value is not allowed.'],
-  'right error';
+is_deeply $validation->error('baz'), [qw(in yada whatever)], 'right error';
 
 # Regex
 $validation = $t->app->validation;
@@ -86,11 +82,11 @@ $validation->input({foo => 'bar', baz => 'yada'});
 ok $validation->required('foo')->regex(qr/^b/)->is_valid, 'valid';
 is_deeply $validation->output, {foo => 'bar'}, 'right result';
 ok !$validation->has_error, 'no error';
-ok !$validation->required('baz')->regex(qr/ar$/)->is_valid, 'not valid';
+my $re = qr/ar$/;
+ok !$validation->required('baz')->regex($re)->is_valid, 'not valid';
 is_deeply $validation->output, {foo => 'bar'}, 'right result';
 ok $validation->has_error, 'has error';
-is_deeply [$validation->errors('baz')->each], ['Value is not valid.'],
-  'right error';
+is_deeply $validation->error('baz'), ['regex', $re], 'right error';
 
 # Size
 $validation = $t->app->validation;
@@ -101,41 +97,13 @@ ok !$validation->has_error, 'no error';
 ok !$validation->required('baz')->size(1, 3)->is_valid, 'not valid';
 is_deeply $validation->output, {foo => 'bar'}, 'right result';
 ok $validation->has_error, 'has error';
-is_deeply [$validation->errors('baz')->each],
-  ['Value needs to be 1-3 characters long.'], 'right error';
+is_deeply $validation->error('baz'), [qw(size 1 3)], 'right error';
 ok !$validation->required('yada')->size(5, 10)->is_valid, 'not valid';
+is $validation->topic, 'yada', 'right topic';
+ok $validation->has_error('baz'), 'has error';
 is_deeply $validation->output, {foo => 'bar'}, 'right result';
 ok $validation->has_error, 'has error';
-is_deeply [$validation->errors('yada')->each],
-  ['Value needs to be 5-10 characters long.'], 'right error';
-
-# Custom errors
-$validation = $t->app->validation;
-ok !$validation->has_error('bar'), 'no error';
-$validation->input({foo => 'bar', yada => 'yada'});
-ok !$validation->error('Bar is required.')->required('bar')->is_valid,
-  'not valid';
-is_deeply $validation->output, {}, 'right result';
-ok $validation->has_error, 'has error';
-is_deeply [$validation->errors('bar')->each], ['Bar is required.'],
-  'right error';
-ok !$validation->required('baz')->is_valid, 'not valid';
-ok $validation->has_error, 'has error';
-is_deeply [$validation->errors('baz')->each], ['Value is required.'],
-  'right error';
-ok !$validation->required('foo')->error('Foo is too small.')->size(25, 100)
-  ->is_valid, 'not valid';
-ok $validation->has_error, 'has error';
-is_deeply [$validation->errors('foo')->each], ['Foo is too small.'],
-  'right error';
-is $validation->topic, 'foo', 'right topic';
-ok !$validation->error('Failed!')->required('yada')->size(25, 100)->is_valid,
-  'not valid';
-ok $validation->has_error, 'has error';
-is_deeply [$validation->errors('yada')->each],
-  ['Value needs to be 25-100 characters long.'], 'right error';
-is $validation->topic, 'yada', 'right topic';
-ok $validation->has_error('bar'), 'has error';
+is_deeply $validation->error('yada'), [qw(size 5 10)], 'right error';
 
 # Multiple empty values
 $validation = $t->app->validation;
@@ -145,8 +113,7 @@ ok $validation->has_data, 'has data';
 ok !$validation->required('foo')->is_valid, 'not valid';
 is_deeply $validation->output, {}, 'right result';
 ok $validation->has_error, 'has error';
-is_deeply [$validation->errors('foo')->each], ['Value is required.'],
-  'right error';
+is_deeply $validation->error('foo'), ['required'], 'right error';
 
 # Missing method and function (AUTOLOAD)
 eval { $t->app->validation->missing };
@@ -164,15 +131,25 @@ $t->get_ok('/')->status_is(200)->element_exists_not('div:root')
   ->element_exists('input[type="password"]');
 
 # Successful validation
-$t->get_ok('/?foo=ok')->status_is(200)->element_exists_not('div:root')
-  ->text_is('label[for="foo"]' => '<Foo>')
-  ->element_exists('input[type="password"]')->element_exists('textarea')
+$t->get_ok('/' => form => {foo => '☃☃'})->status_is(200)
+  ->element_exists_not('div:root')->text_is('label[for="foo"]' => '<Foo>')
+  ->element_exists('input[type="text"]')->element_exists('textarea')
   ->text_is('label[for="baz"]' => 'Baz')->element_exists('select')
   ->element_exists('input[type="password"]');
 
-# Failed validation
+# Validation failed for required fields
+$t->get_ok('/' => form => {foo => 'no'})->status_is(200)
+  ->text_is('div:root'                                 => 'in')
+  ->text_is('label.custom.field-with-error[for="foo"]' => '<Foo>')
+  ->element_exists('input.custom.field-with-error[type="text"][value="no"]')
+  ->element_exists_not('textarea.field-with-error')
+  ->element_exists_not('label.custom.field-with-error[for="baz"]')
+  ->element_exists_not('select.field-with-error')
+  ->element_exists_not('input.field-with-error[type="password"]');
+
+# Failed validation for all fields
 $t->get_ok('/?foo=too_long&bar=too_long_too&baz=way_too_long&yada=whatever')
-  ->status_is(200)->text_is('div:root' => 'My error.')
+  ->status_is(200)->text_is('div:root' => 'two')
   ->text_is('label.custom.field-with-error[for="foo"]' => '<Foo>')
   ->element_exists('input.custom.field-with-error[type="text"]')
   ->element_exists('textarea.field-with-error')
@@ -186,7 +163,7 @@ __DATA__
 
 @@ index.html.ep
 % if (validation->has_error('foo')) {
-  <div><%= validation->errors('foo') %></div>
+  <div><%= validation->error('foo')->[0] %></div>
 % }
 %= form_for index => begin
   %= label_for foo => '<Foo>', class => 'custom'

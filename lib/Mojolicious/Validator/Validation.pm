@@ -3,7 +3,6 @@ use Mojo::Base -base;
 
 use Carp 'croak';
 use Scalar::Util 'blessed';
-use Mojo::Collection;
 
 has [qw(input output)] => sub { {} };
 has [qw(topic validator)];
@@ -25,7 +24,6 @@ sub DESTROY { }
 sub check {
   my ($self, $check) = (shift, shift);
 
-  my $err = delete $self->{error};
   return $self unless $self->is_valid;
 
   my $cb    = $self->validator->checks->{$check};
@@ -34,24 +32,18 @@ sub check {
   for my $value (ref $input eq 'ARRAY' ? @$input : $input) {
     next if $self->$cb($name, $value, @_);
     delete $self->output->{$name};
-    $self->_error($check, $err, $name, $value, @_);
+    $self->{error}{$name} = [$check, @_];
     last;
   }
 
   return $self;
 }
 
-sub error {
-  my $self = shift;
-  $self->{error} = shift;
-  return $self;
-}
-
-sub errors { Mojo::Collection->new(@{shift->{errors}{shift()} // []}) }
+sub error { shift->{error}{shift()} }
 
 sub has_data { !!keys %{shift->input} }
 
-sub has_error { $_[1] ? exists $_[0]{errors}{$_[1]} : !!keys %{$_[0]{errors}} }
+sub has_error { $_[1] ? exists $_[0]{error}{$_[1]} : !!keys %{$_[0]{error}} }
 
 sub is_valid { exists $_[0]->output->{$_[1] // $_[0]->topic} }
 
@@ -83,16 +75,8 @@ sub param {
 sub required {
   my ($self, $name) = @_;
   $self->optional($name);
-  my $err = delete $self->{error};
-  $self->_error('required', $err, $name) unless $self->is_valid;
+  $self->{error}{$name} = ['required'] unless $self->is_valid;
   return $self;
-}
-
-sub _error {
-  my ($self, $check, $err, $name, $value)
-    = (shift, shift, shift, shift, shift);
-  my $cb = $self->validator->errors->{$check} // sub {'Value is not valid.'};
-  push @{$self->{errors}{$name}}, $err // $self->$cb($name, $value, @_);
 }
 
 1;
@@ -162,37 +146,29 @@ Perform validation check.
 
 =head2 error
 
-  $validation = $validation->error('This went wrong.');
+  my $err = $validation->error('foo');
 
-Set custom error message for next validation C<check> or C<topic> change.
+Return details about failed validation check.
 
-  $validation->optional('name')
-    ->error('Name needs to be between 3 and 9 characters long.')->size(3, 9);
-
-=head2 errors
-
-  my $collection = $validation->errors('foo');
-
-Return L<Mojo::Collection> object containing all error messages for failed
-validation checks.
+  my ($check, @args) = @{$validation->error('foo')};
 
 =head2 has_data
 
-  my $success = $validation->has_data;
+  my $bool = $validation->has_data;
 
 Check if C<input> is available for validation.
 
 =head2 has_error
 
-  my $success = $validation->has_error;
-  my $success = $validation->has_error('foo');
+  my $bool = $validation->has_error;
+  my $bool = $validation->has_error('foo');
 
 Check if validation resulted in errors, defaults to checking all fields.
 
 =head2 is_valid
 
-  my $success = $validation->is_valid;
-  my $success = $validation->is_valid('foo');
+  my $bool = $validation->is_valid;
+  my $bool = $validation->is_valid('foo');
 
 Check if validation was successful and field has a value, defaults to checking
 the current C<topic>.
