@@ -11,8 +11,8 @@ sub AUTOLOAD {
   my $self = shift;
 
   my ($package, $method) = our $AUTOLOAD =~ /^([\w:]+)::(\w+)$/;
-  Carp::croak "Undefined subroutine &${package}::$method called"
-    unless Scalar::Util::blessed $self && $self->isa(__PACKAGE__);
+  croak "Undefined subroutine &${package}::$method called"
+    unless blessed $self && $self->isa(__PACKAGE__);
 
   croak qq{Can't locate object method "$method" via package "$package"}
     unless $self->validator->checks->{$method};
@@ -74,8 +74,7 @@ sub param {
 
 sub required {
   my ($self, $name) = @_;
-  $self->optional($name);
-  $self->{error}{$name} = ['required'] unless $self->is_valid;
+  $self->{error}{$name} = ['required'] unless $self->optional($name)->is_valid;
   return $self;
 }
 
@@ -95,6 +94,9 @@ Mojolicious::Validator::Validation - Perform validations
   my $validator = Mojolicious::Validator->new;
   my $validation
     = Mojolicious::Validator::Validation->new(validator => $validator);
+  $validation->input({foo => 'bar'});
+  $validation->required('foo')->in(qw(bar baz));
+  say $validation->param('foo');
 
 =head1 DESCRIPTION
 
@@ -186,7 +188,7 @@ Change validation C<topic>.
   my @foo         = $c->param('foo');
   my ($foo, $bar) = $c->param(['foo', 'bar']);
 
-Access validated parameters.
+Access validated parameters, similar to L<Mojolicious::Controller/"param">.
 
 =head2 required
 
@@ -200,7 +202,7 @@ In addition to the methods above, you can also call validation checks provided
 by L<Mojolicious::Validator> on L<Mojolicious::Validator::Validation> objects,
 similar to C<check>.
 
-  $validation->required('foo')->size(2, 5)->regex(qr/^[A-Z]/);
+  $validation->required('foo')->size(2, 5)->like(qr/^[A-Z]/);
   $validation->optional('bar')->equal_to('foo');
   $validation->optional('baz')->in(qw(test 123));
 

@@ -12,7 +12,7 @@ use Test::Mojo;
 # Custom check
 app->validator->add_check(two => sub { length $_[2] == 2 });
 
-get '/' => sub {
+any '/' => sub {
   my $self = shift;
 
   my $validation = $self->validation;
@@ -76,17 +76,17 @@ is_deeply $validation->output, {foo => [qw(bar whatever)]}, 'right result';
 ok $validation->has_error, 'has error';
 is_deeply $validation->error('baz'), [qw(in yada whatever)], 'right error';
 
-# Regex
+# Like
 $validation = $t->app->validation;
 $validation->input({foo => 'bar', baz => 'yada'});
-ok $validation->required('foo')->regex(qr/^b/)->is_valid, 'valid';
+ok $validation->required('foo')->like(qr/^b/)->is_valid, 'valid';
 is_deeply $validation->output, {foo => 'bar'}, 'right result';
 ok !$validation->has_error, 'no error';
 my $re = qr/ar$/;
-ok !$validation->required('baz')->regex($re)->is_valid, 'not valid';
+ok !$validation->required('baz')->like($re)->is_valid, 'not valid';
 is_deeply $validation->output, {foo => 'bar'}, 'right result';
 ok $validation->has_error, 'has error';
-is_deeply $validation->error('baz'), ['regex', $re], 'right error';
+is_deeply $validation->error('baz'), ['like', $re], 'right error';
 
 # Size
 $validation = $t->app->validation;
@@ -138,7 +138,7 @@ $t->get_ok('/' => form => {foo => '☃☃'})->status_is(200)
   ->element_exists('input[type="password"]');
 
 # Validation failed for required fields
-$t->get_ok('/' => form => {foo => 'no'})->status_is(200)
+$t->post_ok('/' => form => {foo => 'no'})->status_is(200)
   ->text_is('div:root'                                 => 'in')
   ->text_is('label.custom.field-with-error[for="foo"]' => '<Foo>')
   ->element_exists('input.custom.field-with-error[type="text"][value="no"]')
