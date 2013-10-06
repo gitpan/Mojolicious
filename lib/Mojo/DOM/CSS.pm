@@ -6,11 +6,11 @@ has 'tree';
 my $ESCAPE_RE = qr/\\[^0-9a-fA-F]|\\[0-9a-fA-F]{1,6}/;
 my $ATTR_RE   = qr/
   \[
-  ((?:$ESCAPE_RE|[\w\-])+)        # Key
+  ((?:$ESCAPE_RE|[\w\-])+)           # Key
   (?:
-    (\W)?                         # Operator
+    (\W)?                            # Operator
     =
-    (?:"((?:\\"|[^"])*)"|(\S+))   # Value
+    (?:"((?:\\"|[^"])*)"|([^\]]+))   # Value
   )?
   \]
 /x;
@@ -592,7 +592,7 @@ Elements of type C<E>, C<F> and C<G>.
 
 An C<E> element whose attributes match all following attribute selectors.
 
-  my $links = $css->select('a[foo^="b"][foo$="ar"]');
+  my $links = $css->select('a[foo^=b][foo$=ar]');
 
 =head1 ATTRIBUTES
 
