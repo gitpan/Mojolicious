@@ -668,7 +668,7 @@ with methods like L<Mojolicious::Validator::Validation/"is_valid">.
         <br>
         %= password_field 'pass_again'
       % end
-    </html>
+    </body>
   </html>
 
   @@ thanks.html.ep

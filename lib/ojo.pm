@@ -6,7 +6,7 @@ use Mojo::Collection 'c';
 use Mojo::DOM;
 use Mojo::JSON 'j';
 use Mojo::UserAgent;
-use Mojo::Util 'monkey_patch';
+use Mojo::Util qw(dumper monkey_patch);
 
 # Silent one-liners
 $ENV{MOJO_LOG_LEVEL} ||= 'fatal';
@@ -36,9 +36,9 @@ sub import {
     j => \&j,
     o => sub { _request($UA->build_tx(OPTIONS => @_)) },
     p => sub { _request($UA->build_tx(POST    => @_)) },
-    r => sub { $UA->app->dumper(@_) },
-    t => sub { _request($UA->build_tx(PATCH => @_)) },
-    u => sub { _request($UA->build_tx(PUT => @_)) },
+    r => \&dumper,
+    t => sub { _request($UA->build_tx(PATCH   => @_)) },
+    u => sub { _request($UA->build_tx(PUT     => @_)) },
     x => sub { Mojo::DOM->new(@_) };
 }
 
@@ -160,7 +160,7 @@ L<Mojo::Message::Response> object.
 
   my $perl = r({data => 'structure'});
 
-Dump a Perl data structure with L<Data::Dumper>.
+Dump a Perl data structure with L<Mojo::Util/"dumper">.
 
   perl -Mojo -E 'say r(g("example.com")->headers->to_hash)'
 
