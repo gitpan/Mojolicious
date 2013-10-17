@@ -43,7 +43,7 @@ has types     => sub { Mojolicious::Types->new };
 has validator => sub { Mojolicious::Validator->new };
 
 our $CODENAME = 'Top Hat';
-our $VERSION  = '4.48';
+our $VERSION  = '4.49';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -372,8 +372,7 @@ L<Mojolicious::Types> object.
   my $validator = $app->validator;
   $app          = $app->validator(Mojolicious::Validator->new);
 
-Validate form data, defaults to a L<Mojolicious::Validator> object. Note that
-this attribute is EXPERIMENTAL and might change without warning!
+Validate form data, defaults to a L<Mojolicious::Validator> object.
 
 =head1 METHODS
 

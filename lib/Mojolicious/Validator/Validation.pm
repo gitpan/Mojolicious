@@ -65,7 +65,7 @@ sub param {
   return map { scalar $self->param($_) } @$name if ref $name eq 'ARRAY';
 
   # List names
-  return sort keys %{$self->output} unless $name;
+  return sort keys %{$self->output} unless defined $name;
 
   my $value = $self->output->{$name};
   my @values = ref $value eq 'ARRAY' ? @$value : ($value);
@@ -100,8 +100,8 @@ Mojolicious::Validator::Validation - Perform validations
 
 =head1 DESCRIPTION
 
-L<Mojolicious::Validator::Validation> performs validations. Note that this
-module is EXPERIMENTAL and might change without warning!
+L<Mojolicious::Validator::Validation> performs L<Mojolicious::Validator>
+validation checks.
 
 =head1 ATTRIBUTES
 
@@ -110,7 +110,7 @@ L<Mojolicious::Validator::Validation> implements the following attributes.
 =head2 input
 
   my $input   = $validation->input;
-  $validation = $validation->input({});
+  $validation = $validation->input({foo => 'bar', baz => [123, 'yada']});
 
 Data to be validated.
 
@@ -126,7 +126,7 @@ Validated data.
   my $topic   = $validation->topic;
   $validation = $validation->topic('foo');
 
-Current validation topic.
+Name of field currently being validated.
 
 =head2 validator
 
@@ -144,14 +144,15 @@ and implements the following new ones.
 
   $validation = $validation->check('size', 2, 7);
 
-Perform validation check, no more checks will be performend for the current
-C<topic> after the first one failed.
+Perform validation check on all values of the current C<topic>, no more checks
+will be performend on them after the first one failed.
 
 =head2 error
 
   my $err = $validation->error('foo');
 
-Return details about failed validation check.
+Return details about failed validation check, at any given time there can only
+be one per field.
 
   my ($check, $result, @args) = @{$validation->error('foo')};
 
@@ -195,7 +196,8 @@ Access validated parameters, similar to L<Mojolicious::Controller/"param">.
 
   $validation = $validation->required('foo');
 
-Change validation C<topic> and make sure a value is present.
+Change validation C<topic> and make sure a value is present and not an empty
+string.
 
 =head1 CHECKS
 

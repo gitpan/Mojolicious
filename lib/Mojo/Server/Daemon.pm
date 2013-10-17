@@ -163,14 +163,12 @@ sub _listen {
   my $url     = Mojo::URL->new($listen);
   my $query   = $url->query;
   my $options = {
-    address  => $url->host,
-    backlog  => $self->backlog,
-    port     => $url->port,
-    reuse    => scalar $query->param('reuse'),
-    tls_ca   => scalar $query->param('ca'),
-    tls_cert => scalar $query->param('cert'),
-    tls_key  => scalar $query->param('key')
+    address => $url->host,
+    backlog => $self->backlog,
+    port    => $url->port,
+    reuse   => scalar $query->param('reuse'),
   };
+  $options->{"tls_$_"} = scalar $query->param($_) for qw(ca cert ciphers key);
   my $verify = $query->param('verify');
   $options->{tls_verify} = hex $verify if defined $verify;
   delete $options->{address} if $options->{address} eq '*';
@@ -393,6 +391,12 @@ Path to TLS certificate authority file.
   cert=/etc/tls/server.crt
 
 Path to the TLS cert file, defaults to a built-in test certificate.
+
+=item ciphers
+
+  ciphers=AES128-GCM-SHA256:RC4:HIGH:!MD5:!aNULL:!EDH
+
+Cipher specification string.
 
 =item key
 
