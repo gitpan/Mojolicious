@@ -43,7 +43,7 @@ has types     => sub { Mojolicious::Types->new };
 has validator => sub { Mojolicious::Validator->new };
 
 our $CODENAME = 'Top Hat';
-our $VERSION  = '4.49';
+our $VERSION  = '4.50';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -94,10 +94,10 @@ sub new {
   # DEPRECATED in Top Hat!
   if (my $sub = $self->can("${mode}_mode")) {
     deprecated qq{"sub ${mode}_mode {...}" in application class is DEPRECATED};
-    $self->$sub(@_);
+    $self->$sub;
   }
 
-  $self->startup(@_);
+  $self->startup;
 
   return $self;
 }
@@ -754,6 +754,8 @@ Bernhard Graf
 Breno G. de Oliveira
 
 Brian Duggan
+
+Brian Medley
 
 Burak Gursoy
 

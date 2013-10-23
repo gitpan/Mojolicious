@@ -12,7 +12,7 @@ use Carp 'croak';
 use Mojo::Collection;
 use Mojo::DOM::CSS;
 use Mojo::DOM::HTML;
-use Mojo::Util qw(deprecated squish);
+use Mojo::Util 'squish';
 use Scalar::Util qw(blessed weaken);
 
 sub AUTOLOAD {
@@ -66,12 +66,6 @@ sub attr {
   %$attrs = (%$attrs, %{ref $_[0] ? $_[0] : {@_}});
 
   return $self;
-}
-
-# DEPRECATED in Top Hat!
-sub attrs {
-  deprecated 'Mojo::DOM::attrs is DEPRECATED in favor of Mojo::DOM::attr';
-  shift->attr(@_);
 }
 
 sub children {
@@ -128,7 +122,7 @@ sub parent {
   return $self->new->tree($tree->[3])->xml($self->xml);
 }
 
-sub parse { shift->_html(parse => shift) }
+sub parse { shift->_delegate(parse => shift) }
 
 sub prepend { shift->_add(0, @_) }
 
@@ -209,7 +203,7 @@ sub text_before {
 
 sub to_xml { shift->[0]->render }
 
-sub tree { shift->_html(tree => @_) }
+sub tree { shift->_delegate(tree => @_) }
 
 sub type {
   my ($self, $type) = @_;
@@ -219,7 +213,7 @@ sub type {
   return $self;
 }
 
-sub xml { shift->_html(xml => @_) }
+sub xml { shift->_delegate(xml => @_) }
 
 sub _add {
   my ($self, $offset, $new) = @_;
@@ -252,7 +246,7 @@ sub _content {
   return _text([_nodes($tree)], shift, _trim($tree, @_));
 }
 
-sub _html {
+sub _delegate {
   my ($self, $method) = (shift, shift);
   return $self->[0]->$method unless @_;
   $self->[0]->$method(@_);
@@ -774,8 +768,8 @@ Element type.
 
 =head2 xml
 
-  my $xml = $dom->xml;
-  $dom    = $dom->xml(1);
+  my $bool = $dom->xml;
+  $dom     = $dom->xml($bool);
 
 Disable HTML semantics in parser and activate case sensitivity, defaults to
 auto detection based on processing instructions.

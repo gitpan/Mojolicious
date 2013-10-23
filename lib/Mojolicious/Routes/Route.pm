@@ -279,8 +279,8 @@ The children of this route, used for nesting routes.
 
 =head2 inline
 
-  my $inline = $r->inline;
-  $r         = $r->inline(1);
+  my $bool = $r->inline;
+  $r       = $r->inline($bool);
 
 Allow C<bridge> semantics for this route.
 
@@ -293,8 +293,8 @@ The parent of this route, used for nesting routes.
 
 =head2 partial
 
-  my $partial = $r->partial;
-  $r          = $r->partial(1);
+  my $bool = $r->partial;
+  $r       = $r->partial($bool);
 
 Route has no specific end, remaining characters will be captured in C<path>.
 
@@ -345,7 +345,7 @@ also the L<Mojolicious::Lite> tutorial for more argument variations.
   my $bridge = $r->bridge('/:action', action => qr/\w+/);
   my $bridge = $r->bridge(format => 0);
 
-Generate bridge route.
+Generate bridge route with optional pattern and restrictive placeholders.
 
   my $auth = $r->bridge('/user')->to('user#auth');
   $auth->get('/show')->to('#show');
@@ -519,7 +519,8 @@ The L<Mojolicious::Routes> object this route is an descendent of.
   my $route = $r->route('/:action', action => qr/\w+/);
   my $route = $r->route(format => 0);
 
-Generate route matching all HTTP request methods.
+Generate route matching all HTTP request methods with optional pattern and
+restrictive placeholders.
 
 =head2 to
 
@@ -546,8 +547,8 @@ Stringify the whole route.
 
 =head2 under
 
-  my $route = $r->under(sub {...});
-  my $route = $r->under('/:foo');
+  my $bridge = $r->under(sub {...});
+  my $bridge = $r->under('/:foo');
 
 Generate bridge route. See also the L<Mojolicious::Lite> tutorial for more
 argument variations.

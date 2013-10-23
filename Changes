@@ -1,4 +1,27 @@
 
+4.50  2013-10-22
+  - Deprecated Mojo::UserAgent::app in favor of
+    Mojo::UserAgent::Server::app.
+  - Deprecated Mojo::UserAgent::app_url in favor of
+    Mojo::UserAgent::Server::url.
+  - Deprecated Mojo::UserAgent::detect_proxy in favor of
+    Mojo::UserAgent::Proxy::detect.
+  - Deprecated Mojo::UserAgent::http_proxy in favor of
+    Mojo::UserAgent::Proxy::http.
+  - Deprecated Mojo::UserAgent::https_proxy in favor of
+    Mojo::UserAgent::Proxy::https.
+  - Deprecated Mojo::UserAgent::no_proxy in favor of
+    Mojo::UserAgent::Proxy::not.
+  - Deprecated Mojo::UserAgent::need_proxy in favor of
+    Mojo::UserAgent::Proxy::is_needed.
+  - Deprecated Mojo::UserAgent::name in favor of
+    Mojo::UserAgent::Transactor::name.
+  - Added modules Mojo::UserAgent::Proxy and Mojo::UserAgent::Server.
+  - Added proxy and server attributes to Mojo::UserAgent.
+  - Removed deprecated attrs method from Mojo::DOM.
+  - Improved Mojo::Message to allow max_message_size check to be disabled.
+  - Fixed small assignment bug in content helper.
+
 4.49  2013-10-17
   - Added tls_ciphers option to Mojo::IOLoop::Server::listen.
   - Added ciphers parameter to Mojo::Server::Daemon::listen.

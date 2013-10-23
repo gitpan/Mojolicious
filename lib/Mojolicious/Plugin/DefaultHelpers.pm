@@ -41,7 +41,7 @@ sub _content {
 
   # Set (first come)
   my $c = $self->stash->{'mojo.content'} ||= {};
-  $c->{$name} ||= ref $content eq 'CODE' ? $content->() : $content
+  $c->{$name} //= ref $content eq 'CODE' ? $content->() : $content
     if defined $content;
 
   # Get
@@ -133,7 +133,10 @@ Alias for L<Mojo/"config">.
   %= content 'bar'
   %= content
 
-Store partial rendered content in named buffer and retrieve it.
+Store partial rendered content in named buffer and retrieve it, defaults to
+retrieving the named buffer C<content>, which is commonly used for the
+renderers C<layout> and C<extends> features. Note that new content will be
+ignored if the named buffer is already in use.
 
 =head2 content_for
 
@@ -142,7 +145,8 @@ Store partial rendered content in named buffer and retrieve it.
   % end
   %= content_for 'foo'
 
-Append partial rendered content to named buffer and retrieve it.
+Append partial rendered content to named buffer and retrieve it. Note that
+named buffers are shared with the C<content> helper.
 
   % content_for message => begin
     Hello

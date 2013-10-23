@@ -65,6 +65,8 @@ lib/Mojo/Upload.pm
 lib/Mojo/URL.pm
 lib/Mojo/UserAgent.pm
 lib/Mojo/UserAgent/CookieJar.pm
+lib/Mojo/UserAgent/Proxy.pm
+lib/Mojo/UserAgent/Server.pm
 lib/Mojo/UserAgent/Transactor.pm
 lib/Mojo/Util.pm
 lib/Mojolicious.pm
@@ -222,6 +224,7 @@ t/mojo/morbo.t
 t/mojo/parameters.t
 t/mojo/path.t
 t/mojo/prefork.t
+t/mojo/proxy.t
 t/mojo/psgi.t
 t/mojo/reactor_ev.t
 t/mojo/reactor_poll.t
