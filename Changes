@@ -1,4 +1,13 @@
 
+4.51  2013-10-28
+  - Added tag_with_error helper to Mojolicious::Plugin::TagHelpers.
+  - Improved .ep template performance significantly, the number of helpers no
+    longer has any effect. (jberger, sri)
+  - Improved form_for performance.
+  - Improved built-in templates with documentation search.
+  - Fixed template inheritance bug in include helper.
+  - Fixed a few multipart form handling bugs.
+
 4.50  2013-10-22
   - Deprecated Mojo::UserAgent::app in favor of
     Mojo::UserAgent::Server::app.

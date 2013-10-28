@@ -53,11 +53,11 @@ sub render {
   my ($self, $c, $args) = @_;
   $args ||= {};
 
-  # Localize "extends" and "layout"
-  my $partial = $args->{partial};
-  my $stash   = $c->stash;
-  local $stash->{layout}  = $partial ? undef : $stash->{layout};
-  local $stash->{extends} = $partial ? undef : $stash->{extends};
+  # Localize "extends" and "layout" to allow argument overrides
+  my $stash = $c->stash;
+  local $stash->{layout}  = $stash->{layout}  if exists $stash->{layout};
+  local $stash->{extends} = $stash->{extends} if exists $stash->{extends};
+  delete @{$stash}{qw(layout extends)} if my $partial = $args->{partial};
 
   # Merge stash and arguments
   @{$stash}{keys %$args} = values %$args;

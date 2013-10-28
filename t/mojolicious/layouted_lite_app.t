@@ -69,11 +69,12 @@ get '/plain/reverse' => {text => 'Hello!', format => 'foo', reverse => 1};
 
 get '/outerlayout' => sub {
   my $self = shift;
-  $self->render(
-    template => 'outerlayout',
-    layout   => 'layout',
-    handler  => 'ep'
-  );
+  $self->render(template => 'outerlayout', layout => 'layout');
+};
+
+get '/outerextends' => sub {
+  my $self = shift;
+  $self->render(template => 'outerlayout', extends => 'layouts/layout');
 };
 
 get '/outerlayouttwo' => {layout => 'layout'} => sub {
@@ -207,6 +208,11 @@ $t->get_ok('/outerlayout')->status_is(200)
   ->header_is(Server => 'Mojolicious (Perl)')
   ->content_is("layouted Hello\n[\n  1,\n  2\n]\nthere<br>!\n\n\n");
 
+# Extends in render call
+$t->get_ok('/outerextends')->status_is(200)
+  ->header_is(Server => 'Mojolicious (Perl)')
+  ->content_is("layouted Hello\n[\n  1,\n  2\n]\nthere<br>!\n\n\n");
+
 # Layout in route
 $t->get_ok('/outerlayouttwo')->status_is(200)
   ->header_is(Server => 'Mojolicious (Perl)')
@@ -320,18 +326,18 @@ layout_with_template
 Nested <%= include 'outerlayout' %>
 
 @@ localized.html.ep
-% layout 'localized1';
+% extends 'localized1';
 <%= $test %>
-<%= include 'localized_partial', test => 321, layout => 'localized2' %>
+<%= include 'localized_partial', test => 321, extends => 'localized2' %>
 <%= $test %>
 
 @@ localized_partial.html.ep
 <%= $test %>
 
-@@ layouts/localized1.html.ep
+@@ localized1.html.ep
 localized1 <%= content %>
 
-@@ layouts/localized2.html.ep
+@@ localized2.html.ep
 localized2 <%= content %>
 
 @@ outerlayout.html.ep

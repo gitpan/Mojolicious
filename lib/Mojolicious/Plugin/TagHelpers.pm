@@ -37,7 +37,8 @@ sub register {
   # "t" is just a shortcut for the "tag" helper
   $app->helper($_ => sub { shift; _tag(@_) }) for qw(t tag);
 
-  $app->helper(text_area => \&_text_area);
+  $app->helper(tag_with_error => \&_tag_with_error);
+  $app->helper(text_area      => \&_text_area);
 }
 
 sub _form_for {
@@ -46,7 +47,7 @@ sub _form_for {
 
   # POST detection
   my @post;
-  if (my $r = $self->app->routes->find($url[0])) {
+  if (my $r = $self->app->routes->lookup($url[0])) {
     my %methods = (GET => 1, POST => 1);
     do {
       my @via = @{$r->via || []};
@@ -210,6 +211,13 @@ sub _tag {
   return Mojo::ByteStream->new($tag);
 }
 
+sub _tag_with_error {
+  my ($self, $tag) = (shift, shift);
+  my ($content, %attrs) = (@_ % 2 ? pop : undef, @_);
+  $attrs{class} .= $attrs{class} ? ' field-with-error' : 'field-with-error';
+  return _tag($tag, %attrs, defined $content ? $content : ());
+}
+
 sub _text_area {
   my ($self, $name) = (shift, shift);
 
@@ -223,11 +231,9 @@ sub _text_area {
 }
 
 sub _validation {
-  my ($self, $name, $tag) = (shift, shift, shift);
-  my ($content, %attrs) = (@_ % 2 ? pop : undef, @_);
-  $attrs{class} .= $attrs{class} ? ' field-with-error' : 'field-with-error'
-    if $self->validation->has_error($name);
-  return _tag($tag, %attrs, defined $content ? $content : ());
+  my ($self, $name) = (shift, shift);
+  return _tag(@_) unless $self->validation->has_error($name);
+  return $self->tag_with_error(@_);
 }
 
 1;
@@ -262,8 +268,8 @@ necessary attributes always be generated automatically.
   <%= radio_button country => 'uk'      %> UK
 
 For fields that failed validation with L<Mojolicious::Controller/"validation">
-the C<field-with-error> class will be automatically added to make styling with
-CSS easier.
+the C<field-with-error> class will be automatically added through the
+C<tag_with_error> helper, to make styling with CSS easier.
 
   <input class="field-with-error" name="age" type="text" value="250" />
 
@@ -436,7 +442,7 @@ Generate portable script tag for C<Javascript> asset.
 =head2 label_for
 
   %= label_for first_name => 'First name'
-  %= label_for first_name => 'First name, class => 'user'
+  %= label_for first_name => 'First name', class => 'user'
   %= label_for first_name => begin
     First name
   % end
@@ -626,14 +632,22 @@ Alias for C<tag>.
   %= tag 'div'
   %= tag 'div', id => 'foo'
   %= tag div => 'some & content'
-  <%= tag div => begin %>some & content<% end %>
+  %= tag div => (id => 'foo') => 'some & content'
+  %= tag div => begin
+    some & content
+  % end
+  <%= tag div => (id => 'foo') => begin %>some & content<% end %>
 
 HTML tag generator.
 
   <div />
   <div id="foo" />
   <div>some &amp; content</div>
-  <div>some & content</div>
+  <div id="foo">some &amp; content</div>
+  <div>
+    some & content
+  </div>
+  <div id="foo">some & content</div>
 
 Very useful for reuse in more specific tag helpers.
 
@@ -643,6 +657,14 @@ Very useful for reuse in more specific tag helpers.
 
 Results are automatically wrapped in L<Mojo::ByteStream> objects to prevent
 accidental double escaping.
+
+=head2 tag_with_error
+
+  %= tag_with_error 'input', class => 'foo'
+
+Same as C<tag>, but adds the class C<field-with-error>.
+
+  <input class="foo field-with-error" />
 
 =head2 tel_field
 
