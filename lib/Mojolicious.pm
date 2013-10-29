@@ -43,7 +43,7 @@ has types     => sub { Mojolicious::Types->new };
 has validator => sub { Mojolicious::Validator->new };
 
 our $CODENAME = 'Top Hat';
-our $VERSION  = '4.51';
+our $VERSION  = '4.52';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -718,6 +718,8 @@ Adam Kennedy
 Adriano Ferreira
 
 Al Newkirk
+
+Alex Efros
 
 Alex Salimon
 
