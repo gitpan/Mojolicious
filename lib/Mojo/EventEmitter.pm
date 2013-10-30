@@ -27,14 +27,8 @@ sub emit_safe {
     warn "-- Emit $name in @{[blessed $self]} safely (@{[scalar @$s]})\n"
       if DEBUG;
     for my $cb (@$s) {
-      unless (eval { $self->$cb(@_); 1 }) {
-
-        # Error event failed
-        if ($name eq 'error') { die "@{[blessed $self]}: $@" }
-
-        # Normal event failed
-        else { $self->emit_safe(error => qq{Event "$name" failed: $@}) }
-      }
+      $self->emit(error => qq{Event "$name" failed: $@})
+        unless eval { $self->$cb(@_); 1 };
     }
   }
   else {
@@ -76,6 +70,7 @@ sub unsubscribe {
   # One
   if ($cb) {
     $self->{events}{$name} = [grep { $cb ne $_ } @{$self->{events}{$name}}];
+    delete $self->{events}{$name} unless @{$self->{events}{$name}};
   }
 
   # All
@@ -128,7 +123,7 @@ L<Mojo::EventEmitter> can emit the following events.
     ...
   });
 
-Emitted safely for event errors, fatal if unhandled.
+Emitted for event errors, fatal if unhandled.
 
   $e->on(error => sub {
     my ($e, $err) = @_;
