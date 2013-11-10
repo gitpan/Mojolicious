@@ -43,7 +43,7 @@ has types     => sub { Mojolicious::Types->new };
 has validator => sub { Mojolicious::Validator->new };
 
 our $CODENAME = 'Top Hat';
-our $VERSION  = '4.55';
+our $VERSION  = '4.56';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -802,6 +802,8 @@ Graham Barr
 Henry Tang
 
 Hideki Yamamura
+
+Ian Goodacre
 
 Ilya Chesnokov
 
