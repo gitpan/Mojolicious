@@ -458,9 +458,9 @@ Mojo::UserAgent - Non-blocking I/O HTTP and WebSocket user agent
 =head1 SYNOPSIS
 
   use Mojo::UserAgent;
-  my $ua = Mojo::UserAgent->new;
 
   # Say hello to the Unicode snowman with "Do Not Track" header
+  my $ua = Mojo::UserAgent->new;
   say $ua->get('www.☃.net?hello=there' => {DNT => 1})->res->body;
 
   # Form POST with exception handling
@@ -754,8 +754,8 @@ L<Mojo::UserAgent::Transactor/"tx">.
 =head2 build_websocket_tx
 
   my $tx = $ua->build_websocket_tx('ws://example.com');
-  my $tx =
-    $ua->build_websocket_tx('ws://example.com' => {DNT => 1} => ['v1.proto']);
+  my $tx = $ua->build_websocket_tx(
+    'ws://example.com' => {DNT => 1} => ['v1.proto']);
 
 Generate L<Mojo::Transaction::HTTP> object with
 L<Mojo::UserAgent::Transactor/"websocket">.
