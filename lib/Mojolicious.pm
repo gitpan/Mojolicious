@@ -43,12 +43,12 @@ has types     => sub { Mojolicious::Types->new };
 has validator => sub { Mojolicious::Validator->new };
 
 our $CODENAME = 'Top Hat';
-our $VERSION  = '4.63';
+our $VERSION  = '4.64';
 
 sub AUTOLOAD {
   my $self = shift;
 
-  my ($package, $method) = our $AUTOLOAD =~ /^([\w:]+)::(\w+)$/;
+  my ($package, $method) = split /::(\w+)$/, our $AUTOLOAD;
   croak "Undefined subroutine &${package}::$method called"
     unless blessed $self && $self->isa(__PACKAGE__);
 
@@ -459,8 +459,8 @@ change it!!! As long as you are using the insecure default there will be debug
 messages in the log file reminding you to change your passphrase. Only the
 first passphrase is used to create new signatures, but all of them for
 verification. So you can increase security without invalidating all your
-signed cookies by rotating passphrases, just add new ones to the front and
-remove old ones from the back.
+existing signed cookies by rotating passphrases, just add new ones to the
+front and remove old ones from the back.
 
   # Rotate passphrases
   $app->secrets(['new_passw0rd', 'old_passw0rd', 'very_old_passw0rd']);
@@ -649,7 +649,7 @@ that have been bundled for internal use.
 
 =head2 Mojolicious Artwork
 
-  Copyright (C) 2010-2013, Sebastian Riedel.
+  Copyright (C) 2010-2014, Sebastian Riedel.
 
 Licensed under the CC-SA License, Version 4.0
 L<http://creativecommons.org/licenses/by-sa/4.0>.
@@ -957,7 +957,7 @@ Zak B. Elep
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2008-2013, Sebastian Riedel.
+Copyright (C) 2008-2014, Sebastian Riedel.
 
 This program is free software, you can redistribute it and/or modify it under
 the terms of the Artistic License version 2.0.

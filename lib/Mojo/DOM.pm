@@ -18,7 +18,7 @@ use Scalar::Util qw(blessed weaken);
 sub AUTOLOAD {
   my $self = shift;
 
-  my ($package, $method) = our $AUTOLOAD =~ /^([\w:]+)::(\w+)$/;
+  my ($package, $method) = split /::(\w+)$/, our $AUTOLOAD;
   croak "Undefined subroutine &${package}::$method called"
     unless blessed $self && $self->isa(__PACKAGE__);
 
@@ -125,7 +125,7 @@ sub prepend { shift->_add(0, @_) }
 sub prepend_content {
   my ($self, $new) = @_;
   my $tree = $self->tree;
-  splice @$tree, _offset($tree), 0, _link($self->_parse("$new"), $tree);
+  splice @$tree, _start($tree), 0, _link($self->_parse("$new"), $tree);
   return $self;
 }
 
@@ -143,7 +143,7 @@ sub replace {
 sub replace_content {
   my ($self, $new) = @_;
   my $tree = $self->tree;
-  splice @$tree, _offset($tree), $#$tree, _link($self->_parse("$new"), $tree);
+  splice @$tree, _start($tree), $#$tree, _link($self->_parse("$new"), $tree);
   return $self;
 }
 
@@ -190,8 +190,7 @@ sub text_before {
   my @nodes;
   for my $n (_nodes($tree->[3])) {
     last if $n eq $tree;
-    push @nodes, $n;
-    @nodes = () if $n->[0] eq 'tag';
+    @nodes = $n->[0] eq 'tag' ? () : (@nodes, $n);
   }
 
   return _text(\@nodes, 0, _trim($tree->[3], $trim));
@@ -217,7 +216,7 @@ sub _add {
   return $self if (my $tree = $self->tree)->[0] eq 'root';
 
   my $parent = $tree->[3];
-  splice @$parent, _parent($parent, $tree) + $offset, 0,
+  splice @$parent, _offset($parent, $tree) + $offset, 0,
     _link($self->_parse("$new"), $parent);
 
   return $self;
@@ -267,22 +266,14 @@ sub _link {
 }
 
 sub _nodes {
-  return unless my $n = shift;
-  return @$n[_offset($n) .. $#$n];
+  return unless my $tree = shift;
+  return @$tree[_start($tree) .. $#$tree];
 }
 
-sub _offset { $_[0][0] eq 'root' ? 1 : 4 }
-
-sub _parent {
+sub _offset {
   my ($parent, $child) = @_;
-
-  # Find parent offset for child
-  my $i = _offset($parent);
-  for my $n (@$parent[$i .. $#$parent]) {
-    last if $n == $child;
-    $i++;
-  }
-
+  my $i = _start($parent);
+  $_ eq $child ? last : $i++ for @$parent[$i .. $#$parent];
   return $i;
 }
 
@@ -293,7 +284,7 @@ sub _render { Mojo::DOM::HTML->new(tree => shift, xml => shift)->render }
 sub _replace {
   my ($self, $tree, $new) = @_;
   my $parent = $tree->[3];
-  splice @$parent, _parent($parent, $tree), 1, _link($new, $parent);
+  splice @$parent, _offset($parent, $tree), 1, _link($new, $parent);
   return $self->parent;
 }
 
@@ -316,6 +307,8 @@ sub _siblings {
 
   return $merge ? [@before, @after] : [\@before, \@after];
 }
+
+sub _start { $_[0][0] eq 'root' ? 1 : 4 }
 
 sub _text {
   my ($nodes, $recurse, $trim) = @_;
@@ -354,15 +347,15 @@ sub _text {
 }
 
 sub _trim {
-  my ($e, $trim) = @_;
+  my ($n, $trim) = @_;
 
   # Disabled
-  return 0 unless $e && ($trim = defined $trim ? $trim : 1);
+  return 0 unless $n && ($trim = defined $trim ? $trim : 1);
 
   # Detect "pre" tag
-  while ($e->[0] eq 'tag') {
-    return 0 if $e->[1] eq 'pre';
-    last unless $e = $e->[3];
+  while ($n->[0] eq 'tag') {
+    return 0 if $n->[1] eq 'pre';
+    last unless $n = $n->[3];
   }
 
   return 1;
