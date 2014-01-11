@@ -1,4 +1,11 @@
 
+4.67  2014-01-11
+  - Added history and max_history_size attributes to Mojo::Log.
+  - Improved exception and not found pages with log messages.
+  - Improved exception page with more information.
+  - Improved not found page with a more generic message.
+  - Improved inline templates to use their checksum as name.
+
 4.66  2014-01-04
   - Added success attribute to Test::Mojo.
   - Improved Mojo::DOM::CSS and Mojo::DOM::HTML performance.

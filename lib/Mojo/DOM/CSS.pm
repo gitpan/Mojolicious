@@ -125,24 +125,13 @@ sub _compile {
       push @$selector, ['attr', 'id',    _regex('',  $2)] if defined $2;
     }
 
-    # Pseudo classes
-    while ($pc =~ /$PSEUDO_CLASS_RE/g) {
-
-      # "not"
-      if ($1 eq 'not') {
-        my $subpattern = _compile($2)->[-1][-1];
-        push @$selector, ['pc', 'not', $subpattern];
-      }
-
-      # Everything else
-      else { push @$selector, ['pc', $1, $2] }
-    }
+    # Pseudo classes (":not" contains more selectors)
+    push @$selector, ['pc', "$1", $1 eq 'not' ? _compile($2) : $2]
+      while $pc =~ /$PSEUDO_CLASS_RE/g;
 
     # Attributes
-    while ($attrs =~ /$ATTR_RE/g) {
-      my ($key, $op, $value) = (_unescape($1), $2 // '', $3 // $4);
-      push @$selector, ['attr', $key, _regex($op, $value)];
-    }
+    push @$selector, ['attr', _unescape($1), _regex($2 // '', $3 // $4)]
+      while $attrs =~ /$ATTR_RE/g;
 
     # Combinator
     push @$part, [combinator => $combinator] if $combinator;
@@ -213,7 +202,7 @@ sub _pc {
   }
 
   # ":not"
-  elsif ($class eq 'not') { return 1 if !_selector($args, $current) }
+  elsif ($class eq 'not') { return 1 if !_match($args, $current, $current) }
 
   # ":nth-*"
   elsif ($class =~ /^nth-/) {

@@ -298,7 +298,7 @@ sub websocket_ok {
   Mojo::IOLoop->start;
 
   my $desc = encode 'UTF-8', "WebSocket $url";
-  return $self->_test('ok', $self->tx->res->code eq 101, $desc);
+  return $self->_test('ok', $self->tx->is_websocket, $desc);
 }
 
 sub _json {
@@ -609,6 +609,9 @@ Wait for WebSocket connection to be closed gracefully and check status.
 Perform a GET request and check for transport errors, takes the same
 arguments as L<Mojo::UserAgent/"get">, except for the callback.
 
+  # Run tests against remote host
+  $t->get_ok('http://mojolicio.us/perldoc')->status_is(200);
+
 =head2 head_ok
 
   $t = $t->head_ok('/foo');
@@ -793,7 +796,7 @@ arguments as L<Mojo::UserAgent/"post">, except for the callback.
     ->status_is(200);
 
   # Test JSON API
-  $t->post_json_ok('/hello.json' => json => {hello => 'world'})
+  $t->post_ok('/hello.json' => json => {hello => 'world'})
     ->status_is(200)
     ->json_is({bye => 'world'});
 
