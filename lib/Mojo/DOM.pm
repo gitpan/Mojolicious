@@ -12,6 +12,7 @@ use Carp 'croak';
 use Mojo::Collection;
 use Mojo::DOM::CSS;
 use Mojo::DOM::HTML;
+use Mojo::DOM::Node;
 use Mojo::Util 'squish';
 use Scalar::Util qw(blessed weaken);
 
@@ -52,7 +53,7 @@ sub append_content {
 sub at {
   my $self = shift;
   return undef unless my $result = $self->_css->select_one(@_);
-  return $self->new->tree($result)->xml($self->xml);
+  return _tag($self, $result, $self->xml);
 }
 
 sub attr {
@@ -84,6 +85,8 @@ sub content_xml {
   return join '', map { _render($_, $xml) } _nodes($self->tree);
 }
 
+sub contents { $_[0]->_collect(_nodes($_[0]->tree)) }
+
 sub find { $_[0]->_collect(@{$_[0]->_css->select($_[1])}) }
 
 sub match { $_[0]->_css->match($_[1]) ? $_[0] : undef }
@@ -112,10 +115,12 @@ sub namespace {
 
 sub next { shift->_siblings->[1][0] }
 
+sub node { shift->tree->[0] }
+
 sub parent {
   my $self = shift;
   return undef if (my $tree = $self->tree)->[0] eq 'root';
-  return $self->new->tree($tree->[3])->xml($self->xml);
+  return _tag($self, $tree->[3], $self->xml);
 }
 
 sub parse { shift->_delegate(parse => shift) }
@@ -150,7 +155,7 @@ sub replace_content {
 sub root {
   my $self = shift;
   return $self unless my $tree = _ancestors($self->tree, 1);
-  return $self->new->tree($tree)->xml($self->xml);
+  return _tag($self, $tree, $self->xml);
 }
 
 sub siblings { _select(Mojo::Collection->new(@{_siblings($_[0], 1)}), $_[1]) }
@@ -233,7 +238,7 @@ sub _collect {
   my $self = shift;
   my $xml  = $self->xml;
   return Mojo::Collection->new(@_)
-    ->map(sub { $self->new->tree($_)->xml($xml) });
+    ->map(sub { $_->[0] eq 'tag' ? _tag($self, $_, $xml) : _node($self, $_) });
 }
 
 sub _content {
@@ -264,6 +269,8 @@ sub _link {
 
   return @new;
 }
+
+sub _node { Mojo::DOM::Node->new(parent => $_[0], tree => $_[1]) }
 
 sub _nodes {
   return unless my $tree = shift;
@@ -309,6 +316,8 @@ sub _siblings {
 }
 
 sub _start { $_[0][0] eq 'root' ? 1 : 4 }
+
+sub _tag { $_[0]->new->tree($_[1])->xml($_[2]) }
 
 sub _text {
   my ($nodes, $recurse, $trim) = @_;
@@ -530,6 +539,16 @@ Render content of this element to XML.
   # "<b>test</b>"
   $dom->parse('<div><b>test</b></div>')->div->content_xml;
 
+=head2 contents
+
+  my $collection = $dom->contents;
+
+Return a L<Mojo::Collection> object containing the children of this element as
+L<Mojo::DOM> and L<Mojo::DOM::Node> objects.
+
+  "<p><b>123</b></p>"
+  $dom->parse('<p>test<b>123</b></p>')->at('p')->contents->first->remove;
+
 =head2 find
 
   my $collection = $dom->find('html title');
@@ -574,6 +593,12 @@ are no more siblings.
 
   # "<h2>B</h2>"
   $dom->parse('<div><h1>A</h1><h2>B</h2></div>')->at('h1')->next;
+
+=head2 node
+
+  my $type = $dom->node;
+
+Node type, usually C<root> or C<tag>.
 
 =head2 parent
 

@@ -142,6 +142,34 @@ is_deeply [$dom->at('simple')->ancestors->type->each], ['foo'],
   'right results';
 ok !$dom->at('simple')->ancestors->first->xml, 'XML mode not active';
 
+# Nodes
+$dom = Mojo::DOM->new(
+  '<!DOCTYPE before><p>test<![CDATA[123]]><!-- 456 --></p><?after?>');
+is $dom->contents->[1]->contents->first->parent->type, 'p', 'right type';
+is $dom->contents->[1]->contents->first->content, 'test', 'right content';
+is $dom->contents->[1]->contents->first, 'test', 'right content';
+is $dom->at('p')->contents->first->node, 'text', 'right node';
+is $dom->at('p')->contents->first->remove->type, 'p', 'right type';
+is $dom->at('p')->contents->first->node,    'cdata', 'right node';
+is $dom->at('p')->contents->first->content, '123',   'right content';
+is $dom->at('p')->contents->[1]->node,    'comment', 'right node';
+is $dom->at('p')->contents->[1]->content, ' 456 ',   'right content';
+is $dom->contents->first->node,    'doctype', 'right node';
+is $dom->contents->first->content, ' before', 'right content';
+is $dom->contents->[2]->node,    'pi',    'right node';
+is $dom->contents->[2]->content, 'after', 'right content';
+is $dom->contents->first->content(' again')->content, ' again',
+  'right content';
+is $dom->contents->grep(sub { $_->node eq 'pi' })->remove->first->node,
+  'root', 'right node';
+is "$dom", '<!DOCTYPE again><p><![CDATA[123]]><!-- 456 --></p>',
+  'right result';
+$dom = Mojo::DOM->new('<script>la<la>la</script>');
+is $dom->at('script')->node, 'tag', 'right node';
+is $dom->at('script')->contents->first->node,    'raw',      'right node';
+is $dom->at('script')->contents->first->content, 'la<la>la', 'right content';
+is "$dom", '<script>la<la>la</script>', 'right result';
+
 # Class and ID
 $dom = Mojo::DOM->new->parse('<div id="id" class="class">a</div>');
 is $dom->at('div#id.class')->text, 'a', 'right text';
@@ -1762,17 +1790,20 @@ is $dom->at('div:root')->text, 'Test', 'right text';
 ok !!Mojo::DOM->new->xml(1)->parse('<foo />')->xml, 'XML mode active';
 $dom = Mojo::DOM->new->parse(<<'EOF');
 <?xml version='1.0' encoding='UTF-8'?>
-<table>
-  <td>
-    <tr><thead>foo<thead></tr>
-  </td>
-  <td>
-    <tr><thead>bar<thead></tr>
-  </td>
-</table>
+<script>
+  <table>
+    <td>
+      <tr><thead>foo<thead></tr>
+    </td>
+    <td>
+      <tr><thead>bar<thead></tr>
+    </td>
+  </table>
+</script>
 EOF
 is $dom->find('table > td > tr > thead')->[0]->text, 'foo', 'right text';
-is $dom->find('table > td > tr > thead')->[1]->text, 'bar', 'right text';
+is $dom->find('script > table > td > tr > thead')->[1]->text, 'bar',
+  'right text';
 is $dom->find('table > td > tr > thead')->[2], undef, 'no result';
 is $dom->find('table > td > tr > thead')->size, 2, 'right number of elements';
 

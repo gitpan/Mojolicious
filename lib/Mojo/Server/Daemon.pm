@@ -302,7 +302,7 @@ L<IO::Socket::SSL> (1.75+) will be used automatically by L<Mojo::IOLoop> if
 they are installed. Individual features can also be disabled with the
 MOJO_NO_IPV6 and MOJO_NO_TLS environment variables.
 
-See L<Mojolicious::Guides::Cookbook> for more.
+See L<Mojolicious::Guides::Cookbook/"DEPLOYMENT"> for more.
 
 =head1 EVENTS
 
@@ -360,11 +360,20 @@ L<Mojo::IOLoop> singleton.
 List of one or more locations to listen on, defaults to the value of the
 MOJO_LISTEN environment variable or C<http://*:3000>.
 
-  # Allow multiple servers to use the same port (SO_REUSEPORT)
-  $daemon->listen(['http://*:8080?reuse=1']);
+  # Listen on all IPv4 interfaces
+  $daemon->listen(['http://*:3000']);
+
+  # Listen on all IPv4 and IPv6 interfaces
+  $daemon->listen(['http://[::]:3000']);
 
   # Listen on IPv6 interface
   $daemon->listen(['http://[::1]:4000']);
+
+  # Listen on IPv4 and IPv6 interfaces
+  $daemon->listen(['http://127.0.0.1:3000', 'http://[::1]:3000']);
+
+  # Allow multiple servers to use the same port (SO_REUSEPORT)
+  $daemon->listen(['http://*:8080?reuse=1']);
 
   # Listen on two ports with HTTP and HTTPS at the same time
   $daemon->listen([qw(http://*:3000 https://*:4000)]);
@@ -424,7 +433,7 @@ TLS verification mode, defaults to C<0x03>.
   my $max = $daemon->max_clients;
   $daemon = $daemon->max_clients(1000);
 
-Maximum number of parallel client connections, defaults to C<1000>.
+Maximum number of concurrent client connections, defaults to C<1000>.
 
 =head2 max_requests
 

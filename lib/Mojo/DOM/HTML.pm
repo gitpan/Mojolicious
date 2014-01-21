@@ -126,11 +126,11 @@ sub parse {
         _end($start, $xml, \$current)
           if (!$xml && $VOID{$start}) || $attr =~ m!/\s*$!;
 
-        # Relaxed "script" or "style"
-        next unless $start eq 'script' || $start eq 'style';
+        # Relaxed "script" or "style" HTML elements
+        next if $xml || ($start ne 'script' && $start ne 'style');
         next unless $html =~ m!\G(.*?)<\s*/\s*$start\s*>!gcsi;
         push @$current, ['raw', $1];
-        _end($start, $xml, \$current);
+        _end($start, 0, \$current);
       }
     }
 
@@ -225,10 +225,8 @@ sub _render {
   return '<?' . $tree->[1] . '?>' if $type eq 'pi';
 
   # Start tag
-  my $start   = 1;
   my $content = '';
   if ($type eq 'tag') {
-    $start = 4;
 
     # Open tag
     my $tag = $tree->[1];
@@ -237,10 +235,9 @@ sub _render {
     # Attributes
     my @attrs;
     for my $key (sort keys %{$tree->[2]}) {
-      my $value = $tree->[2]{$key};
 
       # No value
-      push @attrs, $key and next unless defined $value;
+      push @attrs, $key and next unless defined(my $value = $tree->[2]{$key});
 
       # Key and value
       push @attrs, qq{$key="} . xml_escape($value) . '"';
@@ -256,7 +253,8 @@ sub _render {
   }
 
   # Render whole tree
-  $content .= _render($tree->[$_], $xml) for $start .. $#$tree;
+  $content .= _render($tree->[$_], $xml)
+    for ($type eq 'root' ? 1 : 4) .. $#$tree;
 
   # End tag
   $content .= '</' . $tree->[1] . '>' if $type eq 'tag';
@@ -314,7 +312,9 @@ Mojo::DOM::HTML - HTML/XML engine
 
 =head1 DESCRIPTION
 
-L<Mojo::DOM::HTML> is the HTML/XML engine used by L<Mojo::DOM>.
+L<Mojo::DOM::HTML> is the HTML/XML engine used by L<Mojo::DOM> and based on
+the L<HTML Living Standard|http://www.whatwg.org/html> as well as the
+L<Extensible Markup Language (XML) 1.0|http://www.w3.org/TR/xml/>.
 
 =head1 ATTRIBUTES
 

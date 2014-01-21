@@ -314,7 +314,7 @@ L<IO::Socket::SSL> (1.75+) will be used automatically if they are installed.
 Individual features can also be disabled with the MOJO_NO_IPV6 and MOJO_NO_TLS
 environment variables.
 
-See L<Mojolicious::Guides::Cookbook> for more.
+See L<Mojolicious::Guides::Cookbook/"REAL-TIME WEB"> for more.
 
 =head1 ATTRIBUTES
 
@@ -361,7 +361,7 @@ randomly to improve load balancing between multiple server processes.
   my $max = $loop->max_connections;
   $loop   = $loop->max_connections(1000);
 
-The maximum number of parallel connections this event loop is allowed to
+The maximum number of concurrent connections this event loop is allowed to
 handle before stopping to accept new incoming connections, defaults to
 C<1000>. Setting the value to C<0> will make this event loop stop accepting
 new connections and allow it to shut down gracefully without interrupting
@@ -380,7 +380,8 @@ Number of connections to accept at once, defaults to C<50>.
   $loop       = $loop->reactor(Mojo::Reactor->new);
 
 Low level event reactor, usually a L<Mojo::Reactor::Poll> or
-L<Mojo::Reactor::EV> object with a default C<error> event.
+L<Mojo::Reactor::EV> object with a default subscriber to the event
+L<Mojo::Reactor/"error">.
 
   # Watch if handle becomes readable or writable
   $loop->reactor->io($handle => sub {
@@ -435,9 +436,11 @@ L<Mojo::IOLoop::Client/"connect">.
   my $delay = $loop->delay(sub {...});
   my $delay = $loop->delay(sub {...}, sub {...});
 
-Get L<Mojo::IOLoop::Delay> object to manage callbacks and control the flow of
-events. A single callback will be treated as a subscriber to the C<finish>
-event, and multiple ones as a chain of steps.
+Build L<Mojo::IOLoop::Delay> object to manage callbacks and control the flow
+of events, which can help you avoid deep nested closures that often result
+from continuation-passing style. A single callback will be treated as a
+subscriber to the event L<Mojo::IOLoop::Delay/"finish">, and multiple ones as
+a chain for L<Mojo::IOLoop::Delay/"steps">.
 
   # Synchronize multiple events
   my $delay = Mojo::IOLoop->delay(sub { say 'BOOM!' });

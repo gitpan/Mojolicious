@@ -265,7 +265,7 @@ L<IO::Socket::SSL> (1.75+) will be used automatically by L<Mojo::IOLoop> if
 they are installed. Individual features can also be disabled with the
 MOJO_NO_IPV6 and MOJO_NO_TLS environment variables.
 
-See L<Mojolicious::Guides::Cookbook> for more.
+See L<Mojolicious::Guides::Cookbook/"DEPLOYMENT"> for more.
 
 =head1 MANAGER SIGNALS
 
@@ -462,7 +462,10 @@ Full path of process id file, defaults to a random temporary path.
   $prefork    = $prefork->workers(10);
 
 Number of worker processes, defaults to C<4>. A good rule of thumb is two
-worker processes per CPU core.
+worker processes per CPU core for applications that perform mostly
+non-blocking operations, blocking operations often require more and benefit
+from decreasing the number of concurrent L<Mojo::Server::Daemon/"clients">
+(often as low as C<1>).
 
 =head1 METHODS
 
