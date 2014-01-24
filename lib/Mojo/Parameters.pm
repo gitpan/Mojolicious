@@ -10,8 +10,6 @@ use Mojo::Util qw(decode encode url_escape url_unescape);
 
 has charset => 'UTF-8';
 
-sub new { shift->SUPER::new->parse(@_) }
-
 sub append {
   my ($self, @pairs) = @_;
 
@@ -45,6 +43,8 @@ sub merge {
   push @{$self->params}, @{$_->params} for @_;
   return $self;
 }
+
+sub new { shift->SUPER::new->parse(@_) }
 
 sub param {
   my ($self, $name) = (shift, shift);
@@ -222,17 +222,6 @@ Charset used for encoding and decoding parameters, defaults to C<UTF-8>.
 L<Mojo::Parameters> inherits all methods from L<Mojo::Base> and implements the
 following new ones.
 
-=head2 new
-
-  my $params = Mojo::Parameters->new;
-  my $params = Mojo::Parameters->new('foo=b%3Bar&baz=23');
-  my $params = Mojo::Parameters->new(foo => 'b;ar');
-  my $params = Mojo::Parameters->new(foo => ['ba;r', 'b;az']);
-  my $params = Mojo::Parameters->new(foo => ['ba;r', 'b;az'], bar => 23);
-
-Construct a new L<Mojo::Parameters> object and L</"parse"> parameters if
-necessary.
-
 =head2 append
 
   $params = $params->append(foo => 'ba;r');
@@ -262,6 +251,17 @@ Clone parameters.
 
 Merge L<Mojo::Parameters> objects. Note that this method will normalize the
 parameters.
+
+=head2 new
+
+  my $params = Mojo::Parameters->new;
+  my $params = Mojo::Parameters->new('foo=b%3Bar&baz=23');
+  my $params = Mojo::Parameters->new(foo => 'b;ar');
+  my $params = Mojo::Parameters->new(foo => ['ba;r', 'b;az']);
+  my $params = Mojo::Parameters->new(foo => ['ba;r', 'b;az'], bar => 23);
+
+Construct a new L<Mojo::Parameters> object and L</"parse"> parameters if
+necessary.
 
 =head2 param
 
@@ -312,17 +312,33 @@ the parameters.
 =head2 to_string
 
   my $str = $params->to_string;
-  my $str = "$params";
 
 Turn parameters into a string.
 
-=head1 PARAMETERS
+=head1 OPERATORS
 
-Direct array reference access to the parsed parameters is also possible. Note
-that this will normalize the parameters.
+L<Mojo::Parameters> overloads the following operators.
+
+=head2 array
+
+  my @params = @$params;
+
+Alias for L</"params">. Note that this will normalize the parameters.
 
   say $params->[0];
   say for @$params;
+
+=head2 bool
+
+  my $bool = !!$params;
+
+Always true.
+
+=head2 stringify
+
+  my $str = "$params";
+
+Alias for L</"to_string">.
 
 =head1 SEE ALSO
 

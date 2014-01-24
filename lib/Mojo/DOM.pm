@@ -31,12 +31,6 @@ sub AUTOLOAD {
 
 sub DESTROY { }
 
-sub new {
-  my $class = shift;
-  my $self = bless [Mojo::DOM::HTML->new], ref $class || $class;
-  return @_ ? $self->parse(@_) : $self;
-}
-
 sub all_text { shift->_content(1, @_) }
 
 sub ancestors { _select($_[0]->_collect(_ancestors($_[0]->tree)), $_[1]) }
@@ -111,6 +105,12 @@ sub namespace {
   }
 
   return '';
+}
+
+sub new {
+  my $class = shift;
+  my $self = bless [Mojo::DOM::HTML->new], ref $class || $class;
+  return @_ ? $self->parse(@_) : $self;
 }
 
 sub next { shift->_siblings->[1][0] }
@@ -443,14 +443,6 @@ XML detection can also be disabled with the L</"xml"> method.
 
 L<Mojo::DOM> implements the following methods.
 
-=head2 new
-
-  my $dom = Mojo::DOM->new;
-  my $dom = Mojo::DOM->new('<foo bar="baz">test</foo>');
-
-Construct a new array-based L<Mojo::DOM> object and L</"parse"> HTML/XML
-fragment if necessary.
-
 =head2 all_text
 
   my $trimmed   = $dom->all_text;
@@ -583,6 +575,14 @@ Find element namespace.
 
   # Find namespace for an element that may or may not have a namespace prefix
   my $namespace = $dom->at('svg > circle')->namespace;
+
+=head2 new
+
+  my $dom = Mojo::DOM->new;
+  my $dom = Mojo::DOM->new('<foo bar="baz">test</foo>');
+
+Construct a new array-based L<Mojo::DOM> object and L</"parse"> HTML/XML
+fragment if necessary.
 
 =head2 next
 
@@ -757,7 +757,6 @@ is enabled by default.
 =head2 to_xml
 
   my $xml = $dom->to_xml;
-  my $xml = "$dom";
 
 Render this element and its content to XML.
 
@@ -790,22 +789,40 @@ Element type.
 Disable HTML semantics in parser and activate case sensitivity, defaults to
 auto detection based on processing instructions.
 
-=head1 CHILD ELEMENTS
+=head1 AUTOLOAD
 
-In addition to the methods above, many child elements are also automatically
-available as object methods, which return a L<Mojo::DOM> or
+In addition to the L</"METHODS"> above, many child elements are also
+automatically available as object methods, which return a L<Mojo::DOM> or
 L<Mojo::Collection> object, depending on number of children.
 
   say $dom->p->text;
   say $dom->div->[23]->text;
   say $dom->div->text;
 
-=head1 ELEMENT ATTRIBUTES
+=head1 OPERATORS
 
-Direct hash reference access to element attributes is also possible.
+L<Mojo::DOM> overloads the following operators.
+
+=head2 bool
+
+  my $bool = !!$dom;
+
+Always true.
+
+=head2 hash
+
+  my %attrs = %$dom;
+
+Alias for L</"attr">.
 
   say $dom->{foo};
   say $dom->div->{id};
+
+=head2 stringify
+
+  my $xml = "$dom";
+
+Alias for L</"to_xml">.
 
 =head1 SEE ALSO
 

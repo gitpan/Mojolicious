@@ -78,7 +78,7 @@ Mojo::Date - HTTP date
 =head1 DESCRIPTION
 
 L<Mojo::Date> implements HTTP date and time functions as described in
-L<RFC 2616|http://tools.ietf.org/search/rfc2616>.
+L<RFC 2616|http://tools.ietf.org/html/rfc2616>.
 
   Sun, 06 Nov 1994 08:49:37 GMT  ; RFC 822, updated by RFC 1123
   Sunday, 06-Nov-94 08:49:37 GMT ; RFC 850, obsoleted by RFC 1036
@@ -128,9 +128,24 @@ Parse date.
 =head2 to_string
 
   my $str = $date->to_string;
-  my $str = "$date";
 
 Render date suitable for HTTP messages.
+
+=head1 OPERATORS
+
+L<Mojo::Date> overloads the following operators.
+
+=head2 bool
+
+  my $bool = !!$date;
+
+Always true.
+
+=head2 stringify
+
+  my $str = "$date";
+
+Alias for L</to_string>.
 
 =head1 SEE ALSO
 

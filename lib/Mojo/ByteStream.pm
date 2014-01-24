@@ -24,11 +24,6 @@ for my $name (@UTILS) {
   };
 }
 
-sub new {
-  my $class = shift;
-  return bless \(my $dummy = join '', @_), ref $class || $class;
-}
-
 sub b { __PACKAGE__->new(@_) }
 
 sub clone { $_[0]->new(${$_[0]}) }
@@ -43,6 +38,11 @@ sub encode {
   my $self = shift;
   $$self = Mojo::Util::encode shift || 'UTF-8', $$self;
   return $self;
+}
+
+sub new {
+  my $class = shift;
+  return bless \(my $dummy = join '', @_), ref $class || $class;
 }
 
 sub say {
@@ -91,8 +91,12 @@ Mojo::ByteStream - ByteStream
 
 =head1 DESCRIPTION
 
-L<Mojo::ByteStream> provides a more friendly API for the bytestream
-manipulation functions in L<Mojo::Util>.
+L<Mojo::ByteStream> is a scalar-based container for bytestreams that provides
+a more friendly API for many of the functions in L<Mojo::Util>.
+
+  # Access scalar directly to manipulate bytestream
+  my $stream = Mojo::ByteStream->new('foo');
+  $$stream .= 'bar';
 
 =head1 FUNCTIONS
 
@@ -107,12 +111,6 @@ Construct a new scalar-based L<Mojo::ByteStream> object.
 =head1 METHODS
 
 L<Mojo::ByteStream> implements the following methods.
-
-=head2 new
-
-  my $stream = Mojo::ByteStream->new('test123');
-
-Construct a new scalar-based L<Mojo::ByteStream> object.
 
 =head2 b64_decode
 
@@ -192,6 +190,12 @@ Generate binary MD5 checksum for bytestream with L<Mojo::Util/"md5_bytes">.
   $stream = $stream->md5_sum;
 
 Generate MD5 checksum for bytestream with L<Mojo::Util/"md5_sum">.
+
+=head2 new
+
+  my $stream = Mojo::ByteStream->new('test123');
+
+Construct a new scalar-based L<Mojo::ByteStream> object.
 
 =head2 punycode_decode
 
@@ -286,7 +290,6 @@ Alias for L<Mojo::Base/"tap">.
 =head2 to_string
 
   my $str = $stream->to_string;
-  my $str = "$stream";
 
 Stringify bytestream.
 
@@ -335,11 +338,21 @@ bytestream with L<Mojo::Util/"xml_escape">.
 
 XOR encode bytestream with L<Mojo::Util/"xor_encode">.
 
-=head1 BYTESTREAM
+=head1 OPERATORS
 
-Direct scalar reference access to the bytestream is also possible.
+L<Mojo::ByteStream> overloads the following operators.
 
-  $$stream .= 'foo';
+=head2 bool
+
+  my $bool = !!$bytestream;
+
+Always true.
+
+=head2 stringify
+
+  my $str = "$bytestream";
+
+Alias for L</to_string>.
 
 =head1 SEE ALSO
 
