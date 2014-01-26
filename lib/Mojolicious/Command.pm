@@ -9,12 +9,13 @@ use File::Spec::Functions qw(catdir catfile);
 use Mojo::Loader;
 use Mojo::Server;
 use Mojo::Template;
-use Mojo::Util 'spurt';
+use Mojo::Util qw(spurt unindent);
+use Pod::Usage 'pod2usage';
 
 has app => sub { Mojo::Server->new->build_app('Mojo::HelloWorld') };
 has description => 'No description.';
 has quiet       => 0;
-has usage       => "usage: $0\n";
+has usage       => "Usage: APPLICATION\n";
 
 sub chmod_file {
   my ($self, $path, $mod) = @_;
@@ -24,10 +25,7 @@ sub chmod_file {
   return $self;
 }
 
-sub chmod_rel_file {
-  my ($self, $path, $mod) = @_;
-  $self->chmod_file($self->rel_file($path), $mod);
-}
+sub chmod_rel_file { $_[0]->chmod_file($_[0]->rel_file($_[1]), $_[2]) }
 
 sub create_dir {
   my ($self, $path) = @_;
@@ -41,9 +39,17 @@ sub create_dir {
   return $self;
 }
 
-sub create_rel_dir {
-  my ($self, $path) = @_;
-  $self->create_dir($self->rel_dir($path));
+sub create_rel_dir { $_[0]->create_dir($_[0]->rel_dir($_[1])) }
+
+sub extract_usage {
+  my $self = shift;
+
+  open my $handle, '>', \my $output;
+  pod2usage -exitval => 'noexit', -input => (caller)[1], -output => $handle;
+  $output =~ s/^.*\n//;
+  $output =~ s/\n$//;
+
+  return unindent $output;
 }
 
 sub help {
@@ -81,10 +87,7 @@ sub write_file {
   return $self;
 }
 
-sub write_rel_file {
-  my ($self, $path, $data) = @_;
-  $self->write_file($self->rel_file($path), $data);
-}
+sub write_rel_file { $_[0]->write_file($_[0]->rel_file($_[1]), $_[2]) }
 
 1;
 
@@ -105,9 +108,9 @@ Mojolicious::Command - Command base class
 
   # Short usage message
   has usage => <<EOF;
-  usage: $0 mycommand [OPTIONS]
+  Usage: APPLICATION mycommand [OPTIONS]
 
-  These options are available:
+  Options:
     -s, --something   Does something.
   EOF
 
@@ -188,6 +191,13 @@ Create a directory.
 
 Portably create a directory relative to the current working directory.
 
+=head2 extract_usage
+
+  my $usage = $command->extract_usage;
+
+Extract usage message from the SYNOPSIS section of the file this method was
+called from.
+
 =head2 help
 
   $command->help;
@@ -209,7 +219,6 @@ Portably generate an absolute path for a file relative to the current working
 directory.
 
 =head2 render_data
-
 
   my $data = $command->render_data('foo_bar');
   my $data = $command->render_data('foo_bar', @args);

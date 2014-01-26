@@ -5,7 +5,7 @@ use Mojo::Asset::File;
 use Mojo::ByteStream 'b';
 use Mojo::DOM;
 use Mojo::URL;
-use Mojo::Util qw(slurp url_escape);
+use Mojo::Util qw(slurp unindent url_escape);
 use Pod::Simple::HTML;
 use Pod::Simple::Search;
 
@@ -46,9 +46,10 @@ sub _html {
       if $attrs->{href} =~ s!^http://search\.cpan\.org/perldoc\?!$perldoc!;
   }
 
-  # Rewrite code blocks for syntax highlighting
+  # Rewrite code blocks for syntax highlighting and correct indentation
   for my $e ($dom->find('pre')->each) {
-    next if $e->all_text =~ /^\s*\$\s+/m;
+    $e->replace_content(my $xml = unindent $e->content_xml);
+    next if $xml =~ /^\s*(?:\$|Usage:)\s+/m || $xml !~ /[\$\@\%]\w|-&gt;\w/m;
     my $attrs = $e->attr;
     my $class = $attrs->{class};
     $attrs->{class} = defined $class ? "$class prettyprint" : 'prettyprint';

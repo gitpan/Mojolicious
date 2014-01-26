@@ -43,7 +43,7 @@ has types     => sub { Mojolicious::Types->new };
 has validator => sub { Mojolicious::Validator->new };
 
 our $CODENAME = 'Top Hat';
-our $VERSION  = '4.69';
+our $VERSION  = '4.70';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -656,7 +656,7 @@ L<http://creativecommons.org/licenses/by-sa/4.0>.
 
 =head2 jQuery
 
-  Copyright (C) 2005, 2013 jQuery Foundation, Inc.
+  Copyright (C) 2005, 2014 jQuery Foundation, Inc.
 
 Licensed under the MIT License, L<http://creativecommons.org/licenses/MIT>.
 

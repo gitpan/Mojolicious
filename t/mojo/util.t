@@ -13,7 +13,8 @@ use Mojo::Util
   qw(decode dumper encode get_line hmac_sha1_sum html_unescape md5_bytes),
   qw(md5_sum monkey_patch punycode_decode punycode_encode quote),
   qw(secure_compare sha1_bytes sha1_sum slurp split_header spurt squish),
-  qw(steady_time trim unquote url_escape url_unescape xml_escape xor_encode);
+  qw(steady_time trim unindent unquote url_escape url_unescape xml_escape),
+  qw(xor_encode);
 
 # camelize
 is camelize('foo_bar_baz'), 'FooBarBaz', 'right camelized result';
@@ -90,6 +91,25 @@ $tree   = [
   ]
 ];
 is_deeply split_header($header), $tree, 'right result';
+
+# unindent
+is unindent(" test\n  123\n 456\n"), "test\n 123\n456\n",
+  'right unindented result';
+is unindent("\ttest\n\t\t123\n\t456\n"), "test\n\t123\n456\n",
+  'right unindented result';
+is unindent("\t \ttest\n\t \t\t123\n\t \t456\n"), "test\n\t123\n456\n",
+  'right unindented result';
+is unindent("\n\n\n test\n  123\n 456\n"), "\n\n\ntest\n 123\n456\n",
+  'right unindented result';
+is unindent("   test\n    123\n   456\n"), "test\n 123\n456\n",
+  'right unindented result';
+is unindent("    test\n  123\n   456\n"), "  test\n123\n 456\n",
+  'right unindented result';
+is unindent("test\n123\n"),     "test\n123\n",   'right unindented result';
+is unindent(" test\n\n 123\n"), "test\n\n123\n", 'right unindented result';
+is unindent('  test'),          'test',          'right unindented result';
+is unindent(" te st\r\n\r\n  1 2 3\r\n 456\r\n"),
+  "te st\r\n\r\n 1 2 3\r\n456\r\n", 'right unindented result';
 
 # b64_encode
 is b64_encode('foobar$%^&3217'), "Zm9vYmFyJCVeJjMyMTc=\n",

@@ -8,6 +8,7 @@ use Digest::SHA qw(hmac_sha1_hex sha1 sha1_hex);
 use Encode 'find_encoding';
 use File::Basename 'dirname';
 use File::Spec::Functions 'catfile';
+use List::Util 'min';
 use MIME::Base64 qw(decode_base64 encode_base64);
 use Time::HiRes ();
 
@@ -42,7 +43,8 @@ our @EXPORT_OK = (
   qw(decode deprecated dumper encode get_line hmac_sha1_sum html_unescape),
   qw(md5_bytes md5_sum monkey_patch punycode_decode punycode_encode quote),
   qw(secure_compare sha1_bytes sha1_sum slurp split_header spurt squish),
-  qw(steady_time trim unquote url_escape url_unescape xml_escape xor_encode)
+  qw(steady_time trim unindent unquote url_escape url_unescape xml_escape),
+  qw(xor_encode)
 );
 
 sub b64_decode { decode_base64($_[0]) }
@@ -292,6 +294,13 @@ sub trim {
   return $str;
 }
 
+sub unindent {
+  my $str = shift;
+  my $min = min map { m/^([ \t]*)/; length $1 || () } split /\n/, $str;
+  $str =~ s/^[ \t]{0,$min}//gm if $min;
+  return $str;
+}
+
 sub unquote {
   my $str = shift;
   return $str unless $str =~ s/^"(.*)"$/$1/g;
@@ -394,7 +403,8 @@ L<Mojo::Util> provides portable utility functions for L<Mojo>.
 
 =head1 FUNCTIONS
 
-L<Mojo::Util> implements the following functions.
+L<Mojo::Util> implements the following functions, which can be imported
+individually.
 
 =head2 b64_decode
 
@@ -621,6 +631,12 @@ available through L<Time::HiRes>.
   my $trimmed = trim $str;
 
 Trim whitespace characters from both ends of string.
+
+=head2 unindent
+
+  my $unindented = unindent $str;
+
+Unindent multiline string.
 
 =head2 unquote
 
