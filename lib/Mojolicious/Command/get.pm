@@ -134,8 +134,8 @@ Mojolicious::Command::get - Get command
     ./myapp.pl get /
     mojo get mojolicio.us
     mojo get -v -r google.com
+    mojo get -v -H 'Host: mojolicious.org' -H 'DNT: 1' mojolicio.us
     mojo get -M POST -c 'trololo' mojolicio.us
-    mojo get -H 'X-Bender: Bite my shiny metal ass!' mojolicio.us
     mojo get mojolicio.us 'head > title' text
     mojo get mojolicio.us .footer all
     mojo get mojolicio.us a attr href
@@ -154,7 +154,8 @@ Mojolicious::Command::get - Get command
 
 =head1 DESCRIPTION
 
-L<Mojolicious::Command::get> is a command interface to L<Mojo::UserAgent>.
+L<Mojolicious::Command::get> is a command line interface for
+L<Mojo::UserAgent>.
 
 This is a core command, that means it is always enabled and its code a good
 example for learning to build new commands, you're welcome to fork it.
