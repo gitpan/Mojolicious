@@ -7,13 +7,8 @@ has hint        => <<EOF;
 See 'APPLICATION generate help GENERATOR' for more information on a specific
 generator.
 EOF
-has message => <<EOF;
-Usage: APPLICATION generate GENERATOR [OPTIONS]
-
-Generators:
-EOF
+has message    => sub { shift->extract_usage . "\nGenerators:\n" };
 has namespaces => sub { ['Mojolicious::Command::generate'] };
-has usage      => sub { shift->extract_usage };
 
 sub help { shift->run(@_) }
 
@@ -36,6 +31,9 @@ L<Mojolicious::Command::generate> lists available generators.
 This is a core command, that means it is always enabled and its code a good
 example for learning to build new commands, you're welcome to fork it.
 
+See L<Mojolicious::Commands/"COMMANDS"> for a list of commands that are
+available by default.
+
 =head1 ATTRIBUTES
 
 L<Mojolicious::Command::generate> inherits all attributes from
@@ -54,13 +52,6 @@ Short description of this command, used for the command list.
   $generator = $generator->hint('Foo!');
 
 Short hint shown after listing available generator commands.
-
-=head2 usage
-
-  my $usage  = $generator->usage;
-  $generator = $generator->usage('Foo!');
-
-Usage information for this command, used for the help screen.
 
 =head2 message
 

@@ -26,8 +26,9 @@ sub register {
     );
   }
 
-  $app->helper(b => sub { shift; Mojo::ByteStream->new(@_) });
-  $app->helper(c => sub { shift; Mojo::Collection->new(@_) });
+  $app->helper(accepts => \&_accepts);
+  $app->helper(b       => sub { shift; Mojo::ByteStream->new(@_) });
+  $app->helper(c       => sub { shift; Mojo::Collection->new(@_) });
   $app->helper(config => sub { shift->app->config(@_) });
   $app->helper(content       => \&_content);
   $app->helper(content_for   => \&_content_for);
@@ -37,6 +38,11 @@ sub register {
   $app->helper(include       => \&_include);
   $app->helper(ua => sub { shift->app->ua });
   $app->helper(url_with => \&_url_with);
+}
+
+sub _accepts {
+  my $self = shift;
+  return $self->app->renderer->accepts($self, @_);
 }
 
 sub _content {
@@ -116,9 +122,24 @@ L<Mojolicious>.
 This is a core plugin, that means it is always enabled and its code a good
 example for learning to build new plugins, you're welcome to fork it.
 
+See L<Mojolicious::Plugins/"PLUGINS"> for a list of plugins that are available
+by default.
+
 =head1 HELPERS
 
 L<Mojolicious::Plugin::DefaultHelpers> implements the following helpers.
+
+=head2 accepts
+
+  %= accepts->[0] // 'html'
+  %= accepts('html', 'json', 'txt') // 'html'
+
+Select best possible representation for resource from C<Accept> request
+header, C<format> stash value or C<format> GET/POST parameter with
+L<Mojolicious::Renderer/"accepts">, defaults to returning the first extension
+if no preference could be detected.
+
+  $self->render(json => {hello => 'world'}) if $self->accepts('json');
 
 =head2 app
 
