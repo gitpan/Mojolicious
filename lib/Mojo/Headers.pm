@@ -44,10 +44,7 @@ sub append {
   return $self->header($name => defined $old ? "$old, $value" : $value);
 }
 
-sub clone {
-  my $self = shift;
-  return $self->new->from_hash($self->to_hash(1));
-}
+sub clone { $_[0]->new->from_hash($_[0]->to_hash(1)) }
 
 sub from_hash {
   my ($self, $hash) = @_;
@@ -100,7 +97,7 @@ sub parse {
 
     # Check line size limit
     if (length $line > $max) {
-      $self->{limit} = $self->{state} = 'finished';
+      @$self{qw(state limit)} = ('finished', 1);
       return $self;
     }
 
@@ -119,8 +116,7 @@ sub parse {
   }
 
   # Check line size limit
-  $self->{limit} = $self->{state} = 'finished'
-    if length $self->{buffer} > $max;
+  @$self{qw(state limit)} = ('finished', 1) if length $self->{buffer} > $max;
 
   return $self;
 }

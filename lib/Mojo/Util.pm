@@ -35,6 +35,15 @@ for my $line (split "\x0a", slurp(catfile dirname(__FILE__), 'entities.txt')) {
   $ENTITIES{$1} = defined $3 ? (chr(hex $2) . chr(hex $3)) : chr(hex $2);
 }
 
+# Characters that should be escaped in XML
+my %XML = (
+  '&'  => '&amp;',
+  '<'  => '&lt;',
+  '>'  => '&gt;',
+  '"'  => '&quot;',
+  '\'' => '&#39;'
+);
+
 # Encoding cache
 my %CACHE;
 
@@ -118,7 +127,6 @@ sub hmac_sha1_sum { hmac_sha1_hex(@_) }
 
 sub html_unescape {
   my $str = shift;
-  return $str if index($str, '&') == -1;
   $str =~ s/&(?:\#((?:\d{1,7}|x[0-9a-fA-F]{1,6}));|(\w+;?))/_decode($1, $2)/ge;
   return $str;
 }
@@ -318,20 +326,13 @@ sub url_escape {
 
 sub url_unescape {
   my $str = shift;
-  return $str if index($str, '%') == -1;
   $str =~ s/%([0-9a-fA-F]{2})/chr(hex($1))/ge;
   return $str;
 }
 
 sub xml_escape {
   my $str = shift;
-
-  $str =~ s/&/&amp;/g;
-  $str =~ s/</&lt;/g;
-  $str =~ s/>/&gt;/g;
-  $str =~ s/"/&quot;/g;
-  $str =~ s/'/&#39;/g;
-
+  $str =~ s/([&<>"'])/$XML{$1}/ge;
   return $str;
 }
 
