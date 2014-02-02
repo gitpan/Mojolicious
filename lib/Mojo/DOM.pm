@@ -31,6 +31,8 @@ sub AUTOLOAD {
 
 sub DESTROY { }
 
+sub all_contents { $_[0]->_collect(_contents(_nodes($_[0]->tree))) }
+
 sub all_text { shift->_content(1, @_) }
 
 sub ancestors { _select($_[0]->_collect(_ancestors($_[0]->tree)), $_[1]) }
@@ -246,6 +248,10 @@ sub _content {
   return _text([_nodes($tree)], shift, _trim($tree, @_));
 }
 
+sub _contents {
+  map { $_->[0] eq 'tag' ? ($_, _contents(_nodes($_))) : ($_) } @_;
+}
+
 sub _css { Mojo::DOM::CSS->new(tree => shift->tree) }
 
 sub _delegate {
@@ -443,6 +449,17 @@ XML detection can also be disabled with the L</"xml"> method.
 
 L<Mojo::DOM> implements the following methods.
 
+=head2 all_contents
+
+  my $collection = $dom->all_contents;
+
+Return a L<Mojo::Collection> object containing all nodes in DOM structure as
+L<Mojo::DOM> and L<Mojo::DOM::Node> objects.
+
+  "<p><b>123</b></p>"
+  $dom->parse('<p><!-- test --><b>123<!-- 456 --></b></p>')
+    ->all_contents->grep(sub { $_->node eq 'comment' })->remove->first;
+
 =head2 all_text
 
   my $trimmed   = $dom->all_text;
@@ -471,7 +488,7 @@ All selectors from L<Mojo::DOM::CSS> are supported.
 
 =head2 append
 
-  $dom = $dom->append('<p>Hi!</p>');
+  $dom = $dom->append('<p>I ♥ Mojolicious!</p>');
 
 Append HTML/XML fragment to element.
 
@@ -480,7 +497,7 @@ Append HTML/XML fragment to element.
 
 =head2 append_content
 
-  $dom = $dom->append_content('<p>Hi!</p>');
+  $dom = $dom->append_content('<p>I ♥ Mojolicious!</p>');
 
 Append HTML/XML fragment to element content.
 
@@ -579,7 +596,7 @@ Find element namespace.
 =head2 new
 
   my $dom = Mojo::DOM->new;
-  my $dom = Mojo::DOM->new('<foo bar="baz">test</foo>');
+  my $dom = Mojo::DOM->new('<foo bar="baz">I ♥ Mojolicious!</foo>');
 
 Construct a new array-based L<Mojo::DOM> object and L</"parse"> HTML/XML
 fragment if necessary.
@@ -609,7 +626,7 @@ has no parent.
 
 =head2 parse
 
-  $dom = $dom->parse('<foo bar="baz">test</foo>');
+  $dom = $dom->parse('<foo bar="baz">I ♥ Mojolicious!</foo>');
 
 Parse HTML/XML fragment with L<Mojo::DOM::HTML>.
 
@@ -618,7 +635,7 @@ Parse HTML/XML fragment with L<Mojo::DOM::HTML>.
 
 =head2 prepend
 
-  $dom = $dom->prepend('<p>Hi!</p>');
+  $dom = $dom->prepend('<p>I ♥ Mojolicious!</p>');
 
 Prepend HTML/XML fragment to element.
 
@@ -627,7 +644,7 @@ Prepend HTML/XML fragment to element.
 
 =head2 prepend_content
 
-  $dom = $dom->prepend_content('<p>Hi!</p>');
+  $dom = $dom->prepend_content('<p>I ♥ Mojolicious!</p>');
 
 Prepend HTML/XML fragment to element content.
 
@@ -655,7 +672,7 @@ Remove element and return L<Mojo::DOM> object for parent of element.
 
 =head2 replace
 
-  my $parent = $dom->replace('<div>test</div>');
+  my $parent = $dom->replace('<div>I ♥ Mojolicious!</div>');
 
 Replace element with HTML/XML fragment and return L<Mojo::DOM> object for
 parent of element.
@@ -668,7 +685,7 @@ parent of element.
 
 =head2 replace_content
 
-  $dom = $dom->replace_content('<p>test</p>');
+  $dom = $dom->replace_content('<p>I ♥ Mojolicious!</p>');
 
 Replace element content with HTML/XML fragment.
 
