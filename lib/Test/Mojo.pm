@@ -289,13 +289,13 @@ sub _build_ok {
 sub _json {
   my ($self, $method, $p) = @_;
   return Mojo::JSON::Pointer->new->$method(
-    Mojo::JSON->new->decode(@{$self->message}[1]), $p);
+    Mojo::JSON->new->decode(@{$self->message // []}[1]), $p);
 }
 
 sub _message {
   my ($self, $name, $value, $desc) = @_;
   local $Test::Builder::Level = $Test::Builder::Level + 1;
-  my ($type, $msg) = @{$self->message};
+  my ($type, $msg) = @{$self->message // []};
 
   # Type check
   if (ref $value eq 'HASH') {
@@ -902,6 +902,13 @@ Opposite of L</"text_like">.
 
 Open a WebSocket connection with transparent handshake, takes the same
 arguments as L<Mojo::UserAgent/"websocket">, except for the callback.
+
+  # WebSocket with permessage-deflate compression
+  $t->websocket('/x' => {'Sec-WebSocket-Extensions' => 'permessage-deflate'})
+    ->send_ok('y' x 50000)
+    ->message_ok
+    ->message_is('z' x 50000)
+    ->finish_ok;
 
 =head1 SEE ALSO
 
