@@ -472,7 +472,7 @@ this allows multiple processes to share the same L<Mojo::UserAgent> object
 safely.
 
 For better scalability (epoll, kqueue) and to provide IPv6 as well as TLS
-support, the optional modules L<EV> (4.0+), L<IO::Socket::IP> (0.16+) and
+support, the optional modules L<EV> (4.0+), L<IO::Socket::IP> (0.20+) and
 L<IO::Socket::SSL> (1.75+) will be used automatically by L<Mojo::IOLoop> if
 they are installed. Individual features can also be disabled with the
 MOJO_NO_IPV6 and MOJO_NO_TLS environment variables.
@@ -678,7 +678,12 @@ L<Mojo::UserAgent::Transactor/"tx">.
   # Request with custom cookie
   my $tx = $ua->build_tx(GET => 'example.com');
   $tx->req->cookies({name => 'foo', value => 'bar'});
-  $ua->start($tx);
+  $tx = $ua->start($tx);
+
+  # Deactivate gzip compression
+  my $tx = $ua->build_tx(GET => 'example.com');
+  $tx->req->headers->remove('Accept-Encoding');
+  $tx = $ua->start($tx);
 
   # Interrupt response by raising an error
   my $tx = $ua->build_tx(GET => 'example.com');
@@ -687,7 +692,7 @@ L<Mojo::UserAgent::Transactor/"tx">.
     return unless my $server = $res->headers->server;
     $res->error('Oh noes, it is IIS!') if $server =~ /IIS/;
   });
-  $ua->start($tx);
+  $tx = $ua->start($tx);
 
 =head2 build_websocket_tx
 
@@ -874,6 +879,12 @@ L<Mojo::Transaction::HTTP> object.
     $tx->send('Hi!');
   });
   Mojo::IOLoop->start unless Mojo::IOLoop->is_running;
+
+You can activate C<permessage-deflate> compression by setting the
+C<Sec-WebSocket-Extensions> header.
+
+  my $headers = {'Sec-WebSocket-Extensions' => 'permessage-deflate'};
+  $ua->websocket('ws://example.com/foo' => $headers => sub {...});
 
 =head1 DEBUGGING
 

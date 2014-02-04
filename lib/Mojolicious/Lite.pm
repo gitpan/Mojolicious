@@ -225,13 +225,18 @@ full access to all HTTP features and information.
   };
 
   # Echo the request body and send custom header with response
-  get '/echo' => sub {
+  post '/echo' => sub {
     my $self = shift;
     $self->res->headers->header('X-Bender' => 'Bite my shiny metal ass!');
     $self->render(data => $self->req->body);
   };
 
   app->start;
+
+You can test the more advanced examples right from the command line with
+L<Mojolicious::Command::get>.
+
+  $ ./myapp.pl get -v -M POST -c 'test' /echo
 
 =head2 Built-in C<exception> and C<not_found> pages
 

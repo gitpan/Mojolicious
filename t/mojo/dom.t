@@ -107,7 +107,7 @@ is "$dom", <<EOF, 'right result';
   <?boom lalalala ?>
   <a bit broken little>
   &lt; very broken
-  <br />
+  <br>
   more text
 </a></foo>
 EOF
@@ -685,7 +685,7 @@ is_deeply \@div, [qw(A B 0)], 'found all div elements with id';
 
 # Empty tags
 $dom = Mojo::DOM->new->parse('<hr /><br/><br id="br"/><br />');
-is "$dom", '<hr /><br /><br id="br" /><br />', 'right result';
+is "$dom", '<hr><br><br id="br"><br>', 'right result';
 is $dom->at('br')->content_xml, '', 'empty result';
 
 # Inner XML
@@ -1736,9 +1736,9 @@ is $dom, <<EOF, 'right result';
   <body>
     <table>
       <tr>
-        <td><font><br />te<br />st<br />1</font></td>
-        <td>x1</td><td><img />tes<br />t2</td>
-        <td>x2</td><td><font>t<br />est3</font></td>
+        <td><font><br>te<br>st<br>1</font></td>
+        <td>x1</td><td><img>tes<br>t2</td>
+        <td>x2</td><td><font>t<br>est3</font></td>
       </tr>
     </table>
   </body>
@@ -1786,9 +1786,9 @@ $element = $dom->at('XMLTest')->children->[0];
 is $element->type, 'Element', 'right child';
 is $element->parent->type, 'XMLTest', 'right parent';
 ok $element->root->xml, 'XML mode active';
-$dom->replace('<XMLTest2 />');
+$dom->replace('<XMLTest2 /><XMLTest3 just="works" />');
 ok $dom->xml, 'XML mode active';
-is $dom, '<XMLTest2 />', 'right result';
+is $dom, '<XMLTest2 /><XMLTest3 just="works" />', 'right result';
 
 # Ensure HTML semantics
 ok !Mojo::DOM->new->xml(undef)->parse('<?xml version="1.0"?>')->xml,
@@ -2009,6 +2009,17 @@ is $dom->at('d')->parent->type, 'b', 'right element';
 $dom->at('b')->prepend_content('<e>Mojo</e>');
 is $dom->at('e')->parent->type, 'b', 'right element';
 is $dom->all_text, 'Mojo Test', 'right text';
+
+# Wrap elements
+$dom = Mojo::DOM->new('<a>Test</a>');
+is $dom->wrap('<no></no>')->root->to_xml, '<a>Test</a>', 'right result';
+is $dom->at('a')->wrap('A')->type, 'a', 'right element';
+is "$dom", '<a>Test</a>', 'right result';
+is $dom->at('a')->wrap('<b></b>')->type, 'a', 'right element';
+is "$dom", '<b><a>Test</a></b>', 'right result';
+is $dom->at('a')->wrap('C<c><d>D</d><e>E</e></c>F')->parent->type, 'd',
+  'right element';
+is "$dom", '<b>C<c><d>D<a>Test</a></d><e>E</e></c>F</b>', 'right result';
 
 # Broken "div" in "td"
 $dom = Mojo::DOM->new(<<EOF);

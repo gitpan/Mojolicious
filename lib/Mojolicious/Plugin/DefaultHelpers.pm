@@ -78,19 +78,15 @@ sub _current_route {
 }
 
 sub _include {
-  my $self     = shift;
-  my $template = @_ % 2 ? shift : undef;
-  my $args     = {@_, defined $template ? (template => $template) : ()};
+  my $self = shift;
 
-  # "layout" and "extends" can't be localized
-  my $layout  = delete $args->{layout};
-  my $extends = delete $args->{extends};
+  # Template may be first argument
+  my ($template, $args) = (@_ % 2 ? shift : undef, {@_});
+  $args->{template} = $template if $template;
 
   # Localize arguments
-  my @keys = keys %$args;
-  local @{$self->stash}{@keys} = @{$args}{@keys};
-
-  return $self->render(partial => 1, layout => $layout, extends => $extends);
+  local @{$self->stash}{keys %$args};
+  return $self->render(partial => 1, %$args);
 }
 
 sub _url_with {
@@ -139,7 +135,15 @@ header, C<format> stash value or C<format> GET/POST parameter with
 L<Mojolicious::Renderer/"accepts">, defaults to returning the first extension
 if no preference could be detected.
 
+  # Check if JSON is acceptable
   $self->render(json => {hello => 'world'}) if $self->accepts('json');
+
+  # Unsupported representation
+  $self->render(data => '', status => 204)
+    unless my $format = $self->accepts('html', 'json');
+
+  # Detected representations to select from
+  my @formats = @{$self->accepts};
 
 =head2 app
 

@@ -157,9 +157,9 @@ sub render {
   my $maybe   = delete $args->{'mojo.maybe'};
 
   # Render
+  my $partial = $args->{partial};
   my ($output, $format) = $app->renderer->render($self, $args);
-  return defined $output ? Mojo::ByteStream->new($output) : undef
-    if $args->{partial};
+  return defined $output ? Mojo::ByteStream->new($output) : undef if $partial;
 
   # Maybe
   return $maybe ? undef : !$self->render_not_found unless defined $output;
@@ -545,7 +545,7 @@ implements the following new ones.
 
   $c->continue;
 
-Continue dispatch chain.
+Continue dispatch chain with L<Mojolicious::Routes/"continue">.
 
 =head2 cookie
 
@@ -645,6 +645,9 @@ For more control you can also access request information directly.
   # Only GET parameters
   my $foo = $c->req->url->query->param('foo');
 
+  # Only POST parameters
+  my $foo = $c->req->body_params->param('foo');
+
   # Only GET and POST parameters
   my $foo = $c->req->param('foo');
 
@@ -660,25 +663,22 @@ For more control you can also access request information directly.
 
 Prepare a C<302> redirect response, takes the same arguments as L</"url_for">.
 
-  # Conditional redirect
-  return $c->redirect_to('login') unless $c->session('user');
-
   # Moved permanently
   $c->res->code(301);
   $c->redirect_to('some_route');
 
 =head2 render
 
-  my $bool    = $c->render;
-  my $bool    = $c->render(controller => 'foo', action => 'bar');
-  my $bool    = $c->render(template => 'foo/index');
-  my $bool    = $c->render(template => 'index', format => 'html');
-  my $bool    = $c->render(data => $bytes);
-  my $bool    = $c->render(text => 'Hello!');
-  my $bool    = $c->render(json => {foo => 'bar'});
-  my $bool    = $c->render(handler => 'something');
-  my $bool    = $c->render('foo/index');
-  my $output  = $c->render('foo/index', partial => 1);
+  my $bool   = $c->render;
+  my $bool   = $c->render(controller => 'foo', action => 'bar');
+  my $bool   = $c->render(template => 'foo/index');
+  my $bool   = $c->render(template => 'index', format => 'html');
+  my $bool   = $c->render(data => $bytes);
+  my $bool   = $c->render(text => 'Hello!');
+  my $bool   = $c->render(json => {foo => 'bar'});
+  my $bool   = $c->render(handler => 'something');
+  my $bool   = $c->render('foo/index');
+  my $output = $c->render('foo/index', partial => 1);
 
 Render content using L<Mojolicious::Renderer/"render"> and emit hooks
 L<Mojolicious/"before_render"> as well as L<Mojolicious/"after_render"> if the
@@ -686,6 +686,25 @@ result is not C<partial>. If no template is provided a default one based on
 controller and action or route name will be generated with
 L<Mojolicious::Renderer/"template_for">, all additional values get merged into
 the L</"stash">.
+
+  # Render characters
+  $c->render(text => 'I ♥ Mojolicious!');
+
+  # Render binary data
+  use Mojo::JSON 'j';
+  $c->render(data => j({test => 'I ♥ Mojolicious!'}));
+
+  # Render JSON
+  $c->render(json => {test => 'I ♥ Mojolicious!'});
+
+  # Render template "foo/bar.html.ep"
+  $c->render(template => 'foo/bar', format => 'html', handler => 'ep');
+
+  # Render template "foo/bar.*.*"
+  $c->render(template => 'foo/bar');
+
+  # Render template "test.xml.*"
+  $c->render('test', format => 'xml');
 
 =head2 render_exception
 
@@ -746,6 +765,11 @@ method does not protect from traversing to parent directories.
 Finalize response and emit hook L<Mojolicious/"after_dispatch">, defaults to
 using a C<200> response code.
 
+  # Custom response
+  $self->res->headers->content_type('text/plain');
+  $self->res->body('Hello World!');
+  $self->rendered(200);
+
 =head2 req
 
   my $req = $c->req;
@@ -762,6 +786,7 @@ Get L<Mojo::Message::Request> object from L<Mojo::Transaction/"req">.
   my $agent    = $c->req->headers->user_agent;
   my $bytes    = $c->req->body;
   my $str      = $c->req->text;
+  my $hash     = $c->req->params->to_hash;
   my $hash     = $c->req->json;
   my $foo      = $c->req->json('/23/foo');
   my $dom      = $c->req->dom;
@@ -799,6 +824,9 @@ is set to the value C<XMLHttpRequest>.
     xml  => {text => '<just>works</just>'},
     any  => {data => '', status => 204}
   );
+
+For more advanced negotiation logic you can also use the helper
+L<Mojolicious::Plugin::DefaultHelper/"accepts">.
 
 =head2 send
 
@@ -846,9 +874,10 @@ timeout, which usually defaults to C<15> seconds.
   $c          = $c->session({foo => 'bar'});
   $c          = $c->session(foo => 'bar');
 
-Persistent data storage, all session data gets serialized with L<Mojo::JSON>
-and stored C<Base64> encoded in C<HMAC-SHA1> signed cookies. Note that cookies
-usually have a 4096 byte limit, depending on browser.
+Persistent data storage for the next few requests, all session data gets
+serialized with L<Mojo::JSON> and stored C<Base64> encoded in C<HMAC-SHA1>
+signed cookies. Note that cookies usually have a 4096 byte limit, depending on
+browser.
 
   # Manipulate session
   $c->session->{foo} = 'bar';
@@ -882,12 +911,13 @@ discarded.
   $c       = $c->stash({foo => 'bar'});
   $c       = $c->stash(foo => 'bar');
 
-Non persistent data storage and exchange, application wide default values can
-be set with L<Mojolicious/"defaults">. Some stash values have a special
-meaning and are reserved, the full list is currently C<action>, C<app>, C<cb>,
-C<controller>, C<data>, C<extends>, C<format>, C<handler>, C<json>, C<layout>,
-C<namespace>, C<partial>, C<path>, C<status>, C<template> and C<text>. Note
-that all stash values with a C<mojo.*> prefix are reserved for internal use.
+Non-persistent data storage and exchange for the current request, application
+wide default values can be set with L<Mojolicious/"defaults">. Some stash
+values have a special meaning and are reserved, the full list is currently
+C<action>, C<app>, C<cb>, C<controller>, C<data>, C<extends>, C<format>,
+C<handler>, C<json>, C<layout>, C<namespace>, C<partial>, C<path>, C<status>,
+C<template> and C<text>. Note that all stash values with a C<mojo.*> prefix
+are reserved for internal use.
 
   # Remove value
   my $foo = delete $c->stash->{foo};
