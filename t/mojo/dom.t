@@ -120,7 +120,7 @@ is $simple->text, 'easy', 'right text';
 is $simple->parent->type, 'foo', 'right parent type';
 is $simple->parent->attr->{bar}, 'ba<z', 'right parent attribute';
 is $simple->parent->children->[1]->type, 'test', 'right sibling';
-is $simple->to_xml, '<simple class="working">easy</simple>',
+is $simple->to_string, '<simple class="working">easy</simple>',
   'stringified right';
 $simple->parent->attr(bar => 'baz')->attr({this => 'works', too => 'yea'});
 is $simple->parent->attr('bar'),  'baz',   'right parent attribute';
@@ -340,8 +340,8 @@ is $dom->at('html'), $html, 'right result';
 is $dom->at('#☃x')->parent,     $html, 'right result';
 is $dom->at('#☃x')->root,       $html, 'right result';
 is $dom->children('html')->first, $html, 'right result';
-is $dom->to_xml,      $html, 'right result';
-is $dom->content_xml, $html, 'right result';
+is $dom->to_string, $html, 'right result';
+is $dom->content,   $html, 'right result';
 
 # Looks remotely like HTML
 $dom = Mojo::DOM->new->parse(
@@ -374,15 +374,15 @@ is "$dom", '<div>foo<p>lalala</p>bar</div>', 'right result';
 $dom->find('p')->replace('');
 is "$dom", '<div>foobar</div>', 'right result';
 $dom = Mojo::DOM->new->parse('<div>♥</div>');
-$dom->at('div')->replace_content('☃');
+$dom->at('div')->content('☃');
 is "$dom", '<div>☃</div>', 'right result';
 $dom = Mojo::DOM->new->parse('<div>♥</div>');
-$dom->at('div')->replace_content("\x{2603}");
-is $dom->to_xml, '<div>☃</div>', 'right result';
+$dom->at('div')->content("\x{2603}");
+is $dom->to_string, '<div>☃</div>', 'right result';
 is $dom->at('div')->replace('<p>♥</p>')->root, '<p>♥</p>', 'right result';
-is $dom->to_xml, '<p>♥</p>', 'right result';
+is $dom->to_string, '<p>♥</p>', 'right result';
 is $dom->replace('<b>whatever</b>')->root, '<b>whatever</b>', 'right result';
-is $dom->to_xml, '<b>whatever</b>', 'right result';
+is $dom->to_string, '<b>whatever</b>', 'right result';
 $dom->at('b')->prepend('<p>foo</p>')->append('<p>bar</p>');
 is "$dom", '<p>foo</p><b>whatever</b><p>bar</p>', 'right result';
 is $dom->find('p')->remove->first->root->at('b')->text, 'whatever',
@@ -394,33 +394,33 @@ is $dom->remove, '',         'right result';
 $dom->replace('A<div>B<p>C<b>D<i><u>E</u></i>F</b>G</p><div>H</div></div>I');
 is $dom->find(':not(div):not(i):not(u)')->strip->first->root,
   'A<div>BCD<i><u>E</u></i>FG<div>H</div></div>I', 'right result';
-is $dom->at('i')->to_xml, '<i><u>E</u></i>', 'right result';
+is $dom->at('i')->to_string, '<i><u>E</u></i>', 'right result';
 
 # Replace element content
 $dom = Mojo::DOM->new->parse('<div>foo<p>lalala</p>bar</div>');
-is $dom->at('p')->replace_content('bar'), '<p>bar</p>', 'right result';
+is $dom->at('p')->content('bar'), '<p>bar</p>', 'right result';
 is "$dom", '<div>foo<p>bar</p>bar</div>', 'right result';
-$dom->at('p')->replace_content(Mojo::DOM->new->parse('text'));
+$dom->at('p')->content(Mojo::DOM->new->parse('text'));
 is "$dom", '<div>foo<p>text</p>bar</div>', 'right result';
 $dom = Mojo::DOM->new->parse('<div>foo</div><div>bar</div>');
-$dom->find('div')->each(sub { shift->replace_content('<p>test</p>') });
+$dom->find('div')->each(sub { shift->content('<p>test</p>') });
 is "$dom", '<div><p>test</p></div><div><p>test</p></div>', 'right result';
-$dom->find('p')->each(sub { shift->replace_content('') });
+$dom->find('p')->each(sub { shift->content('') });
 is "$dom", '<div><p></p></div><div><p></p></div>', 'right result';
 $dom = Mojo::DOM->new->parse('<div><p id="☃" /></div>');
-$dom->at('#☃')->replace_content('♥');
+$dom->at('#☃')->content('♥');
 is "$dom", '<div><p id="☃">♥</p></div>', 'right result';
 $dom = Mojo::DOM->new->parse('<div>foo<p>lalala</p>bar</div>');
-$dom->replace_content('♥');
+$dom->content('♥');
 is "$dom", '♥', 'right result';
-is $dom->replace_content('<div>foo<p>lalala</p>bar</div>'),
+is $dom->content('<div>foo<p>lalala</p>bar</div>'),
   '<div>foo<p>lalala</p>bar</div>', 'right result';
 is "$dom", '<div>foo<p>lalala</p>bar</div>', 'right result';
-is $dom->replace_content(''), '', 'no result';
+is $dom->content(''), '', 'no result';
 is "$dom", '', 'no result';
-$dom->replace_content('<div>foo<p>lalala</p>bar</div>');
+$dom->content('<div>foo<p>lalala</p>bar</div>');
 is "$dom", '<div>foo<p>lalala</p>bar</div>', 'right result';
-is $dom->at('p')->replace_content(''), '<p></p>', 'right result';
+is $dom->at('p')->content(''), '<p></p>', 'right result';
 
 # Mixed search and tree walk
 $dom = Mojo::DOM->new->parse(<<EOF);
@@ -663,8 +663,8 @@ is $dom->at('[test3=""]'), undef, 'no result';
 # Whitespaces before closing bracket
 $dom = Mojo::DOM->new->parse('<div >content</div>');
 ok $dom->at('div'), 'tag found';
-is $dom->at('div')->text,        'content', 'right text';
-is $dom->at('div')->content_xml, 'content', 'right text';
+is $dom->at('div')->text,    'content', 'right text';
+is $dom->at('div')->content, 'content', 'right text';
 
 # Class with hyphen
 $dom
@@ -686,12 +686,12 @@ is_deeply \@div, [qw(A B 0)], 'found all div elements with id';
 # Empty tags
 $dom = Mojo::DOM->new->parse('<hr /><br/><br id="br"/><br />');
 is "$dom", '<hr><br><br id="br"><br>', 'right result';
-is $dom->at('br')->content_xml, '', 'empty result';
+is $dom->at('br')->content, '', 'empty result';
 
 # Inner XML
 $dom = Mojo::DOM->new->parse('<a>xxx<x>x</x>xxx</a>');
-is $dom->at('a')->content_xml, 'xxx<x>x</x>xxx', 'right result';
-is $dom->content_xml, '<a>xxx<x>x</x>xxx</a>', 'right result';
+is $dom->at('a')->content, 'xxx<x>x</x>xxx', 'right result';
+is $dom->content, '<a>xxx<x>x</x>xxx</a>', 'right result';
 
 # Multiple selectors
 $dom = Mojo::DOM->new->parse(
@@ -1778,7 +1778,7 @@ $dom = Mojo::DOM->new->parse(<<'EOF');
 <XMLTest />
 EOF
 ok $dom->xml, 'XML mode detected';
-$dom->at('XMLTest')->replace_content('<Element />');
+$dom->at('XMLTest')->content('<Element />');
 my $element = $dom->at('Element');
 is $element->type, 'Element', 'right type';
 ok $element->xml, 'XML mode active';
@@ -2012,14 +2012,29 @@ is $dom->all_text, 'Mojo Test', 'right text';
 
 # Wrap elements
 $dom = Mojo::DOM->new('<a>Test</a>');
-is $dom->wrap('<no></no>')->root->to_xml, '<a>Test</a>', 'right result';
-is $dom->at('a')->wrap('A')->type, 'a', 'right element';
+is $dom->wrap('<b></b>')->node, 'root', 'right node';
+is "$dom", '<b><a>Test</a></b>', 'right result';
+is $dom->at('b')->strip->at('a')->wrap('A')->type, 'a', 'right element';
 is "$dom", '<a>Test</a>', 'right result';
 is $dom->at('a')->wrap('<b></b>')->type, 'a', 'right element';
 is "$dom", '<b><a>Test</a></b>', 'right result';
 is $dom->at('a')->wrap('C<c><d>D</d><e>E</e></c>F')->parent->type, 'd',
   'right element';
 is "$dom", '<b>C<c><d>D<a>Test</a></d><e>E</e></c>F</b>', 'right result';
+
+# Wrap content
+$dom = Mojo::DOM->new('<a>Test</a>');
+is $dom->at('a')->wrap_content('A')->type, 'a', 'right element';
+is "$dom", '<a>Test</a>', 'right result';
+is $dom->wrap_content('<b></b>')->node, 'root', 'right node';
+is "$dom", '<b><a>Test</a></b>', 'right result';
+is $dom->at('b')->strip->at('a')->wrap_content('1<b c="d"></b>')->type, 'a',
+  'right element';
+is "$dom", '<a>1<b c="d">Test</b></a>', 'right result';
+is $dom->at('a')->wrap_content('C<c><d>D</d><e>E</e></c>F')->parent->node,
+  'root', 'right node';
+is "$dom", '<a>C<c><d>D1<b c="d">Test</b></d><e>E</e></c>F</a>',
+  'right result';
 
 # Broken "div" in "td"
 $dom = Mojo::DOM->new(<<EOF);
@@ -2059,8 +2074,6 @@ is $dom->text(0), "\n", 'right text';
 is $dom->all_text, "looks like\n  it\n    really\n  works", 'right text';
 is $dom->all_text(0), "\n  looks\n  like\n  it\n    really\n  \n  works\n\n",
   'right text';
-is $dom->text_before, '', 'no text';
-is $dom->text_after,  '', 'no text';
 is $dom->div->text, 'looks works', 'right text';
 is $dom->div->text(0), "\n  looks\n  \n  works\n", 'right text';
 is $dom->div->all_text, "looks like\n  it\n    really\n  works", 'right text';
@@ -2074,46 +2087,6 @@ is $dom->div->pre->code->text, "like\n  it\n    really", 'right text';
 is $dom->div->pre->code->text(0), "like\n  it\n    really", 'right text';
 is $dom->div->pre->code->all_text, "like\n  it\n    really", 'right text';
 is $dom->div->pre->code->all_text(0), "like\n  it\n    really", 'right text';
-is $dom->div->pre->text_before, 'looks', 'right text';
-is $dom->div->pre->text_after,  'works', 'right text';
-
-# Text siblings
-$dom = Mojo::DOM->new(<<EOF);
-ok
-<div>
-  looks<p>like</p>
-  thi<![CDATA[s]]>
-  <p>might</p><p>really</p>
-  <p>
-    just
-  </p>work
-</div>
-wow
-EOF
-is $dom->text_before, '', 'no text';
-is $dom->text_before(0), '', 'no text';
-is $dom->div->text_before, 'ok', 'right text';
-is $dom->div->text_before(0), "ok\n", 'right text';
-is $dom->div->p->[0]->text_before, 'looks', 'right text';
-is $dom->div->p->[0]->text_before(0), "\n  looks", 'right text';
-is $dom->div->p->[1]->text_before, 'thi s', 'right text';
-is $dom->div->p->[1]->text_before(0), "\n  thi s\n  ", 'right text';
-is $dom->div->p->[2]->text_before, '', 'no text';
-is $dom->div->p->[2]->text_before(0), '', 'no text';
-is $dom->div->p->[3]->text_before, '', 'no text';
-is $dom->div->p->[3]->text_before(0), "\n  ", 'right text';
-is $dom->text_after, '', 'no text';
-is $dom->text_after(0), '', 'no text';
-is $dom->div->text_after, 'wow', 'right text';
-is $dom->div->text_after(0), "\nwow\n", 'right text';
-is $dom->div->p->[0]->text_after, 'thi s', 'right text';
-is $dom->div->p->[0]->text_after(0), "\n  thi s\n  ", 'right text';
-is $dom->div->p->[1]->text_after, '', 'no text';
-is $dom->div->p->[1]->text_after(0), '', 'no text';
-is $dom->div->p->[2]->text_after, '', 'no text';
-is $dom->div->p->[2]->text_after(0), "\n  ", 'right text';
-is $dom->div->p->[3]->text_after, 'work', 'right text';
-is $dom->div->p->[3]->text_after(0), "work\n", 'right text';
 
 # PoCo example with whitespace sensitive text
 $dom = Mojo::DOM->new(<<EOF);

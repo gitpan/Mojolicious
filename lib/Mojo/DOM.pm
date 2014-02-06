@@ -3,7 +3,7 @@ use Mojo::Base -strict;
 use overload
   '%{}'    => sub { shift->attr },
   bool     => sub {1},
-  '""'     => sub { shift->to_xml },
+  '""'     => sub { shift->to_string },
   fallback => 1;
 
 # "Fry: This snow is beautiful. I'm glad global warming never happened.
@@ -14,7 +14,7 @@ use Mojo::Collection;
 use Mojo::DOM::CSS;
 use Mojo::DOM::HTML;
 use Mojo::DOM::Node;
-use Mojo::Util 'squish';
+use Mojo::Util qw(deprecated squish);
 use Scalar::Util qw(blessed weaken);
 
 sub AUTOLOAD {
@@ -34,7 +34,7 @@ sub DESTROY { }
 
 sub all_contents { $_[0]->_collect(_all(_nodes($_[0]->tree))) }
 
-sub all_text { shift->_extract(1, @_) }
+sub all_text { shift->_all_text(1, @_) }
 
 sub ancestors { _select($_[0]->_collect(_ancestors($_[0]->tree)), $_[1]) }
 
@@ -71,10 +71,18 @@ sub children {
     $self->_collect(grep { $_->[0] eq 'tag' } _nodes($self->tree)), @_);
 }
 
-sub content_xml {
+sub content {
   my $self = shift;
-  my $xml  = $self->xml;
-  return join '', map { _render($_, $xml) } _nodes($self->tree);
+  return $self->_content(0, 1, @_) if @_;
+  my $html = Mojo::DOM::HTML->new(xml => $self->xml);
+  return join '', map { $html->tree($_)->render } _nodes($self->tree);
+}
+
+# DEPRECATED in Top Hat!
+sub content_xml {
+  deprecated
+    'Mojo::DOM::content_xml is DEPRECATED in favor of Mojo::DOM::content';
+  shift->content;
 }
 
 sub contents { $_[0]->_collect(_nodes($_[0]->tree)) }
@@ -86,20 +94,18 @@ sub match { $_[0]->_css->match($_[1]) ? $_[0] : undef }
 sub namespace {
   my $self = shift;
 
-  return '' if (my $current = $self->tree)->[0] eq 'root';
+  return '' if (my $tree = $self->tree)->[0] eq 'root';
 
   # Extract namespace prefix and search parents
-  my $ns = $current->[1] =~ /^(.*?):/ ? "xmlns:$1" : undef;
-  while ($current->[0] ne 'root') {
+  my $ns = $tree->[1] =~ /^(.*?):/ ? "xmlns:$1" : undef;
+  for my $n ($tree, _ancestors($tree)) {
 
     # Namespace for prefix
-    my $attrs = $current->[2];
+    my $attrs = $n->[2];
     if ($ns) { /^\Q$ns\E$/ and return $attrs->{$_} for keys %$attrs }
 
     # Namespace attribute
     elsif (defined $attrs->{xmlns}) { return $attrs->{xmlns} }
-
-    $current = $current->[3];
   }
 
   return '';
@@ -137,7 +143,12 @@ sub replace {
   return $self->_replace($tree, $self->_parse("$new"));
 }
 
-sub replace_content { shift->_content(0, 1, @_) }
+# DEPRECATED in Top Hat!
+sub replace_content {
+  deprecated
+    'Mojo::DOM::replace_content is DEPRECATED in favor of Mojo::DOM::content';
+  shift->content(@_);
+}
 
 sub root {
   my $self = shift;
@@ -155,9 +166,12 @@ sub strip {
 
 sub tap { shift->Mojo::Base::tap(@_) }
 
-sub text { shift->_extract(0, @_) }
+sub text { shift->_all_text(0, @_) }
 
+# DEPRECATED in Top Hat!
 sub text_after {
+  deprecated
+    'Mojo::DOM::text_after is DEPRECATED in favor of Mojo::DOM::contents';
   my ($self, $trim) = @_;
 
   return '' if (my $tree = $self->tree)->[0] eq 'root';
@@ -173,7 +187,10 @@ sub text_after {
   return _text(\@nodes, 0, _trim($tree->[3], $trim));
 }
 
+# DEPRECATED in Top Hat!
 sub text_before {
+  deprecated
+    'Mojo::DOM::text_before is DEPRECATED in favor of Mojo::DOM::contents';
   my ($self, $trim) = @_;
 
   return '' if (my $tree = $self->tree)->[0] eq 'root';
@@ -187,7 +204,14 @@ sub text_before {
   return _text(\@nodes, 0, _trim($tree->[3], $trim));
 }
 
-sub to_xml { shift->[0]->render }
+sub to_string { shift->[0]->render }
+
+# DEPRECATED in Top Hat!
+sub to_xml {
+  deprecated
+    'Mojo::DOM::to_xml is DEPRECATED in favor of Mojo::DOM::to_string';
+  shift->to_string;
+}
 
 sub tree { shift->_delegate(tree => @_) }
 
@@ -199,23 +223,8 @@ sub type {
   return $self;
 }
 
-sub wrap {
-  my ($self, $new) = @_;
-
-  return $self if (my $tree = $self->tree)->[0] eq 'root';
-
-  # Find innermost tag
-  my $current;
-  my $first = $new = $self->_parse("$new");
-  $current = $first while $first = first { $_->[0] eq 'tag' } _nodes($first);
-  return $self unless $current;
-
-  # Wrap element
-  $self->_replace($tree, $new);
-  push @$current, _link(['root', $tree], $current);
-
-  return $self;
-}
+sub wrap         { shift->_wrap(0, @_) }
+sub wrap_content { shift->_wrap(1, @_) }
 
 sub xml { shift->_delegate(xml => @_) }
 
@@ -233,6 +242,11 @@ sub _add {
 
 sub _all {
   map { $_->[0] eq 'tag' ? ($_, _all(_nodes($_))) : ($_) } @_;
+}
+
+sub _all_text {
+  my $tree = shift->tree;
+  return _text([_nodes($tree)], shift, _trim($tree, @_));
 }
 
 sub _ancestors {
@@ -269,11 +283,6 @@ sub _delegate {
   return $self;
 }
 
-sub _extract {
-  my $tree = shift->tree;
-  return _text([_nodes($tree)], shift, _trim($tree, @_));
-}
-
 sub _link {
   my ($children, $parent) = @_;
 
@@ -304,8 +313,6 @@ sub _offset {
 }
 
 sub _parse { Mojo::DOM::HTML->new(xml => shift->xml)->parse(shift)->tree }
-
-sub _render { Mojo::DOM::HTML->new(tree => shift, xml => shift)->render }
 
 sub _replace {
   my ($self, $tree, $new) = @_;
@@ -388,6 +395,30 @@ sub _trim {
   }
 
   return 1;
+}
+
+sub _wrap {
+  my ($self, $content, $new) = @_;
+
+  $content = 1 if (my $tree = $self->tree)->[0] eq 'root';
+
+  # Find innermost tag
+  my $current;
+  my $first = $new = $self->_parse("$new");
+  $current = $first while $first = first { $_->[0] eq 'tag' } _nodes($first);
+  return $self unless $current;
+
+  # Wrap content
+  if ($content) {
+    push @$current, _link(['root', _nodes($tree)], $current);
+    splice @$tree, _start($tree), $#$tree, _link($new, $tree);
+    return $self;
+  }
+
+  # Wrap element
+  $self->_replace($tree, $new);
+  push @$current, _link(['root', $tree], $current);
+  return $self;
 }
 
 1;
@@ -553,14 +584,22 @@ All selectors from L<Mojo::DOM::CSS/"SELECTORS"> are supported.
   # Show type of random child element
   say $dom->children->shuffle->first->type;
 
-=head2 content_xml
+=head2 content
 
-  my $xml = $dom->content_xml;
+  my $str = $dom->content;
+  $dom    = $dom->content('<p>I ♥ Mojolicious!</p>');
 
-Render content of this element to HTML/XML.
+Render this element's content to HTML/XML or replace it with HTML/XML
+fragment.
 
   # "<b>test</b>"
-  $dom->parse('<div><b>test</b></div>')->div->content_xml;
+  $dom->parse('<div><b>test</b></div>')->div->content;
+
+  # "<div><h1>B</h1></div>"
+  $dom->parse('<div><h1>A</h1></div>')->at('h1')->content('B')->root;
+
+  # "<div><h1></h1></div>"
+  $dom->parse('<div><h1>A</h1></div>')->at('h1')->content('')->root;
 
 =head2 contents
 
@@ -696,18 +735,6 @@ Replace this element with HTML/XML fragment and return L</"parent">.
   # "<div></div>"
   $dom->parse('<div><h1>A</h1></div>')->at('h1')->replace('');
 
-=head2 replace_content
-
-  $dom = $dom->replace_content('<p>I ♥ Mojolicious!</p>');
-
-Replace this element's content with HTML/XML fragment.
-
-  # "<div><h1>B</h1></div>"
-  $dom->parse('<div><h1>A</h1></div>')->at('h1')->replace_content('B')->root;
-
-  # "<div><h1></h1></div>"
-  $dom->parse('<div><h1>A</h1></div>')->at('h1')->replace_content('')->root;
-
 =head2 root
 
   my $root = $dom->root;
@@ -755,42 +782,14 @@ smart whitespace trimming is enabled by default.
   # "foo\nbaz\n"
   $dom->parse("<div>foo\n<p>bar</p>baz\n</div>")->div->text(0);
 
-=head2 text_after
+=head2 to_string
 
-  my $trimmed   = $dom->text_after;
-  my $untrimmed = $dom->text_after(0);
-
-Extract text content immediately following this element, smart whitespace
-trimming is enabled by default.
-
-  # "baz"
-  $dom->parse("<div>foo\n<p>bar</p>baz\n</div>")->div->p->text_after;
-
-  # "baz\n"
-  $dom->parse("<div>foo\n<p>bar</p>baz\n</div>")->div->p->text_after(0);
-
-=head2 text_before
-
-  my $trimmed   = $dom->text_before;
-  my $untrimmed = $dom->text_before(0);
-
-Extract text content immediately preceding this element, smart whitespace
-trimming is enabled by default.
-
-  # "foo"
-  $dom->parse("<div>foo\n<p>bar</p>baz\n</div>")->div->p->text_before;
-
-  # "foo\n"
-  $dom->parse("<div>foo\n<p>bar</p>baz\n</div>")->div->p->text_before(0);
-
-=head2 to_xml
-
-  my $xml = $dom->to_xml;
+  my $str = $dom->to_string;
 
 Render this element and its content to HTML/XML.
 
   # "<b>test</b>"
-  $dom->parse('<div><b>test</b></div>')->div->b->to_xml;
+  $dom->parse('<div><b>test</b></div>')->div->b->to_string;
 
 =head2 tree
 
@@ -812,19 +811,32 @@ This element's type.
 
 =head2 wrap
 
-  $dom = $dom->wrap('<p></p>');
+  $dom = $dom->wrap('<div></div>');
 
 Wrap HTML/XML fragment around this element, placing it as the last child of
 the first innermost element.
 
-  # "<div>B<h1>A</h1></div>"
-  $dom->parse('<h1>A</h1>')->at('h1')->wrap('<div>B</div>')->root;
+  # "<p>B<b>A</b></p>"
+  $dom->parse('<b>A</b>')->at('b')->wrap('<p>B</p>')->root;
 
-  # "<div><div><h1>A</h1></div>B</div>"
-  $dom->parse('<h1>A</h1>')->at('h1')->wrap('<div><div></div>B</div>')->root;
+  # "<div><p><b>A</b></p>B</div>"
+  $dom->parse('<b>A</b>')->at('b')->wrap('<div><p></p>B</div>')->root;
 
-  # "<div><h1>A</h1></div><div>B</div>"
-  $dom->parse('<h1>A</h1>')->at('h1')->wrap('<div></div><div>B</div>')->root;
+  # "<p><b>A</b></p><p>B</p>"
+  $dom->parse('<b>A</b>')->at('b')->wrap('<p></p><p>B</p>')->root;
+
+=head2 wrap_content
+
+  $dom = $dom->wrap_content('<div></div>');
+
+Wrap HTML/XML fragment around this element's content, placing it as the last
+children of the first innermost element.
+
+  # "<p><b>BA</b></p>"
+  $dom->parse('<p>A<p>')->at('p')->wrap_content('<b>B</b>')->root;
+
+  # "<p><b>A</b></p><p>B</p>"
+  $dom->parse('<b>A</b>')->wrap_content('<p></p><p>B</p>');
 
 =head2 xml
 
@@ -865,9 +877,9 @@ Alias for L</"attr">.
 
 =head2 stringify
 
-  my $xml = "$dom";
+  my $str = "$dom";
 
-Alias for L</"to_xml">.
+Alias for L</"to_string">.
 
 =head1 SEE ALSO
 

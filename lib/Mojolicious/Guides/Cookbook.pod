@@ -28,7 +28,8 @@ for small to mid sized applications.
 
 It is available to every application through the command
 L<Mojolicious::Command::daemon>, which has many configuration options and is
-known to work on every platform Perl works on.
+known to work on every platform Perl works on with its single-process
+architecture.
 
   $ ./script/myapp daemon -h
   ...List of available options...
@@ -41,8 +42,9 @@ L<Mojo::Server::Daemon/"listen">.
   $ ./script/myapp daemon -l https://[::]:3000
   Server available at https://[::]:3000.
 
-On UNIX platforms you can also add preforking with
-L<Mojolicious::Command::prefork>.
+On UNIX platforms you can also add preforking and switch to a multi-process
+architecture with L<Mojolicious::Command::prefork>, to take advantage of
+multiple CPU cores and copy-on-write.
 
   $ ./script/myapp prefork
   Server available at http://127.0.0.1:3000.
@@ -51,14 +53,15 @@ Since all built-in web servers are based on the L<Mojo::IOLoop> event loop,
 they scale best with non-blocking operations. But if your application for some
 reason needs to perform many blocking operations, you can improve performance
 by increasing the number of worker processes and decreasing the number of
-concurrent connections each worker is allowed to handle.
+concurrent connections each worker is allowed to handle (often as low as
+C<1>).
 
   $ ./script/myapp prefork -m production -w 10 -c 1
   Server available at http://127.0.0.1:3000.
 
 Your application is preloaded in the manager process during startup, to run
-code whenever a new worker process has been forked you can use L<Mojo::IOLoop>
-timers.
+code whenever a new worker process has been forked you can use
+L<Mojo::IOLoop/"timer">.
 
   use Mojolicious::Lite;
 
@@ -88,8 +91,9 @@ used during development.
 =head2 Hypnotoad
 
 For bigger applications L<Mojolicious> contains the UNIX optimized preforking
-web server L<Mojo::Server::Hypnotoad> that will allow you to take advantage of
-multiple CPU cores and copy-on-write.
+web server L<Mojo::Server::Hypnotoad>, which can take advantage of multiple
+CPU cores and copy-on-write to scale up to thousands of concurrent client
+connections.
 
   Mojo::Server::Hypnotoad
   |- Mojo::Server::Daemon [1]
@@ -373,7 +377,7 @@ latency backend web services.
     </body>
   </html>
 
-Multiple events such as parallel requests can be easily synchronized with
+Multiple events such as concurrent requests can be easily synchronized with
 L<Mojo::IOLoop/"delay">, which can help you avoid deep nested closures that
 often result from continuation-passing style.
 
@@ -388,7 +392,7 @@ often result from continuation-passing style.
     # Prepare response in two steps
     Mojo::IOLoop->delay(
 
-      # Parallel requests
+      # Concurrent requests
       sub {
         my $delay = shift;
         my $url   = Mojo::URL->new('api.metacpan.org/v0/module/_search');
@@ -412,9 +416,10 @@ often result from continuation-passing style.
 
 =head2 Timers
 
-Another primary feature of the L<Mojo::IOLoop> event loop are timers, which
-can for example be used to delay rendering of a response, and unlike C<sleep>,
-won't block any other requests that might be processed in parallel.
+Another primary feature of the event loop are timers, which are created with
+L<Mojo::IOLoop/"timer"> and can for example be used to delay rendering of a
+response, and unlike C<sleep>, won't block any other requests that might be
+processed concurrently.
 
   use Mojolicious::Lite;
   use Mojo::IOLoop;
@@ -429,8 +434,9 @@ won't block any other requests that might be processed in parallel.
 
   app->start;
 
-Recurring timers are slightly more powerful, but need to be stopped manually,
-or they would just keep getting emitted.
+Recurring timers created with L<Mojo::IOLoop/"recurring"> are slightly more
+powerful, but need to be stopped manually, or they would just keep getting
+emitted.
 
   use Mojolicious::Lite;
   use Mojo::IOLoop;
@@ -458,14 +464,19 @@ created at startup time.
   use Mojolicious::Lite;
   use Mojo::IOLoop;
 
-  # Count seconds since startup
-  my $i = 0;
-  Mojo::IOLoop->recurring(1 => sub { $i++ });
+  # Check title in the background every 10 seconds
+  my $title = 'Got no title yet.';
+  Mojo::IOLoop->recurring(10 => sub {
+    app->ua->get('http://mojolicio.us' => sub {
+      my ($ua, $tx) = @_;
+      $title = $tx->res->dom->at('title')->text;
+    });
+  });
 
-  # Show counter
+  # Show current title
   get '/' => sub {
     my $self = shift;
-    $self->render(text => "About $i seconds running!");
+    $self->render(json => {title => $title});
   };
 
   app->start;
@@ -778,20 +789,14 @@ web application.
   # Extract headings
   $tx->res->dom('h1, h2, h3')->each(sub { say 'Heading: ', shift->all_text });
 
-  # Visit all elements recursively to extract more than just text
-  for my $e ($tx->res->dom('*')->each) {
+  # Visit all nodes recursively to extract more than just text
+  for my $n ($tx->res->dom->all_contents->each) {
 
-    # Text before this element
-    print $e->text_before(0);
+    # Text or CDATA node
+    print $n->content if $n->node eq 'text' || $n->node eq 'cdata';
 
     # Also include alternate text for images
-    print $e->{alt} if $e->type eq 'img';
-
-    # Text for elements without children
-    print $e->text(0) unless $e->children->size;
-
-    # Text after last element
-    print $e->text_after(0) unless $e->next;
+    print $n->{alt} if $n->node eq 'tag' && $n->type eq 'img';
   }
 
 For a full list of available CSS selectors see L<Mojo::DOM::CSS/"SELECTORS">.
@@ -992,7 +997,7 @@ can keep many concurrent connections active at the same time.
   use Mojo::UserAgent;
   use Mojo::IOLoop;
 
-  # Parallel non-blocking requests
+  # Concurrent non-blocking requests
   my $ua = Mojo::UserAgent->new;
   $ua->get('http://metacpan.org/search?q=mojo' => sub {
     my ($ua, $mojo) = @_;
@@ -1008,7 +1013,7 @@ can keep many concurrent connections active at the same time.
 
 You can take full control of the L<Mojo::IOLoop> event loop.
 
-=head2 Parallel blocking requests
+=head2 Concurrent blocking requests
 
 You can emulate blocking behavior by using L<Mojo::IOLoop/"delay"> to
 synchronize multiple non-blocking requests.
@@ -1102,7 +1107,7 @@ that they will be picked up automatically by the command line interface?
   package Mojolicious::Command::spy;
   use Mojo::Base 'Mojolicious::Command';
 
-  has description => "Spy on application.\n";
+  has description => 'Spy on application.';
   has usage       => "Usage: APPLICATION spy [TARGET]\n";
 
   sub run {

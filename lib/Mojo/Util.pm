@@ -52,8 +52,8 @@ our @EXPORT_OK = (
   qw(decode deprecated dumper encode get_line hmac_sha1_sum html_unescape),
   qw(md5_bytes md5_sum monkey_patch punycode_decode punycode_encode quote),
   qw(secure_compare sha1_bytes sha1_sum slurp split_header spurt squish),
-  qw(steady_time trim unindent unquote url_escape url_unescape xml_escape),
-  qw(xor_encode)
+  qw(steady_time tablify trim unindent unquote url_escape url_unescape),
+  qw(xml_escape xor_encode)
 );
 
 sub b64_decode { decode_base64($_[0]) }
@@ -294,6 +294,22 @@ sub steady_time () {
   MONOTONIC
     ? Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC())
     : Time::HiRes::time;
+}
+
+sub tablify {
+  my $rows = shift;
+
+  my @spec;
+  for my $row (@$rows) {
+    for my $i (0 .. $#$row) {
+      $row->[$i] =~ s/[\r\n]//g;
+      my $len = length $row->[$i];
+      $spec[$i] = $len if $len > ($spec[$i] // 0);
+    }
+  }
+
+  my $format = join '  ', map({"\%-${_}s"} @spec[0 .. $#spec - 1]), '%s';
+  return join '', map { sprintf "$format\n", @$_ } @$rows;
 }
 
 sub trim {
@@ -626,6 +642,15 @@ consecutive groups of whitespace into one space each.
 
 High resolution time, resilient to time jumps if a monotonic clock is
 available through L<Time::HiRes>.
+
+=head2 tablify
+
+  my $table = tablify [['foo', 'bar'], ['baz', 'yada']];
+
+Row-oriented generator for text tables.
+
+  # "foo   bar\nyada  yada\nbaz   yada\n"
+  tablify [['foo', 'bar'], ['yada', 'yada'], ['baz', 'yada']];
 
 =head2 trim
 

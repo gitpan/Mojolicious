@@ -1,4 +1,14 @@
 
+4.77  2014-02-06
+  - Deprecated Mojo::DOM::text_after and Mojo::DOM::text_before in favor of
+    Mojo::DOM::contents.
+  - Deprecated Mojo::DOM::content_xml and Mojo::DOM::replace_content in favor
+    of Mojo::DOM::content.
+  - Deprecated Mojo::DOM::to_xml in favor of Mojo::DOM::to_string.
+  - Added wrap_content method to Mojo::DOM.
+  - Added tablify function to Mojo::Util.
+  - Improved wrap method in Mojo::DOM to allow wrapping of the root node.
+
 4.76  2014-02-04
   - Added wrap method to Mojo::DOM.
   - Updated IO::Socket::IP requirement to 0.20 for certain bug fixes.
@@ -2962,7 +2972,8 @@
   - Added version command.
   - Added after_build_tx plugin hook.
   - Added timer support to Mojo::IOLoop.
-  - Added the ability to run multiple parallel ioloops that block each other.
+  - Added the ability to run multiple concurrent ioloops that block each
+    other.
   - Added default_template_class attribute to MojoX::Renderer.
   - Added render_static method to Mojolicious::Controller.
   - Added support for embedded Mojolicious applications.

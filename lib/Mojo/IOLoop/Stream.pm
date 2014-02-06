@@ -88,7 +88,7 @@ sub write {
 
   $self->{buffer} .= $chunk;
   if ($cb) { $self->once(drain => $cb) }
-  else     { return $self unless length $self->{buffer} }
+  elsif (!length $self->{buffer}) { return $self }
   $self->reactor->watch($self->{handle}, !$self->{paused}, 1)
     if $self->{handle};
 
@@ -129,9 +129,9 @@ sub _write {
     $self->_again;
   }
 
-  $self->emit_safe('drain') unless length $self->{buffer};
-  return if $self->is_writing;
-  return $self->close if $self->{graceful};
+  $self->emit_safe('drain') if !length $self->{buffer};
+  return                    if $self->is_writing;
+  return $self->close       if $self->{graceful};
   $self->reactor->watch($handle, !$self->{paused}, 0) if $self->{handle};
 }
 

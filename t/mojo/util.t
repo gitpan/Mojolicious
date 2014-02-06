@@ -13,8 +13,8 @@ use Mojo::Util
   qw(decode dumper encode get_line hmac_sha1_sum html_unescape md5_bytes),
   qw(md5_sum monkey_patch punycode_decode punycode_encode quote),
   qw(secure_compare sha1_bytes sha1_sum slurp split_header spurt squish),
-  qw(steady_time trim unindent unquote url_escape url_unescape xml_escape),
-  qw(xor_encode);
+  qw(steady_time tablify trim unindent unquote url_escape url_unescape),
+  qw(xml_escape xor_encode);
 
 # camelize
 is camelize('foo_bar_baz'), 'FooBarBaz', 'right camelized result';
@@ -417,6 +417,15 @@ ok !!MojoMonkeyTest->can('yin'), 'function "yin" exists';
 is MojoMonkeyTest::yin(), 'yin', 'right result';
 ok !!MojoMonkeyTest->can('yang'), 'function "yang" exists';
 is MojoMonkeyTest::yang(), 'yang', 'right result';
+
+# tablify
+is tablify([["f\r\no o\r\n", 'bar']]),     "fo o  bar\n",      'right result';
+is tablify([["  foo",        '  b a r']]), "  foo    b a r\n", 'right result';
+is tablify([['foo']]), "foo\n", 'right result';
+is tablify([['foo', 'yada'], ['yada', 'yada']]), "foo   yada\nyada  yada\n",
+  'right result';
+is tablify([['foo', 'bar', 'baz'], ['yada', 'yada', 'yada']]),
+  "foo   bar   baz\nyada  yada  yada\n", 'right result';
 
 # deprecated
 {
