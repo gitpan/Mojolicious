@@ -115,10 +115,10 @@ sub parse {
   # Relaxed parsing
   my $headers = $self->headers;
   if ($self->auto_relax) {
-    my $connection = $headers->connection     // '';
-    my $len        = $headers->content_length // '';
+    my $connection = lc($headers->connection // '');
+    my $len = $headers->content_length // '';
     $self->relaxed(1)
-      if !length $len && ($connection =~ /close/i || $headers->content_type);
+      if !length $len && ($connection eq 'close' || $headers->content_type);
   }
 
   # Chunked or relaxed content
@@ -324,7 +324,7 @@ Mojo::Content - HTTP content base class
 
 =head1 DESCRIPTION
 
-L<Mojo::Content> is an abstract base class for HTTP content as described in
+L<Mojo::Content> is an abstract base class for HTTP content based on
 L<RFC 2616|http://tools.ietf.org/html/rfc2616>.
 
 =head1 EVENTS

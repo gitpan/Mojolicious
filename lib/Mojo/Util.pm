@@ -49,12 +49,15 @@ my %CACHE;
 
 our @EXPORT_OK = (
   qw(b64_decode b64_encode camelize class_to_file class_to_path decamelize),
-  qw(decode deprecated dumper encode get_line hmac_sha1_sum html_unescape),
-  qw(md5_bytes md5_sum monkey_patch punycode_decode punycode_encode quote),
+  qw(decode deprecated dumper encode hmac_sha1_sum html_unescape md5_bytes),
+  qw(md5_sum monkey_patch punycode_decode punycode_encode quote),
   qw(secure_compare sha1_bytes sha1_sum slurp split_header spurt squish),
   qw(steady_time tablify trim unindent unquote url_escape url_unescape),
   qw(xml_escape xor_encode)
 );
+
+# DEPRECATED in Top Hat!
+push @EXPORT_OK, 'get_line';
 
 sub b64_decode { decode_base64($_[0]) }
 sub b64_encode { encode_base64($_[0], $_[1]) }
@@ -65,8 +68,8 @@ sub camelize {
 
   # CamelCase words
   return join '::', map {
-    join '', map { ucfirst lc } split /_/, $_
-  } split /-/, $str;
+    join '', map { ucfirst lc } split '_', $_
+  } split '-', $str;
 }
 
 sub class_to_file {
@@ -84,7 +87,7 @@ sub decamelize {
 
   # Module parts
   my @parts;
-  for my $part (split /::/, $str) {
+  for my $part (split '::', $str) {
 
     # snake_case words
     my @words;
@@ -111,16 +114,10 @@ sub dumper { Data::Dumper->new([@_])->Indent(1)->Sortkeys(1)->Terse(1)->Dump }
 
 sub encode { _encoding($_[0])->encode("$_[1]") }
 
+# DEPRECATED in Top Hat!
 sub get_line {
-
-  # Locate line ending
-  return undef if (my $pos = index ${$_[0]}, "\x0a") == -1;
-
-  # Extract line and ending
-  my $line = substr ${$_[0]}, 0, $pos + 1, '';
-  $line =~ s/\x0d?\x0a$//;
-
-  return $line;
+  deprecated 'Mojo::Util::get_line is DEPRECATED';
+  ${$_[0]} =~ s/^(.*?)\x0d?\x0a// ? $1 : undef;
 }
 
 sub hmac_sha1_sum { hmac_sha1_hex(@_) }
@@ -152,7 +149,7 @@ sub punycode_decode {
   my @output;
 
   # Consume all code points before the last delimiter
-  push @output, split //, $1 if $input =~ s/(.*)\x2d//s;
+  push @output, split '', $1 if $input =~ s/(.*)\x2d//s;
 
   while (length $input) {
     my $oldi = $i;
@@ -189,7 +186,7 @@ sub punycode_encode {
 
   # Extract basic code points
   my $len   = length $output;
-  my @input = map {ord} split //, $output;
+  my @input = map {ord} split '', $output;
   my @chars = sort grep { $_ >= PC_INITIAL_N } @input;
   $output =~ s/[^\x00-\x7f]+//gs;
   my $h = my $b = length $output;
@@ -320,7 +317,7 @@ sub trim {
 
 sub unindent {
   my $str = shift;
-  my $min = min map { m/^([ \t]*)/; length $1 || () } split /\n/, $str;
+  my $min = min map { m/^([ \t]*)/; length $1 || () } split "\n", $str;
   $str =~ s/^[ \t]{0,$min}//gm if $min;
   return $str;
 }
@@ -520,13 +517,6 @@ Dump a Perl data structure with L<Data::Dumper>.
   my $bytes = encode 'UTF-8', $chars;
 
 Encode characters to bytes.
-
-=head2 get_line
-
-  my $line = get_line \$str;
-
-Extract whole line from string or return C<undef>. Lines are expected to end
-with C<0x0d 0x0a> or C<0x0a>.
 
 =head2 hmac_sha1_sum
 

@@ -21,7 +21,7 @@ sub detect {
   if (my $class = @_ ? shift : 'Mojo::HelloWorld') {
     my $file = class_to_path $class;
     if (my $path = $INC{$file}) {
-      $path =~ s/$file$//;
+      $path =~ s/\Q$file\E$//;
       my @home = splitdir $path;
 
       # Remove "lib" and "blib"
@@ -33,7 +33,7 @@ sub detect {
   }
 
   # FindBin fallback
-  return $self->parts([split /\//, $FindBin::Bin]);
+  return $self->parts([split '/', $FindBin::Bin]);
 }
 
 sub lib_dir {

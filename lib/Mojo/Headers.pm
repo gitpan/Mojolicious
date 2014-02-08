@@ -1,7 +1,7 @@
 package Mojo::Headers;
 use Mojo::Base -base;
 
-use Mojo::Util qw(get_line monkey_patch);
+use Mojo::Util 'monkey_patch';
 
 has max_line_size => sub { $ENV{MOJO_MAX_LINE_SIZE} || 10240 };
 
@@ -31,8 +31,6 @@ sub add {
   # Make sure we have a normal case entry for name
   my $key = lc $name;
   $self->{normalcase}{$key} //= $name unless $NORMALCASE{$key};
-
-  # Add lines
   push @{$self->{headers}{$key}}, map { ref $_ eq 'ARRAY' ? $_ : [$_] } @_;
 
   return $self;
@@ -93,7 +91,8 @@ sub parse {
   $self->{buffer} .= shift // '';
   my $headers = $self->{cache} ||= [];
   my $max = $self->max_line_size;
-  while (defined(my $line = get_line \$self->{buffer})) {
+  while ($self->{buffer} =~ s/^(.*?)\x0d?\x0a//) {
+    my $line = $1;
 
     # Check line size limit
     if (length $line > $max) {
@@ -131,10 +130,8 @@ sub remove {
 
 sub to_hash {
   my ($self, $multi) = @_;
-  my %hash;
-  $hash{$_} = $multi ? [$self->header($_)] : scalar $self->header($_)
-    for @{$self->names};
-  return \%hash;
+  return {map { $_ => $multi ? [$self->header($_)] : scalar $self->header($_) }
+      @{$self->names}};
 }
 
 sub to_string {
@@ -176,7 +173,7 @@ Mojo::Headers - Headers
 
 =head1 DESCRIPTION
 
-L<Mojo::Headers> is a container for HTTP headers as described in
+L<Mojo::Headers> is a container for HTTP headers based on
 L<RFC 2616|http://tools.ietf.org/html/rfc2616>.
 
 =head1 ATTRIBUTES
@@ -370,7 +367,8 @@ Shortcut for the C<Expires> header.
 
 =head2 from_hash
 
-  $headers = $headers->from_hash({'Content-Type' => 'text/html'});
+  $headers = $headers->from_hash({'Cookie' => 'a=b'});
+  $headers = $headers->from_hash({'Cookie' => ['a=b', 'c=d']});
   $headers = $headers->from_hash({});
 
 Parse headers from a hash reference, an empty hash removes all headers.
@@ -582,7 +580,7 @@ Shortcut for the C<TE> header.
   my $multi  = $headers->to_hash(1);
 
 Turn headers into hash reference, nested array references to represent
-multiline values are disabled by default.
+multiple headers with the same name are disabled by default.
 
   say $headers->to_hash->{DNT};
 
