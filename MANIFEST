@@ -160,10 +160,9 @@ lib/Mojolicious/Routes/Pattern.pm
 lib/Mojolicious/Routes/Route.pm
 lib/Mojolicious/Sessions.pm
 lib/Mojolicious/Static.pm
-lib/Mojolicious/templates/exception.development.html.ep
+lib/Mojolicious/templates/development.html.ep
 lib/Mojolicious/templates/exception.html.ep
 lib/Mojolicious/templates/mojobar.html.ep
-lib/Mojolicious/templates/not_found.development.html.ep
 lib/Mojolicious/templates/not_found.html.ep
 lib/Mojolicious/templates/perldoc.html.ep
 lib/Mojolicious/Types.pm
