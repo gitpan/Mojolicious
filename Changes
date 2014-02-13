@@ -1,4 +1,13 @@
 
+4.80  2014-02-13
+  - Merged Mojo::DOM::Node into Mojo::DOM.
+  - Added next_sibling and previous_sibling methods to Mojo::DOM.
+  - Added last method to Mojo::Collection.
+  - Improved many methods in Mojo::DOM to work with all node types.
+  - Improved Mojo::DOM::HTML to handle slashes between attributes more
+    gracefully.
+  - Fixed list parsing bug in Mojo::DOM::HTML.
+
 4.79  2014-02-11
   - Improved not found page to show request information and the exact path
     used for route matching.

@@ -25,7 +25,6 @@ lib/Mojo/Date.pm
 lib/Mojo/DOM.pm
 lib/Mojo/DOM/CSS.pm
 lib/Mojo/DOM/HTML.pm
-lib/Mojo/DOM/Node.pm
 lib/Mojo/entities.txt
 lib/Mojo/EventEmitter.pm
 lib/Mojo/Exception.pm

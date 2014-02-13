@@ -307,6 +307,13 @@ $num = 1 + $str;
 is $json->encode({test => [$num, $str]}), '{"test":[1,0]}',
   'upgraded number detected';
 
+# Ensure numbers and strings are not upgraded
+my $mixed = [3, 'three', '3', 0, "0"];
+is $json->encode($mixed), '[3,"three","3",0,"0"]',
+  'all have been detected correctly';
+is $json->encode($mixed), '[3,"three","3",0,"0"]',
+  'all have been detected correctly again';
+
 # "inf" and "nan"
 like $json->encode({test => 9**9**9}), qr/^{"test":".*"}$/,
   'encode "inf" as string';
