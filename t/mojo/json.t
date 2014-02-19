@@ -10,7 +10,7 @@ use Mojo::Base -strict;
 
 use Test::More;
 use Mojo::ByteStream 'b';
-use Mojo::JSON 'j';
+use Mojo::JSON qw(decode_json encode_json j);
 
 # Decode array
 my $json  = Mojo::JSON->new;
@@ -245,10 +245,10 @@ ok $bytes, 'defined value';
 is_deeply $json->decode($bytes), $array, 'successful roundtrip';
 
 # Real world roundtrip
-$bytes = $json->encode({foo => 'c:\progra~1\mozill~1\firefox.exe'});
+$bytes = encode_json({foo => 'c:\progra~1\mozill~1\firefox.exe'});
 is $bytes, '{"foo":"c:\\\\progra~1\\\\mozill~1\\\\firefox.exe"}',
   'encode {foo => \'c:\progra~1\mozill~1\firefox.exe\'}';
-$hash = $json->decode($bytes);
+$hash = decode_json($bytes);
 is_deeply $hash, {foo => 'c:\progra~1\mozill~1\firefox.exe'},
   'successful roundtrip';
 
@@ -368,6 +368,13 @@ is $json->decode("[\"foo\",\n\"bar\",\n\"bazra\"]lalala"), undef,
 is $json->error,
   'Malformed JSON: Unexpected data after array at line 3, offset 8',
   'right error';
+is $json->decode('0'), undef, 'syntax error';
+is $json->error,
+  'Malformed JSON: Expected array or object at line 0, offset 0',
+  'right error';
 is j('{'), undef, 'decoding failed';
+eval { decode_json("[\"foo\",\n\"bar\",\n\"bazra\"]lalala") };
+like $@, qr/Malformed JSON: Unexpected data after array at line 3, offset 8/,
+  'right error';
 
 done_testing();

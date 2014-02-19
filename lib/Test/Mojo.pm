@@ -9,7 +9,7 @@ use Mojo::Base -base;
 #  Bender: You're better off dead, I'm telling you, dude.
 #  Fry: Santa Claus is gunning you down!"
 use Mojo::IOLoop;
-use Mojo::JSON;
+use Mojo::JSON 'j';
 use Mojo::JSON::Pointer;
 use Mojo::Server;
 use Mojo::UserAgent;
@@ -144,14 +144,14 @@ sub json_has {
   my ($self, $p, $desc) = @_;
   $desc ||= qq{has value for JSON Pointer "$p"};
   return $self->_test('ok',
-    !!Mojo::JSON::Pointer->new->contains($self->tx->res->json, $p), $desc);
+    !!Mojo::JSON::Pointer->new($self->tx->res->json)->contains($p), $desc);
 }
 
 sub json_hasnt {
   my ($self, $p, $desc) = @_;
   $desc ||= qq{has no value for JSON Pointer "$p"};
   return $self->_test('ok',
-    !Mojo::JSON::Pointer->new->contains($self->tx->res->json, $p), $desc);
+    !Mojo::JSON::Pointer->new($self->tx->res->json)->contains($p), $desc);
 }
 
 sub json_is {
@@ -288,8 +288,7 @@ sub _build_ok {
 
 sub _json {
   my ($self, $method, $p) = @_;
-  return Mojo::JSON::Pointer->new->$method(
-    Mojo::JSON->new->decode(@{$self->message // []}[1]), $p);
+  return Mojo::JSON::Pointer->new(j(@{$self->message // []}[1]))->$method($p);
 }
 
 sub _message {
