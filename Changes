@@ -1,4 +1,8 @@
 
+4.83  2014-02-19
+  - Improved Mojo::JSON to handle encoding errors more gracefully.
+  - Fixed line numbers in Mojo::JSON error messages.
+
 4.82  2014-02-19
   - Added decode_json and encode_json functions to Mojo::JSON.
   - Added data attribute to Mojo::JSON::Pointer.
