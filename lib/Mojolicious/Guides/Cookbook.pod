@@ -314,6 +314,7 @@ with this little L<Mojo::Server> based mock server you can just embed them.
   say for @{$app->static->paths};
   say $app->config->{secret_identity};
   say $app->dumper({just => 'a helper test'});
+  say $app->build_controller->render(template => 'foo', partial => 1);
 
 The plugin L<Mojolicious::Plugin::Mount> uses this functionality to allow you
 to combine multiple applications into one and deploy them together.
@@ -777,15 +778,17 @@ application.
 
 =head1 USER AGENT
 
-When we say L<Mojolicious> is a web framework we actually mean it.
+When we say L<Mojolicious> is a web framework we actually mean it, with
+L<Mojo::UserAgent> there's a full featured HTTP and WebSocket user agent built
+right in.
 
 =head2 Web scraping
 
 Scraping information from web sites has never been this much fun before. The
 built-in HTML/XML parser L<Mojo::DOM> is accessible through
 L<Mojo::Message/"dom"> and supports all CSS selectors that make sense for a
-standalone parser, it can be a very powerful tool especially for unit testing
-web application.
+standalone parser, it can be a very powerful tool especially for testing web
+application.
 
   use Mojo::UserAgent;
 
