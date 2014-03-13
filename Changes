@@ -1,4 +1,12 @@
 
+4.89  2014-03-13
+  - Added support for template variants.
+  - Improved built-in templates with unobtrusive menu bar.
+  - Fixed bug in Mojo::DOM::HTML where non-self-closing elements were not
+    handled correctly.
+  - Fixed bug in Mojo::DOM::HTML where <image> was not treated as an alias for
+    <img>.
+
 4.88  2014-03-09
   - Added build_controller method to Mojolicious.
   - Added match method to Mojolicious::Routes.

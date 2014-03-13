@@ -31,8 +31,9 @@ or the route name, C<format> defaulting to C<html> and C<handler> to C<ep>.
   {name => 'foo', format => 'txt'}          -> 'foo.txt.ep'
   {name => 'foo', handler => 'epl'}         -> 'foo.html.epl'
 
-All templates should be in the C<templates> directories of the application or
-the C<DATA> section of the class C<main>.
+All templates should be in the C<templates> directories of the application,
+which can be customized with L<Mojolicious::Renderer/"paths">, or one of the
+the C<DATA> sections from L<Mojolicious::Renderer/"classes">.
 
   __DATA__
 
@@ -197,6 +198,19 @@ the method L<Mojolicious::Controller/"render_maybe"> to try multiple
 alternatives.
 
   $self->render_maybe('localized/baz') or $self->render('foo/bar/baz');
+
+=head2 Template variants
+
+To make your application look great on many different devices you can also
+use the C<variant> stash value to choose between different variants of your
+templates.
+
+  # foo/bar/baz.html+phone.ep
+  # foo/bar/baz.html.ep
+  $self->render('foo/bar/baz', variant => 'phone');
+
+This can be done very liberally since it only applies when a template with the
+correct name actually exists and falls back to the generic one otherwise.
 
 =head2 Rendering inline templates
 
