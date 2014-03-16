@@ -26,7 +26,7 @@ presentation and input.
            +------------+    +-------+    +------+
 
 A slightly modified version of the pattern moving some application logic into
-the C<controller> is the foundation of pretty much every web framework these
+the I<controller> is the foundation of pretty much every web framework these
 days, including L<Mojolicious>.
 
               +----------------+     +-------+
@@ -37,9 +37,9 @@ days, including L<Mojolicious>.
   Response <- |                | <-> | View  |
               +----------------+     +-------+
 
-The C<controller> receives a request from a user, passes incoming data to the
-C<model> and retrieves data from it, which then gets turned into an actual
-response by the C<view>. But note that this pattern is just a guideline that
+The I<controller> receives a request from a user, passes incoming data to the
+I<model> and retrieves data from it, which then gets turned into an actual
+response by the I<view>. But note that this pattern is just a guideline that
 most of the time results in cleaner more maintainable code, not a rule that
 should be followed at all costs.
 
@@ -49,8 +49,8 @@ REST is a software architectural style for distributed hypermedia systems such
 as the web. While it can be applied to many protocols it is most commonly used
 with HTTP these days. In REST terms, when you are opening a URL like
 C<http://mojolicio.us/foo> with your browser, you are basically asking the web
-server for the HTML C<representation> of the C<http://mojolicio.us/foo>
-C<resource>.
+server for the HTML I<representation> of the C<http://mojolicio.us/foo>
+I<resource>.
 
   +--------+                                +--------+
   |        | -> http://mojolicio.us/foo  -> |        |
@@ -79,8 +79,9 @@ all session state is kept client-side.
   |         | <-    200 OK        <- |            |
   +---------+                        +------------+
 
-While HTTP methods such as PUT, GET and DELETE are not directly part of REST
-they go very well with it and are commonly used to manipulate C<resources>.
+While HTTP methods such as C<PUT>, C<GET> and C<DELETE> are not directly part
+of REST they go very well with it and are commonly used to manipulate
+I<resources>.
 
 =head2 Sessions
 
@@ -112,8 +113,8 @@ ids were exchanged between browser and web server in the form of cookies.
   Set-Cookie: session=hmac-sha1(base64(json($session)))
 
 In L<Mojolicious> however we are taking this concept one step further by
-storing everything C<JSON> serialized and C<Base64> encoded in C<HMAC-SHA1>
-signed cookies, which is more compatible with the REST philosophy and reduces
+storing everything JSON serialized and Base64 encoded in HMAC-SHA1 signed
+cookies, which is more compatible with the REST philosophy and reduces
 infrastructure requirements.
 
 =head2 Test Driven Development
@@ -237,8 +238,8 @@ logic related to matching usernames and passwords.
   1;
 
 A simple helper can be registered with the function
-L<Mojolicious::Lite/"helper"> to make our C<model> available to all actions
-and templates.
+L<Mojolicious::Lite/"helper"> to make our model available to all actions and
+templates.
 
   #!/usr/bin/env perl
   use Mojolicious::Lite;
@@ -268,7 +269,8 @@ and templates.
   app->start;
 
 The method L<Mojolicious::Controller/"param"> is used to access query
-parameters, POST parameters, file uploads and route placeholders, all at once.
+parameters, C<POST> parameters, file uploads and route placeholders, all at
+once.
 
 =head2 Testing
 
@@ -355,7 +357,7 @@ L<Mojolicious/"secrets">.
 
   app->secrets(['Mojolicious rocks']);
 
-This passphrase is used by the C<HMAC-SHA1> algorithm to make signed cookies
+This passphrase is used by the HMAC-SHA1 algorithm to make signed cookies
 secure and can be changed at any time to invalidate all existing sessions.
 
   $self->session(user => 'sri');
@@ -379,7 +381,7 @@ method L<Mojolicious::Controller/"flash">.
   $self->redirect_to('goodbye');
 
 Just remember that all session data gets serialized with L<Mojo::JSON> and
-stored in C<HMAC-SHA1> signed cookies, which usually have a 4096 byte limit,
+stored in HMAC-SHA1 signed cookies, which usually have a C<4096> byte limit,
 depending on browser.
 
 =head2 Final prototype

@@ -43,7 +43,7 @@ has types     => sub { Mojolicious::Types->new };
 has validator => sub { Mojolicious::Validator->new };
 
 our $CODENAME = 'Top Hat';
-our $VERSION  = '4.89';
+our $VERSION  = '4.90';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -413,10 +413,10 @@ L<Mojolicious::Controller>.
   $app     = $app->mode('production');
 
 The operating mode for your application, defaults to a value from the
-MOJO_MODE and PLACK_ENV environment variables or C<development>. Right before
-calling L</"startup">, L<Mojolicious> will pick up the current mode, name the
-log file after it and raise the log level from C<debug> to C<info> if it has a
-value other than C<development>.
+C<MOJO_MODE> and C<PLACK_ENV> environment variables or C<development>. Right
+before calling L</"startup">, L<Mojolicious> will pick up the current mode,
+name the log file after it and raise the log level from C<debug> to C<info> if
+it has a value other than C<development>.
 
 =head2 moniker
 
