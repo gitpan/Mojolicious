@@ -80,7 +80,7 @@ Mojo::IOLoop::Delay - Manage callbacks and control the flow of events
 
   # Synchronize multiple events
   my $delay = Mojo::IOLoop::Delay->new;
-  $delay->on(finish => sub { say 'BOOM!' });
+  $delay->steps(sub { say 'BOOM!' });
   for my $i (1 .. 10) {
     my $end = $delay->begin;
     Mojo::IOLoop->timer($i => sub {
@@ -240,8 +240,8 @@ event counter or an error occurs in a callback.
 Start L</"ioloop"> and stop it again once an L</"error"> or L</"finish"> event
 gets emitted, only works when L</"ioloop"> is not running already.
 
-  # Use the "finish" event to synchronize portably
-  $delay->on(finish => sub {
+  # Use a single step to synchronize portably
+  $delay->steps(sub {
     my ($delay, @args) = @_;
     ...
   });
