@@ -43,7 +43,7 @@ has types     => sub { Mojolicious::Types->new };
 has validator => sub { Mojolicious::Validator->new };
 
 our $CODENAME = 'Top Hat';
-our $VERSION  = '4.94';
+our $VERSION  = '4.95';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -57,8 +57,6 @@ sub AUTOLOAD {
     unless my $helper = $self->renderer->helpers->{$method};
   return $self->build_controller->$helper(@_);
 }
-
-sub DESTROY { }
 
 sub build_controller {
   my ($self, $tx) = @_;

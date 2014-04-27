@@ -1,4 +1,10 @@
 
+4.95  2014-04-27
+  - Improved Mojo::IOLoop::Delay with circular reference protection.
+  - Improved Mojo::IOLoop::Delay to allow argument splicing.
+  - Improved Mojo::IOLoop::Server to reuse cipher list from IO::Socket::SSL.
+  - Fixed memory leak in Mojo::UserAgent::Server.
+
 4.94  2014-04-20
   - Added reverse_proxy attribute to Mojo::Server::Daemon.
   - Added reverse_proxy attribute to Mojo::Message::Request.
