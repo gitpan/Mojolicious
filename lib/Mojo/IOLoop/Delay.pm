@@ -227,10 +227,11 @@ circular references.
 
   $delay = $delay->steps(sub {...}, sub {...});
 
-Sequentialize multiple events, the first callback will run right away, and the
-next one once the active event counter reaches zero. This chain will continue
-until there are no more callbacks, a callback does not increment the active
-event counter or an error occurs in a callback.
+Sequentialize multiple events, every time the active event counter reaches
+zero a callback will run, the first one automatically runs during the next
+reactor tick unless it is delayed by incrementing the active event counter.
+This chain will continue until there are no more callbacks, a callback does
+not increment the active event counter or an error occurs in a callback.
 
 =head2 wait
 
