@@ -5,6 +5,7 @@ use Carp 'croak';
 use File::Basename 'dirname';
 use File::Spec::Functions 'catfile';
 use IO::Socket::INET;
+use Mojo::IOLoop;
 use Scalar::Util 'weaken';
 use Socket qw(IPPROTO_TCP TCP_NODELAY);
 
@@ -26,14 +27,11 @@ my $CERT = catfile dirname(__FILE__), 'server.crt';
 my $KEY  = catfile dirname(__FILE__), 'server.key';
 
 has multi_accept => 50;
-has reactor      => sub {
-  require Mojo::IOLoop;
-  Mojo::IOLoop->singleton->reactor;
-};
+has reactor => sub { Mojo::IOLoop->singleton->reactor };
 
 sub DESTROY {
   my $self = shift;
-  $ENV{MOJO_REUSE} =~ s/(?:^|\,)\Q$self->{reuse}\E:\d+// if $self->{reuse};
+  $ENV{MOJO_REUSE} =~ s/(?:^|\,)\Q$self->{reuse}\E// if $self->{reuse};
   return unless my $reactor = $self->reactor;
   $self->stop if $self->{handle};
   $reactor->remove($_) for values %{$self->{handles}};
@@ -51,11 +49,10 @@ sub listen {
 
   # Look for reusable file descriptor
   my $address = $args->{address} || '0.0.0.0';
-  my $port    = $args->{port}    || 3000;
-  my $reuse = $self->{reuse} = "$address:$port";
+  my $port = $args->{port};
   $ENV{MOJO_REUSE} ||= '';
   my $fd;
-  if ($ENV{MOJO_REUSE} =~ /(?:^|\,)\Q$reuse\E:(\d+)/) { $fd = $1 }
+  $fd = $1 if $port && $ENV{MOJO_REUSE} =~ /(?:^|\,)\Q$address:$port\E:(\d+)/;
 
   # Allow file descriptor inheritance
   local $^F = 1000;
@@ -73,15 +70,16 @@ sub listen {
     my %options = (
       Listen => $args->{backlog} // SOMAXCONN,
       LocalAddr => $address,
-      LocalPort => $port,
       ReuseAddr => 1,
       ReusePort => $args->{reuse},
       Type      => SOCK_STREAM
     );
+    $options{LocalPort} = $port if $port;
     $options{LocalAddr} =~ s/[\[\]]//g;
     $handle = $class->new(%options) or croak "Can't create listen socket: $@";
     $fd = fileno $handle;
-    $ENV{MOJO_REUSE} .= length $ENV{MOJO_REUSE} ? ",$reuse:$fd" : "$reuse:$fd";
+    my $reuse = $self->{reuse} = join ':', $address, $handle->sockport, $fd;
+    $ENV{MOJO_REUSE} .= length $ENV{MOJO_REUSE} ? ",$reuse" : "$reuse";
   }
   $handle->blocking(0);
   $self->{handle} = $handle;
@@ -262,7 +260,7 @@ Maximum backlog size, defaults to C<SOMAXCONN>.
 
   port => 80
 
-Port to listen on.
+Port to listen on, defaults to a random port.
 
 =item reuse
 
