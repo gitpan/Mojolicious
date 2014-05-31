@@ -1,4 +1,13 @@
 
+5.02  2014-05-31
+  - Added multi-name support to cookie and signed_cookie methods in
+    Mojolicious::Controller.
+  - Added multi-name support to cookie and upload methods in Mojo::Message.
+  - Improved Mojolicious::Command::generate::plugin to use better directory
+    names.
+  - Fixed bug where Mojo::DOM::HTML could not handle tags with lots of
+    attributes.
+
 5.01  2014-05-30
   - Fixed continuation line handling in Mojo::Headers.
 
