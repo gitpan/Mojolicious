@@ -1846,6 +1846,10 @@ is $dom->find('#screw-up .ewww > a > img')->[2], undef, 'no result';
 is $dom->find('#screw-up .ewww > a > img')->size, 2,
   'right number of elements';
 
+# Broken "br" tag
+$dom = Mojo::DOM->new('<br< abc abc abc abc abc abc abc abc<p>Test</p>');
+is $dom->at('p')->text, 'Test', 'right text';
+
 # Modifying an XML document
 $dom = Mojo::DOM->new->parse(<<'EOF');
 <?xml version='1.0' encoding='UTF-8'?>
