@@ -5,7 +5,7 @@ use Carp 'croak';
 use Compress::Raw::Zlib qw(WANT_GZIP Z_STREAM_END);
 use Mojo::Headers;
 
-has [qw(auto_relax relaxed skip_body)];
+has [qw(auto_relax expect_close relaxed skip_body)];
 has headers           => sub { Mojo::Headers->new };
 has max_buffer_size   => sub { $ENV{MOJO_MAX_BUFFER_SIZE} || 262144 };
 has max_leftover_size => sub { $ENV{MOJO_MAX_LEFTOVER_SIZE} || 262144 };
@@ -114,11 +114,11 @@ sub parse {
 
   # Relaxed parsing
   my $headers = $self->headers;
-  if ($self->auto_relax) {
+  my $len = $headers->content_length // '';
+  if ($self->auto_relax && !length $len) {
     my $connection = lc($headers->connection // '');
-    my $len = $headers->content_length // '';
     $self->relaxed(1)
-      if !length $len && ($connection eq 'close' || $headers->content_type);
+      if $connection eq 'close' || (!$connection && $self->expect_close);
   }
 
   # Chunked or relaxed content
@@ -130,9 +130,8 @@ sub parse {
 
   # Normal content
   else {
-    my $len = $headers->content_length || 0;
     $self->{size} ||= 0;
-    if ((my $need = $len - $self->{size}) > 0) {
+    if ((my $need = ($len ||= 0) - $self->{size}) > 0) {
       my $len = length $self->{buffer};
       my $chunk = substr $self->{buffer}, 0, $need > $len ? $len : $need, '';
       $self->_uncompress($chunk);
@@ -385,6 +384,13 @@ L<Mojo::Content> implements the following attributes.
   $content = $content->auto_relax($bool);
 
 Try to detect when relaxed parsing is necessary.
+
+=head2 expect_close
+
+  my $bool = $content->expect_close;
+  $content = $content->expect_close($bool);
+
+Expect a response that is terminated with a connection close.
 
 =head2 headers
 
