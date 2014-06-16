@@ -658,7 +658,7 @@ Render content using L<Mojolicious::Renderer/"render"> and emit hooks
 L<Mojolicious/"before_render"> as well as L<Mojolicious/"after_render">. If no
 template is provided a default one based on controller and action or route
 name will be generated with L<Mojolicious::Renderer/"template_for">, all
-additional values get merged into the L</"stash">.
+additional pairs get merged into the L</"stash">.
 
   # Render characters
   $c->render(text => 'I ♥ Mojolicious!');
@@ -862,8 +862,8 @@ timeout, which usually defaults to C<15> seconds.
 
 Persistent data storage for the next few requests, all session data gets
 serialized with L<Mojo::JSON> and stored Base64 encoded in HMAC-SHA1 signed
-cookies. Note that cookies usually have a C<4096> byte limit, depending on
-browser.
+cookies. Note that cookies usually have a C<4096> byte (4KB) limit, depending
+on browser.
 
   # Manipulate session
   $c->session->{foo} = 'bar';
