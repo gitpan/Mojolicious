@@ -3,6 +3,7 @@ use Mojo::Base 'Mojolicious::Plugin';
 
 use Mojo::ByteStream;
 use Mojo::Collection;
+use Mojo::IOLoop;
 use Mojo::Util qw(dumper sha1_sum steady_time);
 
 sub register {
@@ -26,18 +27,15 @@ sub register {
     );
   }
 
-  $app->helper(accepts => \&_accepts);
-  $app->helper(b       => sub { shift; Mojo::ByteStream->new(@_) });
-  $app->helper(c       => sub { shift; Mojo::Collection->new(@_) });
-  $app->helper(config => sub { shift->app->config(@_) });
-  $app->helper(content       => \&_content);
-  $app->helper(content_for   => \&_content_for);
-  $app->helper(csrf_token    => \&_csrf_token);
-  $app->helper(current_route => \&_current_route);
-  $app->helper(dumper        => sub { shift; dumper(@_) });
+  $app->helper($_ => $self->can("_$_"))
+    for qw(accepts content content_for csrf_token current_route delay),
+    qw(inactivity_timeout url_with);
+  $app->helper(b => sub { shift; Mojo::ByteStream->new(@_) });
+  $app->helper(c => sub { shift; Mojo::Collection->new(@_) });
+  $app->helper(config  => sub { shift->app->config(@_) });
+  $app->helper(dumper  => sub { shift; dumper(@_) });
   $app->helper(include => sub { shift->render_to_string(@_) });
   $app->helper(ua      => sub { shift->app->ua });
-  $app->helper(url_with => \&_url_with);
 }
 
 sub _accepts {
@@ -75,6 +73,18 @@ sub _current_route {
   return '' unless my $endpoint = shift->match->endpoint;
   return $endpoint->name unless @_;
   return $endpoint->name eq shift;
+}
+
+sub _delay {
+  my $self  = shift;
+  my $tx    = $self->render_later->tx;
+  my $delay = Mojo::IOLoop->delay(@_);
+  $delay->catch(sub { $self->render_exception(pop) and undef $tx })->wait;
+}
+
+sub _inactivity_timeout {
+  return unless my $stream = Mojo::IOLoop->stream(shift->tx->connection // '');
+  $stream->timeout(shift);
 }
 
 sub _url_with {
@@ -115,8 +125,8 @@ L<Mojolicious::Plugin::DefaultHelpers> implements the following helpers.
 
 =head2 accepts
 
-  %= accepts->[0] // 'html'
-  %= accepts('html', 'json', 'txt') // 'html'
+  my $formats = $c->accepts;
+  my $format  = $c->accepts('html', 'json', 'txt');
 
 Select best possible representation for resource from C<Accept> request
 header, C<format> stash value or C<format> C<GET>/C<POST> parameter with
@@ -208,6 +218,21 @@ Get CSRF token from L</"session">, and generate one if none exists.
 
 Check or get name of current route.
 
+=head2 delay
+
+  $c->delay(sub {...}, sub {...});
+
+Disable automatic rendering and use L<Mojo::IOLoop/"delay"> to manage
+callbacks and control the flow of events, which can help you avoid deep nested
+closures and memory leaks that often result from continuation-passing style.
+Calls L<Mojolicious::Controller/"render_exception"> if an error occured in one
+of the steps, breaking the chain.
+
+  # Longer version
+  $c->render_later;
+  my $delay = Mojo::IOLoop->delay(sub {...}, sub {...});
+  $delay->catch(sub { $c->render_exception(pop) })->wait;
+
 =head2 dumper
 
   %= dumper {some => 'data'}
@@ -227,6 +252,16 @@ L</"stash">.
   %= flash 'foo'
 
 Alias for L<Mojolicious::Controller/"flash">.
+
+=head2 inactivity_timeout
+
+  $c->inactivity_timeout(3600);
+
+Use L<Mojo::IOLoop/"stream"> to find the current connection and increase
+timeout if possible.
+
+  # Longer version
+  Mojo::IOLoop->stream($c->tx->connection)->timeout(3600);
 
 =head2 include
 

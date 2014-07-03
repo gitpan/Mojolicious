@@ -130,8 +130,8 @@ Mojo::IOLoop::Delay - Manage callbacks and control the flow of events
 =head1 DESCRIPTION
 
 L<Mojo::IOLoop::Delay> manages callbacks and controls the flow of events for
-L<Mojo::IOLoop>, which can help you avoid deep nested closures that often
-result from continuation-passing style.
+L<Mojo::IOLoop>, which can help you avoid deep nested closures and memory
+leaks that often result from continuation-passing style.
 
 =head1 EVENTS
 
@@ -258,12 +258,6 @@ not increment the active event counter or an error occurs in a callback.
 
 Start L</"ioloop"> and stop it again once an L</"error"> or L</"finish"> event
 gets emitted, does nothing when L</"ioloop"> is already running.
-
-  # Use a single step to synchronize portably
-  $delay->steps(sub {
-    my ($delay, @args) = @_;
-    ...
-  })->wait;
 
 =head1 SEE ALSO
 
