@@ -35,8 +35,7 @@ my $TOKEN_RE        = qr/
 
 sub match {
   my $tree = shift->tree;
-  return undef if $tree->[0] ne 'tag';
-  return _match(_compile(shift), $tree, $tree);
+  return $tree->[0] ne 'tag' ? undef : _match(_compile(shift), $tree, $tree);
 }
 
 sub select     { shift->_select(0, @_) }
@@ -171,37 +170,25 @@ sub _parent {
 sub _pc {
   my ($class, $args, $current) = @_;
 
-  # ":first-*"
-  if ($class =~ /^first-(?:(child)|of-type)$/) {
-    $class = defined $1 ? 'nth-child' : 'nth-of-type';
-    $args = 1;
-  }
-
-  # ":last-*"
-  elsif ($class =~ /^last-(?:(child)|of-type)$/) {
-    $class = defined $1 ? 'nth-last-child' : 'nth-last-of-type';
-    $args = '-n+1';
-  }
-
-  # ":checked"
-  if ($class eq 'checked') {
-    my $attrs = $current->[2];
-    return 1 if exists $attrs->{checked} || exists $attrs->{selected};
-  }
-
   # ":empty"
-  elsif ($class eq 'empty') { return 1 unless defined $current->[4] }
+  return !defined $current->[4] if $class eq 'empty';
 
   # ":root"
-  elsif ($class eq 'root') {
-    if (my $parent = $current->[3]) { return 1 if $parent->[0] eq 'root' }
-  }
+  return $current->[3] && $current->[3][0] eq 'root' if $class eq 'root';
 
   # ":not"
-  elsif ($class eq 'not') { return 1 if !_match($args, $current, $current) }
+  return !_match($args, $current, $current) if $class eq 'not';
+
+  # ":checked"
+  return exists $current->[2]{checked} || exists $current->[2]{selected}
+    if $class eq 'checked';
+
+  # ":first-*" or ":last-*" (rewrite with equation)
+  ($class, $args) = $1 ? ("nth-$class", 1) : ("nth-last-$class", '-n+1')
+    if $class =~ s/^(?:(first)|last)-//;
 
   # ":nth-*"
-  elsif ($class =~ /^nth-/) {
+  if ($class =~ /^nth-/) {
     my $type = $class =~ /of-type$/ ? $current->[1] : undef;
     my @siblings = @{_siblings($current, $type)};
 
@@ -507,15 +494,15 @@ An C<E> element, only sibling of its type.
 
 =head2 E.warning
 
-  my $warning = $css->select('div.warning');
-
 An C<E> element whose class is "warning".
+
+  my $warning = $css->select('div.warning');
 
 =head2 E#myid
 
-  my $foo = $css->select('div#foo');
-
 An C<E> element with C<ID> equal to "myid".
+
+  my $foo = $css->select('div#foo');
 
 =head2 E:not(s)
 

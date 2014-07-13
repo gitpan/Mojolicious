@@ -306,7 +306,7 @@ sub _siblings {
 
 sub _start { $_[0][0] eq 'root' ? 1 : 4 }
 
-sub _tag { $_[0]->new->tree($_[1])->xml($_[2]) }
+sub _tag { shift->new->tree(shift)->xml(shift) }
 
 sub _text {
   my ($nodes, $recurse, $trim) = @_;
@@ -409,11 +409,11 @@ Mojo::DOM - Minimalistic HTML/XML DOM parser with CSS selectors
   say $dom->div->children('p')->first->{id};
 
   # Iterate
-  $dom->find('p[id]')->each(sub { say shift->{id} });
+  $dom->find('p[id]')->each(sub { say $_->{id} });
 
   # Loop
   for my $e ($dom->find('p[id]')->each) {
-    say $e->text;
+    say $e->{id}, ':', $e->text;
   }
 
   # Modify
