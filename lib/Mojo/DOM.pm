@@ -198,8 +198,16 @@ sub _all {
 }
 
 sub _all_text {
-  my $tree = shift->tree;
-  return _text([_nodes($tree)], shift, _trim($tree, @_));
+  my ($self, $recurse, $trim) = @_;
+
+  # Detect "pre" tag
+  my $tree = $self->tree;
+  if (!defined $trim || $trim) {
+    $trim = 1;
+    $_->[1] eq 'pre' and $trim = 0 for $self->_ancestors, $tree;
+  }
+
+  return _text([_nodes($tree)], $recurse, $trim);
 }
 
 sub _ancestors {
@@ -325,7 +333,8 @@ sub _text {
     # Nested tag
     my $content = '';
     if ($type eq 'tag' && $recurse) {
-      $content = _text([_nodes($n)], 1, _trim($n, $trim));
+      no warnings 'recursion';
+      $content = _text([_nodes($n)], 1, $n->[1] eq 'pre' ? 0 : $trim);
     }
 
     # Text
@@ -342,21 +351,6 @@ sub _text {
   }
 
   return $text;
-}
-
-sub _trim {
-  my ($n, $trim) = @_;
-
-  # Disabled
-  return 0 unless $n && ($trim = defined $trim ? $trim : 1);
-
-  # Detect "pre" tag
-  while ($n->[0] eq 'tag') {
-    return 0 if $n->[1] eq 'pre';
-    last unless $n = $n->[3];
-  }
-
-  return 1;
 }
 
 sub _wrap {
