@@ -22,29 +22,28 @@ my $ATTR_RE = qr/
   \s*
 /x;
 my $TOKEN_RE = qr/
-  ([^<]+)?                                          # Text
+  ([^<]+)?                                            # Text
   (?:
-    <\?(.*?)\?>                                     # Processing Instruction
-  |
-    <!--(.*?)--\s*>                                 # Comment
-  |
-    <!\[CDATA\[(.*?)\]\]>                           # CDATA
-  |
-    <!DOCTYPE(
-      \s+\w+
-      (?:(?:\s+\w+)?(?:\s+(?:"[^"]*"|'[^']*'))+)?   # External ID
-      (?:\s+\[.+?\])?                               # Int Subset
-      \s*
+    <(?:
+      !(?:
+        DOCTYPE(
+        \s+\w+                                        # Doctype
+        (?:(?:\s+\w+)?(?:\s+(?:"[^"]*"|'[^']*'))+)?   # External ID
+        (?:\s+\[.+?\])?                               # Int Subset
+        \s*)
+      |
+        --(.*?)--\s*                                  # Comment
+      |
+        \[CDATA\[(.*?)\]\]                            # CDATA
+      )
+    |
+      \?(.*?)\?                                       # Processing Instruction
+    |
+      (\s*[^<>\s]+                                    # Tag
+      \s*(?:(?:$ATTR_RE){0,32766})*+)                 # Attributes
     )>
   |
-    <(
-      \s*
-      [^<>\s]+                                      # Tag
-      \s*
-      (?:(?:$ATTR_RE){0,32766})*+                   # Attributes
-    )>
-  |
-    (<)                                             # Runaway "<"
+    (<)                                               # Runaway "<"
   )??
 /xis;
 
@@ -107,7 +106,7 @@ sub parse {
   my $xml = $self->xml;
   my $current = my $tree = ['root'];
   while ($html =~ m/\G$TOKEN_RE/gcso) {
-    my ($text, $pi, $comment, $cdata, $doctype, $tag, $runaway)
+    my ($text, $doctype, $comment, $cdata, $pi, $tag, $runaway)
       = ($1, $2, $3, $4, $5, $6, $11);
 
     # Text (and runaway "<")
@@ -204,9 +203,8 @@ sub _end {
 
 sub _node {
   my ($current, $type, $content) = @_;
-  my $new = [$type, $content, $current];
+  push @$current, my $new = [$type, $content, $current];
   weaken $new->[2];
-  push @$current, $new;
 }
 
 sub _render {
@@ -247,7 +245,7 @@ sub _render {
       push @attrs, $key and next unless defined(my $value = $tree->[2]{$key});
 
       # Key and value
-      push @attrs, qq{$key="} . xml_escape($value) . '"';
+      push @attrs, $key . '="' . xml_escape($value) . '"';
     }
     $result .= join ' ', '', @attrs if @attrs;
 
@@ -295,9 +293,8 @@ sub _start {
   }
 
   # New tag
-  my $new = ['tag', $start, $attrs, $$current];
+  push @$$current, my $new = ['tag', $start, $attrs, $$current];
   weaken $new->[3];
-  push @$$current, $new;
   $$current = $new;
 }
 
