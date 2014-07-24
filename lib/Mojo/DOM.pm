@@ -176,6 +176,24 @@ sub type {
   return $self;
 }
 
+sub val {
+  my $self = shift;
+
+  # "option"
+  my $type = $self->type;
+  return Mojo::Collection->new($self->{value} // $self->text)
+    if $type eq 'option';
+
+  # "select"
+  return $self->find('option[selected]')->val->flatten if $type eq 'select';
+
+  # "textarea"
+  return Mojo::Collection->new($self->text) if $type eq 'textarea';
+
+  # "input" or "button"
+  return Mojo::Collection->new($self->{value} // ());
+}
+
 sub wrap         { shift->_wrap(0, @_) }
 sub wrap_content { shift->_wrap(1, @_) }
 
@@ -529,10 +547,10 @@ from L<Mojo::DOM::CSS/"SELECTORS"> are supported.
 
 =head2 attr
 
-  my $attrs = $dom->attr;
-  my $foo   = $dom->attr('foo');
-  $dom      = $dom->attr({foo => 'bar'});
-  $dom      = $dom->attr(foo => 'bar');
+  my $hash = $dom->attr;
+  my $foo  = $dom->attr('foo');
+  $dom     = $dom->attr({foo => 'bar'});
+  $dom     = $dom->attr(foo => 'bar');
 
 This element's attributes.
 
@@ -823,6 +841,18 @@ This element's type.
 
   # List types of child elements
   say $dom->children->type;
+
+=head2 val
+
+  my $collection = $dom->val;
+
+Extract values from C<button>, C<input>, C<option>, C<select> and C<textarea>
+elements and return a L<Mojo::Collection> object containing these values. In
+the case of C<select>, find all C<option> elements it contains that have a
+C<selected> attribute and extract their values.
+
+  # "b"
+  $dom->parse('<form><input name="a" value="b"></form>')->at('input')->val;
 
 =head2 wrap
 
