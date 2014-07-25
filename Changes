@@ -1,4 +1,7 @@
 
+5.18  2014-07-25
+  - Improved is_readable performance in Mojo::Reactor.
+
 5.17  2014-07-24
   - Welcome to the Mojolicious core team Jan Henning Thorsen.
   - Added val method to Mojo::DOM. (batman, sri)
