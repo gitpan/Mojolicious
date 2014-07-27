@@ -1,4 +1,8 @@
 
+5.21  2014-07-27
+  - Improved handling of Pod::Simple::XHTML 3.09 dependency.
+  - Improved documentation browser CSS.
+
 5.20  2014-07-27
   - Fixed a few bugs in Mojolicious::Plugin::PODRenderer by switching from
     Pod::Simple::HTML to Pod::Simple::XHTML.
