@@ -237,6 +237,7 @@ t/mojo/transactor.t
 t/mojo/url.t
 t/mojo/user_agent.t
 t/mojo/user_agent_online.t
+t/mojo/user_agent_socks.t
 t/mojo/user_agent_tls.t
 t/mojo/util.t
 t/mojo/websocket.t
