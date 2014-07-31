@@ -435,9 +435,9 @@ Mojo::UserAgent - Non-blocking I/O HTTP and WebSocket user agent
 =head1 DESCRIPTION
 
 L<Mojo::UserAgent> is a full featured non-blocking I/O HTTP and WebSocket user
-agent, with IPv6, SOCKS5, TLS, SNI, IDNA, Comet (long polling), keep-alive,
-connection pooling, timeout, cookie, multipart, proxy, gzip compression and
-multiple event loop support.
+agent, with IPv6, TLS, SNI, IDNA, HTTP/SOCKS5 proxy, Comet (long polling),
+keep-alive, connection pooling, timeout, cookie, multipart, gzip compression
+and multiple event loop support.
 
 All connections will be reset automatically if a new process has been forked,
 this allows multiple processes to share the same L<Mojo::UserAgent> object
@@ -592,7 +592,10 @@ Proxy manager, defaults to a L<Mojo::UserAgent::Proxy> object.
   # Detect proxy servers from environment
   $ua->proxy->detect;
 
-  # Manually configure Tor
+  # Manually configure HTTP proxy (using CONNECT for HTTPS)
+  $ua->proxy->http('http://127.0.0.1:8080')->https('http://127.0.0.1:8080');
+
+  # Manually configure Tor (SOCKS5)
   $ua->proxy->http('socks://127.0.0.1:9050')->https('socks://127.0.0.1:9050');
 
 =head2 request_timeout
