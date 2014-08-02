@@ -9,7 +9,7 @@ use Mojo::JSON 'j';
 use Mojo::JSON::Pointer;
 use Mojo::Parameters;
 use Mojo::Upload;
-use Mojo::Util 'decode';
+use Mojo::Util qw(decode split_header);
 
 has content => sub { Mojo::Content::Single->new };
 has default_charset  => 'UTF-8';
