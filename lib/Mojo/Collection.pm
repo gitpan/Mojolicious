@@ -73,6 +73,12 @@ sub pluck {
   return $self->new(map { $_->$method(@args) } @$self);
 }
 
+sub reduce {
+  my $self = shift;
+  @_ = (@_, @$self);
+  goto &List::Util::reduce;
+}
+
 sub reverse { $_[0]->new(reverse @{$_[0]}) }
 
 sub shuffle { $_[0]->new(List::Util::shuffle @{$_[0]}) }
@@ -86,7 +92,16 @@ sub slice {
 
 sub sort {
   my ($self, $cb) = @_;
-  return $self->new($cb ? sort { $a->$cb($b) } @$self : sort @$self);
+
+  return $self->new(sort @$self) unless $cb;
+
+  my $caller = caller;
+  no strict 'refs';
+  my @sorted = sort {
+    local (*{"${caller}::a"}, *{"${caller}::b"}) = (\$a, \$b);
+    $a->$cb($b);
+  } @$self;
+  return $self->new(@sorted);
 }
 
 sub tap { shift->Mojo::Base::tap(@_) }
@@ -172,6 +187,7 @@ Evaluate callback for each element in collection or return all elements as a
 list if none has been provided. The element will be the first argument passed
 to the callback and is also available as C<$_>.
 
+  # Make a numbered list
   $collection->each(sub {
     my ($e, $count) = @_;
     say "$count: $e";
@@ -188,7 +204,8 @@ return the first one that matched the regular expression, or for which the
 callback returned true. The element will be the first argument passed to the
 callback and is also available as C<$_>.
 
-  my $five = $collection->first(sub { $_ == 5 });
+  # Find first value that is greater than 5
+  my $greater = $collection->first(sub { $_ > 5 });
 
 =head2 flatten
 
@@ -207,6 +224,7 @@ create a new collection with all elements that matched the regular expression,
 or for which the callback returned true. The element will be the first
 argument passed to the callback and is also available as C<$_>.
 
+  # Find all values that contain the word "mojo"
   my $interesting = $collection->grep(qr/mojo/i);
 
 =head2 join
@@ -216,7 +234,8 @@ argument passed to the callback and is also available as C<$_>.
 
 Turn collection into L<Mojo::ByteStream>.
 
-  $collection->join("\n")->say;
+  # Join all values with commas
+  $collection->join(', ')->say;
 
 =head2 last
 
@@ -232,7 +251,8 @@ Evaluate callback for each element in collection and create a new collection
 from the results. The element will be the first argument passed to the
 callback and is also available as C<$_>.
 
-  my $doubled = $collection->map(sub { $_ * 2 });
+  # Append the word "mojo" to all values
+  my $mojoified = $collection->map(sub { $_ . 'mojo' });
 
 =head2 new
 
@@ -250,6 +270,20 @@ results.
 
   # Equal to but more convenient than
   my $new = $collection->map(sub { $_->$method(@args) });
+
+=head2 reduce
+
+  my $result = $collection->reduce(sub {...});
+  my $result = $collection->reduce(sub {...}, $initial);
+
+Reduce elements in collection with callback, the first element will be used as
+initial value if none has been provided.
+
+  # Calculate the sum of all values
+  my $sum = $collection->reduce(sub { $a + $b });
+
+  # Count how often each value occurs in collection
+  my $hash = $collection->reduce(sub { $a->{$b}++; $a }, {});
 
 =head2 reverse
 
@@ -283,7 +317,8 @@ Number of elements in collection.
 Sort elements based on return value of callback and create a new collection
 from the results.
 
-  my $insensitive = $collection->sort(sub { uc(shift) cmp uc(shift) });
+  # Sort values case insensitive
+  my $insensitive = $collection->sort(sub { uc($a) cmp uc($b) });
 
 =head2 tap
 
