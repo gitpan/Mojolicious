@@ -1,6 +1,7 @@
 package Mojolicious::Renderer;
 use Mojo::Base -base;
 
+use Carp ();
 use File::Spec::Functions 'catfile';
 use Mojo::Cache;
 use Mojo::JSON 'encode_json';
@@ -65,6 +66,14 @@ sub get_data_template {
   # Find template
   my $template = $self->template_name($options);
   return $loader->data($self->{index}{$template}, $template);
+}
+
+sub get_helper {
+  my ($self, $name) = @_;
+  if (my $h = $self->helpers->{$name} || $self->{proxy}{$name}) { return $h }
+  return undef unless grep {/^\Q$name\E\./} keys %{$self->helpers};
+  return $self->{proxy}{$name}
+    = sub { bless [shift, $name], 'Mojolicious::Renderer::_Proxy' };
 }
 
 sub render {
@@ -239,6 +248,21 @@ sub _render_template {
   return undef;
 }
 
+package Mojolicious::Renderer::_Proxy;
+use Mojo::Base -strict;
+
+sub AUTOLOAD {
+  my $self = shift;
+
+  my ($package, $method) = split /::(\w+)$/, our $AUTOLOAD;
+  my $c = $self->[0];
+  Carp::croak qq{Can't locate object method "$method" via package "$package"}
+    unless my $helper = $c->app->renderer->get_helper("$self->[1].$method");
+  return $c->$helper(@_);
+}
+
+sub DESTROY { }
+
 1;
 
 =encoding utf8
@@ -371,6 +395,14 @@ Register a new helper.
   });
 
 Get a C<DATA> section template by name, usually used by handlers.
+
+=head2 get_helper
+
+  my $helper = $renderer->get_helper('url_for');
+
+Get a helper by full name, generate a helper dynamically for a prefix or
+return C<undef> if no helper or prefix could be found. Generated helpers
+return a proxy object on which nested helpers can be called.
 
 =head2 render
 

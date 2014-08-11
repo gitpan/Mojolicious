@@ -145,6 +145,11 @@ controller object as both C<$self> and C<$c>.
 
   Hello <%= $name %> from <%= $c->tx->remote_address %>.
 
+A prefix like C<myapp.*> is commonly used for stash values that you don't want
+to expose in templates.
+
+  $c->stash('myapp.name' => 'tester');
+
 There are also many helper functions available, but more about that later.
 
   <%= dumper {foo => 'bar'} %>
@@ -842,7 +847,7 @@ The token can also be submitted with the C<X-CSRF-Token> request header.
 =head2 Adding helpers
 
 Adding and redefining helpers is very easy, you can use them to do pretty much
-everything.
+anything.
 
   use Mojolicious::Lite;
 
@@ -863,7 +868,9 @@ everything.
   % debug 'Hello from a template!';
 
 Helpers can also accept template blocks as last argument, this for example
-allows very pleasant to use tag helpers and filters.
+allows very pleasant to use tag helpers and filters. Wrapping the helper
+result into a L<Mojo::ByteStream> object can prevent accidental double
+escaping.
 
   use Mojolicious::Lite;
   use Mojo::ByteStream;
@@ -887,8 +894,36 @@ allows very pleasant to use tag helpers and filters.
     More text.
   % end
 
-Wrapping the helper result into a L<Mojo::ByteStream> object can prevent
-accidental double escaping.
+Similar to stash values you can use a prefix like C<myapp.*> to keep helpers
+from getting exposed in templates and to organize them into namespaces as your
+application grows. Every prefix automatically becomes a helper that returns a
+proxy object on which you can call the nested helpers.
+
+  use Mojolicious::Lite;
+
+  helper 'cache_control.no_caching' => sub {
+    my $c = shift;
+    $c->res->headers->cache_control('private, max-age=0, no-cache');
+  };
+
+  helper 'cache_control.five_minutes' => sub {
+    my $c = shift;
+    $c->res->headers->cache_control('public, max-age=300');
+  };
+
+  get '/news' => sub {
+    my $c = shift;
+    $c->cache_control->no_caching;
+    $c->render(text => 'Always up to date.');
+  };
+
+  get '/some_older_story' => sub {
+    my $c = shift;
+    $c->cache_control->five_minutes;
+    $c->render(text => 'This one can be cached for a bit.');
+  };
+
+  app->start;
 
 =head2 Helper plugins
 
