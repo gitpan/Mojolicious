@@ -104,6 +104,7 @@ ok $t->app->routes->is_hidden('finish'),           'is hidden';
 ok $t->app->routes->is_hidden('flash'),            'is hidden';
 ok $t->app->routes->is_hidden('handler'),          'is hidden';
 ok $t->app->routes->is_hidden('has'),              'is hidden';
+ok $t->app->routes->is_hidden('helpers'),          'is hidden';
 ok $t->app->routes->is_hidden('match'),            'is hidden';
 ok $t->app->routes->is_hidden('new'),              'is hidden';
 ok $t->app->routes->is_hidden('on'),               'is hidden';
@@ -224,8 +225,7 @@ like $log, qr/Rendering template "syntaxerror.html.epl"\./, 'right message';
 like $log, qr/Missing right curly/, 'right message';
 like $log, qr/Template "exception.development.html.ep" not found\./,
   'right message';
-like $log, qr/Rendering cached template "exception.html.epl"\./,
-  'right message';
+like $log, qr/Rendering template "exception.html.epl"\./, 'right message';
 like $log, qr/500 Internal Server Error/, 'right message';
 $t->app->log->unsubscribe(message => $cb);
 
@@ -259,10 +259,16 @@ $t->get_ok('/fun/time' => {'X-Test' => 'Hi there!'})->status_is(200)
 
 # Foo::fun
 $url = $t->ua->server->url;
+$log = '';
+$cb  = $t->app->log->on(message => sub { $log .= pop });
 $url->path('/fun/time');
 $t->get_ok($url => {'X-Test' => 'Hi there!'})->status_is(200)
   ->header_is('X-Bender' => undef)->header_is(Server => 'Mojolicious (Perl)')
   ->content_is('Have fun!');
+like $log,
+  qr!Rendering cached template "foo/fun\.html\.ep" from DATA section\.!,
+  'right message';
+$t->app->log->unsubscribe(message => $cb);
 
 # Foo::fun
 $t->get_ok('/happy/fun/time' => {'X-Test' => 'Hi there!'})->status_is(200)

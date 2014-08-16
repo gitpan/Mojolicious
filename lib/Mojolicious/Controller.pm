@@ -93,6 +93,8 @@ sub flash {
   return $self;
 }
 
+sub helpers { $_[0]->app->renderer->get_helper('')->($_[0]) }
+
 sub on {
   my ($self, $name, $cb) = @_;
   my $tx = $self->tx;
@@ -553,6 +555,17 @@ L</"session">.
   # Show message after redirect
   $c->flash(message => 'User created successfully!');
   $c->redirect_to('show_user', id => 23);
+
+=head2 helpers
+
+  my $helpers = $c->helpers;
+
+Return a proxy object containing the current controller object and on which
+helpers provided by L</"app"> can be called. This includes all helpers from
+L<Mojolicious::Plugin::DefaultHelpers> and L<Mojolicious::Plugin::TagHelpers>.
+
+  # Make sure to use the "title" helper and not the controller method
+  $c->helpers->title('Welcome!');
 
 =head2 on
 

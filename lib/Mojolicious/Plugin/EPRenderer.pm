@@ -19,21 +19,18 @@ sub register {
     $conf->{name} || 'ep' => sub {
       my ($renderer, $c, $output, $options) = @_;
 
-      # Generate name
-      my $name = $options->{inline} || $renderer->template_name($options);
+      my $name = $options->{inline} // $renderer->template_name($options);
       return undef unless defined $name;
       my @keys = sort grep {/^\w+$/} keys %{$c->stash};
-      my $id = encode 'UTF-8', join(',', $name, @keys);
-      my $key = $options->{cache} = md5_sum $id;
+      my $key = md5_sum encode 'UTF-8', join(',', $name, @keys);
 
-      # Cache template for "epl" handler
+      # Prepare template for "epl" handler
       my $cache = $renderer->cache;
-      my $mt    = $cache->get($key);
-      unless ($mt) {
-        $mt = Mojo::Template->new($template);
+      unless ($options->{'mojo.template'} = $cache->get($key)) {
+        my $mt = $options->{'mojo.template'} = Mojo::Template->new($template);
 
         # Helpers (only once)
-        ++$self->{helpers} and _helpers($mt->namespace, $renderer->helpers)
+        ++$self->{helpers} and _helpers($ns, $renderer->helpers)
           unless $self->{helpers};
 
         # Stash values (every time)
@@ -84,13 +81,14 @@ Mojolicious::Plugin::EPRenderer - Embedded Perl renderer plugin
 
 =head1 DESCRIPTION
 
-L<Mojolicious::Plugin::EPRenderer> is a renderer for C<ep> templates.
+L<Mojolicious::Plugin::EPRenderer> is a renderer for C<ep> or C<Embedded Perl>
+templates.
 
-C<ep> or C<Embedded Perl> is a simple template format where you embed perl
-code into documents. It is based on L<Mojo::Template>, but extends it with
-some convenient syntax sugar designed specifically for L<Mojolicious>. It
-supports L<Mojolicious> template helpers and exposes the stash directly as
-Perl variables.
+C<Embedded Perl> is a simple template format where you embed perl code into
+documents. It is based on L<Mojo::Template>, but extends it with some
+convenient syntax sugar designed specifically for L<Mojolicious>. It supports
+L<Mojolicious> template helpers and exposes the stash directly as Perl
+variables.
 
 This is a core plugin, that means it is always enabled and its code a good
 example for learning to build new plugins, you're welcome to fork it.

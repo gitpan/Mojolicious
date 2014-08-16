@@ -72,12 +72,13 @@ sub get_data_template {
 sub get_helper {
   my ($self, $name) = @_;
 
-  if (my $h = $self->helpers->{$name} || $self->{proxy}{$name}) { return $h }
+  if (my $h = $self->{proxy}{$name} || $self->helpers->{$name}) { return $h }
 
   my $found;
   my $class = 'Mojolicious::Renderer::Helpers::' . md5_sum "$name:$self";
+  my $re = $name eq '' ? qr/^(([^.]+))/ : qr/^(\Q$name\E\.([^.]+))/;
   for my $key (keys %{$self->helpers}) {
-    $key =~ /^(\Q$name\E\.([^.]+))/ ? ($found, my $method) = (1, $2) : next;
+    $key =~ $re ? ($found, my $method) = (1, $2) : next;
     my $sub = $self->get_helper($1);
     monkey_patch $class, $method => sub { ${shift()}->$sub(@_) };
   }
@@ -88,7 +89,6 @@ sub get_helper {
 
 sub render {
   my ($self, $c, $args) = @_;
-  $args ||= {};
 
   # Localize "extends" and "layout" to allow argument overrides
   my $stash = $c->stash;
@@ -398,11 +398,11 @@ Get a C<DATA> section template by name, usually used by handlers.
 
 Get a helper by full name, generate a helper dynamically for a prefix or
 return C<undef> if no helper or prefix could be found. Generated helpers
-return a proxy object on which nested helpers can be called.
+return a proxy object containing the current controller object and on which
+nested helpers can be called.
 
 =head2 render
 
-  my ($output, $format) = $renderer->render(Mojolicious::Controller->new);
   my ($output, $format) = $renderer->render(Mojolicious::Controller->new, {
     template => 'foo/bar',
     foo      => 'bar'
