@@ -4,6 +4,7 @@ CONTRIBUTING.md
 examples/connect-proxy.pl
 examples/entities.pl
 examples/fast.pl
+examples/hello-template.pl
 examples/hello.pl
 examples/microhttpd.pl
 examples/websocket.pl

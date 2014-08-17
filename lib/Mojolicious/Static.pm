@@ -19,12 +19,19 @@ my $MTIME = time;
 my $HOME   = Mojo::Home->new;
 my $PUBLIC = $HOME->parse($HOME->mojo_lib_dir)->rel_dir('Mojolicious/public');
 
+my $LOADER = Mojo::Loader->new;
+
 sub dispatch {
   my ($self, $c) = @_;
 
+  # Method (GET or HEAD)
+  my $req    = $c->req;
+  my $method = $req->method;
+  return undef unless $method eq 'GET' || $method eq 'HEAD';
+
   # Canonical path
   my $stash = $c->stash;
-  my $path  = $c->req->url->path;
+  my $path  = $req->url->path;
   $path = $stash->{path} ? $path->new($stash->{path}) : $path->clone;
   return undef unless my @parts = @{$path->canonicalize->parts};
 
@@ -117,18 +124,11 @@ sub _get_data_file {
   # Protect templates
   return undef if $rel =~ /\.\w+\.\w+$/;
 
-  # Index DATA files
-  my $loader = Mojo::Loader->new;
-  unless ($self->{index}) {
-    my $index = $self->{index} = {};
-    for my $class (reverse @{$self->classes}) {
-      $index->{$_} = $class for keys %{$loader->data($class)};
-    }
-  }
+  $self->_warmup unless $self->{index};
 
   # Find file
   return undef
-    unless defined(my $data = $loader->data($self->{index}{$rel}, $rel));
+    unless defined(my $data = $LOADER->data($self->{index}{$rel}, $rel));
   return Mojo::Asset::Memory->new->add_chunk($data);
 }
 
@@ -136,6 +136,14 @@ sub _get_file {
   my ($self, $path) = @_;
   no warnings 'newline';
   return -f $path && -r $path ? Mojo::Asset::File->new(path => $path) : undef;
+}
+
+sub _warmup {
+  my $self = shift;
+  my $index = $self->{index} = {};
+  for my $class (reverse @{$self->classes}) {
+    $index->{$_} = $class for keys %{$LOADER->data($class)};
+  }
 }
 
 1;
