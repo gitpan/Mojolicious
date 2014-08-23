@@ -1,4 +1,8 @@
 
+5.33  2014-08-24
+  - Improved Mojo::Date to be able to handle higher precision times.
+  - Improved Mojo::ByteStream performance.
+
 5.32  2014-08-21
   - Added to_datetime method to Mojo::Date.
   - Improved Mojo::Date to support RFC 3339.

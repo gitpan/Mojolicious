@@ -34,6 +34,7 @@
       "runtime" : {
          "requires" : {
             "Pod::Simple" : "3.09",
+            "Time::Local" : "1.2",
             "perl" : "5.010001"
          }
       }
@@ -52,5 +53,5 @@
       },
       "x_MailingList" : "http://groups.google.com/group/mojolicious"
    },
-   "version" : "5.32"
+   "version" : "5.33"
 }
