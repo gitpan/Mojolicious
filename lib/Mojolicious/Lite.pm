@@ -93,9 +93,9 @@ applications.
 =head2 Hello World
 
 A simple Hello World application can look like this, L<strict>, L<warnings>,
-L<utf8> and Perl 5.10 features are automatically enabled and a few functions
-imported when you use L<Mojolicious::Lite>, turning your script into a full
-featured web application.
+L<utf8> and Perl 5.10 features are automatically enabled and a few
+L</"FUNCTIONS"> imported when you use L<Mojolicious::Lite>, turning your
+script into a full featured web application.
 
   #!/usr/bin/env perl
   use Mojolicious::Lite;
@@ -347,9 +347,8 @@ many helpers.
 
 =head2 Helpers
 
-You can also extend L<Mojolicious> with your own helpers, a list of all
-built-in ones can be found in L<Mojolicious::Plugin::DefaultHelpers> and
-L<Mojolicious::Plugin::TagHelpers>.
+Helpers are little functions you can reuse throughout your whole application,
+from actions to templates.
 
   use Mojolicious::Lite;
 
@@ -373,6 +372,9 @@ L<Mojolicious::Plugin::TagHelpers>.
 
   @@ secret.html.ep
   We know who you are <%= whois %>.
+
+A list of all built-in ones can be found in
+L<Mojolicious::Plugin::DefaultHelpers> and L<Mojolicious::Plugin::TagHelpers>.
 
 =head2 Placeholders
 
@@ -1022,7 +1024,12 @@ argument variations.
 
   my $app = app;
 
-The L<Mojolicious::Lite> application.
+Returns the L<Mojolicious::Lite> application object, which is a subclass of
+L<Mojolicious>.
+
+  # Use all the available attributes and methods
+  app->log->level('error');
+  app->defaults(foo => 'bar');
 
 =head2 del
 
