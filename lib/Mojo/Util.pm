@@ -29,6 +29,9 @@ use constant {
   PC_INITIAL_N    => 128
 };
 
+# Will be shipping with Perl 5.22
+my $NAME = eval 'use Sub::Util; 1' ? \&Sub::Util::set_subname : sub { $_[1] };
+
 # To update HTML entities run this command
 # perl examples/entities.pl > lib/Mojo/entities.txt
 my %ENTITIES;
@@ -130,7 +133,7 @@ sub monkey_patch {
   my ($class, %patch) = @_;
   no strict 'refs';
   no warnings 'redefine';
-  *{"${class}::$_"} = $patch{$_} for keys %patch;
+  *{"${class}::$_"} = $NAME->("${class}::$_", $patch{$_}) for keys %patch;
 }
 
 # Direct translation of RFC 3492
@@ -664,8 +667,9 @@ consecutive groups of whitespace into one space each.
 
   my $time = steady_time;
 
-High resolution time, resilient to time jumps if a monotonic clock is
-available through L<Time::HiRes>.
+High resolution time elapsed from an arbitrary fixed point in the past,
+resilient to time jumps if a monotonic clock is available through
+L<Time::HiRes>.
 
 =head2 tablify
 

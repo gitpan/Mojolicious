@@ -15,6 +15,7 @@ $file->add_chunk('abc');
 is $file->contains('abc'), 0,  '"abc" at position 0';
 is $file->contains('bc'),  1,  '"bc" at position 1';
 is $file->contains('db'),  -1, 'does not contain "db"';
+is $file->size, 3, 'right size';
 
 # Cleanup
 my $path = $file->path;
@@ -28,6 +29,7 @@ $mem->add_chunk('abc');
 is $mem->contains('abc'), 0,  '"abc" at position 0';
 is $mem->contains('bc'),  1,  '"bc" at position 1';
 is $mem->contains('db'),  -1, 'does not contain "db"';
+is $mem->size, 3, 'right size';
 
 # Empty file asset
 $file = Mojo::Asset::File->new;
