@@ -8,8 +8,8 @@ use Mojo::Util qw(decode encode monkey_patch slurp);
 
 use constant DEBUG => $ENV{MOJO_TEMPLATE_DEBUG} || 0;
 
-has [qw(auto_escape compiled)];
 has [qw(append code prepend template)] => '';
+has [qw(auto_escape compiled)];
 has capture_end   => 'end';
 has capture_start => 'begin';
 has comment_mark  => '#';
@@ -26,66 +26,61 @@ has tree      => sub { [] };
 sub build {
   my $self = shift;
 
-  my (@lines, $capture, $multi);
+  my $tree   = $self->tree;
   my $escape = $self->auto_escape;
-  for my $line (@{$self->tree}) {
-    push @lines, '';
-    for my $i (0 .. $#$line) {
-      my ($op, $value) = @{$line->[$i]};
-      my $newline = chomp($value //= '');
 
-      # Text (quote and fix line ending)
-      if ($op eq 'text') {
-        $value = join "\n", map { quotemeta $_ } split("\n", $value);
-        $value .= '\n' if $newline;
-        $lines[-1] .= "\$_M .= \"" . $value . "\";" if length $value;
+  my @blocks = ('');
+  my ($i, $capture, $multi);
+  while (++$i <= @$tree && (my $next = $tree->[$i])) {
+    my ($op, $value) = @{$tree->[$i - 1]};
+    push @blocks, '' and next if $op eq 'line';
+    my $newline = chomp($value //= '');
+
+    # Text (quote and fix line ending)
+    if ($op eq 'text') {
+      $value = join "\n", map { quotemeta $_ } split("\n", $value);
+      $value .= '\n' if $newline;
+      $blocks[-1] .= "\$_M .= \"" . $value . "\";" if length $value;
+    }
+
+    # Code or multiline expression
+    elsif ($op eq 'code' || $multi) { $blocks[-1] .= $value }
+
+    # Capture end
+    elsif ($op eq 'cpen') {
+      $blocks[-1] .= 'return Mojo::ByteStream->new($_M) }';
+
+      # No following code
+      $blocks[-1] .= ';' if ($next->[1] // '') =~ /^\s*$/;
+    }
+
+    # Expression
+    if ($op eq 'expr' || $op eq 'escp') {
+
+      # Escaped
+      if (!$multi && ($op eq 'escp' && !$escape || $op eq 'expr' && $escape)) {
+        $blocks[-1] .= "\$_M .= _escape scalar $value";
       }
 
-      # Capture end
-      elsif ($op eq 'cpen') {
-        $lines[-1] .= 'return Mojo::ByteStream->new($_M) }';
+      # Raw
+      elsif (!$multi) { $blocks[-1] .= "\$_M .= scalar $value" }
 
-        # No following code
-        my $next = $line->[$i + 1];
-        $lines[-1] .= ';' if !defined $next->[1] || $next->[1] =~ /^\s*$/;
-      }
+      # Multiline
+      $multi = !$next || $next->[0] ne 'text';
 
-      # Code or multiline expression
-      elsif ($op eq 'code' || $multi) { $lines[-1] .= "$value" }
+      # Append semicolon
+      $blocks[-1] .= ';' unless $multi || $capture;
+    }
 
-      # Expression
-      if ($op eq 'expr' || $op eq 'escp') {
-
-        # Start
-        unless ($multi) {
-
-          # Escaped
-          if ($op eq 'escp' && !$escape || $op eq 'expr' && $escape) {
-            $lines[-1] .= "\$_M .= _escape scalar $value";
-          }
-
-          # Raw
-          else { $lines[-1] .= "\$_M .= scalar $value" }
-        }
-
-        # Multiline
-        my $previous = $line->[$i + 1] || [''];
-        $multi = $previous->[0] ne 'text' || $previous->[1] ne '';
-
-        # Append semicolon
-        $lines[-1] .= ';' unless $multi || $capture;
-      }
-
-      # Capture start
-      if ($op eq 'cpst') { $capture = 1 }
-      elsif ($capture) {
-        $lines[-1] .= " sub { my \$_M = ''; ";
-        $capture = 0;
-      }
+    # Capture start
+    if ($op eq 'cpst') { $capture = 1 }
+    elsif ($capture) {
+      $blocks[-1] .= " sub { my \$_M = ''; ";
+      $capture = 0;
     }
   }
 
-  return $self->code(join "\n", @lines)->tree([]);
+  return $self->code(join "\n", @blocks)->tree([]);
 }
 
 sub compile {
@@ -169,7 +164,6 @@ sub parse {
     $line .= "\n" if $line !~ s/\\\\$/\\\n/ && $line !~ s/\\$//;
 
     # Mixed line
-    my @line;
     for my $token (split $token_re, $line) {
 
       # Capture end
@@ -180,13 +174,13 @@ sub parse {
         $op = 'text';
 
         # Capture start
-        splice @line, -1, 0, ['cpst'] if $1;
+        splice @tree, -1, 0, ['cpst'] if $1;
 
         # Trim left side
-        $self->_trim(\@line) if $trimming = $2;
+        _trim(\@tree) if ($trimming = $2) && @tree > 1;
 
         # Hint at end
-        push @line, ['text', ''];
+        push @tree, ['text', ''];
       }
 
       # Code
@@ -209,20 +203,22 @@ sub parse {
 
         # Trim right side (convert whitespace to line noise)
         if ($trimming && $token =~ s/^(\s+)//) {
-          push @line, ['code', $1];
+          push @tree, ['code', $1];
           $trimming = 0;
         }
 
         # Token (with optional capture end)
-        push @line, $capture ? ['cpen'] : (), [$op, $token];
+        push @tree, $capture ? ['cpen'] : (), [$op, $token];
         $capture = 0;
       }
     }
 
-    # Optimize successive text lines ending with newlines
-    my $previous = $tree[-1] || [];
-    unless (_text($previous) && _text(\@line)) { push @tree, \@line }
-    else { $previous->[-1][1] .= $line[0][1] }
+    # Optimize successive text lines separated by a newline
+    push @tree, ['line'] and next
+      if $tree[-4] && $tree[-4][0] ne 'line'
+      || (!$tree[-3] || $tree[-3][0] ne 'text' || $tree[-3][1] !~ /\n$/)
+      || ($tree[-2][0] ne 'line' || $tree[-1][0] ne 'text');
+    $tree[-3][1] .= pop(@tree)->[1];
   }
 
   return $self;
@@ -251,26 +247,17 @@ sub _line {
   return qq{#line @{[shift]} "$name"};
 }
 
-sub _text { @{$_[0]} == 1 && $_[0][0][0] eq 'text' && $_[0][0][1] =~ /\n$/ }
-
 sub _trim {
-  my ($self, $line) = @_;
+  my $tree = shift;
 
-  # Walk line backwards
-  for (my $i = @$line - 2; $i >= 0; $i -= 1) {
+  # Skip captures
+  my $i = $tree->[-2][0] eq 'cpst' || $tree->[-2][0] eq 'cpen' ? -3 : -2;
 
-    # Skip captures
-    next if $line->[$i][0] eq 'cpst' || $line->[$i][0] eq 'cpen';
+  # Only trim text
+  return unless $tree->[$i][0] eq 'text';
 
-    # Only trim text
-    return unless $line->[$i][0] eq 'text';
-
-    # Convert whitespace text to line noise
-    splice @$line, $i, 0, ['code', $1] if $line->[$i][1] =~ s/(\s+)$//;
-
-    # Text left
-    return if length $line->[$i][1];
-  }
+  # Convert whitespace text to line noise
+  splice @$tree, $i, 0, ['code', $1] if $tree->[$i][1] =~ s/(\s+)$//;
 }
 
 sub _wrap {
@@ -287,8 +274,8 @@ sub _wrap {
   my $num = () = $code =~ /\n/g;
   my $head = $self->_line(1);
   $head .= "\npackage @{[$self->namespace]}; use Mojo::Base -strict;";
-  $code = "$head sub { my \$_M = ''; @{[$self->prepend]}; do { $code\n";
-  $code .= $self->_line($num + 1) . "\n@{[$self->append]}; \$_M } };";
+  $code = "$head sub { my \$_M = ''; @{[$self->prepend]}; { $code\n";
+  $code .= $self->_line($num + 1) . "\n@{[$self->append]}; } \$_M };";
 
   warn "-- Code for @{[$self->name]}\n@{[encode 'UTF-8', $code]}\n\n" if DEBUG;
   return $code;
@@ -604,7 +591,7 @@ Raw unparsed template.
 =head2 tree
 
   my $tree = $mt->tree;
-  $mt      = $mt->tree([[['text', 'foo']]]);
+  $mt      = $mt->tree([['text', 'foo'], ['line']]);
 
 Template in parsed form. Note that this structure should only be used very
 carefully since it is very dynamic.
