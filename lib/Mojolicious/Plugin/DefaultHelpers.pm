@@ -3,6 +3,7 @@ use Mojo::Base 'Mojolicious::Plugin';
 
 use Mojo::ByteStream;
 use Mojo::Collection;
+use Mojo::Exception;
 use Mojo::IOLoop;
 use Mojo::Util qw(dumper sha1_sum steady_time);
 
@@ -32,10 +33,12 @@ sub register {
     qw(inactivity_timeout is_fresh url_with);
   $app->helper(b => sub { shift; Mojo::ByteStream->new(@_) });
   $app->helper(c => sub { shift; Mojo::Collection->new(@_) });
-  $app->helper(config  => sub { shift->app->config(@_) });
-  $app->helper(dumper  => sub { shift; dumper(@_) });
-  $app->helper(include => sub { shift->render_to_string(@_) });
-  $app->helper(ua      => sub { shift->app->ua });
+  $app->helper(config            => sub { shift->app->config(@_) });
+  $app->helper(dumper            => sub { shift; dumper(@_) });
+  $app->helper(include           => sub { shift->render_to_string(@_) });
+  $app->helper('reply.exception' => sub { _development('exception', @_) });
+  $app->helper('reply.not_found' => sub { _development('not_found', @_) });
+  $app->helper(ua                => sub { shift->app->ua });
 }
 
 sub _accepts {
@@ -82,6 +85,50 @@ sub _delay {
   $delay->catch(sub { $c->render_exception(pop) and undef $tx })->wait;
 }
 
+sub _development {
+  my ($page, $c, $e) = @_;
+
+  my $app = $c->app;
+  $app->log->error($e = Mojo::Exception->new($e)) if $page eq 'exception';
+
+  # Filtered stash snapshot
+  my $stash = $c->stash;
+  my %snapshot = map { $_ => $stash->{$_} }
+    grep { !/^mojo\./ and defined $stash->{$_} } keys %$stash;
+
+  # Render with fallbacks
+  my $mode     = $app->mode;
+  my $renderer = $app->renderer;
+  my $options  = {
+    exception => $page eq 'exception' ? $e : undef,
+    format => $stash->{format} || $renderer->default_format,
+    handler  => undef,
+    snapshot => \%snapshot,
+    status   => $page eq 'exception' ? 500 : 404,
+    template => "$page.$mode"
+  };
+  my $inline = $renderer->_bundled($mode eq 'development' ? $mode : $page);
+  return $c if _fallbacks($c, $options, $page, $inline);
+  _fallbacks($c, {%$options, format => 'html'}, $page, $inline);
+  return $c;
+}
+
+sub _fallbacks {
+  my ($c, $options, $template, $inline) = @_;
+
+  # Mode specific template
+  return 1 if $c->render_maybe(%$options);
+
+  # Normal template
+  return 1 if $c->render_maybe(%$options, template => $template);
+
+  # Inline template
+  my $stash = $c->stash;
+  return undef unless $stash->{format} eq 'html';
+  delete @$stash{qw(extends layout)};
+  return $c->render_maybe(%$options, inline => $inline, handler => 'ep');
+}
+
 sub _inactivity_timeout {
   return unless my $stream = Mojo::IOLoop->stream(shift->tx->connection // '');
   $stream->timeout(shift);
@@ -115,7 +162,7 @@ Mojolicious::Plugin::DefaultHelpers - Default helpers plugin
 
 =head1 DESCRIPTION
 
-L<Mojolicious::Plugin::DefaultHelpers> is a collection of renderer helpers for
+L<Mojolicious::Plugin::DefaultHelpers> is a collection of helpers for
 L<Mojolicious>.
 
 This is a core plugin, that means it is always enabled and its code a good
@@ -230,13 +277,28 @@ Check or get name of current route.
 Disable automatic rendering and use L<Mojo::IOLoop/"delay"> to manage
 callbacks and control the flow of events, which can help you avoid deep nested
 closures and memory leaks that often result from continuation-passing style.
-Calls L<Mojolicious::Controller/"render_exception"> if an error occured in one
-of the steps, breaking the chain.
+Also keeps a reference to L<Mojolicious::Controller/"tx"> in case the
+underlying connection gets closed early, and calls
+L<Mojolicious::Controller/"render_exception"> if an error occured in one of
+the steps, breaking the chain.
 
   # Longer version
   $c->render_later;
+  my $tx    = $c->tx;
   my $delay = Mojo::IOLoop->delay(sub {...}, sub {...});
-  $delay->catch(sub { $c->render_exception(pop) })->wait;
+  $delay->catch(sub { $c->render_exception(pop) and undef $tx })->wait;
+
+  # Non-blocking request
+  $c->delay(
+    sub {
+      my $delay = shift;
+      $c->ua->get('http://mojolicio.us' => $delay->begin);
+    },
+    sub {
+      my ($delay, $tx) = @_;
+      $c->render(json => {title => $tx->res->dom->at('title')->text});
+    }
+  );
 
 =head2 dumper
 
@@ -303,6 +365,25 @@ L</"stash">.
   %= param 'foo'
 
 Alias for L<Mojolicious::Controller/"param">.
+
+=head2 reply->exception
+
+  $c = $c->reply->exception('Oops!');
+  $c = $c->reply->exception(Mojo::Exception->new('Oops!'));
+
+Render the exception template C<exception.$mode.$format.*> or
+C<exception.$format.*> and set the response status code to C<500>. Also sets
+the stash values C<exception> to a L<Mojo::Exception> object and C<snapshot>
+to a copy of the L</"stash"> for use in the templates.
+
+=head2 reply->not_found
+
+  $c = $c->reply->not_found;
+
+Render the not found template C<not_found.$mode.$format.*> or
+C<not_found.$format.*> and set the response status code to C<404>. Also sets
+the stash value C<snapshot> to a copy of the L</"stash"> for use in the
+templates.
 
 =head2 session
 
