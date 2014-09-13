@@ -179,12 +179,11 @@ sub render_maybe { shift->render(@_, 'mojo.maybe' => 1) }
 
 sub render_not_found { shift->helpers->reply->not_found }
 
+# DEPRECATED in Tiger Face!
 sub render_static {
-  my ($self, $file) = @_;
-  my $app = $self->app;
-  return !!$self->rendered if $app->static->serve($self, $file);
-  $app->log->debug(qq{File "$file" not found, public directory missing?});
-  return !$self->render_not_found;
+  Mojo::Util::deprecated 'Mojolicious::Controller::render_static is DEPRECATED'
+    . ' in favor of the reply->static helper';
+  shift->helpers->reply->static(@_);
 }
 
 sub render_to_string { shift->render(@_, 'mojo.to_string' => 1) }
@@ -625,7 +624,7 @@ Prepare a C<302> redirect response, takes the same arguments as L</"url_for">.
   my $bool = $c->render(handler => 'something');
   my $bool = $c->render('foo/index');
 
-Render content using L<Mojolicious::Renderer/"render"> and emit hooks
+Render content with L<Mojolicious::Renderer/"render"> and emit hooks
 L<Mojolicious/"before_render"> as well as L<Mojolicious/"after_render">. If no
 template is provided a default one based on controller and action or route
 name will be generated with L<Mojolicious::Renderer/"template_for">, all
@@ -688,19 +687,6 @@ could be generated, takes the same arguments as L</"render">.
   $c = $c->render_not_found;
 
 Alias for L<Mojolicious::Plugin::DefaultHelpers/"reply-E<gt>not_found">.
-
-=head2 render_static
-
-  my $bool = $c->render_static('images/logo.png');
-  my $bool = $c->render_static('../lib/MyApp.pm');
-
-Render a static file using L<Mojolicious::Static/"serve">, usually from the
-C<public> directories or C<DATA> sections of your application. Note that this
-method does not protect from traversing to parent directories.
-
-  # Serve file with a custom content type
-  $c->res->headers->content_type('application/myapp');
-  $c->render_static('foo.txt');
 
 =head2 render_to_string
 

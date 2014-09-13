@@ -17,33 +17,32 @@ sub register {
 
   # Stash key shortcuts (should not generate log messages)
   for my $name (qw(extends layout title)) {
-    $app->helper(
-      $name => sub {
-        my $c     = shift;
-        my $stash = $c->stash;
-        $stash->{$name} = shift if @_;
-        $c->stash(@_) if @_;
-        return $stash->{$name};
-      }
-    );
+    $app->helper($name => sub { shift->stash($name, @_) });
   }
 
+  $app->helper(accepts => sub { $_[0]->app->renderer->accepts(@_) });
+  $app->helper(b       => sub { shift; Mojo::ByteStream->new(@_) });
+  $app->helper(c       => sub { shift; Mojo::Collection->new(@_) });
+  $app->helper(config  => sub { shift->app->config(@_) });
+
   $app->helper($_ => $self->can("_$_"))
-    for qw(accepts content content_for csrf_token current_route delay),
+    for qw(content content_for csrf_token current_route delay),
     qw(inactivity_timeout is_fresh url_with);
-  $app->helper(b => sub { shift; Mojo::ByteStream->new(@_) });
-  $app->helper(c => sub { shift; Mojo::Collection->new(@_) });
-  $app->helper(config            => sub { shift->app->config(@_) });
-  $app->helper(dumper            => sub { shift; dumper(@_) });
-  $app->helper(include           => sub { shift->render_to_string(@_) });
+
+  $app->helper(dumper => sub { shift; dumper(@_) });
+  $app->helper(include => sub { shift->render_to_string(@_) });
+
+  $app->helper("reply.$_" => $self->can("_$_")) for qw(asset static);
+
   $app->helper('reply.exception' => sub { _development('exception', @_) });
   $app->helper('reply.not_found' => sub { _development('not_found', @_) });
   $app->helper(ua                => sub { shift->app->ua });
 }
 
-sub _accepts {
+sub _asset {
   my $c = shift;
-  return $c->app->renderer->accepts($c, @_);
+  $c->app->static->serve_asset($c, @_);
+  $c->rendered;
 }
 
 sub _content {
@@ -74,8 +73,7 @@ sub _csrf_token {
 
 sub _current_route {
   return '' unless my $endpoint = shift->match->endpoint;
-  return $endpoint->name unless @_;
-  return $endpoint->name eq shift;
+  return @_ ? $endpoint->name eq shift : $endpoint->name;
 }
 
 sub _delay {
@@ -137,6 +135,13 @@ sub _inactivity_timeout {
 sub _is_fresh {
   my ($c, %options) = @_;
   return $c->app->static->is_fresh($c, \%options);
+}
+
+sub _static {
+  my ($c, $file) = @_;
+  return !!$c->rendered if $c->app->static->serve($c, $file);
+  $c->app->log->debug(qq{File "$file" not found, public directory missing?});
+  return !$c->render_not_found;
 }
 
 sub _url_with {
@@ -278,15 +283,14 @@ Disable automatic rendering and use L<Mojo::IOLoop/"delay"> to manage
 callbacks and control the flow of events, which can help you avoid deep nested
 closures and memory leaks that often result from continuation-passing style.
 Also keeps a reference to L<Mojolicious::Controller/"tx"> in case the
-underlying connection gets closed early, and calls
-L<Mojolicious::Controller/"render_exception"> if an error occured in one of
-the steps, breaking the chain.
+underlying connection gets closed early, and calls L</"reply-E<gt>exception">
+if an exception gets thrown in one of the steps, breaking the chain.
 
   # Longer version
   $c->render_later;
   my $tx    = $c->tx;
   my $delay = Mojo::IOLoop->delay(sub {...}, sub {...});
-  $delay->catch(sub { $c->render_exception(pop) and undef $tx })->wait;
+  $delay->catch(sub { $c->reply->exception(pop) and undef $tx })->wait;
 
   # Non-blocking request
   $c->delay(
@@ -366,6 +370,20 @@ L</"stash">.
 
 Alias for L<Mojolicious::Controller/"param">.
 
+=head2 reply->asset
+
+  $c->reply->asset(Mojo::Asset::File->new);
+
+Reply with a L<Mojo::Asset::File> or L<Mojo::Asset::Memory> object using
+L<Mojolicious::Static/"serve_asset">, and perform content negotiation with
+C<Range>, C<If-Modified-Since> and C<If-None-Match> headers.
+
+  # Serve asset with custom modification time
+  my $asset = Mojo::Asset::Memory->new;
+  $asset->add_chunk('Hello World!')->mtime(784111777);
+  $c->res->headers->content_type('text/plain');
+  $c->reply->asset($asset);
+
 =head2 reply->exception
 
   $c = $c->reply->exception('Oops!');
@@ -384,6 +402,19 @@ Render the not found template C<not_found.$mode.$format.*> or
 C<not_found.$format.*> and set the response status code to C<404>. Also sets
 the stash value C<snapshot> to a copy of the L</"stash"> for use in the
 templates.
+
+=head2 reply->static
+
+  my $bool = $c->reply->static('images/logo.png');
+  my $bool = $c->reply->static('../lib/MyApp.pm');
+
+Reply with a static file using L<Mojolicious::Static/"serve">, usually from
+the C<public> directories or C<DATA> sections of your application. Note that
+this helper does not protect from traversing to parent directories.
+
+  # Serve file with a custom content type
+  $c->res->headers->content_type('application/myapp');
+  $c->reply->static('foo.txt');
 
 =head2 session
 
