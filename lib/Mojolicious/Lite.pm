@@ -87,7 +87,7 @@ L<Mojolicious>.
 =head1 TUTORIAL
 
 A quick example driven introduction to the wonders of L<Mojolicious::Lite>.
-Most of what you'll learn here also applies to normal L<Mojolicious>
+Most of what you'll learn here also applies to full L<Mojolicious>
 applications.
 
 =head2 Hello World
@@ -943,7 +943,7 @@ and return them with L<Mojolicious::Controller/"send">.
         ws.onmessage = function (event) {
           document.body.innerHTML += JSON.parse(event.data).msg;
         };
-        ws.onopen = function (event) {
+        ws.onopen = function () {
           ws.send(JSON.stringify({msg: 'I ♥ Mojolicious!'}));
         };
       </script>
