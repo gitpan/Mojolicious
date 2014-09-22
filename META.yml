@@ -23,9 +23,9 @@ requires:
   Time::Local: '1.2'
   perl: '5.010001'
 resources:
-  MailingList: http://groups.google.com/group/mojolicious
-  bugtracker: http://github.com/kraih/mojo/issues
+  IRC: irc://irc.perl.org/#mojo
+  bugtracker: https://github.com/kraih/mojo/issues
   homepage: http://mojolicio.us
   license: http://www.opensource.org/licenses/artistic-license-2.0
-  repository: http://github.com/kraih/mojo
-version: '5.42'
+  repository: https://github.com/kraih/mojo.git
+version: '5.43'

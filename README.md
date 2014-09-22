@@ -62,20 +62,21 @@ app->start;
 
 ## Duct tape for the HTML5 web
 
-  Web development for humans, making hard things possible and everything fun.
+  Use all the latest Perl and HTML features in single file prototypes like
+  this one and grow them easily into well-structured applications.
 
 ```perl
 use Mojolicious::Lite;
+use 5.20.0;
+use experimental 'signatures';
 
-# Route connecting "/" with a template in the DATA section
-get '/' => 'index';
+# Render template "index.html.ep" from the DATA section
+get '/' => {template => 'index'};
 
-# WebSocket service scraping information from a web site
-websocket '/title' => sub {
-  my $c = shift;
-  $c->on(message => sub {
-    my ($c, $url) = @_;
-    my $title = $c->ua->get($url)->res->dom->at('title')->text;
+# WebSocket service used by the template to extract the title from a web site
+websocket '/title' => sub ($c) {
+  $c->on(message => sub ($c, $msg) {
+    my $title = $c->ua->get($msg)->res->dom->at('title')->text;
     $c->send($title);
   });
 };
@@ -84,20 +85,13 @@ app->start;
 __DATA__
 
 @@ index.html.ep
-% my $websocket = url_for 'title';
+% my $url = url_for 'title';
 <script>
-  var ws = new WebSocket('<%= $websocket->to_abs %>');
-  ws.onmessage = function (event) {
-    document.body.innerHTML += event.data;
-  };
-  ws.onopen = function () {
-    ws.send('http://mojolicio.us');
-  };
+  var ws = new WebSocket('<%= $url->to_abs %>');
+  ws.onmessage = function (event) { document.body.innerHTML += event.data };
+  ws.onopen    = function (event) { ws.send('http://mojolicio.us') };
 </script>
 ```
-
-  Single file prototypes like this one can easily grow into well-structured
-  applications.
 
 ## Want to know more?
 
