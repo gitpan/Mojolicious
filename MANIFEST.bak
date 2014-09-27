@@ -173,7 +173,6 @@ lib/Test/Mojo.pm
 LICENSE
 Makefile.PL
 MANIFEST			This list of files
-MANIFEST.bak
 MANIFEST.SKIP
 README.md
 script/hypnotoad
@@ -350,5 +349,3 @@ t/mojolicious/validation_lite_app.t
 t/mojolicious/websocket_lite_app.t
 t/pod.t
 t/pod_coverage.t
-META.yml                                 Module YAML meta-data (added by MakeMaker)
-META.json                                Module JSON meta-data (added by MakeMaker)

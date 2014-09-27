@@ -316,8 +316,7 @@ sub _start {
     $url->scheme($base->scheme)->authority($base->authority);
   }
 
-  $self->proxy->inject($tx);
-  if (my $jar = $self->cookie_jar) { $jar->inject($tx) }
+  $_ && $_->inject($tx) for $self->proxy, $self->cookie_jar;
 
   # Connect and add request timeout if necessary
   my $id = $self->emit(start => $tx)->_connection($nb, $tx, $cb);
@@ -506,11 +505,11 @@ environment variable or C<10>.
   my $cookie_jar = $ua->cookie_jar;
   $ua            = $ua->cookie_jar(Mojo::UserAgent::CookieJar->new);
 
-Cookie jar to use for this user agents requests, defaults to a
+Cookie jar to use for requests performed by this user agent, defaults to a
 L<Mojo::UserAgent::CookieJar> object.
 
-  # Disable cookie jar
-  $ua->cookie_jar(0);
+  # Disable extraction of cookies from responses
+  $ua->cookie_jar->extracting(0);
 
 =head2 inactivity_timeout
 

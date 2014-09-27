@@ -58,7 +58,10 @@ sub find {
 
 sub get { shift->_generate_route(GET => @_) }
 
+# DEPRECATED in Tiger Face!
 sub has_conditions {
+  Mojo::Util::deprecated
+    'Mojolicious::Routes::Route::has_conditions is DEPRECATED';
   my $self = shift;
   return 1 if @{$self->over || []};
   return undef unless my $parent = $self->parent;
@@ -71,7 +74,7 @@ sub has_websocket {
   my $self = shift;
   return 1 if $self->is_websocket;
   return undef unless my $parent = $self->parent;
-  return $parent->is_websocket;
+  return $parent->has_websocket;
 }
 
 sub is_endpoint { $_[0]->inline ? undef : !@{$_[0]->children} }
@@ -97,7 +100,7 @@ sub over {
   my $conditions = ref $_[0] eq 'ARRAY' ? $_[0] : [@_];
   return $self unless @$conditions;
   $self->{over} = $conditions;
-  $self->root->cache(0);
+  $self->root->cache->max_keys(0);
 
   return $self;
 }
@@ -375,12 +378,6 @@ See also the L<Mojolicious::Lite> tutorial for many more argument variations.
 
   $r->get('/user')->to('user#show');
 
-=head2 has_conditions
-
-  my $bool = $r->has_conditions;
-
-Check if this route has active conditions.
-
 =head2 has_custom_name
 
   my $bool = $r->has_custom_name;
@@ -516,9 +513,7 @@ Render route with parameters into a path.
 
   my $root = $r->root;
 
-The L<Mojolicious::Routes> object this route is an descendent of.
-
-  $r->root->cache(0);
+The L<Mojolicious::Routes> object this route is a descendant of.
 
 =head2 route
 
