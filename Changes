@@ -1,4 +1,10 @@
 
+5.47  2014-09-28
+  - Improved url_for performance.
+
+5.46  2014-09-26
+  - PAUSE lost the previous release.
+
 5.45  2014-09-26
   - Deprecated Mojolicious::Routes::Route::has_conditions.
   - Added extracting attribute to Mojo::UserAgent::CookieJar.
