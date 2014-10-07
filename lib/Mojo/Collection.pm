@@ -26,7 +26,7 @@ sub DESTROY { }
 sub c { __PACKAGE__->new(@_) }
 
 sub compact {
-  $_[0]->new(grep { defined $_ && (ref $_ || length $_) } @{$_[0]});
+  $_[0]->new(grep { defined && (ref || length) } @{$_[0]});
 }
 
 sub each {
@@ -69,8 +69,8 @@ sub new {
 }
 
 sub pluck {
-  my ($self, $method, @args) = @_;
-  return $self->new(map { $_->$method(@args) } @$self);
+  my ($self, $key) = (shift, shift);
+  return $self->new(map { ref eq 'HASH' ? $_->{$key} : $_->$key(@_) } @$self);
 }
 
 sub reduce {
@@ -262,13 +262,15 @@ Construct a new array-based L<Mojo::Collection> object.
 
 =head2 pluck
 
+  my $new = $collection->pluck($key);
   my $new = $collection->pluck($method);
   my $new = $collection->pluck($method, @args);
 
-Call method on each element in collection and create a new collection from the
-results.
+Extract hash reference value from, or call method on, each element in
+collection and create a new collection from the results.
 
-  # Equal to but more convenient than
+  # Longer version
+  my $new = $collection->map(sub { $_->{$key} });
   my $new = $collection->map(sub { $_->$method(@args) });
 
 =head2 reduce
