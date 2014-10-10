@@ -56,11 +56,12 @@ sub param {
   # Multiple names
   return map { $self->param($_) } @$name if ref $name eq 'ARRAY';
 
+  # Last value
+  return $self->_param($name)->[-1] unless @_;
+
   # Replace values
   $self->remove($name) if defined $_[0];
-  return $self->append($name => ref $_[0] eq 'ARRAY' ? $_[0] : [@_]) if @_;
-
-  return $self->_param($name)->[-1];
+  return $self->append($name => ref $_[0] eq 'ARRAY' ? $_[0] : [@_]);
 }
 
 sub params {
@@ -173,7 +174,6 @@ sub to_string {
 sub _param {
   my ($self, $name) = @_;
 
-  # List values
   my @values;
   my $params = $self->params;
   for (my $i = 0; $i < @$params; $i += 2) {
@@ -289,9 +289,9 @@ necessary.
   $params         = $params->param(foo => qw(ba&r baz));
   $params         = $params->param(foo => ['ba;r', 'baz']);
 
-Access parameter values. To access multiple values sharing the same name you
-can also use L</"every_param">. Note that this method will normalize the
-parameters.
+Access parameter values. If there are multiple values sharing the same name,
+and you want to access more than just the last one, you can use
+L</"every_param">. Note that this method will normalize the parameters.
 
 =head2 params
 

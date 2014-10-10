@@ -125,7 +125,8 @@ sub remove {
 sub render {
   my ($self, $values) = @_;
   my $path = join '',
-    map { $_->pattern->render($values, !@{$_->children}) } @{$self->_chain};
+    map { $_->pattern->render($values, !@{$_->children} && !$_->partial) }
+    @{$self->_chain};
   return $path || '/';
 }
 

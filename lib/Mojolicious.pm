@@ -43,7 +43,7 @@ has types     => sub { Mojolicious::Types->new };
 has validator => sub { Mojolicious::Validator->new };
 
 our $CODENAME = 'Tiger Face';
-our $VERSION  = '5.48';
+our $VERSION  = '5.49';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -980,6 +980,8 @@ Stephane Este-Gracias
 Tatsuhiko Miyagawa
 
 Terrence Brannon
+
+Tianon Gravi
 
 Tomas Znamenacek
 

@@ -1,4 +1,14 @@
 
+5.49  2014-10-10
+  - Improved form content generator to allow custom content types.
+  - Improved Mojo::Server to load applications consistently for all servers.
+    (tianon, sri)
+  - Fixed Mojolicious::Static to hide files without extensions in DATA
+    sections.
+  - Fixed inflate command to ignore files without extensions.
+  - Fixed bug in Mojolicious::Routes::Route where formats could be rendered
+    twice for embedded applications.
+
 5.48  2014-10-07
   - Emergency release for a serious security issue that can result in
     parameter injection attacks, everybody should update!

@@ -218,6 +218,7 @@ t/mojo/lib/Mojo/LoaderException2.pm
 t/mojo/lib/Mojo/LoaderTest/A.pm
 t/mojo/lib/Mojo/LoaderTest/B.pm
 t/mojo/lib/Mojo/LoaderTest/C.pm
+t/mojo/lib/myapp.pl
 t/mojo/loader.t
 t/mojo/log.t
 t/mojo/morbo.t

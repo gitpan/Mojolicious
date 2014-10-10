@@ -358,10 +358,7 @@ Access request cookies, usually L<Mojo::Cookie::Request> objects.
   my $values = $req->every_param('foo');
 
 Similar to L</"param">, but returns all values sharing the same name as an
-array reference. Note that this method caches all data, so it should not be
-called before the entire request body has been received. Parts of the request
-body need to be loaded into memory to parse C<POST> parameters, so you have to
-make sure it is not excessively large, there's a 10MB limit by default.
+array reference.
 
   # Get first value
   say $req->every_param('foo')->[0];
@@ -410,11 +407,12 @@ Check C<X-Requested-With> header for C<XMLHttpRequest> value.
 
 Access C<GET> and C<POST> parameters extracted from the query string and
 C<application/x-www-form-urlencoded> or C<multipart/form-data> message body.
-To access multiple values sharing the same name you can also use
-L</"every_param">. Note that this method caches all data, so it should not be
-called before the entire request body has been received. Parts of the request
-body need to be loaded into memory to parse C<POST> parameters, so you have to
-make sure it is not excessively large, there's a 10MB limit by default.
+If there are multiple values sharing the same name, and you want to access
+more than just the last one, you can use L</"every_param">. Note that this
+method caches all data, so it should not be called before the entire request
+body has been received. Parts of the request body need to be loaded into
+memory to parse C<POST> parameters, so you have to make sure it is not
+excessively large, there's a 10MB limit by default.
 
 =head2 params
 

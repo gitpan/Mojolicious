@@ -461,9 +461,10 @@ Render start line.
   my ($foo, $bar) = $msg->cookie(['foo', 'bar']);
 
 Access message cookies, usually L<Mojo::Cookie::Request> or
-L<Mojo::Cookie::Response> objects. To access multiple cookies sharing the same
-name you can also use L</"every_cookie">. Note that this method caches all
-data, so it should not be called before all headers have been received.
+L<Mojo::Cookie::Response> objects. If there are multiple cookies sharing the
+same name, and you want to access more than just the last one, you can use
+L</"every_cookie">. Note that this method caches all data, so it should not be
+called before all headers have been received.
 
   # Get cookie value
   say $msg->cookie('foo')->value;
@@ -506,8 +507,7 @@ error.
   my $cookies = $msg->every_cookie('foo');
 
 Similar to L</"cookie">, but returns all message cookies sharing the same name
-as an array reference. Note that this method caches all data, so it should not
-be called before all headers have been received.
+as an array reference.
 
   # Get first cookie value
   say $msg->every_cookie('foo')->[0]->value;
@@ -517,8 +517,7 @@ be called before all headers have been received.
   my $uploads = $msg->every_upload('foo');
 
 Similar to L</"upload">, but returns all file uploads sharing the same name as
-an array reference. Note that this method caches all data, so it should not be
-called before the entire message body has been received.
+an array reference.
 
   # Get content of first uploaded file
   say $msg->every_upload('foo')->[0]->asset->slurp;
@@ -632,9 +631,10 @@ Render whole message.
   my ($foo, $bar) = $msg->upload(['foo', 'bar']);
 
 Access C<multipart/form-data> file uploads, usually L<Mojo::Upload> objects.
-To access multiple uploads sharing the same name you can also use
-L</"every_upload">. Note that this method caches all data, so it should not be
-called before the entire message body has been received.
+If there are multiple uploads sharing the same name, and you want to access
+more than just the last one, you can use L</"every_upload">. Note that this
+method caches all data, so it should not be called before the entire message
+body has been received.
 
   # Get content of uploaded file
   say $msg->upload('foo')->asset->slurp;
