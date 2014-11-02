@@ -43,7 +43,7 @@ has types     => sub { Mojolicious::Types->new };
 has validator => sub { Mojolicious::Validator->new };
 
 our $CODENAME = 'Tiger Face';
-our $VERSION  = '5.56';
+our $VERSION  = '5.57';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -674,7 +674,11 @@ Note that application helpers are always called with a new default controller
 object, so they can't depend on or change controller state, which includes
 request, response and stash.
 
-  $app->log->debug($app->dumper({foo => 'bar'}));
+  # Call helper
+  say $app->dumper({foo => 'bar'});
+
+  # Longer version
+  say $app->build_controller->helpers->dumper({foo => 'bar'});
 
 =head1 BUNDLED FILES
 

@@ -8,7 +8,7 @@ my $dom = Mojo::DOM->new->parse(
   '<div><div FOO="0" id="a">A</div><div id="b">B</div></div>');
 is $dom->at('#b')->text, 'B', 'right text';
 my @div;
-push @div, $dom->find('div[id]')->pluck('text')->each;
+push @div, $dom->find('div[id]')->map('text')->each;
 is_deeply \@div, [qw(A B)], 'found all div elements with id';
 @div = ();
 $dom->find('div[id]')->each(sub { push @div, $_->text });
@@ -20,7 +20,7 @@ is "$dom", '<div><div foo="0" id="a">A</div><div id="b">B</div></div>',
 
 # Tap into method chain
 $dom = Mojo::DOM->new->parse('<div id="a">A</div><div id="b">B</div>');
-is_deeply [$dom->find('[id]')->pluck(attr => 'id')->each], [qw(a b)],
+is_deeply [$dom->find('[id]')->map(attr => 'id')->each], [qw(a b)],
   'right result';
 is $dom->tap(sub { $_->at('#b')->remove }), '<div id="a">A</div>',
   'right result';
@@ -143,7 +143,7 @@ is $dom->next,     undef, 'no siblings';
 is $dom->previous, undef, 'no siblings';
 is $dom->at('foo > a')->next,          undef, 'no next sibling';
 is $dom->at('foo > simple')->previous, undef, 'no previous sibling';
-is_deeply [$dom->at('simple')->ancestors->pluck('type')->each], ['foo'],
+is_deeply [$dom->at('simple')->ancestors->map('type')->each], ['foo'],
   'right results';
 ok !$dom->at('simple')->ancestors->first->xml, 'XML mode not active';
 
@@ -186,8 +186,8 @@ is $dom->contents->[2]->node,    'pi',    'right node';
 is $dom->contents->[2]->content, 'after', 'right content';
 is $dom->contents->first->content(' again')->content, ' again',
   'right content';
-is $dom->contents->grep(sub { $_->node eq 'pi' })->pluck('remove')
-  ->first->node, 'root', 'right node';
+is $dom->contents->grep(sub { $_->node eq 'pi' })->map('remove')->first->node,
+  'root', 'right node';
 is "$dom", '<!DOCTYPE again><p><![CDATA[123]]><!-- 456 --></p>',
   'right result';
 
@@ -214,7 +214,7 @@ is $dom->at('script')->contents->first->wrap('<i>:)</i>')->root,
   '<script><i>:)a</i><b>fce</b>1<b>d</b></script>', 'right result';
 is $dom->at('i')->contents->first->wrap_content('<b></b>')->root,
   '<script><i><b>:)</b>a</i><b>fce</b>1<b>d</b></script>', 'right result';
-is $dom->at('b')->contents->first->ancestors->pluck('type')->join(','),
+is $dom->at('b')->contents->first->ancestors->map('type')->join(','),
   'b,i,script', 'right result';
 is $dom->at('b')->contents->first->append_content('g')->content, ':)g',
   'right content';
@@ -284,7 +284,7 @@ $dom->find('p')->each(sub { push @p, $_->attr('id') });
 is_deeply \@p, [qw(foo bar)], 'found all p elements';
 my $ids = [qw(container header logo buttons buttons content)];
 is_deeply \@div, $ids, 'found all div elements';
-is_deeply [$dom->at('p')->ancestors->pluck('type')->each],
+is_deeply [$dom->at('p')->ancestors->map('type')->each],
   [qw(div div div body html)], 'right results';
 is_deeply [$dom->at('html')->ancestors->each], [], 'no results';
 is_deeply [$dom->ancestors->each],             [], 'no results';
@@ -294,8 +294,8 @@ ok $dom->at('form')->siblings->[1]->match('#content'), 'right sibling';
 is $dom->at('form')->siblings('#content')->first->text, 'More stuff',
   'right text';
 is_deeply [$dom->at('form')->siblings('#nothing')->each], [], 'no results';
-is_deeply [$dom->at('#header')->siblings->pluck('type')->each],
-  [qw(form div)], 'right results';
+is_deeply [$dom->at('#header')->siblings->map('type')->each], [qw(form div)],
+  'right results';
 
 # Script tag
 $dom = Mojo::DOM->new->parse(<<EOF);
@@ -437,7 +437,7 @@ is $dom->replace(''), '', 'no result';
 is "$dom", '', 'no result';
 $dom->replace('<div>foo<p>lalala</p>bar</div>');
 is "$dom", '<div>foo<p>lalala</p>bar</div>', 'right result';
-$dom->find('p')->pluck(replace => '');
+$dom->find('p')->map(replace => '');
 is "$dom", '<div>foobar</div>', 'right result';
 $dom = Mojo::DOM->new->parse('<div>♥</div>');
 $dom->at('div')->content('☃');
@@ -451,14 +451,14 @@ is $dom->replace('<b>whatever</b>')->root, '<b>whatever</b>', 'right result';
 is $dom->to_string, '<b>whatever</b>', 'right result';
 $dom->at('b')->prepend('<p>foo</p>')->append('<p>bar</p>');
 is "$dom", '<p>foo</p><b>whatever</b><p>bar</p>', 'right result';
-is $dom->find('p')->pluck('remove')->first->root->at('b')->text, 'whatever',
+is $dom->find('p')->map('remove')->first->root->at('b')->text, 'whatever',
   'right result';
 is "$dom", '<b>whatever</b>', 'right result';
 is $dom->at('b')->strip, 'whatever', 'right result';
 is $dom->strip,  'whatever', 'right result';
 is $dom->remove, '',         'right result';
 $dom->replace('A<div>B<p>C<b>D<i><u>E</u></i>F</b>G</p><div>H</div></div>I');
-is $dom->find(':not(div):not(i):not(u)')->pluck('strip')->first->root,
+is $dom->find(':not(div):not(i):not(u)')->map('strip')->first->root,
   'A<div>BCD<i><u>E</u></i>FG<div>H</div></div>I', 'right result';
 is $dom->at('i')->to_string, '<i><u>E</u></i>', 'right result';
 
@@ -537,7 +537,7 @@ $dom = Mojo::DOM->new->parse(<<EOF);
 EOF
 ok $dom->xml, 'XML mode detected';
 is $dom->find('rss')->[0]->attr('version'), '2.0', 'right version';
-is_deeply [$dom->at('title')->ancestors->pluck('type')->each],
+is_deeply [$dom->at('title')->ancestors->map('type')->each],
   [qw(channel rss)], 'right results';
 is $dom->at('extension')->attr('foo:id'), 'works', 'right id';
 like $dom->at('#works')->text,       qr/\[awesome\]\]/, 'right text';
@@ -1427,7 +1427,8 @@ is $dom->find('table > colgroup > col')->[2]->attr->{id}, 'bar',
 is $dom->at('table > thead > tr > th')->text, 'A', 'right text';
 is $dom->find('table > thead > tr > th')->[1]->text, 'D', 'right text';
 is $dom->at('table > tbody > tr > td')->text, 'B', 'right text';
-is $dom->find('table > tbody > tr > td')->pluck('text'), "B\nE", 'right text';
+is $dom->find('table > tbody > tr > td')->map('text')->join("\n"), "B\nE",
+  'right text';
 
 # Optional "colgroup", "tbody", "tr", "th" and "td" tags
 $dom = Mojo::DOM->new->parse(<<EOF);
@@ -1507,8 +1508,8 @@ is $dom->find('tbody > tr > .gamma > a')->[0]->text, 'Gamma',     'right text';
 is $dom->find('tbody > tr > .alpha')->[1]->text,     'Alpha Two', 'right text';
 is $dom->find('tbody > tr > .gamma > a')->[1]->text, 'Gamma Two', 'right text';
 my @siblings
-  = $dom->find('tr > td:nth-child(1)')->pluck(siblings => ':nth-child(even)')
-  ->flatten->pluck('all_text')->each;
+  = $dom->find('tr > td:nth-child(1)')->map(siblings => ':nth-child(even)')
+  ->flatten->map('all_text')->each;
 is_deeply \@siblings, ['Beta', 'Delta', 'Beta Two', 'Delta Two'],
   'right results';
 
@@ -1993,10 +1994,10 @@ is $dom->find('a B c')->size, 2, 'right number of elements';
 @results = ();
 $dom->find('a B c')->each(sub { push @results, $_->text });
 is_deeply \@results, [qw(bar baz)], 'right results';
-is $dom->find('a B c'), qq{<c id="three">bar</c>\n<c ID="four">baz</c>},
-  'right result';
+is $dom->find('a B c')->join("\n"),
+  qq{<c id="three">bar</c>\n<c ID="four">baz</c>}, 'right result';
 is_deeply [keys %$dom], [], 'root has no attributes';
-is $dom->find('#nothing'), '', 'no result';
+is $dom->find('#nothing')->join, '', 'no result';
 
 # Direct hash access to attributes in HTML mode
 $dom = Mojo::DOM->new(<<EOF);
@@ -2025,10 +2026,10 @@ is $dom->find('a b c')->size, 2, 'right number of elements';
 @results = ();
 $dom->find('a b c')->each(sub { push @results, $_->text });
 is_deeply \@results, [qw(bar baz)], 'right results';
-is $dom->find('a b c'), qq{<c id="three">bar</c>\n<c id="four">baz</c>},
-  'right result';
+is $dom->find('a b c')->join("\n"),
+  qq{<c id="three">bar</c>\n<c id="four">baz</c>}, 'right result';
 is_deeply [keys %$dom], [], 'root has no attributes';
-is $dom->find('#nothing'), '', 'no result';
+is $dom->find('#nothing')->join, '', 'no result';
 
 # Append and prepend content
 $dom = Mojo::DOM->new('<a><b>Test<c /></b></a>');
@@ -2276,46 +2277,6 @@ is $dom->find('div > ul li')->[1]->text, 'B', 'right text';
 is $dom->find('div > ul li')->[2], undef, 'no result';
 is $dom->find('div > ul ul')->[0]->text, 'C', 'right text';
 is $dom->find('div > ul ul')->[1], undef, 'no result';
-
-# Form values
-$dom = Mojo::DOM->new(<<EOF);
-<form action="/foo">
-  <p>Test</p>
-  <input type="text" name="a" value="A" />
-  <input type="checkbox" checked name="b" value="B">
-  <input type="radio" checked name="c" value="C">
-  <select name="f">
-    <option value="F">G</option>
-    <optgroup>
-      <option>H</option>
-      <option selected>I</option>
-    </optgroup>
-    <option value="J" selected>K</option>
-  </select>
-  <select name="n"><option>N</option></select>
-  <select name="d"><option selected>D</option></select>
-  <textarea name="m">M</textarea>
-  <button name="o" value="O">No!</button>
-  <input type="submit" name="p" value="P" />
-</form>
-EOF
-is_deeply [$dom->at('p')->val->each], [], 'no values';
-is $dom->at('input')->val->size, 1, 'one value';
-is $dom->at('input')->val,                     'A', 'right value';
-is $dom->at('input:checked')->val,             'B', 'right value';
-is $dom->at('input:checked[type=radio]')->val, 'C', 'right value';
-is $dom->find('select')->first->val->join(':'), 'I:J', 'right value';
-is_deeply [$dom->find('select')->first->val->each], ['I', 'J'], 'right values';
-is $dom->at('select option')->val->size, 1, 'one value';
-is $dom->at('select option')->val,                          'F', 'right value';
-is $dom->at('select optgroup option:not([selected])')->val, 'H', 'right value';
-is $dom->find('select')->[1]->val->size, 0, 'no values';
-is $dom->find('select')->[1]->at('option')->val, 'N', 'right value';
-is $dom->find('select')->last->val, 'D', 'right value';
-is $dom->at('textarea')->val->size, 1,   'one value';
-is $dom->at('textarea')->val, 'M', 'right value';
-is $dom->at('button')->val,   'O', 'right value';
-is $dom->find('form input')->last->val, 'P', 'right value';
 
 # Slash between attributes
 $dom = Mojo::DOM->new('<input /type=checkbox / value="/a/" checked/><br/>');
