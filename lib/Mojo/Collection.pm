@@ -10,7 +10,8 @@ use Scalar::Util 'blessed';
 
 # DEPRECATED in Tiger Face!
 use overload '""' => sub {
-  deprecated 'Stringification support in Mojo::Collection is DEPRECATED';
+  deprecated 'Stringification support in Mojo::Collection is DEPRECATED'
+    . ' in favor of Mojo::Collection::join';
   shift->join("\n");
 };
 use overload bool => sub {1}, fallback => 1;
@@ -19,10 +20,10 @@ our @EXPORT_OK = ('c');
 
 # DEPRECATED in Tiger Face!
 sub AUTOLOAD {
-  deprecated 'Mojo::Collection::AUTOLOAD is DEPRECATED in favor of'
-    . ' Mojo::Collection::map';
   my $self = shift;
   my ($package, $method) = our $AUTOLOAD =~ /^(.+)::(.+)$/;
+  deprecated "Mojo::Collection::AUTOLOAD ($method) is DEPRECATED"
+    . ' in favor of Mojo::Collection::map';
   croak "Undefined subroutine &${package}::$method called"
     unless blessed $self && $self->isa(__PACKAGE__);
   return $self->map($method, @_);
@@ -143,15 +144,13 @@ Mojo::Collection - Collection
   # Manipulate collection
   my $collection = Mojo::Collection->new(qw(just works));
   unshift @$collection, 'it';
+  say $collection->join("\n");
 
   # Chain methods
   $collection->map(sub { ucfirst })->shuffle->each(sub {
     my ($word, $count) = @_;
     say "$count: $word";
   });
-
-  # Stringify collection
-  say $collection->join("\n");
 
   # Use the alternative constructor
   use Mojo::Collection 'c';
