@@ -19,6 +19,7 @@ no_index:
     - inc
     - t
 requires:
+  IO::Socket::IP: '0.26'
   Pod::Simple: '3.09'
   Time::Local: '1.2'
   perl: '5.010001'
@@ -28,4 +29,4 @@ resources:
   homepage: http://mojolicio.us
   license: http://www.opensource.org/licenses/artistic-license-2.0
   repository: https://github.com/kraih/mojo.git
-version: '5.58'
+version: '5.59'
