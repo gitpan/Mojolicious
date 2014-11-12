@@ -43,7 +43,7 @@ has types     => sub { Mojolicious::Types->new };
 has validator => sub { Mojolicious::Validator->new };
 
 our $CODENAME = 'Tiger Face';
-our $VERSION  = '5.59';
+our $VERSION  = '5.60';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -168,10 +168,10 @@ sub new {
   # DEPRECATED in Tiger Face!
   $r->hide('render_static');
 
-  # Check if we have a log directory
+  # Check if we have a log directory that is writable
   my $mode = $self->mode;
   $self->log->path($home->rel_file("log/$mode.log"))
-    if -w $home->rel_file('log');
+    if -d $home->rel_file('log') && -w _;
 
   $self->plugin($_)
     for qw(HeaderCondition DefaultHelpers TagHelpers EPLRenderer EPRenderer);

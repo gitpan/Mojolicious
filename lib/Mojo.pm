@@ -11,7 +11,7 @@ use Mojo::UserAgent;
 use Mojo::Util;
 use Scalar::Util ();
 
-has home => sub { Mojo::Home->new };
+has home => sub { Mojo::Home->new->detect(ref shift) };
 has log  => sub { Mojo::Log->new };
 has ua   => sub {
   my $ua = Mojo::UserAgent->new;
@@ -24,18 +24,6 @@ sub build_tx { Mojo::Transaction::HTTP->new }
 sub config { Mojo::Util::_stash(config => @_) }
 
 sub handler { Carp::croak 'Method "handler" not implemented in subclass' }
-
-sub new {
-  my $self = shift->SUPER::new(@_);
-
-  # Check if we have a log directory
-  my $home = $self->home;
-  $home->detect(ref $self) unless @{$home->parts};
-  $self->log->path($home->rel_file('log/mojo.log'))
-    if -w $home->rel_file('log');
-
-  return $self;
-}
 
 1;
 
@@ -149,14 +137,6 @@ be overloaded in a subclass.
     my ($self, $tx) = @_;
     ...
   }
-
-=head2 new
-
-  my $app = Mojo->new;
-
-Construct a new L<Mojo> application. Will automatically detect your home
-directory if necessary and set up logging to C<log/mojo.log> if there's a
-C<log> directory.
 
 =head1 SEE ALSO
 
