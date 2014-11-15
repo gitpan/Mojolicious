@@ -43,7 +43,7 @@ has types     => sub { Mojolicious::Types->new };
 has validator => sub { Mojolicious::Validator->new };
 
 our $CODENAME = 'Tiger Face';
-our $VERSION  = '5.60';
+our $VERSION  = '5.61';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -948,6 +948,8 @@ Pedro Melo
 Peter Edwards
 
 Pierre-Yves Ritschard
+
+Piotr Roszatycki
 
 Quentin Carbonneaux
 
