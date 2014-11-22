@@ -99,7 +99,8 @@ sub fix_headers {
   # Content-Length or Connection (unless chunked transfer encoding is used)
   my $content = $self->content;
   my $headers = $content->headers;
-  return $self if $content->is_chunked || $headers->content_length;
+  if ($content->is_multipart) { $headers->remove('Content-Length') }
+  elsif ($content->is_chunked || $headers->content_length) { return $self }
   if   ($content->is_dynamic) { $headers->connection('close') }
   else                        { $headers->content_length($self->body_size) }
 
