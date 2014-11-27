@@ -43,7 +43,7 @@ has types     => sub { Mojolicious::Types->new };
 has validator => sub { Mojolicious::Validator->new };
 
 our $CODENAME = 'Tiger Face';
-our $VERSION  = '5.66';
+our $VERSION  = '5.67';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -89,13 +89,10 @@ sub defaults { Mojo::Util::_stash(defaults => @_) }
 sub dispatch {
   my ($self, $c) = @_;
 
-  # Prepare transaction
-  my $tx = $c->tx;
-  $tx->res->code(undef) if $tx->is_websocket;
-  $self->sessions->load($c);
   my $plugins = $self->plugins->emit_hook(before_dispatch => $c);
 
   # Try to find a static file
+  my $tx = $c->tx;
   $self->static->dispatch($c) and $plugins->emit_hook(after_static => $c)
     unless $tx->res->code;
 
@@ -111,8 +108,8 @@ sub dispatch {
 
   # Routes
   $plugins->emit_hook(before_routes => $c);
-  return if $tx->res->code;
-  $c->render_not_found unless $self->routes->dispatch($c) || $tx->res->code;
+  $c->render_not_found
+    unless $tx->res->code || $self->routes->dispatch($c) || $tx->res->code;
 }
 
 sub handler {
