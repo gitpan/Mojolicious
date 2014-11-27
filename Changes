@@ -1,4 +1,9 @@
 
+5.66  2014-11-26
+  - Improved many WebSocket tests in Test::Mojo to be able to fail gracefully.
+  - Fixed bug in Mojo::DOM::CSS where the :empty pseudo class would not ignore
+    comments and processing instructions.
+
 5.65  2014-11-24
   - Improved installable scripts to use #!perl. (jberger)
   - Improved Mojo::JSON security by escaping the "/" character.
@@ -3399,7 +3404,7 @@
   - Improved PSGI support and added psgi command.
   - Added automatic environment detection for Plack based servers, there is
     no technical way to detect all PSGI compliant servers yet though. That
-    means "plackup myapp.pl" and "plackup script/myapp" should just work.
+    means "plackup myapp.pl" and "plackup script/my_app" should just work.
   - Added session and flash helpers.
   - Added finished callback to WebSocket client and server.
   - Added referrer method to Mojo::Headers. (esskar)

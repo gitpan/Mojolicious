@@ -43,7 +43,7 @@ has types     => sub { Mojolicious::Types->new };
 has validator => sub { Mojolicious::Validator->new };
 
 our $CODENAME = 'Tiger Face';
-our $VERSION  = '5.65';
+our $VERSION  = '5.66';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -111,10 +111,7 @@ sub dispatch {
 
   # Routes
   $plugins->emit_hook(before_routes => $c);
-  my $res = $tx->res;
-  return if $res->code;
-  if (my $code = ($tx->req->error // {})->{advice}) { $res->code($code) }
-  elsif ($tx->is_websocket) { $res->code(426) }
+  return if $tx->res->code;
   $c->render_not_found unless $self->routes->dispatch($c) || $tx->res->code;
 }
 

@@ -97,7 +97,7 @@ sub element_exists_not {
 
 sub finish_ok {
   my $self = shift;
-  $self->tx->finish(@_);
+  $self->tx->finish(@_) if $self->tx->is_websocket;
   Mojo::IOLoop->one_tick while !$self->{finished};
   return $self->_test('ok', 1, 'closed WebSocket');
 }
@@ -258,9 +258,13 @@ sub reset_session {
 
 sub send_ok {
   my ($self, $msg, $desc) = @_;
+
+  $desc ||= 'send message';
+  return $self->_test('ok', 0, $desc) unless $self->tx->is_websocket;
+
   $self->tx->send($msg => sub { Mojo::IOLoop->stop });
   Mojo::IOLoop->start;
-  return $self->_test('ok', 1, $desc || 'send message');
+  return $self->_test('ok', 1, $desc);
 }
 
 sub status_is {
@@ -328,7 +332,7 @@ sub _message {
   }
 
   # Decode text frame if there is no type check
-  else { $msg = decode 'UTF-8', $msg if $type eq 'text' }
+  else { $msg = decode 'UTF-8', $msg if ($type // '') eq 'text' }
 
   return $self->_test($name, $msg // '', $value, $desc);
 }
@@ -344,7 +348,7 @@ sub _request_ok {
     $self->ua->start(
       $tx => sub {
         my ($ua, $tx) = @_;
-        $self->tx($tx);
+        $self->{finished} = [] unless $self->tx($tx)->tx->is_websocket;
         $tx->on(finish => sub { shift; $self->{finished} = [@_] });
         $tx->on(binary => sub { push @{$self->{messages}}, [binary => pop] });
         $tx->on(text   => sub { push @{$self->{messages}}, [text   => pop] });
@@ -353,7 +357,7 @@ sub _request_ok {
     );
     Mojo::IOLoop->start;
 
-    my $desc = encode 'UTF-8', "WebSocket $url";
+    my $desc = encode 'UTF-8', "WebSocket handshake with $url";
     return $self->_test('ok', $self->tx->is_websocket, $desc);
   }
 
@@ -421,7 +425,16 @@ Test::Mojo - Testing Mojo!
 =head1 DESCRIPTION
 
 L<Test::Mojo> is a test user agent based on L<Mojo::UserAgent>, it is usually
-used together with L<Test::More> to test L<Mojolicious> applications.
+used together with L<Test::More> to test L<Mojolicious> applications. Just run
+your tests with the command L<Mojolicious::Command::test> or L<prove>.
+
+  $ ./script/my_app test
+  $ ./script/my_app test -v t/foo.t
+  $ prove -l -v t/foo.t
+
+If it is not already defined, the C<MOJO_LOG_LEVEL> environment variable will
+be set to C<debug> or C<fatal>, depending on the value of the
+C<HARNESS_IS_VERBOSE> environment variable.
 
 =head1 ATTRIBUTES
 
@@ -471,7 +484,8 @@ True if the last test was successful.
   my $tx = $t->tx;
   $t     = $t->tx(Mojo::Transaction::HTTP->new);
 
-Current transaction, usually a L<Mojo::Transaction::HTTP> object.
+Current transaction, usually a L<Mojo::Transaction::HTTP> or
+L<Mojo::Transaction::WebSocket> object.
 
   # More specific tests
   is $t->tx->res->json->{foo}, 'bar', 'right value';
@@ -976,7 +990,7 @@ Open a WebSocket connection with transparent handshake, takes the same
 arguments as L<Mojo::UserAgent/"websocket">, except for the callback.
 
   # WebSocket with permessage-deflate compression
-  $t->websocket('/x' => {'Sec-WebSocket-Extensions' => 'permessage-deflate'})
+  $t->websocket_ok('/' => {'Sec-WebSocket-Extensions' => 'permessage-deflate'})
     ->send_ok('y' x 50000)
     ->message_ok
     ->message_is('z' x 50000)
