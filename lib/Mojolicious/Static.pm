@@ -134,7 +134,7 @@ sub _get_data_file {
 sub _get_file {
   my ($self, $path) = @_;
   no warnings 'newline';
-  return -f $path && -r $path ? Mojo::Asset::File->new(path => $path) : undef;
+  return -f $path && -r _ ? Mojo::Asset::File->new(path => $path) : undef;
 }
 
 sub _warmup {
@@ -210,8 +210,9 @@ Serve static file for L<Mojolicious::Controller> object.
   my $asset = $static->file('../lib/MyApp.pm');
 
 Build L<Mojo::Asset::File> or L<Mojo::Asset::Memory> object for a file,
-relative to L</"paths"> or from L</"classes">. Note that this method does not
-protect from traversing to parent directories.
+relative to L</"paths"> or from L</"classes">, or return C<undef> if it
+doesn't exist. Note that this method does not protect from traversing to
+parent directories.
 
   my $content = $static->file('foo/bar.html')->slurp;
 
