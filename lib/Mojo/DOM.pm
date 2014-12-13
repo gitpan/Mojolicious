@@ -10,7 +10,6 @@ use overload
 # "Fry: This snow is beautiful. I'm glad global warming never happened.
 #  Leela: Actually, it did. But thank God nuclear winter canceled it out."
 use Carp 'croak';
-use List::Util 'first';
 use Mojo::Collection;
 use Mojo::DOM::CSS;
 use Mojo::DOM::HTML;
@@ -42,13 +41,12 @@ sub all_text { shift->_all_text(1, @_) }
 sub ancestors { _select($_[0]->_collect($_[0]->_ancestors), $_[1]) }
 
 sub append { shift->_add(1, @_) }
-
 sub append_content { shift->_content(1, 0, @_) }
 
 sub at {
   my $self = shift;
   return undef unless my $result = $self->_css->select_one(@_);
-  return _build($self, $result, $self->xml);
+  return $self->_build($result, $self->xml);
 }
 
 sub attr {
@@ -69,11 +67,7 @@ sub attr {
   return $self;
 }
 
-sub children {
-  my $self = shift;
-  return _select(
-    $self->_collect(grep { $_->[0] eq 'tag' } _nodes($self->tree)), @_);
-}
+sub children { _select($_[0]->_collect(_nodes($_[0]->tree, 1)), $_[1]) }
 
 sub content {
   my $self = shift;
@@ -93,6 +87,9 @@ sub content {
 sub contents { $_[0]->_collect(_nodes($_[0]->tree)) }
 
 sub find { $_[0]->_collect(@{$_[0]->_css->select($_[1])}) }
+
+sub following { _select($_[0]->_collect(@{$_[0]->_siblings(1)->[1]}), $_[1]) }
+sub following_siblings { $_[0]->_collect(@{$_[0]->_siblings->[1]}) }
 
 sub match { $_[0]->_css->match($_[1]) ? $_[0] : undef }
 
@@ -122,41 +119,48 @@ sub new {
   return @_ ? $self->parse(@_) : $self;
 }
 
-sub next         { _maybe($_[0], $_[0]->_siblings(1)->[1]) }
-sub next_sibling { _maybe($_[0], $_[0]->_siblings->[1]) }
+sub next         { $_[0]->_maybe($_[0]->_siblings(1, 0)->[1]) }
+sub next_sibling { $_[0]->_maybe($_[0]->_siblings(0, 0)->[1]) }
 
 sub node { shift->tree->[0] }
 
 sub parent {
   my $self = shift;
   return undef if $self->tree->[0] eq 'root';
-  return _build($self, $self->_parent, $self->xml);
+  return $self->_build($self->_parent, $self->xml);
 }
 
-sub parse { shift->_delegate(parse => shift) }
+sub parse { shift->_delegate(parse => @_) }
+
+sub preceding { _select($_[0]->_collect(@{$_[0]->_siblings(1)->[0]}), $_[1]) }
+sub preceding_siblings { $_[0]->_collect(@{$_[0]->_siblings->[0]}) }
 
 sub prepend { shift->_add(0, @_) }
-
 sub prepend_content { shift->_content(0, 0, @_) }
 
-sub previous         { _maybe($_[0], $_[0]->_siblings(1)->[0]) }
-sub previous_sibling { _maybe($_[0], $_[0]->_siblings->[0]) }
+sub previous         { $_[0]->_maybe($_[0]->_siblings(1, -1)->[0]) }
+sub previous_sibling { $_[0]->_maybe($_[0]->_siblings(0, -1)->[0]) }
 
 sub remove { shift->replace('') }
 
 sub replace {
   my ($self, $new) = @_;
   return $self->parse($new) if (my $tree = $self->tree)->[0] eq 'root';
-  return $self->_replace($self->_parent, $tree, $self->_parse("$new"));
+  return $self->_replace($self->_parent, $tree, $self->_parse($new));
 }
 
 sub root {
   my $self = shift;
   return $self unless my $tree = $self->_ancestors(1);
-  return _build($self, $tree, $self->xml);
+  return $self->_build($tree, $self->xml);
 }
 
-sub siblings { _select($_[0]->_collect(@{_siblings($_[0], 1, 1)}), $_[1]) }
+# DEPRECATED in Tiger Face!
+sub siblings {
+  deprecated 'Mojo::DOM::siblings is DEPRECATED';
+  my $siblings = $_[0]->_siblings(1);
+  return _select($_[0]->_collect(@{$siblings->[0]}, @{$siblings->[1]}), $_[1]);
+}
 
 sub strip {
   my $self = shift;
@@ -213,7 +217,7 @@ sub _add {
 
   my $parent = $self->_parent;
   splice @$parent, _offset($parent, $tree) + $offset, 0,
-    _link($self->_parse("$new"), $parent);
+    _link($self->_parse($new), $parent);
 
   return $self;
 }
@@ -252,7 +256,7 @@ sub _build { shift->new->tree(shift)->xml(shift) }
 sub _collect {
   my $self = shift;
   my $xml  = $self->xml;
-  return Mojo::Collection->new(map { _build($self, $_, $xml) } @_);
+  return Mojo::Collection->new(map { $self->_build($_, $xml) } @_);
 }
 
 sub _content {
@@ -266,7 +270,7 @@ sub _content {
 
   $start  = $start  ? ($#$tree + 1) : _start($tree);
   $offset = $offset ? $#$tree       : 0;
-  splice @$tree, $start, $offset, _link($self->_parse("$new"), $tree);
+  splice @$tree, $start, $offset, _link($self->_parse($new), $tree);
 
   return $self;
 }
@@ -295,11 +299,12 @@ sub _link {
   return @new;
 }
 
-sub _maybe { $_[1] ? _build($_[0], $_[1], $_[0]->xml) : undef }
+sub _maybe { $_[1] ? $_[0]->_build($_[1], $_[0]->xml) : undef }
 
 sub _nodes {
   return unless my $tree = shift;
-  return @$tree[_start($tree) .. $#$tree];
+  my @nodes = @$tree[_start($tree) .. $#$tree];
+  return shift() ? grep { $_->[0] eq 'tag' } @nodes : @nodes;
 }
 
 sub _offset {
@@ -326,7 +331,7 @@ sub _select {
 }
 
 sub _siblings {
-  my ($self, $tags, $all) = @_;
+  my ($self, $tags, $i) = @_;
 
   return [] unless my $parent = $self->parent;
 
@@ -338,7 +343,7 @@ sub _siblings {
     $match ? push @after, $node : push @before, $node;
   }
 
-  return $all ? [@before, @after] : [$before[-1], $after[0]];
+  return defined $i ? [$before[$i], $after[$i]] : [\@before, \@after];
 }
 
 sub _start { $_[0][0] eq 'root' ? 1 : 4 }
@@ -388,8 +393,8 @@ sub _wrap {
 
   # Find innermost tag
   my $current;
-  my $first = $new = $self->_parse("$new");
-  $current = $first while $first = first { $_->[0] eq 'tag' } _nodes($first);
+  my $first = $new = $self->_parse($new);
+  $current = $first while $first = (_nodes($first, 1))[0];
   return $self unless $current;
 
   # Wrap content
@@ -635,6 +640,29 @@ All selectors from L<Mojo::DOM::CSS/"SELECTORS"> are supported.
   # Find elements with a class that contains dots
   my @divs = $dom->find('div.foo\.bar')->each;
 
+=head2 following
+
+  my $collection = $dom->following;
+  my $collection = $dom->following('div > p');
+
+Find all sibling elements after this node matching the CSS selector and return
+a L<Mojo::Collection> object containing these elements as L<Mojo::DOM>
+objects. All selectors from L<Mojo::DOM::CSS/"SELECTORS"> are supported.
+
+  # List types of sibling elements after this node
+  say $dom->following->map('type')->join("\n");
+
+=head2 following_siblings
+
+  my $collection = $dom->following_siblings;
+
+Return a L<Mojo::Collection> object containing the sibling nodes after this
+node as L<Mojo::DOM> objects.
+
+  # "C"
+  $dom->parse('<p>A</p><!-- B -->C')
+    ->at('p')->following_siblings->last->content;
+
 =head2 match
 
   my $result = $dom->match('html title');
@@ -710,6 +738,29 @@ Parse HTML/XML fragment with L<Mojo::DOM::HTML>.
 
   # Parse XML
   my $dom = Mojo::DOM->new->xml(1)->parse($xml);
+
+=head2 preceding
+
+  my $collection = $dom->preceding;
+  my $collection = $dom->preceding('div > p');
+
+Find all sibling elements before this node matching the CSS selector and
+return a L<Mojo::Collection> object containing these elements as L<Mojo::DOM>
+objects. All selectors from L<Mojo::DOM::CSS/"SELECTORS"> are supported.
+
+  # List types of sibling elements before this node
+  say $dom->preceding->map('type')->join("\n");
+
+=head2 preceding_siblings
+
+  my $collection = $dom->preceding_siblings;
+
+Return a L<Mojo::Collection> object containing the sibling nodes before this
+node as L<Mojo::DOM> objects.
+
+  # "A"
+  $dom->parse('A<!-- B --><p>C</p>')
+    ->at('p')->preceding_siblings->first->content;
 
 =head2 prepend
 
@@ -797,18 +848,6 @@ Replace this node with HTML/XML fragment and return L</"parent">.
   my $root = $dom->root;
 
 Return L<Mojo::DOM> object for root node.
-
-=head2 siblings
-
-  my $collection = $dom->siblings;
-  my $collection = $dom->siblings('div > p');
-
-Find all sibling elements of this node matching the CSS selector and return a
-L<Mojo::Collection> object containing these elements as L<Mojo::DOM> objects.
-All selectors from L<Mojo::DOM::CSS/"SELECTORS"> are supported.
-
-  # List types of sibling elements
-  say $dom->siblings->map('type')->join("\n");
 
 =head2 strip
 

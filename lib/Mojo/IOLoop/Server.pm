@@ -100,6 +100,8 @@ sub listen {
   $tls->{SSL_cipher_list} = $args->{tls_ciphers} if $args->{tls_ciphers};
 }
 
+sub port { shift->{handle}->sockport }
+
 sub start {
   my $self = shift;
   weaken $self;
@@ -243,7 +245,7 @@ These options are currently available:
 
   address => '127.0.0.1'
 
-Local address to listen on, defaults to all.
+Local address to listen on, defaults to C<0.0.0.0>.
 
 =item backlog
 
@@ -301,6 +303,12 @@ Path to the TLS key file, defaults to a built-in test key.
 TLS verification mode, defaults to C<0x03>.
 
 =back
+
+=head2 port
+
+  my $port = $server->port;
+
+Get port this server is listening on.
 
 =head2 start
 

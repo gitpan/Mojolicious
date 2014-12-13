@@ -39,8 +39,7 @@ my $TOKEN_RE = qr/
     |
       \?(.*?)\?                                       # Processing Instruction
     |
-      (\s*[^<>\s]+                                    # Tag
-      \s*(?:(?:$ATTR_RE){0,32766})*+)                 # Attributes
+      \s*([^<>\s]+\s*(?:(?:$ATTR_RE){0,32766})*+)     # Tag
     )>
   |
     (<)                                               # Runaway "<"
@@ -102,7 +101,7 @@ my %BLOCK = map { $_ => 1 } (
 );
 
 sub parse {
-  my ($self, $html) = @_;
+  my ($self, $html) = (shift, "$_[0]");
 
   my $xml = $self->xml;
   my $current = my $tree = ['root'];
@@ -118,10 +117,10 @@ sub parse {
     if (defined $tag) {
 
       # End
-      if ($tag =~ /^\s*\/\s*(.+)/) { _end($xml ? $1 : lc $1, $xml, \$current) }
+      if ($tag =~ /^\/\s*(\S+)/) { _end($xml ? $1 : lc $1, $xml, \$current) }
 
       # Start
-      elsif ($tag =~ m!([^\s/]+)([\s\S]*)!) {
+      elsif ($tag =~ m!^([^\s/]+)([\s\S]*)!) {
         my ($start, $attr) = ($xml ? $1 : lc $1, $2);
 
         # Attributes

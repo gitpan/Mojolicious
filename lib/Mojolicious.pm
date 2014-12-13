@@ -43,7 +43,7 @@ has types     => sub { Mojolicious::Types->new };
 has validator => sub { Mojolicious::Validator->new };
 
 our $CODENAME = 'Tiger Face';
-our $VERSION  = '5.68';
+our $VERSION  = '5.69';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -158,9 +158,6 @@ sub new {
   $r->hide(qw(render_not_found render_to_string rendered req res respond_to));
   $r->hide(qw(send session signed_cookie stash tx url_for validation write));
   $r->hide(qw(write_chunk));
-
-  # DEPRECATED in Tiger Face!
-  $r->hide('render_static');
 
   # Check if we have a log directory that is writable
   my $mode = $self->mode;

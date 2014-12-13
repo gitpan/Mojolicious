@@ -45,9 +45,9 @@ is $tx->res->body, 'Hello TestApp!', 'right content';
 {
   is_deeply(Mojo::Server::Daemon->new->listen,
     ['http://*:3000'], 'right value');
-  local $ENV{MOJO_LISTEN} = 'http://localhost:8080';
+  local $ENV{MOJO_LISTEN} = 'http://127.0.0.1:8080';
   is_deeply(Mojo::Server::Daemon->new->listen,
-    ['http://localhost:8080'], 'right value');
+    ['http://127.0.0.1:8080'], 'right value');
   $ENV{MOJO_LISTEN} = 'http://*:80,https://*:443';
   is_deeply(
     Mojo::Server::Daemon->new->listen,
@@ -229,7 +229,7 @@ ok $remote_port > 0, 'has remote port';
 my $daemon
   = Mojo::Server::Daemon->new(listen => ['http://127.0.0.1'], silent => 1);
 $daemon->start;
-my $port = Mojo::IOLoop->acceptor($daemon->acceptors->[0])->handle->sockport;
+my $port = Mojo::IOLoop->acceptor($daemon->acceptors->[0])->port;
 is $daemon->app->moniker, 'HelloWorld', 'right moniker';
 my $buffer = '';
 my $id;

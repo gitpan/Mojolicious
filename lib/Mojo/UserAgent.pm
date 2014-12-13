@@ -70,7 +70,7 @@ sub websocket {
 
 sub _cleanup {
   my $self = shift;
-  return unless my $loop = $self->_loop(0);
+  return $self unless my $loop = $self->_loop(0);
 
   # Clean up active connections (by closing them)
   delete $self->{pid};
@@ -78,7 +78,7 @@ sub _cleanup {
 
   # Clean up keep-alive connections
   $loop->remove($_->[1]) for @{delete $self->{queue} || []};
-  $loop = $self->_loop(1);
+  return $self unless $loop = $self->_loop(1);
   $loop->remove($_->[1]) for @{delete $self->{nb_queue} || []};
 
   return $self;
@@ -442,7 +442,7 @@ safely.
 
 For better scalability (epoll, kqueue) and to provide non-blocking name
 resolution, SOCKS5 as well as TLS support, the optional modules L<EV> (4.0+),
-L<Net::DNS::Native> (0.12+), L<IO::Socket::Socks> (0.64+) and
+L<Net::DNS::Native> (0.14+), L<IO::Socket::Socks> (0.64+) and
 L<IO::Socket::SSL> (1.84+) will be used automatically if they are installed.
 Individual features can also be disabled with the C<MOJO_NO_NDN>,
 C<MOJO_NO_SOCKS> and C<MOJO_NO_TLS> environment variables.

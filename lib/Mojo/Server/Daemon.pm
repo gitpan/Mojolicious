@@ -266,7 +266,7 @@ and multiple event loop support.
 
 For better scalability (epoll, kqueue) and to provide non-blocking name
 resolution, SOCKS5 as well as TLS support, the optional modules L<EV> (4.0+),
-L<Net::DNS::Native> (0.12+), L<IO::Socket::Socks> (0.64+) and
+L<Net::DNS::Native> (0.14+), L<IO::Socket::Socks> (0.64+) and
 L<IO::Socket::SSL> (1.84+) will be used automatically if they are installed.
 Individual features can also be disabled with the C<MOJO_NO_NDN>,
 C<MOJO_NO_SOCKS> and C<MOJO_NO_TLS> environment variables.
@@ -317,10 +317,11 @@ L<Mojo::IOLoop> singleton.
 =head2 listen
 
   my $listen = $daemon->listen;
-  $daemon    = $daemon->listen(['https://localhost:3000']);
+  $daemon    = $daemon->listen(['https://127.0.0.1:8080']);
 
 List of one or more locations to listen on, defaults to the value of the
-C<MOJO_LISTEN> environment variable or C<http://*:3000>.
+C<MOJO_LISTEN> environment variable or C<http://*:3000> (shortcut for
+C<http://0.0.0.0:3000>).
 
   # Listen on all IPv4 interfaces
   $daemon->listen(['http://*:3000']);
@@ -431,7 +432,7 @@ Start accepting connections.
 
   # Listen on random port
   my $id   = $daemon->listen(['http://127.0.0.1'])->start->acceptors->[0];
-  my $port = $daemon->ioloop->acceptor($id)->handle->sockport;
+  my $port = $daemon->ioloop->acceptor($id)->port;
 
 =head2 stop
 

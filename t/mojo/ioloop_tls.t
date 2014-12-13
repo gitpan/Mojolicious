@@ -10,26 +10,24 @@ plan skip_all => 'set TEST_TLS to enable this test (developer only!)'
 plan skip_all => 'IO::Socket::SSL 1.84 required for this test!'
   unless Mojo::IOLoop::Server::TLS;
 
-# To regenerate all required certificates run these commands (18.04.2012)
+# To regenerate all required certificates run these commands (12.12.2014)
 # openssl genrsa -out ca.key 1024
 # openssl req -new -key ca.key -out ca.csr -subj "/C=US/CN=ca"
 # openssl req -x509 -days 7300 -key ca.key -in ca.csr -out ca.crt
 #
 # openssl genrsa -out server.key 1024
-# openssl req -new -key server.key -out server.csr -subj "/C=US/CN=localhost"
+# openssl req -new -key server.key -out server.csr -subj "/C=US/CN=127.0.0.1"
 # openssl x509 -req -days 7300 -in server.csr -out server.crt -CA ca.crt \
 #   -CAkey ca.key -CAcreateserial
 #
 # openssl genrsa -out client.key 1024
-# openssl req -new -key client.key -out client.csr -subj "/C=US/CN=localhost"
+# openssl req -new -key client.key -out client.csr -subj "/C=US/CN=127.0.0.1"
 # openssl x509 -req -days 7300 -in client.csr -out client.crt -CA ca.crt \
 #   -CAkey ca.key -CAcreateserial
 #
-# openssl genrsa -out badclient.key 1024
-# openssl req -new -key badclient.key -out badclient.csr \
-#   -subj "/C=US/CN=badclient"
-# openssl req -x509 -days 7300 -key badclient.key -in badclient.csr \
-#   -out badclient.crt
+# openssl genrsa -out bad.key 1024
+# openssl req -new -key bad.key -out bad.csr -subj "/C=US/CN=bad"
+# openssl req -x509 -days 7300 -key bad.key -in bad.csr -out bad.crt
 use Mojo::IOLoop;
 
 # Built-in certificate
@@ -45,7 +43,7 @@ my $id  = $loop->server(
     $stream->on(read => sub { $server .= pop });
   }
 );
-my $port = $loop->acceptor($id)->handle->sockport;
+my $port = $loop->acceptor($id)->port;
 my $end2 = $delay->begin;
 $loop->client(
   {port => $port, tls => 1} => sub {
@@ -88,7 +86,7 @@ $id  = Mojo::IOLoop->server(
     $stream->timeout(0.5);
   }
 );
-$port = Mojo::IOLoop->acceptor($id)->handle->sockport;
+$port = Mojo::IOLoop->acceptor($id)->port;
 $end2 = $delay->begin;
 Mojo::IOLoop->client(
   port     => $port,
@@ -122,8 +120,8 @@ my $client_err;
 Mojo::IOLoop->client(
   port     => $port,
   tls      => 1,
-  tls_cert => 't/mojo/certs/badclient.crt',
-  tls_key  => 't/mojo/certs/badclient.key',
+  tls_cert => 't/mojo/certs/bad.crt',
+  tls_key  => 't/mojo/certs/bad.key',
   sub {
     shift->stop;
     $client_err = shift;
@@ -155,7 +153,7 @@ $id = $loop->server(
   tls_key  => 't/mojo/certs/server.key',
   sub { $server_err = 'accepted' }
 );
-$port = $loop->acceptor($id)->handle->sockport;
+$port = $loop->acceptor($id)->port;
 $loop->client(
   port     => $port,
   tls      => 1,
@@ -195,7 +193,7 @@ $id  = Mojo::IOLoop->server(
     $stream->on(read => sub { $server .= pop });
   }
 );
-$port = Mojo::IOLoop->acceptor($id)->handle->sockport;
+$port = Mojo::IOLoop->acceptor($id)->port;
 $end2 = $delay->begin;
 Mojo::IOLoop->client(
   port     => $port,
@@ -232,11 +230,11 @@ $loop = Mojo::IOLoop->new;
 $id = $loop->server(
   address  => '127.0.0.1',
   tls      => 1,
-  tls_cert => 't/mojo/certs/badclient.crt',
-  tls_key  => 't/mojo/certs/badclient.key',
+  tls_cert => 't/mojo/certs/bad.crt',
+  tls_key  => 't/mojo/certs/bad.key',
   sub { $server_err = 'accepted' }
 );
-$port = $loop->acceptor($id)->handle->sockport;
+$port = $loop->acceptor($id)->port;
 $loop->client(
   port   => $port,
   tls    => 1,
@@ -256,11 +254,11 @@ $loop = Mojo::IOLoop->new;
 $id = $loop->server(
   address  => '127.0.0.1',
   tls      => 1,
-  tls_cert => 't/mojo/certs/server.crt',
-  tls_key  => 't/mojo/certs/server.key',
+  tls_cert => 't/mojo/certs/bad.crt',
+  tls_key  => 't/mojo/certs/bad.key',
   sub { $server_err = 'accepted' }
 );
-$port = $loop->acceptor($id)->handle->sockport;
+$port = $loop->acceptor($id)->port;
 $loop->client(
   address => '127.0.0.1',
   port    => $port,
@@ -281,11 +279,11 @@ $loop = Mojo::IOLoop->new;
 $id = $loop->server(
   address  => '127.0.0.1',
   tls      => 1,
-  tls_cert => 't/mojo/certs/badclient.crt',
-  tls_key  => 't/mojo/certs/badclient.key',
+  tls_cert => 't/mojo/certs/bad.crt',
+  tls_key  => 't/mojo/certs/bad.key',
   sub { $server_err = 'accepted' }
 );
-$port = $loop->acceptor($id)->handle->sockport;
+$port = $loop->acceptor($id)->port;
 $loop->client(
   port   => $port,
   tls    => 1,
@@ -317,12 +315,12 @@ $id = $loop->server(
     $server = 'accepted';
   }
 );
-$port = $loop->acceptor($id)->handle->sockport;
+$port = $loop->acceptor($id)->port;
 $loop->client(
   port     => $port,
   tls      => 1,
-  tls_cert => 't/mojo/certs/badclient.crt',
-  tls_key  => 't/mojo/certs/badclient.key',
+  tls_cert => 't/mojo/certs/bad.crt',
+  tls_key  => 't/mojo/certs/bad.key',
   sub {
     my ($loop, $err, $stream) = @_;
     $stream->timeout(0.5);
@@ -348,7 +346,7 @@ $id = Mojo::IOLoop->server(
   tls_verify => 0x01,
   sub { $server = 'accepted' }
 );
-$port = Mojo::IOLoop->acceptor($id)->handle->sockport;
+$port = Mojo::IOLoop->acceptor($id)->port;
 Mojo::IOLoop->client(
   {port => $port, tls => 1} => sub {
     shift->stop;

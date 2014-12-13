@@ -322,7 +322,7 @@ is loaded.
 
 For better scalability (epoll, kqueue) and to provide non-blocking name
 resolution, SOCKS5 as well as TLS support, the optional modules L<EV> (4.0+),
-L<Net::DNS::Native> (0.12+), L<IO::Socket::Socks> (0.64+) and
+L<Net::DNS::Native> (0.14+), L<IO::Socket::Socks> (0.64+) and
 L<IO::Socket::SSL> (1.84+) will be used automatically if they are installed.
 Individual features can also be disabled with the C<MOJO_NO_NDN>,
 C<MOJO_NO_SOCKS> and C<MOJO_NO_TLS> environment variables.
@@ -436,7 +436,7 @@ Get L<Mojo::IOLoop::Server> object for id or turn object into an acceptor.
 Open TCP connection with L<Mojo::IOLoop::Client>, takes the same arguments as
 L<Mojo::IOLoop::Client/"connect">.
 
-  # Connect to localhost on port 3000
+  # Connect to 127.0.0.1 on port 3000
   Mojo::IOLoop->client({port => 3000} => sub {
     my ($loop, $err, $stream) = @_;
     ...
@@ -588,7 +588,7 @@ as L<Mojo::IOLoop::Server/"listen">.
     my ($loop, $stream, $id) = @_;
     ...
   });
-  my $port = Mojo::IOLoop->acceptor($id)->handle->sockport;
+  my $port = Mojo::IOLoop->acceptor($id)->port;
 
 =head2 singleton
 

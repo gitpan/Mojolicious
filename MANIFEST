@@ -181,8 +181,8 @@ t/mojo/asset.t
 t/mojo/base.t
 t/mojo/bytestream.t
 t/mojo/cache.t
-t/mojo/certs/badclient.crt
-t/mojo/certs/badclient.key
+t/mojo/certs/bad.crt
+t/mojo/certs/bad.key
 t/mojo/certs/ca.crt
 t/mojo/certs/ca.key
 t/mojo/certs/client.crt
