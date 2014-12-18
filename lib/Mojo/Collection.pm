@@ -150,8 +150,8 @@ Mojo::Collection - Collection
 
   # Chain methods
   $collection->map(sub { ucfirst })->shuffle->each(sub {
-    my ($word, $count) = @_;
-    say "$count: $word";
+    my ($word, $num) = @_;
+    say "$num: $word";
   });
 
   # Use the alternative constructor
@@ -189,6 +189,9 @@ L<Mojo::Collection> implements the following methods.
 Create a new collection with all elements that are defined and not an empty
 string.
 
+  # "0, 1, 2, 3"
+  Mojo::Collection->new(0, 1, undef, 2, '', 3)->compact->join(', ');
+
 =head2 each
 
   my @elements = $collection->each;
@@ -200,8 +203,8 @@ to the callback and is also available as C<$_>.
 
   # Make a numbered list
   $collection->each(sub {
-    my ($e, $count) = @_;
-    say "$count: $e";
+    my ($e, $num) = @_;
+    say "$num: $e";
   });
 
 =head2 first
@@ -215,6 +218,9 @@ return the first one that matched the regular expression, or for which the
 callback returned true. The element will be the first argument passed to the
 callback and is also available as C<$_>.
 
+  # Find first value that contains the word "mojo"
+  my $interesting = $collection->first(qr/mojo/i);
+
   # Find first value that is greater than 5
   my $greater = $collection->first(sub { $_ > 5 });
 
@@ -224,6 +230,9 @@ callback and is also available as C<$_>.
 
 Flatten nested collections/arrays recursively and create a new collection with
 all elements.
+
+  # "1, 2, 3, 4, 5, 6, 7"
+  Mojo::Collection->new(1, [2, [3, 4], 5, [6]], 7)->flatten->join(', ');
 
 =head2 grep
 
@@ -237,6 +246,9 @@ argument passed to the callback and is also available as C<$_>.
 
   # Find all values that contain the word "mojo"
   my $interesting = $collection->grep(qr/mojo/i);
+
+  # Find all values that are greater than 5
+  my $greater = $collection->grep(sub { $_ > 5 });
 
 =head2 join
 
@@ -302,6 +314,9 @@ Create a new collection with all elements in reverse order.
 
 Create a new collection with all selected elements.
 
+  # "B C E"
+  Mojo::Collection->new('A', 'B', 'C', 'D', 'E')->slice(1, 2, 4)->join(' ');
+
 =head2 shuffle
 
   my $new = $collection->shuffle;
@@ -342,6 +357,9 @@ Turn collection into array reference.
   my $new = $collection->uniq;
 
 Create a new collection without duplicate elements.
+
+  # "foo bar baz"
+  Mojo::Collection->new('foo', 'bar', 'bar', 'baz')->uniq->join(' ');
 
 =head1 SEE ALSO
 
