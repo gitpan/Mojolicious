@@ -44,7 +44,7 @@ L<Mojo::Server::Daemon/"listen">.
 
 On UNIX platforms you can also add preforking and switch to a multi-process
 architecture with L<Mojolicious::Command::prefork>, to take advantage of
-multiple CPU cores and copy-on-write.
+multiple CPU cores and copy-on-write memory management.
 
   $ ./script/my_app prefork
   Server available at http://127.0.0.1:3000.
@@ -92,8 +92,8 @@ used during development.
 
 For bigger applications L<Mojolicious> contains the UNIX optimized preforking
 web server L<Mojo::Server::Hypnotoad>, which can take advantage of multiple
-CPU cores and copy-on-write to scale up to thousands of concurrent client
-connections.
+CPU cores and copy-on-write memory management to scale up to thousands of
+concurrent client connections.
 
   Mojo::Server::Hypnotoad
   |- Mojo::Server::Daemon [1]
@@ -410,6 +410,8 @@ latency backend web services.
       % }
     </body>
   </html>
+
+=head2 Synchronizing events
 
 Multiple events such as concurrent requests can be easily synchronized with
 L<Mojolicious::Plugin::DefaultHelpers/"delay">, which can help you avoid deep
@@ -784,8 +786,8 @@ which can be combined to solve some of hardest problems in web development.
 =head2 Event loops
 
 Internally the L<Mojo::IOLoop> event loop can use multiple reactor backends,
-L<EV> for example will be automatically used if installed. Which in turn
-allows other event loops like L<AnyEvent> to just work.
+L<EV> for example will be automatically used if possible. Which in turn allows
+other event loops like L<AnyEvent> to just work.
 
   use Mojolicious::Lite;
   use EV;

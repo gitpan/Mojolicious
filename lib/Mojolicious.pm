@@ -43,7 +43,7 @@ has types     => sub { Mojolicious::Types->new };
 has validator => sub { Mojolicious::Validator->new };
 
 our $CODENAME = 'Tiger Face';
-our $VERSION  = '5.70';
+our $VERSION  = '5.71';
 
 sub AUTOLOAD {
   my $self = shift;
@@ -522,6 +522,12 @@ L<Mojolicious::Types> object.
 
 Validate parameters, defaults to a L<Mojolicious::Validator> object.
 
+  # Add validation check
+  $app->validator->add_check(foo => sub {
+    my ($validation, $name, $value) = @_;
+    return $value ne 'foo';
+  });
+
 =head1 METHODS
 
 L<Mojolicious> inherits all methods from L<Mojo> and implements the following
@@ -679,7 +685,7 @@ that have been bundled for internal use.
 
 =head2 Mojolicious Artwork
 
-  Copyright (C) 2010-2014, Sebastian Riedel.
+  Copyright (C) 2010-2015, Sebastian Riedel.
 
 Licensed under the CC-SA License, Version 4.0
 L<http://creativecommons.org/licenses/by-sa/4.0>.
@@ -1011,7 +1017,7 @@ Zak B. Elep
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2008-2014, Sebastian Riedel.
+Copyright (C) 2008-2015, Sebastian Riedel.
 
 This program is free software, you can redistribute it and/or modify it under
 the terms of the Artistic License version 2.0.
